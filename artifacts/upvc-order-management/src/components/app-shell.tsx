@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, ChevronRight, LogOut, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, LogOut, Menu, X } from 'lucide-react';
 import type { User } from '@workspace/api-client-react';
 import { getGetAuthSessionQueryKey, useLogout } from '@workspace/api-client-react';
 import { SidebarSectionIcon, type SidebarIconName } from '@/components/sidebar-icons';
@@ -26,14 +26,41 @@ const iconMap: Record<string, SidebarIconName> = {
 };
 
 const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : `/${key}`;
+const isModuleActive = (key: string, location: string) =>
+  key === 'user-access'
+    ? location.startsWith('/admin/users') || location.startsWith('/admin/roles')
+    : location.startsWith(pathForModule(key));
+
+const navigationGroups: { id: string; label: string; icon: SidebarIconName; moduleKeys: string[] }[] = [
+  { id: 'management', label: 'Admin & reports', icon: 'user-access', moduleKeys: ['user-access', 'reporting'] },
+  { id: 'orders', label: 'Sales & orders', icon: 'order-hub', moduleKeys: ['order-hub', 'quotation-builder', 'rate-approval', 'confirmation'] },
+  { id: 'production', label: 'Production', icon: 'measurements', moduleKeys: ['measurements', 'qr-assembly', 'window-readiness', 'glass-procurement'] },
+  { id: 'finance', label: 'Finance', icon: 'payments', moduleKeys: ['payments', 'balance-payment'] },
+  { id: 'fulfillment', label: 'Fulfillment', icon: 'dispatch', moduleKeys: ['dispatch', 'installation'] },
+];
 
 export function AppShell({ user, children, title, eyebrow }: { user: User; children: React.ReactNode; title: string; eyebrow?: string }) {
+  const [location, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [location, setLocation] = useLocation();
+  const [openGroups, setOpenGroups] = useState<string[]>(() =>
+    navigationGroups
+      .filter((group) => group.moduleKeys.some((key) => isModuleActive(key, location)))
+      .map((group) => group.id),
+  );
   const queryClient = useQueryClient();
   const logout = useLogout();
   const isMasterAdmin = user.roleId === 'master-admin';
+
+  useEffect(() => {
+    const activeGroup = navigationGroups.find((group) =>
+      group.moduleKeys.some((key) => isModuleActive(key, location)),
+    );
+    if (!activeGroup) return;
+    setOpenGroups((current) =>
+      current.includes(activeGroup.id) ? current : [...current, activeGroup.id],
+    );
+  }, [location]);
 
   const signOut = () => {
     logout.mutate(undefined, {
@@ -42,6 +69,64 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
         setLocation('/');
       },
     });
+  };
+
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups((current) =>
+      current.includes(groupId)
+        ? current.filter((id) => id !== groupId)
+        : [...current, groupId],
+    );
+  };
+
+  const renderModuleLink = (module: (typeof MODULES)[number]) => {
+    const iconName = iconMap[module.key] || 'overview';
+    const path = pathForModule(module.key);
+    const active = isModuleActive(module.key, location);
+    const itemClass = `flex h-10 min-w-0 items-center rounded-lg text-sm transition-colors ${
+      collapsed ? 'justify-center px-0' : 'gap-3 px-3'
+    }`;
+
+    if (!module.built) {
+      return (
+        <div
+          key={module.key}
+          className={`${itemClass} text-sidebar-foreground/38`}
+          title={`${module.label} — Coming Soon`}
+          aria-disabled="true"
+          data-testid={`nav-coming-soon-${module.key}`}
+        >
+          <SidebarSectionIcon name={iconName} size={32} className="shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="min-w-0 flex-1 truncate whitespace-nowrap">{module.short}</span>
+              <span className="shrink-0 text-[9px] uppercase tracking-wide text-sidebar-foreground/35">Soon</span>
+            </>
+          )}
+          {collapsed && <span className="sr-only">{module.short} — Coming Soon</span>}
+        </div>
+      );
+    }
+
+    return (
+      <Link
+        key={module.key}
+        href={path}
+        onClick={() => setMobileOpen(false)}
+        title={collapsed ? module.short : module.label}
+        aria-current={active ? 'page' : undefined}
+        className={`${itemClass} ${
+          active
+            ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+        }`}
+        data-testid={`link-nav-${module.key}`}
+      >
+        <SidebarSectionIcon name={iconName} size={32} className="shrink-0" />
+        {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">{module.short}</span>}
+        {!collapsed && module.key === 'user-access' && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+      </Link>
+    );
   };
 
   return (
@@ -67,30 +152,50 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               <SidebarSectionIcon name="overview" size={32} className="shrink-0" />
               {!collapsed && <span className="flex-1">Overview</span>}
             </Link>
-            {MODULES.map((module) => {
-              const iconName = iconMap[module.key] || 'overview';
-              const path = pathForModule(module.key);
-              const permission = user.permissions?.[module.key];
-              const canAccess = permission === 'view' || permission === 'edit';
-              const active = module.key === 'user-access'
-                ? location.startsWith('/admin/users') || location.startsWith('/admin/roles')
-                : location.startsWith(path);
-              if (module.key === 'user-access' && !isMasterAdmin) return null;
-              if (!canAccess) return null;
-              if (!module.built) {
-                return (
-                  <div key={module.key} className="group relative flex h-10 min-w-0 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground/38" title={`${module.label} — Coming Soon`} data-testid={`nav-coming-soon-${module.key}`}>
-                    <SidebarSectionIcon name={iconName} size={32} className="shrink-0" />
-                    {!collapsed && <><span className="min-w-0 flex-1 truncate whitespace-nowrap">{module.short}</span><span className="shrink-0 text-[9px] uppercase tracking-wide text-sidebar-foreground/35">Soon</span></>}
-                  </div>
-                );
-              }
+            {navigationGroups.map((group) => {
+              const groupModules = group.moduleKeys
+                .map((key) => MODULES.find((module) => module.key === key))
+                .filter((module): module is (typeof MODULES)[number] => {
+                  if (!module) return false;
+                  if (module.key === 'user-access' && !isMasterAdmin) return false;
+                  const permission = user.permissions?.[module.key];
+                  return permission === 'view' || permission === 'edit';
+                });
+              if (groupModules.length === 0) return null;
+
+              const expanded = openGroups.includes(group.id);
+              const active = groupModules.some((module) => isModuleActive(module.key, location));
+
               return (
-                <Link key={module.key} href={path} onClick={() => setMobileOpen(false)} title={module.label} className={`flex h-10 min-w-0 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${active ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid={`link-nav-${module.key}`}>
-                  <SidebarSectionIcon name={iconName} size={32} className="shrink-0" />
-                  {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">{module.short}</span>}
-                  {!collapsed && module.key === 'user-access' && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
-                </Link>
+                <section key={group.id} className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    aria-expanded={expanded}
+                    aria-controls={`nav-group-${group.id}`}
+                    aria-label={`${group.label}, ${expanded ? 'collapse' : 'expand'}`}
+                    title={collapsed ? group.label : undefined}
+                    className={`relative flex h-9 w-full items-center rounded-lg text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors ${
+                      collapsed ? 'justify-center px-0' : 'gap-2 px-3'
+                    } ${
+                      active
+                        ? 'bg-sidebar-accent/60 text-sidebar-foreground'
+                        : 'text-sidebar-foreground/55 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'
+                    }`}
+                    data-testid={`button-nav-group-${group.id}`}
+                  >
+                    <SidebarSectionIcon name={group.icon} size={collapsed ? 23 : 18} className="shrink-0" />
+                    {!collapsed && <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>}
+                    <ChevronDown
+                      size={collapsed ? 10 : 14}
+                      className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${collapsed ? 'absolute bottom-1 right-2' : ''}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <div id={`nav-group-${group.id}`} className={`mt-1 space-y-1 ${expanded ? '' : 'hidden'}`}>
+                    {groupModules.map(renderModuleLink)}
+                  </div>
+                </section>
               );
             })}
           </nav>

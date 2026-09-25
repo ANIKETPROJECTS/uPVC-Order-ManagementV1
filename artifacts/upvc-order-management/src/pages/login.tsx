@@ -33,9 +33,7 @@ export default function LoginPage() {
       />
       <section className="relative z-10 hidden w-[46%] flex-col justify-between p-10 text-white lg:flex xl:p-14">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm">
-            <img src={`${import.meta.env.BASE_URL}window-logo.svg`} alt="" aria-hidden="true" className="h-full w-full object-contain" />
-          </div>
+          <img src={`${import.meta.env.BASE_URL}window-logo.svg`} alt="" aria-hidden="true" className="h-16 w-16 shrink-0 object-contain drop-shadow-lg" />
           <div>
             <p className="font-display font-bold">Framewise</p>
             <p className="text-[10px] uppercase tracking-[0.2em]">Order operations</p>
@@ -56,13 +54,11 @@ export default function LoginPage() {
       <main className="relative z-10 flex flex-1 items-center justify-center px-5 py-10 sm:px-10">
         <div className="w-full max-w-[420px] animate-enter-up">
           <div className="mb-7 lg:hidden">
-            <div className="mb-4 grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-white shadow-sm">
-              <img src={`${import.meta.env.BASE_URL}window-logo.svg`} alt="" aria-hidden="true" className="h-full w-full object-contain" />
-            </div>
+            <img src={`${import.meta.env.BASE_URL}window-logo.svg`} alt="" aria-hidden="true" className="mb-4 h-16 w-16 object-contain drop-shadow-lg" />
             <p className="font-display text-2xl font-bold">Framewise</p>
             <p className="mt-1 text-xs uppercase tracking-[0.2em]">Order operations</p>
           </div>
-          <div className="rounded-3xl border border-white/25 bg-slate-950/70 p-6 shadow-2xl backdrop-blur-md sm:p-8">
+          <div className="rounded-3xl border border-white/75 bg-white/85 p-6 shadow-2xl backdrop-blur-md sm:p-8">
             <div className="mb-8">
               <p className="text-xs font-semibold uppercase tracking-[0.2em]">Secure staff access</p>
               <h2 className="mt-3 font-display text-4xl font-bold tracking-[-0.04em]">Good morning.</h2>
@@ -86,7 +82,7 @@ export default function LoginPage() {
               {login.isError && <div className="login-feedback rounded-xl border border-white/20 bg-red-950/70 px-4 py-3 text-xs leading-5" data-testid="status-login-error">We couldn't sign you in. Check the username and password, then try again.</div>}
               <button type="submit" disabled={login.isPending || !username || !password} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-semibold shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60" data-testid="button-login">{login.isPending ? 'Checking access…' : <>Sign in <ArrowRight size={16} /></>}</button>
             </form>
-            {import.meta.env.DEV && <div className="mt-8 rounded-xl border border-white/25 bg-black/35 p-4" data-testid="note-demo-credentials"><p className="text-[10px] font-bold uppercase tracking-[0.16em]">Development-only note</p><p className="mt-2 text-xs leading-5">Seeded logins for role switching:</p><div className="mt-2 space-y-1 font-mono text-[11px]"><p><span className="font-semibold">admin</span> / Admin@12345</p><p><span className="font-semibold">operator, manager, rate.approver, accounts, quotations</span> / Demo@12345</p></div></div>}
+            {import.meta.env.DEV && <div className="mt-8 rounded-xl border border-slate-900/15 bg-slate-100/80 p-4" data-testid="note-demo-credentials"><p className="text-[10px] font-bold uppercase tracking-[0.16em]">Development-only note</p><p className="mt-2 text-xs leading-5">Seeded logins for role switching:</p><div className="mt-2 space-y-1 font-mono text-[11px]"><p><span className="font-semibold">admin</span> / Admin@12345</p><p><span className="font-semibold">operator, manager, rate.approver, accounts, quotations</span> / Demo@12345</p></div></div>}
           </div>
         </div>
       </main>
