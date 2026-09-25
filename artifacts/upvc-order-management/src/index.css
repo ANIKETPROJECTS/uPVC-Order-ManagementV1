@@ -105,11 +105,12 @@
 
 .login-page :is(h1, h2, p, span, label, button, input, .login-feedback) {
   color: #fff !important;
-  -webkit-text-stroke: 0.6px #050909;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  -webkit-text-stroke: 0.25px #050909;
+  text-shadow: none;
 }
 
 .login-page input::placeholder {
   color: rgba(255, 255, 255, 0.78) !important;
-  -webkit-text-stroke: 0.25px #050909;
+  -webkit-text-stroke: 0.15px #050909;
+  text-shadow: none;
 }
