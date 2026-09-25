@@ -86,6 +86,36 @@ export interface PublicUser {
   permissionOverrides: PermissionMap | null;
 }
 
+export interface ChatConversationDocument {
+  _id: string;
+  type: "direct";
+  participantIds: string[];
+  readAtByUser: Record<string, Date>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChatGroupDocument {
+  _id: string;
+  name: string;
+  nameLower: string;
+  description: string | null;
+  memberIds: string[];
+  readAtByUser: Record<string, Date>;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface ChatMessageDocument {
+  _id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  createdAt: Date;
+}
+
 export function getMongoClient(): Promise<MongoClient> {
   clientPromise ??= mongoClient.connect();
   return clientPromise;
@@ -106,6 +136,18 @@ export function getUsers(db: Db): Collection<UserDocument> {
 
 export function getRoles(db: Db): Collection<RoleDocument> {
   return db.collection<RoleDocument>("roles");
+}
+
+export function getChatConversations(db: Db): Collection<ChatConversationDocument> {
+  return db.collection<ChatConversationDocument>("chat_conversations");
+}
+
+export function getChatGroups(db: Db): Collection<ChatGroupDocument> {
+  return db.collection<ChatGroupDocument>("chat_groups");
+}
+
+export function getChatMessages(db: Db): Collection<ChatMessageDocument> {
+  return db.collection<ChatMessageDocument>("chat_messages");
 }
 
 export function emptyPermissionMap(): PermissionMap {
@@ -264,10 +306,33 @@ export async function initializeMongo(): Promise<void> {
   const db = await getMongoDb();
   const users = getUsers(db);
   const roles = getRoles(db);
+  const chatConversations = getChatConversations(db);
+  const chatGroups = getChatGroups(db);
+  const chatMessages = getChatMessages(db);
 
   await Promise.all([
     users.createIndex({ usernameLower: 1 }, { unique: true, name: "username_unique" }),
     roles.createIndex({ nameLower: 1 }, { unique: true, name: "role_name_unique" }),
+    chatConversations.createIndex(
+      { participantIds: 1, updatedAt: -1 },
+      { name: "chat_conversations_by_member" },
+    ),
+    chatGroups.createIndex(
+      { memberIds: 1, updatedAt: -1 },
+      { name: "chat_groups_by_member" },
+    ),
+    chatGroups.createIndex(
+      { nameLower: 1 },
+      {
+        unique: true,
+        name: "chat_group_name_unique",
+        partialFilterExpression: { deletedAt: null },
+      },
+    ),
+    chatMessages.createIndex(
+      { conversationId: 1, createdAt: 1 },
+      { name: "chat_messages_by_conversation" },
+    ),
   ]);
 
   const now = new Date();

@@ -288,3 +288,230 @@ export const GetAdminSummaryResponse = zod.object({
 })
 
 
+/**
+ * @summary List active users available for chat and group membership
+ */
+export const ListChatPeopleResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "roleName": zod.string(),
+  "avatarUrl": zod.string().nullable(),
+  "status": zod.enum(['active', 'inactive'])
+})
+export const ListChatPeopleResponse = zod.array(ListChatPeopleResponseItem)
+
+
+/**
+ * @summary List the signed-in user's direct conversations and chat groups
+ */
+export const ListChatConversationsResponseItem = zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['direct', 'group']),
+  "title": zod.string(),
+  "subtitle": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "participantIds": zod.array(zod.string()),
+  "lastMessage": zod.union([zod.object({
+  "body": zod.string(),
+  "senderId": zod.string(),
+  "senderName": zod.string(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "unreadCount": zod.number().int(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListChatConversationsResponse = zod.array(ListChatConversationsResponseItem)
+
+
+/**
+ * @summary Start or reopen a direct conversation with an active user
+ */
+
+
+
+export const StartDirectConversationBody = zod.object({
+  "otherUserId": zod.string().min(1)
+})
+
+export const StartDirectConversationResponse = zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['direct', 'group']),
+  "title": zod.string(),
+  "subtitle": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "participantIds": zod.array(zod.string()),
+  "lastMessage": zod.union([zod.object({
+  "body": zod.string(),
+  "senderId": zod.string(),
+  "senderName": zod.string(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "unreadCount": zod.number().int(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List recent messages in a conversation the user belongs to
+ */
+export const ListChatMessagesParams = zod.object({
+  "conversationId": zod.coerce.string()
+})
+
+export const ListChatMessagesResponseItem = zod.object({
+  "id": zod.string(),
+  "conversationId": zod.string(),
+  "senderId": zod.string(),
+  "senderName": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListChatMessagesResponse = zod.array(ListChatMessagesResponseItem)
+
+
+/**
+ * @summary Send a text message to a conversation the user belongs to
+ */
+export const SendChatMessageParams = zod.object({
+  "conversationId": zod.coerce.string()
+})
+
+export const sendChatMessageBodyBodyMax = 4000;
+
+
+
+export const SendChatMessageBody = zod.object({
+  "body": zod.string().min(1).max(sendChatMessageBodyBodyMax)
+})
+
+export const SendChatMessageResponse = zod.object({
+  "id": zod.string(),
+  "conversationId": zod.string(),
+  "senderId": zod.string(),
+  "senderName": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Mark a conversation as read for the signed-in user
+ */
+export const MarkChatConversationReadParams = zod.object({
+  "conversationId": zod.coerce.string()
+})
+
+export const MarkChatConversationReadResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary List user communication groups for the Master Admin
+ */
+export const ListChatGroupsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "memberIds": zod.array(zod.string()),
+  "members": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "roleName": zod.string(),
+  "avatarUrl": zod.string().nullable(),
+  "status": zod.enum(['active', 'inactive'])
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListChatGroupsResponse = zod.array(ListChatGroupsResponseItem)
+
+
+/**
+ * @summary Create a communication group
+ */
+export const createChatGroupBodyNameMin = 2;
+export const createChatGroupBodyNameMax = 80;
+
+export const createChatGroupBodyDescriptionMax = 500;
+
+export const createChatGroupBodyMemberIdsMin = 2;
+
+
+
+export const CreateChatGroupBody = zod.object({
+  "name": zod.string().min(createChatGroupBodyNameMin).max(createChatGroupBodyNameMax),
+  "description": zod.string().max(createChatGroupBodyDescriptionMax).nullish(),
+  "memberIds": zod.array(zod.string()).min(createChatGroupBodyMemberIdsMin)
+})
+
+export const CreateChatGroupResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "memberIds": zod.array(zod.string()),
+  "members": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "roleName": zod.string(),
+  "avatarUrl": zod.string().nullable(),
+  "status": zod.enum(['active', 'inactive'])
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Edit a communication group and its members
+ */
+export const UpdateChatGroupParams = zod.object({
+  "groupId": zod.coerce.string()
+})
+
+export const updateChatGroupBodyNameMin = 2;
+export const updateChatGroupBodyNameMax = 80;
+
+export const updateChatGroupBodyDescriptionMax = 500;
+
+export const updateChatGroupBodyMemberIdsMin = 2;
+
+
+
+export const UpdateChatGroupBody = zod.object({
+  "name": zod.string().min(updateChatGroupBodyNameMin).max(updateChatGroupBodyNameMax),
+  "description": zod.string().max(updateChatGroupBodyDescriptionMax).nullish(),
+  "memberIds": zod.array(zod.string()).min(updateChatGroupBodyMemberIdsMin)
+})
+
+export const UpdateChatGroupResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "memberIds": zod.array(zod.string()),
+  "members": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "roleName": zod.string(),
+  "avatarUrl": zod.string().nullable(),
+  "status": zod.enum(['active', 'inactive'])
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Archive a communication group while retaining its message history
+ */
+export const DeleteChatGroupParams = zod.object({
+  "groupId": zod.coerce.string()
+})
+
+export const DeleteChatGroupResponse = zod.void()
+
+

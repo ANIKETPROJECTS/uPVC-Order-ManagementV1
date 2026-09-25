@@ -26,7 +26,6 @@ import {
   getListRolesQueryKey,
   getListUsersQueryKey,
   useCreateUser,
-  useDeactivateUser,
   useListRoles,
   useListUsers,
   useUpdateUser,
@@ -83,7 +82,6 @@ export default function UsersPage({ user }: { user: User }) {
   const roles = useListRoles({ query: { queryKey: getListRolesQueryKey() } });
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
-  const deactivateUser = useDeactivateUser();
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<UserStatusFilter>('all');
@@ -265,10 +263,22 @@ export default function UsersPage({ user }: { user: User }) {
     setPhotoError('');
   };
 
-  const deactivate = (item: User) => {
+  const changeStatus = (item: User) => {
     setMenuUser(null);
-    if (item.status === 'inactive' || !window.confirm(`Deactivate ${item.name}? They will no longer be able to sign in.`)) return;
-    deactivateUser.mutate({ userId: item.id }, { onSuccess: refresh });
+    const nextStatus = item.status === 'active' ? 'inactive' : 'active';
+    const action = nextStatus === 'active' ? 'Activate' : 'Deactivate';
+    if (!window.confirm(`${action} ${item.name}?`)) return;
+    updateUser.mutate(
+      { userId: item.id, data: { status: nextStatus } },
+      {
+        onSuccess: () => {
+          refresh();
+          if (item.id === user.id && nextStatus === 'inactive') {
+            void queryClient.invalidateQueries({ queryKey: getGetAuthSessionQueryKey() });
+          }
+        },
+      },
+    );
   };
 
   const renderActions = (item: User) => (
@@ -287,17 +297,20 @@ export default function UsersPage({ user }: { user: User }) {
           <button onClick={() => openEdit(item)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-muted" data-testid={`button-edit-user-${item.id}`}>
             <Edit3 size={14} /> Edit user
           </button>
-          {item.status === 'active' && (
-            <button onClick={() => deactivate(item)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-destructive hover:bg-destructive/10" data-testid={`button-deactivate-user-${item.id}`}>
-              <UserX size={14} /> Deactivate
-            </button>
-          )}
+          <button
+            onClick={() => changeStatus(item)}
+            disabled={updateUser.isPending}
+            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-muted disabled:opacity-50 ${item.status === 'active' ? 'text-destructive hover:bg-destructive/10' : 'text-primary hover:bg-primary/10'}`}
+            data-testid={`button-${item.status === 'active' ? 'deactivate' : 'activate'}-user-${item.id}`}
+          >
+            <UserX size={14} /> {item.status === 'active' ? 'Deactivate' : 'Activate'}
+          </button>
         </div>
       )}
     </div>
   );
 
-  const mutationError = createUser.error || updateUser.error || deactivateUser.error;
+  const mutationError = createUser.error || updateUser.error;
   const hasFilters = Boolean(search.trim()) || status !== 'all' || roleFilter !== 'all';
   const currentPhoto = form.photoMode === 'link' ? form.avatarLink.trim() : form.avatarUrl;
   const isSaving = createUser.isPending || updateUser.isPending;

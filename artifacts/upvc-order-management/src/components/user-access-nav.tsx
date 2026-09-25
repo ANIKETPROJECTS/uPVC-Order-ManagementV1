@@ -2,12 +2,13 @@ import { Link } from 'wouter';
 import { SidebarSectionIcon } from '@/components/sidebar-icons';
 
 type UserAccessNavProps = {
-  active: 'users' | 'roles';
+  active: 'users' | 'roles' | 'groups';
 };
 
 const items = [
   { id: 'users', href: '/admin/users', label: 'Users', icon: 'user-access' },
   { id: 'roles', href: '/admin/roles', label: 'Roles & permissions', icon: 'roles' },
+  { id: 'groups', href: '/admin/groups', label: 'Communication groups', icon: 'user-access' },
 ] as const;
 
 export function UserAccessNav({ active }: UserAccessNavProps) {

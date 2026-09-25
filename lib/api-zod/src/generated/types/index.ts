@@ -8,6 +8,16 @@
 
 export * from './adminSummary';
 export * from './authSession';
+export * from './chatConversation';
+export * from './chatConversationType';
+export * from './chatGroup';
+export * from './chatGroupInput';
+export * from './chatGroupUpdate';
+export * from './chatMessage';
+export * from './chatMessageInput';
+export * from './chatMessagePreview';
+export * from './chatPerson';
+export * from './chatPersonStatus';
 export * from './dashboard';
 export * from './healthStatus';
 export * from './listUsersParams';
@@ -18,6 +28,7 @@ export * from './permissionMap';
 export * from './role';
 export * from './roleInput';
 export * from './roleUpdate';
+export * from './startDirectConversationInput';
 export * from './successResponse';
 export * from './user';
 export * from './userInput';

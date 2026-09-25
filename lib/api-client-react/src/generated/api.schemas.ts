@@ -170,6 +170,116 @@ export interface AdminSummary {
   masterAdmins: number;
 }
 
+export type ChatPersonStatus = typeof ChatPersonStatus[keyof typeof ChatPersonStatus];
+
+
+export const ChatPersonStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+
+export interface ChatPerson {
+  id: string;
+  name: string;
+  username: string;
+  roleName: string;
+  /** @nullable */
+  avatarUrl: string | null;
+  status: ChatPersonStatus;
+}
+
+export interface ChatMessagePreview {
+  body: string;
+  senderId: string;
+  senderName: string;
+  createdAt: string;
+}
+
+export type ChatConversationType = typeof ChatConversationType[keyof typeof ChatConversationType];
+
+
+export const ChatConversationType = {
+  direct: 'direct',
+  group: 'group',
+} as const;
+
+export interface ChatConversation {
+  id: string;
+  type: ChatConversationType;
+  title: string;
+  /** @nullable */
+  subtitle: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
+  participantIds: string[];
+  lastMessage: ChatMessagePreview | null;
+  unreadCount: number;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ChatGroup {
+  id: string;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  memberIds: string[];
+  members: ChatPerson[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StartDirectConversationInput {
+  /** @minLength 1 */
+  otherUserId: string;
+}
+
+export interface ChatMessageInput {
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  body: string;
+}
+
+export interface ChatGroupInput {
+  /**
+     * @minLength 2
+     * @maxLength 80
+     */
+  name: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  description?: string | null;
+  /** @minItems 2 */
+  memberIds: string[];
+}
+
+export interface ChatGroupUpdate {
+  /**
+     * @minLength 2
+     * @maxLength 80
+     */
+  name: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  description?: string | null;
+  /** @minItems 2 */
+  memberIds: string[];
+}
+
 export type ListUsersParams = {
 status?: ListUsersStatus;
 roleId?: string;

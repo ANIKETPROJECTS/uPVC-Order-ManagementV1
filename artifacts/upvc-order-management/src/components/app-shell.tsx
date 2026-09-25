@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
-import { ChevronDown, ChevronLeft, ChevronRight, LogOut, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, LogOut, Menu, MessageSquareText, X } from 'lucide-react';
 import type { User } from '@workspace/api-client-react';
 import { getGetAuthSessionQueryKey, useLogout } from '@workspace/api-client-react';
 import { SidebarSectionIcon, type SidebarIconName } from '@/components/sidebar-icons';
@@ -28,7 +28,7 @@ const iconMap: Record<string, SidebarIconName> = {
 const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : `/${key}`;
 const isModuleActive = (key: string, location: string) =>
   key === 'user-access'
-    ? location.startsWith('/admin/users') || location.startsWith('/admin/roles')
+    ? location.startsWith('/admin/users') || location.startsWith('/admin/roles') || location.startsWith('/admin/groups')
     : location.startsWith(pathForModule(key));
 
 const navigationGroups: { id: string; label: string; icon: SidebarIconName; moduleKeys: string[] }[] = [
@@ -151,6 +151,10 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
             <Link href="/" onClick={() => setMobileOpen(false)} className={`flex h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-overview">
               <SidebarSectionIcon name="overview" size={32} className="shrink-0" />
               {!collapsed && <span className="flex-1">Overview</span>}
+            </Link>
+            <Link href="/communication" onClick={() => setMobileOpen(false)} className={`flex h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/communication') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-communication">
+              <MessageSquareText size={19} className="mx-[6px] shrink-0" />
+              {!collapsed && <span className="flex-1">Communication</span>}
             </Link>
             {navigationGroups.map((group) => {
               const groupModules = group.moduleKeys

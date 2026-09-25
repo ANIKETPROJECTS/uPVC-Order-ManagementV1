@@ -11,6 +11,8 @@ import LoginPage from '@/pages/login';
 import NotFound from '@/pages/not-found';
 import RolesPage from '@/pages/roles';
 import UsersPage from '@/pages/users';
+import ChatGroupsPage from '@/pages/chat-groups';
+import CommunicationPage from '@/pages/communication';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000 } } });
 
@@ -20,6 +22,8 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/" component={() => <DashboardPage user={user} />} />
     <Route path="/admin/users" component={() => <UsersPage user={user} />} />
     <Route path="/admin/roles" component={() => <RolesPage user={user} />} />
+    <Route path="/admin/groups" component={() => <ChatGroupsPage user={user} />} />
+    <Route path="/communication" component={() => <CommunicationPage user={user} />} />
     <Route component={NotFound} />
   </Switch>;
 }

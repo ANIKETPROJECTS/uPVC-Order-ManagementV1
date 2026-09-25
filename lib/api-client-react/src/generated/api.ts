@@ -22,6 +22,13 @@ import type {
 import type {
   AdminSummary,
   AuthSession,
+  ChatConversation,
+  ChatGroup,
+  ChatGroupInput,
+  ChatGroupUpdate,
+  ChatMessage,
+  ChatMessageInput,
+  ChatPerson,
   Dashboard,
   HealthStatus,
   ListUsersParams,
@@ -29,6 +36,7 @@ import type {
   Role,
   RoleInput,
   RoleUpdate,
+  StartDirectConversationInput,
   SuccessResponse,
   User,
   UserInput,
@@ -1195,4 +1203,814 @@ export function useGetAdminSummary<TData = Awaited<ReturnType<typeof getAdminSum
 
 
 
+
+export const getListChatPeopleUrl = () => {
+
+
+
+
+  return `/api/chat/people`
+}
+
+/**
+ * @summary List active users available for chat and group membership
+ */
+export const listChatPeople = async ( options?: Parameters<typeof customFetch>[1]): Promise<ChatPerson[]> => {
+
+  return customFetch<ChatPerson[]>(getListChatPeopleUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChatPeopleQueryKey = () => {
+    return [
+    `/api/chat/people`
+    ] as const;
+    }
+
+
+export const getListChatPeopleQueryOptions = <TData = Awaited<ReturnType<typeof listChatPeople>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatPeople>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChatPeopleQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChatPeople>>> = ({ signal }) => listChatPeople({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChatPeople>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChatPeopleQueryResult = NonNullable<Awaited<ReturnType<typeof listChatPeople>>>
+export type ListChatPeopleQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active users available for chat and group membership
+ */
+
+export function useListChatPeople<TData = Awaited<ReturnType<typeof listChatPeople>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatPeople>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChatPeopleQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListChatConversationsUrl = () => {
+
+
+
+
+  return `/api/chat/conversations`
+}
+
+/**
+ * @summary List the signed-in user's direct conversations and chat groups
+ */
+export const listChatConversations = async ( options?: Parameters<typeof customFetch>[1]): Promise<ChatConversation[]> => {
+
+  return customFetch<ChatConversation[]>(getListChatConversationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChatConversationsQueryKey = () => {
+    return [
+    `/api/chat/conversations`
+    ] as const;
+    }
+
+
+export const getListChatConversationsQueryOptions = <TData = Awaited<ReturnType<typeof listChatConversations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatConversations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChatConversationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChatConversations>>> = ({ signal }) => listChatConversations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChatConversations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChatConversationsQueryResult = NonNullable<Awaited<ReturnType<typeof listChatConversations>>>
+export type ListChatConversationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the signed-in user's direct conversations and chat groups
+ */
+
+export function useListChatConversations<TData = Awaited<ReturnType<typeof listChatConversations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatConversations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChatConversationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getStartDirectConversationUrl = () => {
+
+
+
+
+  return `/api/chat/direct-conversations`
+}
+
+/**
+ * @summary Start or reopen a direct conversation with an active user
+ */
+export const startDirectConversation = async (startDirectConversationInput: StartDirectConversationInput, options?: Parameters<typeof customFetch>[1]): Promise<ChatConversation> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ChatConversation>(getStartDirectConversationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(startDirectConversationInput)
+  }
+);}
+
+
+
+
+
+export const getStartDirectConversationMutationKey = () => ['startDirectConversation'] as const;
+
+export const getStartDirectConversationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startDirectConversation>>, TError,StartDirectConversationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startDirectConversation>>, TError,StartDirectConversationMutationVariables, TContext> => {
+
+const mutationKey = getStartDirectConversationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startDirectConversation>>, StartDirectConversationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  startDirectConversation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartDirectConversationMutationResult = NonNullable<Awaited<ReturnType<typeof startDirectConversation>>>
+    export type StartDirectConversationMutationBody = BodyType<StartDirectConversationInput>
+    export type StartDirectConversationMutationError = ErrorType<unknown>
+    export type StartDirectConversationMutationVariables = {data: BodyType<StartDirectConversationInput>}
+
+    /**
+ * @summary Start or reopen a direct conversation with an active user
+ */
+export const useStartDirectConversation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startDirectConversation>>, TError,StartDirectConversationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startDirectConversation>>,
+        TError,
+        StartDirectConversationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStartDirectConversationMutationOptions(options));
+    }
+
+export const getListChatMessagesUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/chat/conversations/${conversationId}/messages`
+}
+
+/**
+ * @summary List recent messages in a conversation the user belongs to
+ */
+export const listChatMessages = async (conversationId: string, options?: Parameters<typeof customFetch>[1]): Promise<ChatMessage[]> => {
+
+  return customFetch<ChatMessage[]>(getListChatMessagesUrl(conversationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChatMessagesQueryKey = (conversationId: string,) => {
+    return [
+    `/api/chat/conversations/${conversationId}/messages`
+    ] as const;
+    }
+
+
+export const getListChatMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listChatMessages>>, TError = ErrorType<unknown>>(conversationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChatMessagesQueryKey(conversationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChatMessages>>> = ({ signal }) => listChatMessages(conversationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: conversationId !== null && conversationId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChatMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChatMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listChatMessages>>>
+export type ListChatMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List recent messages in a conversation the user belongs to
+ */
+
+export function useListChatMessages<TData = Awaited<ReturnType<typeof listChatMessages>>, TError = ErrorType<unknown>>(
+ conversationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChatMessagesQueryOptions(conversationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendChatMessageUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/chat/conversations/${conversationId}/messages`
+}
+
+/**
+ * @summary Send a text message to a conversation the user belongs to
+ */
+export const sendChatMessage = async (conversationId: string,
+    chatMessageInput: ChatMessageInput, options?: Parameters<typeof customFetch>[1]): Promise<ChatMessage> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ChatMessage>(getSendChatMessageUrl(conversationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatMessageInput)
+  }
+);}
+
+
+
+
+
+export const getSendChatMessageMutationKey = () => ['sendChatMessage'] as const;
+
+export const getSendChatMessageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendChatMessage>>, TError,SendChatMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendChatMessage>>, TError,SendChatMessageMutationVariables, TContext> => {
+
+const mutationKey = getSendChatMessageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendChatMessage>>, SendChatMessageMutationVariables> = (props) => {
+          const {conversationId,data} = props ?? {};
+
+          return  sendChatMessage(conversationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendChatMessageMutationResult = NonNullable<Awaited<ReturnType<typeof sendChatMessage>>>
+    export type SendChatMessageMutationBody = BodyType<ChatMessageInput>
+    export type SendChatMessageMutationError = ErrorType<unknown>
+    export type SendChatMessageMutationVariables = {conversationId: string;data: BodyType<ChatMessageInput>}
+
+    /**
+ * @summary Send a text message to a conversation the user belongs to
+ */
+export const useSendChatMessage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendChatMessage>>, TError,SendChatMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendChatMessage>>,
+        TError,
+        SendChatMessageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSendChatMessageMutationOptions(options));
+    }
+
+export const getMarkChatConversationReadUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/chat/conversations/${conversationId}/read`
+}
+
+/**
+ * @summary Mark a conversation as read for the signed-in user
+ */
+export const markChatConversationRead = async (conversationId: string, options?: Parameters<typeof customFetch>[1]): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getMarkChatConversationReadUrl(conversationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkChatConversationReadMutationKey = () => ['markChatConversationRead'] as const;
+
+export const getMarkChatConversationReadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markChatConversationRead>>, TError,MarkChatConversationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markChatConversationRead>>, TError,MarkChatConversationReadMutationVariables, TContext> => {
+
+const mutationKey = getMarkChatConversationReadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markChatConversationRead>>, MarkChatConversationReadMutationVariables> = (props) => {
+          const {conversationId} = props ?? {};
+
+          return  markChatConversationRead(conversationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkChatConversationReadMutationResult = NonNullable<Awaited<ReturnType<typeof markChatConversationRead>>>
+
+    export type MarkChatConversationReadMutationError = ErrorType<unknown>
+    export type MarkChatConversationReadMutationVariables = {conversationId: string}
+
+    /**
+ * @summary Mark a conversation as read for the signed-in user
+ */
+export const useMarkChatConversationRead = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markChatConversationRead>>, TError,MarkChatConversationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markChatConversationRead>>,
+        TError,
+        MarkChatConversationReadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkChatConversationReadMutationOptions(options));
+    }
+
+export const getListChatGroupsUrl = () => {
+
+
+
+
+  return `/api/admin/chat-groups`
+}
+
+/**
+ * @summary List user communication groups for the Master Admin
+ */
+export const listChatGroups = async ( options?: Parameters<typeof customFetch>[1]): Promise<ChatGroup[]> => {
+
+  return customFetch<ChatGroup[]>(getListChatGroupsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChatGroupsQueryKey = () => {
+    return [
+    `/api/admin/chat-groups`
+    ] as const;
+    }
+
+
+export const getListChatGroupsQueryOptions = <TData = Awaited<ReturnType<typeof listChatGroups>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChatGroupsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChatGroups>>> = ({ signal }) => listChatGroups({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChatGroups>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChatGroupsQueryResult = NonNullable<Awaited<ReturnType<typeof listChatGroups>>>
+export type ListChatGroupsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List user communication groups for the Master Admin
+ */
+
+export function useListChatGroups<TData = Awaited<ReturnType<typeof listChatGroups>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChatGroupsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateChatGroupUrl = () => {
+
+
+
+
+  return `/api/admin/chat-groups`
+}
+
+/**
+ * @summary Create a communication group
+ */
+export const createChatGroup = async (chatGroupInput: ChatGroupInput, options?: Parameters<typeof customFetch>[1]): Promise<ChatGroup> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ChatGroup>(getCreateChatGroupUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatGroupInput)
+  }
+);}
+
+
+
+
+
+export const getCreateChatGroupMutationKey = () => ['createChatGroup'] as const;
+
+export const getCreateChatGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChatGroup>>, TError,CreateChatGroupMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createChatGroup>>, TError,CreateChatGroupMutationVariables, TContext> => {
+
+const mutationKey = getCreateChatGroupMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createChatGroup>>, CreateChatGroupMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createChatGroup(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateChatGroupMutationResult = NonNullable<Awaited<ReturnType<typeof createChatGroup>>>
+    export type CreateChatGroupMutationBody = BodyType<ChatGroupInput>
+    export type CreateChatGroupMutationError = ErrorType<unknown>
+    export type CreateChatGroupMutationVariables = {data: BodyType<ChatGroupInput>}
+
+    /**
+ * @summary Create a communication group
+ */
+export const useCreateChatGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChatGroup>>, TError,CreateChatGroupMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createChatGroup>>,
+        TError,
+        CreateChatGroupMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateChatGroupMutationOptions(options));
+    }
+
+export const getUpdateChatGroupUrl = (groupId: string,) => {
+
+
+
+
+  return `/api/admin/chat-groups/${groupId}`
+}
+
+/**
+ * @summary Edit a communication group and its members
+ */
+export const updateChatGroup = async (groupId: string,
+    chatGroupUpdate: ChatGroupUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ChatGroup> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ChatGroup>(getUpdateChatGroupUrl(groupId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatGroupUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateChatGroupMutationKey = () => ['updateChatGroup'] as const;
+
+export const getUpdateChatGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChatGroup>>, TError,UpdateChatGroupMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateChatGroup>>, TError,UpdateChatGroupMutationVariables, TContext> => {
+
+const mutationKey = getUpdateChatGroupMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateChatGroup>>, UpdateChatGroupMutationVariables> = (props) => {
+          const {groupId,data} = props ?? {};
+
+          return  updateChatGroup(groupId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateChatGroupMutationResult = NonNullable<Awaited<ReturnType<typeof updateChatGroup>>>
+    export type UpdateChatGroupMutationBody = BodyType<ChatGroupUpdate>
+    export type UpdateChatGroupMutationError = ErrorType<unknown>
+    export type UpdateChatGroupMutationVariables = {groupId: string;data: BodyType<ChatGroupUpdate>}
+
+    /**
+ * @summary Edit a communication group and its members
+ */
+export const useUpdateChatGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChatGroup>>, TError,UpdateChatGroupMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateChatGroup>>,
+        TError,
+        UpdateChatGroupMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateChatGroupMutationOptions(options));
+    }
+
+export const getDeleteChatGroupUrl = (groupId: string,) => {
+
+
+
+
+  return `/api/admin/chat-groups/${groupId}`
+}
+
+/**
+ * @summary Archive a communication group while retaining its message history
+ */
+export const deleteChatGroup = async (groupId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteChatGroupUrl(groupId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteChatGroupMutationKey = () => ['deleteChatGroup'] as const;
+
+export const getDeleteChatGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChatGroup>>, TError,DeleteChatGroupMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteChatGroup>>, TError,DeleteChatGroupMutationVariables, TContext> => {
+
+const mutationKey = getDeleteChatGroupMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteChatGroup>>, DeleteChatGroupMutationVariables> = (props) => {
+          const {groupId} = props ?? {};
+
+          return  deleteChatGroup(groupId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteChatGroupMutationResult = NonNullable<Awaited<ReturnType<typeof deleteChatGroup>>>
+
+    export type DeleteChatGroupMutationError = ErrorType<unknown>
+    export type DeleteChatGroupMutationVariables = {groupId: string}
+
+    /**
+ * @summary Archive a communication group while retaining its message history
+ */
+export const useDeleteChatGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChatGroup>>, TError,DeleteChatGroupMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteChatGroup>>,
+        TError,
+        DeleteChatGroupMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteChatGroupMutationOptions(options));
+    }
 

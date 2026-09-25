@@ -248,6 +248,181 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminSummary"
+  /chat/people:
+    get:
+      operationId: listChatPeople
+      tags: [chat]
+      summary: List active users available for chat and group membership
+      responses:
+        "200":
+          description: Active users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatPerson"
+  /chat/conversations:
+    get:
+      operationId: listChatConversations
+      tags: [chat]
+      summary: List the signed-in user's direct conversations and chat groups
+      responses:
+        "200":
+          description: Conversations available to the signed-in user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatConversation"
+  /chat/direct-conversations:
+    post:
+      operationId: startDirectConversation
+      tags: [chat]
+      summary: Start or reopen a direct conversation with an active user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartDirectConversationInput"
+      responses:
+        "200":
+          description: Direct conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+  /chat/conversations/{conversationId}/messages:
+    get:
+      operationId: listChatMessages
+      tags: [chat]
+      summary: List recent messages in a conversation the user belongs to
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages in chronological order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+    post:
+      operationId: sendChatMessage
+      tags: [chat]
+      summary: Send a text message to a conversation the user belongs to
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageInput"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+  /chat/conversations/{conversationId}/read:
+    post:
+      operationId: markChatConversationRead
+      tags: [chat]
+      summary: Mark a conversation as read for the signed-in user
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Read marker updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+  /admin/chat-groups:
+    get:
+      operationId: listChatGroups
+      tags: [admin]
+      summary: List user communication groups for the Master Admin
+      responses:
+        "200":
+          description: Active communication groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatGroup"
+    post:
+      operationId: createChatGroup
+      tags: [admin]
+      summary: Create a communication group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatGroupInput"
+      responses:
+        "201":
+          description: Created communication group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatGroup"
+  /admin/chat-groups/{groupId}:
+    patch:
+      operationId: updateChatGroup
+      tags: [admin]
+      summary: Edit a communication group and its members
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatGroupUpdate"
+      responses:
+        "200":
+          description: Updated communication group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatGroup"
+    delete:
+      operationId: deleteChatGroup
+      tags: [admin]
+      summary: Archive a communication group while retaining its message history
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Communication group archived
 components:
   schemas:
     HealthStatus:
@@ -449,4 +624,159 @@ components:
         masterAdmins:
           type: integer
       required: [totalUsers, activeUsers, inactiveUsers, totalRoles, masterAdmins]
+    ChatPerson:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        username:
+          type: string
+        roleName:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, inactive]
+      required: [id, name, username, roleName, avatarUrl, status]
+    ChatMessagePreview:
+      type: object
+      properties:
+        body:
+          type: string
+        senderId:
+          type: string
+        senderName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [body, senderId, senderName, createdAt]
+    ChatConversation:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [direct, group]
+        title:
+          type: string
+        subtitle:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        participantIds:
+          type: array
+          items:
+            type: string
+        lastMessage:
+          oneOf:
+            - $ref: "#/components/schemas/ChatMessagePreview"
+            - type: "null"
+        unreadCount:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - title
+        - subtitle
+        - avatarUrl
+        - participantIds
+        - lastMessage
+        - unreadCount
+        - updatedAt
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          type: string
+        senderName:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, conversationId, senderId, senderName, body, createdAt]
+    ChatGroup:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        memberIds:
+          type: array
+          items:
+            type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatPerson"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, description, memberIds, members, createdAt, updatedAt]
+    StartDirectConversationInput:
+      type: object
+      properties:
+        otherUserId:
+          type: string
+          minLength: 1
+      required: [otherUserId]
+    ChatMessageInput:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+      required: [body]
+    ChatGroupInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        description:
+          type: ["string", "null"]
+          maxLength: 500
+        memberIds:
+          type: array
+          minItems: 2
+          items:
+            type: string
+      required: [name, memberIds]
+    ChatGroupUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        description:
+          type: ["string", "null"]
+          maxLength: 500
+        memberIds:
+          type: array
+          minItems: 2
+          items:
+            type: string
+      required: [name, memberIds]
 
