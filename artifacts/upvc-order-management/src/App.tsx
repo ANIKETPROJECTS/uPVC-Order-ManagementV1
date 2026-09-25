@@ -1,62 +1,38 @@
 import { type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useGetAuthSession } from '@workspace/api-client-react';
+import type { User } from '@workspace/api-client-react';
+import { Route, Router as WouterRouter, Switch } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import DashboardPage from '@/pages/dashboard';
+import LoginPage from '@/pages/login';
 import NotFound from '@/pages/not-found';
-import {
-  Route,
-  Switch,
-  useLocation,
-  Router as WouterRouter,
-} from 'wouter';
+import RolesPage from '@/pages/roles';
+import UsersPage from '@/pages/users';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000 } } });
 
-function Home() {
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Replit Agent is building...
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Your app will appear here once it's ready.
-        </p>
-      </div>
-    </div>
-  );
+function AuthenticatedRoutes({ user }: { user: User | null }) {
+  if (!user) return <LoginPage />;
+  return <Switch>
+    <Route path="/" component={() => <DashboardPage user={user} />} />
+    <Route path="/admin/users" component={() => <UsersPage user={user} />} />
+    <Route path="/admin/roles" component={() => <RolesPage user={user} />} />
+    <Route component={NotFound} />
+  </Switch>;
 }
 
 function Router() {
-  return (
-    // Keep a shared shell (sidebar, navbar) outside the boundary so it
-    // survives a page crash.
-    <RoutedErrorBoundary>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route component={NotFound} />
-      </Switch>
-    </RoutedErrorBoundary>
-  );
-}
-
-function RoutedErrorBoundary({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
+  const session = useGetAuthSession();
+  return <ErrorBoundary resetKey={window.location.pathname}>
+    {session.isLoading ? <div className="flex min-h-[100dvh] items-center justify-center bg-background"><div className="w-full max-w-sm space-y-3 px-6"><div className="h-10 w-10 animate-pulse rounded-xl bg-secondary" /><div className="h-7 w-56 animate-pulse rounded-lg bg-muted" /><div className="h-4 w-72 animate-pulse rounded-lg bg-muted" /></div></div> : session.isError ? <LoginPage /> : <AuthenticatedRoutes user={session.data?.user || null} />}
+  </ErrorBoundary>;
 }
 
 function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
 }
 
 export default App;

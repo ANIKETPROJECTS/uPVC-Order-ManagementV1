@@ -1,44 +1,47 @@
-# [Project name]
+# uPVC Order Management
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An internal order, quotation, and production tracking system for a uPVC windows and doors business. Build modules sequentially, beginning with user access and administration.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server
+- `pnpm --filter @workspace/upvc-order-management run dev` — run the web app
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required secrets: `MONGODB_URI`, `SESSION_SECRET`
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
+- Web: React + Vite
 - API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Persistence: MongoDB only, using the MongoDB Node.js driver
+- Authentication: username/password with Mongo-backed sessions
+- Validation and API client: Zod + Orval (from the OpenAPI spec)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/upvc-order-management` — web application
+- `artifacts/api-server` — API routes, MongoDB connection, session handling, and seed data
+- `lib/api-spec/openapi.yaml` — API contract
+- `lib/api-client-react` and `lib/api-zod` — generated API client and validation schemas
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- MongoDB is the only persistence layer; do not add PostgreSQL or relational storage.
+- Implement modules in the master prompt's order. Only Module 1 is in scope until it is confirmed.
+- Local username/password authentication is required by the product specification; there is no public self-registration.
+- Role permissions use `none`, `view`, and `edit`; user overrides take precedence over role defaults.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The first release provides sign-in, role-specific dashboard shells, Master Admin user management, custom roles, and per-module permissions. Later business modules remain visible as Coming Soon until built.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Demo users are for development only; never expose seeded demo credentials in a production environment.
+- Do not use PostgreSQL tooling or the removed relational DB scaffold.
 
 ## Pointers
 
