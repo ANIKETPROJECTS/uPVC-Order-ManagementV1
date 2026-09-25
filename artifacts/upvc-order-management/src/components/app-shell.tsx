@@ -96,16 +96,16 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               if (!canAccess) return null;
               if (!module.built) {
                 return (
-                  <div key={module.key} className="group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground/38" title="Coming soon" data-testid={`nav-coming-soon-${module.key}`}>
+                  <div key={module.key} className="group relative flex h-10 min-w-0 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground/38" title={`${module.label} — Coming Soon`} data-testid={`nav-coming-soon-${module.key}`}>
                     <Icon size={17} className="shrink-0" />
-                    {!collapsed && <><span className="flex-1">{module.label}</span><span className="text-[9px] uppercase tracking-wide text-sidebar-foreground/35">Coming Soon</span></>}
+                    {!collapsed && <><span className="min-w-0 flex-1 truncate whitespace-nowrap">{module.short}</span><span className="shrink-0 text-[9px] uppercase tracking-wide text-sidebar-foreground/35">Soon</span></>}
                   </div>
                 );
               }
               return (
-                <Link key={module.key} href={path} onClick={() => setMobileOpen(false)} className={`flex h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${active ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid={`link-nav-${module.key}`}>
+                <Link key={module.key} href={path} onClick={() => setMobileOpen(false)} title={module.label} className={`flex h-10 min-w-0 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${active ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid={`link-nav-${module.key}`}>
                   <Icon size={17} className="shrink-0" />
-                  {!collapsed && <span className="flex-1">{module.label}</span>}
+                  {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">{module.short}</span>}
                   {!collapsed && module.key === 'user-access' && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
                 </Link>
               );
