@@ -91,6 +91,7 @@ export interface ChatConversationDocument {
   type: "direct";
   participantIds: string[];
   readAtByUser: Record<string, Date>;
+  hiddenAtByUser?: Record<string, Date>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -102,6 +103,7 @@ export interface ChatGroupDocument {
   description: string | null;
   memberIds: string[];
   readAtByUser: Record<string, Date>;
+  hiddenAtByUser?: Record<string, Date>;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -114,6 +116,8 @@ export interface ChatMessageDocument {
   senderId: string;
   body: string;
   createdAt: Date;
+  editedAt?: Date | null;
+  deletedAt?: Date | null;
 }
 
 export function getMongoClient(): Promise<MongoClient> {

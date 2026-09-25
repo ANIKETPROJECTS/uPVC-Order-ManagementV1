@@ -337,6 +337,67 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatMessage"
+  /chat/conversations/{conversationId}/messages/{messageId}:
+    patch:
+      operationId: updateChatMessage
+      tags: [chat]
+      summary: Edit a message sent by the signed-in user
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageUpdate"
+      responses:
+        "200":
+          description: Updated message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+    delete:
+      operationId: deleteChatMessage
+      tags: [chat]
+      summary: Delete a message for all conversation participants
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Message deleted for all participants
+  /chat/conversations/{conversationId}:
+    delete:
+      operationId: deleteChatConversation
+      tags: [chat]
+      summary: Hide a conversation from the signed-in user's chat list
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Conversation hidden for the signed-in user
   /chat/conversations/{conversationId}/read:
     post:
       operationId: markChatConversationRead
@@ -707,7 +768,13 @@ components:
         createdAt:
           type: string
           format: date-time
-      required: [id, conversationId, senderId, senderName, body, createdAt]
+        editedAt:
+          type: ["string", "null"]
+          format: date-time
+        deletedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [id, conversationId, senderId, senderName, body, createdAt, editedAt, deletedAt]
     ChatGroup:
       type: object
       properties:
@@ -740,6 +807,14 @@ components:
           minLength: 1
       required: [otherUserId]
     ChatMessageInput:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+      required: [body]
+    ChatMessageUpdate:
       type: object
       properties:
         body:

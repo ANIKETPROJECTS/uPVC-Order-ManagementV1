@@ -13,4 +13,8 @@ export interface ChatMessage {
   senderName: string;
   body: string;
   createdAt: Date;
+  /** @nullable */
+  editedAt: Date | null;
+  /** @nullable */
+  deletedAt: Date | null;
 }

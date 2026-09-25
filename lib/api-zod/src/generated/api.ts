@@ -365,7 +365,9 @@ export const ListChatMessagesResponseItem = zod.object({
   "senderId": zod.string(),
   "senderName": zod.string(),
   "body": zod.string(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "editedAt": zod.coerce.date().nullable(),
+  "deletedAt": zod.coerce.date().nullable()
 })
 export const ListChatMessagesResponse = zod.array(ListChatMessagesResponseItem)
 
@@ -391,8 +393,59 @@ export const SendChatMessageResponse = zod.object({
   "senderId": zod.string(),
   "senderName": zod.string(),
   "body": zod.string(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "editedAt": zod.coerce.date().nullable(),
+  "deletedAt": zod.coerce.date().nullable()
 })
+
+
+/**
+ * @summary Edit a message sent by the signed-in user
+ */
+export const UpdateChatMessageParams = zod.object({
+  "conversationId": zod.coerce.string(),
+  "messageId": zod.coerce.string()
+})
+
+export const updateChatMessageBodyBodyMax = 4000;
+
+
+
+export const UpdateChatMessageBody = zod.object({
+  "body": zod.string().min(1).max(updateChatMessageBodyBodyMax)
+})
+
+export const UpdateChatMessageResponse = zod.object({
+  "id": zod.string(),
+  "conversationId": zod.string(),
+  "senderId": zod.string(),
+  "senderName": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "editedAt": zod.coerce.date().nullable(),
+  "deletedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Delete a message for all conversation participants
+ */
+export const DeleteChatMessageParams = zod.object({
+  "conversationId": zod.coerce.string(),
+  "messageId": zod.coerce.string()
+})
+
+export const DeleteChatMessageResponse = zod.void()
+
+
+/**
+ * @summary Hide a conversation from the signed-in user's chat list
+ */
+export const DeleteChatConversationParams = zod.object({
+  "conversationId": zod.coerce.string()
+})
+
+export const DeleteChatConversationResponse = zod.void()
 
 
 /**

@@ -8,7 +8,11 @@ import {
 import {
   CreateChatGroupBody,
   CreateChatGroupResponse,
+  DeleteChatConversationParams,
+  DeleteChatConversationResponse,
   DeleteChatGroupParams,
+  DeleteChatMessageParams,
+  DeleteChatMessageResponse,
   ListChatConversationsResponse,
   ListChatGroupsResponse,
   ListChatMessagesParams,
@@ -21,6 +25,9 @@ import {
   SendChatMessageResponse,
   StartDirectConversationBody,
   StartDirectConversationResponse,
+  UpdateChatMessageBody,
+  UpdateChatMessageParams,
+  UpdateChatMessageResponse,
   UpdateChatGroupBody,
   UpdateChatGroupParams,
   UpdateChatGroupResponse,
@@ -110,6 +117,20 @@ async function chatPeopleByIds(db: Db, ids: string[]) {
       },
     ]),
   );
+}
+
+async function chatMessagePayload(db: Db, message: ChatMessageDocument) {
+  const people = await chatPeopleByIds(db, [message.senderId]);
+  return {
+    id: message._id,
+    conversationId: message.conversationId,
+    senderId: message.senderId,
+    senderName: people.get(message.senderId)?.name ?? "Former user",
+    body: message.body,
+    createdAt: message.createdAt,
+    editedAt: message.editedAt ?? null,
+    deletedAt: message.deletedAt ?? null,
+  };
 }
 
 async function chatGroupResponse(db: Db, group: ChatGroupDocument) {
@@ -222,6 +243,7 @@ async function conversationList(db: Db, user: UserDocument) {
       body: string;
       senderId: string;
       createdAt: Date;
+      deletedAt?: Date | null;
     }>([
       { $match: { conversationId: { $in: ids } } },
       { $sort: { createdAt: -1, _id: -1 } },
@@ -231,6 +253,7 @@ async function conversationList(db: Db, user: UserDocument) {
           body: { $first: "$body" },
           senderId: { $first: "$senderId" },
           createdAt: { $first: "$createdAt" },
+          deletedAt: { $first: "$deletedAt" },
         },
       },
     ])
@@ -238,7 +261,15 @@ async function conversationList(db: Db, user: UserDocument) {
   const lastMessageByConversation = new Map(
     latestMessages.map((message) => [message._id, message]),
   );
-  const relatedUserIds = refs.flatMap((ref) =>
+  const visibleRefs = refs.filter((ref) => {
+    const hiddenAt = ref.document.hiddenAtByUser?.[readKey(user._id)];
+    if (!hiddenAt) return true;
+    const lastMessage = lastMessageByConversation.get(ref.id);
+    return Boolean(lastMessage && lastMessage.createdAt > hiddenAt);
+  });
+  if (visibleRefs.length === 0) return [];
+
+  const relatedUserIds = visibleRefs.flatMap((ref) =>
     ref.type === "direct"
       ? ref.document.participantIds
       : ref.document.memberIds,
@@ -249,11 +280,11 @@ async function conversationList(db: Db, user: UserDocument) {
   );
 
   const conversations = await Promise.all(
-    refs.map(async (ref) => {
+    visibleRefs.map(async (ref) => {
       const last = lastMessageByConversation.get(ref.id);
       const lastMessage = last
         ? {
-            body: last.body,
+            body: last.deletedAt ? "This message was deleted" : last.body,
             senderId: last.senderId,
             senderName: people.get(last.senderId)?.name ?? "Former user",
             createdAt: last.createdAt,
@@ -265,6 +296,7 @@ async function conversationList(db: Db, user: UserDocument) {
         conversationId: ref.id,
         senderId: { $ne: user._id },
         createdAt: { $gt: readAt },
+        deletedAt: null,
       });
 
       if (ref.type === "direct") {
@@ -364,6 +396,9 @@ router.post("/chat/direct-conversations", async (req, res): Promise<void> => {
         createdAt: now,
         updatedAt: now,
       },
+      $unset: {
+        [`hiddenAtByUser.${readKey(signedInUser._id)}`]: "",
+      },
     },
     { upsert: true },
   );
@@ -415,6 +450,8 @@ router.get(
       senderName: people.get(message.senderId)?.name ?? "Former user",
       body: message.body,
       createdAt: message.createdAt,
+      editedAt: message.editedAt ?? null,
+      deletedAt: message.deletedAt ?? null,
     }));
     res.json(ListChatMessagesResponse.parse(response));
   },
@@ -463,6 +500,8 @@ router.post(
       senderId: signedInUser._id,
       body: parsed.data.body.trim(),
       createdAt: now,
+      editedAt: null,
+      deletedAt: null,
     };
     await getChatMessages(db).insertOne(message);
     const readField = `readAtByUser.${readKey(signedInUser._id)}`;
@@ -486,8 +525,179 @@ router.post(
         senderName: signedInUser.name,
         body: message.body,
         createdAt: now,
+        editedAt: null,
+        deletedAt: null,
       }),
     );
+  },
+);
+
+router.patch(
+  "/chat/conversations/:conversationId/messages/:messageId",
+  async (req, res): Promise<void> => {
+    const params = UpdateChatMessageParams.safeParse(req.params);
+    const parsed = UpdateChatMessageBody.safeParse(req.body);
+    if (!params.success || !parsed.success || !parsed.data.body.trim()) {
+      res.status(400).json({ error: "Enter a message of up to 4,000 characters." });
+      return;
+    }
+
+    const db = await getMongoDb();
+    const signedInUser = currentUser(res);
+    const access = await conversationForUser(
+      db,
+      params.data.conversationId,
+      signedInUser._id,
+    );
+    if (!access) {
+      res.status(404).json({ error: "Conversation not found." });
+      return;
+    }
+
+    const messages = getChatMessages(db);
+    const message = await messages.findOne({
+      _id: params.data.messageId,
+      conversationId: params.data.conversationId,
+    });
+    if (!message) {
+      res.status(404).json({ error: "Message not found." });
+      return;
+    }
+    if (message.senderId !== signedInUser._id) {
+      res.status(403).json({ error: "You can only edit your own messages." });
+      return;
+    }
+    if (message.deletedAt) {
+      res.status(409).json({ error: "This message has already been deleted." });
+      return;
+    }
+
+    const editedAt = new Date();
+    const update = await messages.updateOne(
+      {
+        _id: message._id,
+        conversationId: message.conversationId,
+        senderId: signedInUser._id,
+        deletedAt: null,
+      },
+      { $set: { body: parsed.data.body.trim(), editedAt } },
+    );
+    if (update.matchedCount === 0) {
+      res.status(409).json({ error: "This message has already been deleted." });
+      return;
+    }
+
+    const updated = await messages.findOne({ _id: message._id });
+    if (!updated) {
+      res.status(404).json({ error: "Message not found." });
+      return;
+    }
+    res.json(
+      UpdateChatMessageResponse.parse(await chatMessagePayload(db, updated)),
+    );
+  },
+);
+
+router.delete(
+  "/chat/conversations/:conversationId/messages/:messageId",
+  async (req, res): Promise<void> => {
+    const params = DeleteChatMessageParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Choose a valid message." });
+      return;
+    }
+
+    const db = await getMongoDb();
+    const signedInUser = currentUser(res);
+    const access = await conversationForUser(
+      db,
+      params.data.conversationId,
+      signedInUser._id,
+    );
+    if (!access) {
+      res.status(404).json({ error: "Conversation not found." });
+      return;
+    }
+
+    const messages = getChatMessages(db);
+    const message = await messages.findOne({
+      _id: params.data.messageId,
+      conversationId: params.data.conversationId,
+    });
+    if (!message) {
+      res.status(404).json({ error: "Message not found." });
+      return;
+    }
+    if (message.senderId !== signedInUser._id) {
+      res.status(403).json({ error: "You can only delete your own messages." });
+      return;
+    }
+    if (message.deletedAt) {
+      res.status(409).json({ error: "This message has already been deleted." });
+      return;
+    }
+
+    const deletedAt = new Date();
+    const update = await messages.updateOne(
+      {
+        _id: message._id,
+        conversationId: message.conversationId,
+        senderId: signedInUser._id,
+        deletedAt: null,
+      },
+      { $set: { body: "", editedAt: null, deletedAt } },
+    );
+    if (update.matchedCount === 0) {
+      res.status(409).json({ error: "This message has already been deleted." });
+      return;
+    }
+
+    DeleteChatMessageResponse.parse(undefined);
+    res.status(204).end();
+  },
+);
+
+router.delete(
+  "/chat/conversations/:conversationId",
+  async (req, res): Promise<void> => {
+    const params = DeleteChatConversationParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Choose a valid conversation." });
+      return;
+    }
+
+    const db = await getMongoDb();
+    const signedInUser = currentUser(res);
+    const access = await conversationForUser(
+      db,
+      params.data.conversationId,
+      signedInUser._id,
+    );
+    if (!access) {
+      res.status(404).json({ error: "Conversation not found." });
+      return;
+    }
+
+    const hiddenField = `hiddenAtByUser.${readKey(signedInUser._id)}`;
+    const hiddenAt = new Date();
+    if (access.type === "direct") {
+      await getChatConversations(db).updateOne(
+        { _id: access.document._id, participantIds: signedInUser._id },
+        { $set: { [hiddenField]: hiddenAt } },
+      );
+    } else {
+      await getChatGroups(db).updateOne(
+        {
+          _id: access.document._id,
+          memberIds: signedInUser._id,
+          deletedAt: null,
+        },
+        { $set: { [hiddenField]: hiddenAt } },
+      );
+    }
+
+    DeleteChatConversationResponse.parse(undefined);
+    res.status(204).end();
   },
 );
 

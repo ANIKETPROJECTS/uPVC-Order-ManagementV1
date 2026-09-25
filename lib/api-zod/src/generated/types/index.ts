@@ -16,6 +16,7 @@ export * from './chatGroupUpdate';
 export * from './chatMessage';
 export * from './chatMessageInput';
 export * from './chatMessagePreview';
+export * from './chatMessageUpdate';
 export * from './chatPerson';
 export * from './chatPersonStatus';
 export * from './dashboard';

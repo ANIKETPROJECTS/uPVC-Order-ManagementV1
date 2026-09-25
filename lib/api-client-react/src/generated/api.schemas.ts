@@ -224,6 +224,10 @@ export interface ChatMessage {
   senderName: string;
   body: string;
   createdAt: string;
+  /** @nullable */
+  editedAt: string | null;
+  /** @nullable */
+  deletedAt: string | null;
 }
 
 export interface ChatGroup {
@@ -243,6 +247,14 @@ export interface StartDirectConversationInput {
 }
 
 export interface ChatMessageInput {
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  body: string;
+}
+
+export interface ChatMessageUpdate {
   /**
      * @minLength 1
      * @maxLength 4000
