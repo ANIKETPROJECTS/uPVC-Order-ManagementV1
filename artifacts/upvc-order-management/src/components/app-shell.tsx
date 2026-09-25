@@ -72,7 +72,9 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               const path = pathForModule(module.key);
               const permission = user.permissions?.[module.key];
               const canAccess = permission === 'view' || permission === 'edit';
-              const active = location.startsWith(path);
+              const active = module.key === 'user-access'
+                ? location.startsWith('/admin/users') || location.startsWith('/admin/roles')
+                : location.startsWith(path);
               if (module.key === 'user-access' && !isMasterAdmin) return null;
               if (!canAccess) return null;
               if (!module.built) {
@@ -91,7 +93,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
                 </Link>
               );
             })}
-            {isMasterAdmin && !collapsed && <Link href="/admin/roles" onClick={() => setMobileOpen(false)} className={`ml-8 flex h-8 items-center gap-2 rounded-lg px-3 text-xs transition-colors ${location === '/admin/roles' ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground' : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground'}`} data-testid="link-nav-roles"><SidebarSectionIcon name="roles" size={21} /> Roles & permissions</Link>}
           </nav>
           {!collapsed && <div className="mt-7 rounded-xl border border-sidebar-border bg-sidebar-accent/60 p-3"><p className="text-xs font-semibold text-sidebar-foreground">Module 1 active</p><p className="mt-1 text-[11px] leading-relaxed text-sidebar-foreground/55">User access and permission controls are ready for your team.</p></div>}
         </div>

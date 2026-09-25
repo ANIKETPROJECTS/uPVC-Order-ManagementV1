@@ -34,6 +34,7 @@ import {
 import type { Role, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { AvatarCropper } from '@/components/avatar-cropper';
+import { UserAccessNav } from '@/components/user-access-nav';
 import { UserAvatar } from '@/components/user-avatar';
 import { MODULES, type PermissionValue } from '@/lib/modules';
 
@@ -302,8 +303,9 @@ export default function UsersPage({ user }: { user: User }) {
   const isSaving = createUser.isPending || updateUser.isPending;
 
   return (
-    <AppShell user={user} title="Users" eyebrow="Administration">
+    <AppShell user={user} title="Users" eyebrow="User access">
       <div className="space-y-6">
+        <UserAccessNav active="users" />
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="text-sm text-muted-foreground">People with access to Framewise and their effective permissions.</p>
@@ -507,7 +509,7 @@ export default function UsersPage({ user }: { user: User }) {
 
       {dialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4" role="dialog" aria-modal="true" aria-labelledby="user-dialog-title">
-          <div className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="max-h-[92dvh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
             <div className="flex items-start justify-between border-b border-border p-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{editing ? 'Edit account' : 'New account'}</p>
