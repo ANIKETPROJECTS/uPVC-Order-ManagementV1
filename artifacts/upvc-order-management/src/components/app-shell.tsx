@@ -57,14 +57,14 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
       {mobileOpen && <button className="fixed inset-0 z-30 bg-foreground/25 md:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation overlay" data-testid="button-close-navigation-overlay" />}
       <aside className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-200 ${collapsed ? 'w-[76px]' : 'w-[260px]'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="flex h-[76px] items-center gap-3 border-b border-sidebar-border px-5">
-          <div className="grid h-9 w-9 shrink-0 place-items-center"><SidebarSectionIcon name="brand" size={36} /></div>
+          <div className="grid h-12 w-12 shrink-0 place-items-center"><SidebarSectionIcon name="brand" size={48} /></div>
           {!collapsed && <div className="min-w-0"><p className="font-display text-sm font-bold tracking-tight">Framewise</p><p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">Order operations</p></div>}
         </div>
         <div className="scrollbar-thin flex-1 overflow-y-auto px-3 py-5">
           <p className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40 ${collapsed ? 'text-center' : ''}`}>{collapsed ? '•••' : 'Workspace'}</p>
           <nav className="space-y-1" aria-label="Main navigation">
             <Link href="/" onClick={() => setMobileOpen(false)} className={`flex h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-overview">
-              <SidebarSectionIcon name="overview" size={19} className="shrink-0" />
+              <SidebarSectionIcon name="overview" size={27} className="shrink-0" />
               {!collapsed && <span className="flex-1">Overview</span>}
             </Link>
             {MODULES.map((module) => {
@@ -78,20 +78,20 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               if (!module.built) {
                 return (
                   <div key={module.key} className="group relative flex h-10 min-w-0 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground/38" title={`${module.label} — Coming Soon`} data-testid={`nav-coming-soon-${module.key}`}>
-                    <SidebarSectionIcon name={iconName} size={19} className="shrink-0" />
+                    <SidebarSectionIcon name={iconName} size={27} className="shrink-0" />
                     {!collapsed && <><span className="min-w-0 flex-1 truncate whitespace-nowrap">{module.short}</span><span className="shrink-0 text-[9px] uppercase tracking-wide text-sidebar-foreground/35">Soon</span></>}
                   </div>
                 );
               }
               return (
                 <Link key={module.key} href={path} onClick={() => setMobileOpen(false)} title={module.label} className={`flex h-10 min-w-0 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${active ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid={`link-nav-${module.key}`}>
-                  <SidebarSectionIcon name={iconName} size={19} className="shrink-0" />
+                  <SidebarSectionIcon name={iconName} size={27} className="shrink-0" />
                   {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">{module.short}</span>}
                   {!collapsed && module.key === 'user-access' && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
                 </Link>
               );
             })}
-            {isMasterAdmin && !collapsed && <Link href="/admin/roles" onClick={() => setMobileOpen(false)} className={`ml-8 flex h-8 items-center gap-2 rounded-lg px-3 text-xs transition-colors ${location === '/admin/roles' ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground' : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-roles"><SidebarSectionIcon name="roles" size={16} /> Roles & permissions</Link>}
+            {isMasterAdmin && !collapsed && <Link href="/admin/roles" onClick={() => setMobileOpen(false)} className={`ml-8 flex h-8 items-center gap-2 rounded-lg px-3 text-xs transition-colors ${location === '/admin/roles' ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground' : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground'}`} data-testid="link-nav-roles"><SidebarSectionIcon name="roles" size={21} /> Roles & permissions</Link>}
           </nav>
           {!collapsed && <div className="mt-7 rounded-xl border border-sidebar-border bg-sidebar-accent/60 p-3"><p className="text-xs font-semibold text-sidebar-foreground">Module 1 active</p><p className="mt-1 text-[11px] leading-relaxed text-sidebar-foreground/55">User access and permission controls are ready for your team.</p></div>}
         </div>
