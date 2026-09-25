@@ -130,15 +130,3 @@
 
 .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--sidebar-border)); border-radius: 999px; }
-
-.login-page :is(h1, h2, p, span, label, button, input, .login-feedback) {
-  color: #fff !important;
-  -webkit-text-stroke: 0.25px #050909;
-  text-shadow: none;
-}
-
-.login-page input::placeholder {
-  color: rgba(255, 255, 255, 0.78) !important;
-  -webkit-text-stroke: 0.15px #050909;
-  text-shadow: none;
-}

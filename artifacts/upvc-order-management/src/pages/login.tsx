@@ -58,7 +58,7 @@ export default function LoginPage() {
             <p className="font-display text-2xl font-bold">Framewise</p>
             <p className="mt-1 text-xs uppercase tracking-[0.2em]">Order operations</p>
           </div>
-          <div className="rounded-3xl border border-white/70 bg-white/95 p-6 text-foreground shadow-2xl backdrop-blur-md sm:p-8">
+          <div className="rounded-3xl bg-white/95 p-6 text-foreground shadow-2xl backdrop-blur-md sm:p-8">
             <div className="mb-8">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Secure staff access</p>
               <h2 className="mt-3 font-display text-4xl font-bold tracking-[-0.04em]">Good morning.</h2>
@@ -69,14 +69,14 @@ export default function LoginPage() {
                 <span className="mb-2 block text-xs font-semibold text-foreground">Username</span>
                 <div className="relative">
                   <UserRound className="absolute left-3.5 top-3.5 text-muted-foreground" size={17} />
-                  <input value={username} onChange={(event) => setUsername(event.target.value)} className="h-12 w-full rounded-xl border border-input bg-background pl-11 pr-4 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40" data-testid="input-login-username" autoComplete="username" />
+                  <input value={username} onChange={(event) => setUsername(event.target.value)} className="h-12 w-full rounded-xl border border-input bg-background pl-11 pr-4 text-sm text-foreground outline-none transition focus:border-input focus:ring-0 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/35" data-testid="input-login-username" autoComplete="username" />
                 </div>
               </label>
               <label className="block">
                 <span className="mb-2 block text-xs font-semibold text-foreground">Password</span>
                 <div className="relative">
                   <LockKeyhole className="absolute left-3.5 top-3.5 text-muted-foreground" size={17} />
-                  <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 w-full rounded-xl border border-input bg-background pl-11 pr-4 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40" data-testid="input-login-password" autoComplete="current-password" />
+                  <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 w-full rounded-xl border border-input bg-background pl-11 pr-4 text-sm text-foreground outline-none transition focus:border-input focus:ring-0 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/35" data-testid="input-login-password" autoComplete="current-password" />
                 </div>
               </label>
               {login.isError && <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-xs leading-5 text-destructive" data-testid="status-login-error">We couldn't sign you in. Check the username and password, then try again.</div>}
