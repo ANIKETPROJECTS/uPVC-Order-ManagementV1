@@ -58,31 +58,31 @@ export default function LoginPage() {
             <p className="font-display text-2xl font-bold">Framewise</p>
             <p className="mt-1 text-xs uppercase tracking-[0.2em]">Order operations</p>
           </div>
-          <div className="rounded-3xl border border-white/25 bg-slate-950/70 p-6 shadow-2xl backdrop-blur-md sm:p-8">
+          <div className="rounded-3xl border border-white/70 bg-white/95 p-6 text-foreground shadow-2xl backdrop-blur-md sm:p-8">
             <div className="mb-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em]">Secure staff access</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Secure staff access</p>
               <h2 className="mt-3 font-display text-4xl font-bold tracking-[-0.04em]">Good morning.</h2>
-              <p className="mt-3 text-sm leading-6">Sign in to pick up where your team left off.</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Sign in to pick up where your team left off.</p>
             </div>
             <form onSubmit={submit} className="space-y-5">
               <label className="block">
-                <span className="mb-2 block text-xs font-semibold">Username</span>
+                <span className="mb-2 block text-xs font-semibold text-foreground">Username</span>
                 <div className="relative">
-                  <UserRound className="absolute left-3.5 top-3.5 text-white/70" size={17} />
-                  <input value={username} onChange={(event) => setUsername(event.target.value)} className="h-12 w-full rounded-xl border border-white/25 bg-black/30 pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40" data-testid="input-login-username" autoComplete="username" />
+                  <UserRound className="absolute left-3.5 top-3.5 text-muted-foreground" size={17} />
+                  <input value={username} onChange={(event) => setUsername(event.target.value)} className="h-12 w-full rounded-xl border border-input bg-background pl-11 pr-4 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40" data-testid="input-login-username" autoComplete="username" />
                 </div>
               </label>
               <label className="block">
-                <span className="mb-2 block text-xs font-semibold">Password</span>
+                <span className="mb-2 block text-xs font-semibold text-foreground">Password</span>
                 <div className="relative">
-                  <LockKeyhole className="absolute left-3.5 top-3.5 text-white/70" size={17} />
-                  <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 w-full rounded-xl border border-white/25 bg-black/30 pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40" data-testid="input-login-password" autoComplete="current-password" />
+                  <LockKeyhole className="absolute left-3.5 top-3.5 text-muted-foreground" size={17} />
+                  <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 w-full rounded-xl border border-input bg-background pl-11 pr-4 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40" data-testid="input-login-password" autoComplete="current-password" />
                 </div>
               </label>
-              {login.isError && <div className="login-feedback rounded-xl border border-white/20 bg-red-950/70 px-4 py-3 text-xs leading-5" data-testid="status-login-error">We couldn't sign you in. Check the username and password, then try again.</div>}
-              <button type="submit" disabled={login.isPending || !username || !password} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-semibold shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60" data-testid="button-login">{login.isPending ? 'Checking access…' : <>Sign in <ArrowRight size={16} /></>}</button>
+              {login.isError && <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-xs leading-5 text-destructive" data-testid="status-login-error">We couldn't sign you in. Check the username and password, then try again.</div>}
+              <button type="submit" disabled={login.isPending || !username || !password} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60" data-testid="button-login">{login.isPending ? 'Checking access…' : <>Sign in <ArrowRight size={16} /></>}</button>
             </form>
-            {import.meta.env.DEV && <div className="mt-8 rounded-xl border border-white/25 bg-black/35 p-4" data-testid="note-demo-credentials"><p className="text-[10px] font-bold uppercase tracking-[0.16em]">Development-only note</p><p className="mt-2 text-xs leading-5">Seeded logins for role switching:</p><div className="mt-2 space-y-1 font-mono text-[11px]"><p><span className="font-semibold">admin</span> / Admin@12345</p><p><span className="font-semibold">operator, manager, rate.approver, accounts, quotations</span> / Demo@12345</p></div></div>}
+            {import.meta.env.DEV && <div className="mt-8 rounded-xl border border-border bg-muted/60 p-4" data-testid="note-demo-credentials"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Development-only note</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Seeded logins for role switching:</p><div className="mt-2 space-y-1 font-mono text-[11px] text-foreground"><p><span className="font-semibold">admin</span> / Admin@12345</p><p><span className="font-semibold">operator, manager, rate.approver, accounts, quotations</span> / Demo@12345</p></div></div>}
           </div>
         </div>
       </main>
