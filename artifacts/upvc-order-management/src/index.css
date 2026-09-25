@@ -109,8 +109,8 @@
 
 .order-hub-accent {
   background:
-    radial-gradient(circle at 92% 8%, hsl(var(--accent) / 0.18), transparent 26%),
-    linear-gradient(135deg, hsl(var(--sidebar) / 0.98), hsl(204 34% 20%));
+    radial-gradient(circle at 92% 8%, rgb(231 163 83 / 0.14), transparent 26%),
+    linear-gradient(135deg, #173b48 0%, #123241 58%, #0d2938 100%);
 }
 
 .order-rule {
