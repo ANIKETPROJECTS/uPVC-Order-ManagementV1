@@ -16,6 +16,8 @@ tags:
     description: User and role administration
   - name: dashboard
     description: Role-specific dashboard data
+  - name: order-hub
+    description: Client and central order management
 paths:
   /healthz:
     get:
@@ -248,6 +250,345 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminSummary"
+  /clients:
+    get:
+      operationId: listClients
+      tags: [order-hub]
+      summary: List clients
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: includeInactive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Clients visible to the current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientList"
+        "401":
+          description: Sign in required
+        "403":
+          description: Client and order access required
+    post:
+      operationId: createClient
+      tags: [order-hub]
+      summary: Add a client and assign its order ID prefix
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInput"
+      responses:
+        "201":
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          description: Invalid client details
+        "401":
+          description: Sign in required
+        "403":
+          description: Edit access required
+        "409":
+          description: Client prefix already exists
+  /clients/{clientId}:
+    patch:
+      operationId: updateClient
+      tags: [order-hub]
+      summary: Update client details or deactivate a client
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientUpdate"
+      responses:
+        "200":
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          description: Invalid client details
+        "401":
+          description: Sign in required
+        "403":
+          description: Edit access required
+        "404":
+          description: Client not found
+        "409":
+          description: Client prefix already exists
+  /locations:
+    get:
+      operationId: listOrderLocations
+      tags: [order-hub]
+      summary: List order locations
+      parameters:
+        - name: includeInactive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Locations visible to the current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderLocationList"
+        "401":
+          description: Sign in required
+        "403":
+          description: Client and order access required
+    post:
+      operationId: createOrderLocation
+      tags: [order-hub]
+      summary: Add an order location code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderLocationInput"
+      responses:
+        "201":
+          description: Location created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderLocation"
+        "400":
+          description: Invalid location details
+        "401":
+          description: Sign in required
+        "403":
+          description: Edit access required
+        "409":
+          description: Location code already exists
+  /locations/{locationId}:
+    patch:
+      operationId: updateOrderLocation
+      tags: [order-hub]
+      summary: Update or deactivate an order location code
+      parameters:
+        - name: locationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderLocationUpdate"
+      responses:
+        "200":
+          description: Updated location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderLocation"
+        "400":
+          description: Invalid location details
+        "401":
+          description: Sign in required
+        "403":
+          description: Edit access required
+        "404":
+          description: Location not found
+        "409":
+          description: Location code already exists
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [order-hub]
+      summary: Search and filter central orders
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrderStatus"
+        - name: clientId
+          in: query
+          schema:
+            type: string
+        - name: locationCode
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Matching orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderList"
+        "400":
+          description: Invalid order filters
+        "401":
+          description: Sign in required
+        "403":
+          description: Client and order access required
+    post:
+      operationId: createOrder
+      tags: [order-hub]
+      summary: Create an order with a canonical Order ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Invalid order details
+        "401":
+          description: Sign in required
+        "403":
+          description: Edit access required
+        "404":
+          description: Active client or location not found
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [order-hub]
+      summary: Get an order from the central hub
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "401":
+          description: Sign in required
+        "403":
+          description: Client and order access required
+        "404":
+          description: Order not found
+    patch:
+      operationId: updateOrder
+      tags: [order-hub]
+      summary: Update an order's lifecycle status or notes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderUpdate"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Invalid order update
+        "401":
+          description: Sign in required
+        "403":
+          description: Edit access required
+        "404":
+          description: Order not found
+  /order-message-templates:
+    get:
+      operationId: listOrderMessageTemplates
+      tags: [order-hub]
+      summary: List centrally configured lifecycle message templates
+      responses:
+        "200":
+          description: Lifecycle message templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderMessageTemplateList"
+        "401":
+          description: Sign in required
+        "403":
+          description: Client and order access required
+  /order-message-templates/{status}:
+    patch:
+      operationId: updateOrderMessageTemplate
+      tags: [order-hub]
+      summary: Update a lifecycle message template
+      parameters:
+        - name: status
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/OrderStatus"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderMessageTemplateUpdate"
+      responses:
+        "200":
+          description: Updated message template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderMessageTemplate"
+        "400":
+          description: Invalid message template
+        "401":
+          description: Sign in required
+        "403":
+          description: Master Admin access required
+        "404":
+          description: Message template not found
   /chat/people:
     get:
       operationId: listChatPeople
@@ -659,6 +1000,245 @@ components:
         success:
           type: boolean
       required: [success]
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        gstin:
+          type: ["string", "null"]
+        prefix:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, phone, address, gstin, prefix, isActive, createdAt, updatedAt]
+    ClientInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        phone:
+          type: string
+          minLength: 7
+          maxLength: 20
+        address:
+          type: string
+          minLength: 3
+          maxLength: 500
+        gstin:
+          type: ["string", "null"]
+          maxLength: 15
+          pattern: "^[0-9A-Za-z]{15}$"
+        prefix:
+          type: string
+          minLength: 1
+          maxLength: 8
+          pattern: "^[A-Za-z0-9]+$"
+      required: [name, phone, address, prefix]
+    ClientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        phone:
+          type: string
+          minLength: 7
+          maxLength: 20
+        address:
+          type: string
+          minLength: 3
+          maxLength: 500
+        gstin:
+          type: ["string", "null"]
+          maxLength: 15
+          pattern: "^[0-9A-Za-z]{15}$"
+        prefix:
+          type: string
+          minLength: 1
+          maxLength: 8
+          pattern: "^[A-Za-z0-9]+$"
+        isActive:
+          type: boolean
+    ClientList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Client"
+    OrderLocation:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, code, name, isActive, createdAt, updatedAt]
+    OrderLocationInput:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 2
+          maxLength: 5
+          pattern: "^[A-Za-z0-9]+$"
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+      required: [code, name]
+    OrderLocationUpdate:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 2
+          maxLength: 5
+          pattern: "^[A-Za-z0-9]+$"
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        isActive:
+          type: boolean
+    OrderLocationList:
+      type: array
+      items:
+        $ref: "#/components/schemas/OrderLocation"
+    OrderStatus:
+      type: string
+      enum: [quotation_stage, confirmed, in_production, ready, dispatched, installed]
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        sequenceNo:
+          type: integer
+        clientId:
+          type: string
+        clientName:
+          type: string
+        clientPrefix:
+          type: string
+        clientPhone:
+          type: ["string", "null"]
+        clientAddress:
+          type: ["string", "null"]
+        clientGstin:
+          type: ["string", "null"]
+        locationCode:
+          type: string
+        locationName:
+          type: string
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        notes:
+          type: ["string", "null"]
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - orderId
+        - sequenceNo
+        - clientId
+        - clientName
+        - clientPrefix
+        - clientPhone
+        - clientAddress
+        - clientGstin
+        - locationCode
+        - locationName
+        - status
+        - notes
+        - createdBy
+        - createdAt
+        - updatedBy
+        - updatedAt
+    OrderInput:
+      type: object
+      properties:
+        clientId:
+          type: string
+          minLength: 1
+        locationCode:
+          type: string
+          minLength: 2
+          maxLength: 5
+        notes:
+          type: ["string", "null"]
+          maxLength: 2000
+      required: [clientId, locationCode]
+    OrderUpdate:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        notes:
+          type: ["string", "null"]
+          maxLength: 2000
+    OrderList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Order"
+    OrderMessageTemplate:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        label:
+          type: string
+        template:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required: [status, label, template, updatedAt]
+    OrderMessageTemplateUpdate:
+      type: object
+      properties:
+        template:
+          type: string
+          minLength: 10
+          maxLength: 2000
+      required: [template]
+    OrderMessageTemplateList:
+      type: array
+      items:
+        $ref: "#/components/schemas/OrderMessageTemplate"
     Dashboard:
       type: object
       properties:

@@ -120,6 +120,72 @@ export interface ChatMessageDocument {
   deletedAt?: Date | null;
 }
 
+export type OrderStatus =
+  | "quotation_stage"
+  | "confirmed"
+  | "in_production"
+  | "ready"
+  | "dispatched"
+  | "installed";
+
+export interface ClientDocument {
+  _id: string;
+  name: string;
+  nameLower: string;
+  phone: string;
+  address: string;
+  gstin: string | null;
+  prefix: string;
+  prefixUpper: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OrderLocationDocument {
+  _id: string;
+  code: string;
+  codeUpper: string;
+  name: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OrderDocument {
+  _id: string;
+  orderId: string;
+  sequenceNo: number;
+  clientId: string;
+  clientName: string;
+  clientPrefix: string;
+  clientPhone: string | null;
+  clientAddress: string | null;
+  clientGstin: string | null;
+  locationCode: string;
+  locationName: string;
+  status: OrderStatus;
+  notes: string | null;
+  createdBy: string;
+  createdAt: Date;
+  updatedBy: string | null;
+  updatedAt: Date;
+}
+
+export interface OrderMessageTemplateDocument {
+  _id: OrderStatus;
+  status: OrderStatus;
+  label: string;
+  template: string;
+  updatedAt: Date;
+}
+
+interface CounterDocument {
+  _id: string;
+  value: number;
+  updatedAt: Date;
+}
+
 export function getMongoClient(): Promise<MongoClient> {
   clientPromise ??= mongoClient.connect();
   return clientPromise;
@@ -152,6 +218,28 @@ export function getChatGroups(db: Db): Collection<ChatGroupDocument> {
 
 export function getChatMessages(db: Db): Collection<ChatMessageDocument> {
   return db.collection<ChatMessageDocument>("chat_messages");
+}
+
+export function getClients(db: Db): Collection<ClientDocument> {
+  return db.collection<ClientDocument>("clients");
+}
+
+export function getOrderLocations(db: Db): Collection<OrderLocationDocument> {
+  return db.collection<OrderLocationDocument>("order_locations");
+}
+
+export function getOrders(db: Db): Collection<OrderDocument> {
+  return db.collection<OrderDocument>("orders");
+}
+
+export function getOrderMessageTemplates(
+  db: Db,
+): Collection<OrderMessageTemplateDocument> {
+  return db.collection<OrderMessageTemplateDocument>("order_message_templates");
+}
+
+export function getCounters(db: Db): Collection<CounterDocument> {
+  return db.collection<CounterDocument>("counters");
 }
 
 export function emptyPermissionMap(): PermissionMap {
@@ -306,6 +394,61 @@ const developmentUsers = [
   { name: "Kavita More", username: "quotations", phone: "+91 98220 10006", roleId: "quotation-team", password: "Demo@12345" },
 ];
 
+const seedOrderClients = [
+  { id: "rayal", name: "Rayal uPVC", phone: "+91 98220 21001", address: "College Road, Nashik, Maharashtra", gstin: "27AAECR1234F1Z5", prefix: "R" },
+  { id: "chavan-bhau", name: "Chavan Bhau Developers", phone: "+91 98220 21002", address: "Kothrud, Pune, Maharashtra", gstin: "27AACCC4567G1Z2", prefix: "C" },
+  { id: "aakar-solitaire", name: "Aakar Solitaire", phone: "+91 98220 21003", address: "Gangapur Road, Nashik, Maharashtra", gstin: null, prefix: "A" },
+  { id: "patil-builders", name: "Patil Builders", phone: "+91 98220 21004", address: "Andheri East, Mumbai, Maharashtra", gstin: "27AANCP7654B1ZT", prefix: "P" },
+  { id: "greenview-heights", name: "Greenview Heights", phone: "+91 98220 21005", address: "Wadala, Mumbai, Maharashtra", gstin: null, prefix: "G" },
+  { id: "mehta-residency", name: "Mehta Residency", phone: "+91 98220 21006", address: "Baner, Pune, Maharashtra", gstin: "27AAKFM9876J1ZQ", prefix: "M" },
+];
+
+const seedOrderLocations = [
+  { id: "pune", code: "PN", name: "Pune" },
+  { id: "mumbai", code: "MUM", name: "Mumbai" },
+  { id: "wadala", code: "WAD", name: "Wadala" },
+  { id: "nashik", code: "NSK", name: "Nashik" },
+];
+
+const seedOrders: Array<{
+  id: string;
+  orderId: string;
+  sequenceNo: number;
+  clientId: string;
+  clientName: string;
+  clientPrefix: string;
+  clientPhone: string;
+  clientAddress: string;
+  clientGstin: string | null;
+  locationCode: string;
+  locationName: string;
+  status: OrderStatus;
+  notes: string | null;
+  ageDays: number;
+}> = [
+  { id: "seed-order-253", orderId: "R253 PN", sequenceNo: 253, clientId: "rayal", clientName: "Rayal uPVC", clientPrefix: "R", clientPhone: "+91 98220 21001", clientAddress: "College Road, Nashik, Maharashtra", clientGstin: "27AAECR1234F1Z5", locationCode: "PN", locationName: "Pune", status: "quotation_stage", notes: "Site measurements received; quotation preparation started.", ageDays: 2 },
+  { id: "seed-order-254", orderId: "C254 NSK", sequenceNo: 254, clientId: "chavan-bhau", clientName: "Chavan Bhau Developers", clientPrefix: "C", clientPhone: "+91 98220 21002", clientAddress: "Kothrud, Pune, Maharashtra", clientGstin: "27AACCC4567G1Z2", locationCode: "NSK", locationName: "Nashik", status: "confirmed", notes: "Confirmation received from the client.", ageDays: 8 },
+  { id: "seed-order-255", orderId: "A255 MUM", sequenceNo: 255, clientId: "aakar-solitaire", clientName: "Aakar Solitaire", clientPrefix: "A", clientPhone: "+91 98220 21003", clientAddress: "Gangapur Road, Nashik, Maharashtra", clientGstin: null, locationCode: "MUM", locationName: "Mumbai", status: "in_production", notes: "Production schedule shared with the factory.", ageDays: 12 },
+  { id: "seed-order-256", orderId: "P256 WAD", sequenceNo: 256, clientId: "patil-builders", clientName: "Patil Builders", clientPrefix: "P", clientPhone: "+91 98220 21004", clientAddress: "Andheri East, Mumbai, Maharashtra", clientGstin: "27AANCP7654B1ZT", locationCode: "WAD", locationName: "Wadala", status: "ready", notes: "All scheduled windows are ready for the next stage.", ageDays: 18 },
+  { id: "seed-order-257", orderId: "G257 PN", sequenceNo: 257, clientId: "greenview-heights", clientName: "Greenview Heights", clientPrefix: "G", clientPhone: "+91 98220 21005", clientAddress: "Wadala, Mumbai, Maharashtra", clientGstin: null, locationCode: "PN", locationName: "Pune", status: "dispatched", notes: "Dispatch completed; installation coordination is pending.", ageDays: 23 },
+  { id: "seed-order-258", orderId: "M258 MUM", sequenceNo: 258, clientId: "mehta-residency", clientName: "Mehta Residency", clientPrefix: "M", clientPhone: "+91 98220 21006", clientAddress: "Baner, Pune, Maharashtra", clientGstin: "27AAKFM9876J1ZQ", locationCode: "MUM", locationName: "Mumbai", status: "installed", notes: "Installation completed and recorded.", ageDays: 31 },
+  { id: "seed-order-259", orderId: "R259 NSK", sequenceNo: 259, clientId: "rayal", clientName: "Rayal uPVC", clientPrefix: "R", clientPhone: "+91 98220 21001", clientAddress: "College Road, Nashik, Maharashtra", clientGstin: "27AAECR1234F1Z5", locationCode: "NSK", locationName: "Nashik", status: "confirmed", notes: null, ageDays: 5 },
+  { id: "seed-order-260", orderId: "C260 PN", sequenceNo: 260, clientId: "chavan-bhau", clientName: "Chavan Bhau Developers", clientPrefix: "C", clientPhone: "+91 98220 21002", clientAddress: "Kothrud, Pune, Maharashtra", clientGstin: "27AACCC4567G1Z2", locationCode: "PN", locationName: "Pune", status: "quotation_stage", notes: "Awaiting final quotation review.", ageDays: 1 },
+];
+
+const seedOrderMessageTemplates: Array<{
+  status: OrderStatus;
+  label: string;
+  template: string;
+}> = [
+  { status: "quotation_stage", label: "Quotation Stage", template: "Dear {{clientName}}, quotation preparation has started for order {{orderId}} at {{locationName}}. We will share the details with you shortly." },
+  { status: "confirmed", label: "Confirmed", template: "Dear {{clientName}}, your order {{orderId}} for {{locationName}} has been confirmed. We will keep you updated on the next steps." },
+  { status: "in_production", label: "In Production", template: "Dear {{clientName}}, your order {{orderId}} for {{locationName}} is now in production. We will share another update as it progresses." },
+  { status: "ready", label: "Ready", template: "Dear {{clientName}}, the items for order {{orderId}} at {{locationName}} are ready. Please contact us to coordinate the next steps." },
+  { status: "dispatched", label: "Dispatched", template: "Dear {{clientName}}, order {{orderId}} for {{locationName}} has been dispatched. Please contact us if you need any delivery details." },
+  { status: "installed", label: "Installed", template: "Dear {{clientName}}, installation for order {{orderId}} at {{locationName}} has been completed. Thank you for choosing us." },
+];
+
 export async function initializeMongo(): Promise<void> {
   const db = await getMongoDb();
   const users = getUsers(db);
@@ -313,6 +456,11 @@ export async function initializeMongo(): Promise<void> {
   const chatConversations = getChatConversations(db);
   const chatGroups = getChatGroups(db);
   const chatMessages = getChatMessages(db);
+  const clients = getClients(db);
+  const locations = getOrderLocations(db);
+  const orders = getOrders(db);
+  const orderMessageTemplates = getOrderMessageTemplates(db);
+  const counters = getCounters(db);
 
   await Promise.all([
     users.createIndex({ usernameLower: 1 }, { unique: true, name: "username_unique" }),
@@ -337,6 +485,14 @@ export async function initializeMongo(): Promise<void> {
       { conversationId: 1, createdAt: 1 },
       { name: "chat_messages_by_conversation" },
     ),
+    clients.createIndex({ prefixUpper: 1 }, { unique: true, name: "client_prefix_unique" }),
+    clients.createIndex({ nameLower: 1 }, { name: "clients_by_name" }),
+    locations.createIndex({ codeUpper: 1 }, { unique: true, name: "location_code_unique" }),
+    orders.createIndex({ orderId: 1 }, { unique: true, name: "order_id_unique" }),
+    orders.createIndex({ sequenceNo: 1 }, { unique: true, name: "order_sequence_unique" }),
+    orders.createIndex({ clientId: 1, createdAt: -1 }, { name: "orders_by_client_date" }),
+    orders.createIndex({ status: 1, createdAt: -1 }, { name: "orders_by_status_date" }),
+    orders.createIndex({ locationCode: 1, createdAt: -1 }, { name: "orders_by_location_date" }),
   ]);
 
   const now = new Date();
@@ -378,6 +534,104 @@ export async function initializeMongo(): Promise<void> {
     );
     logger.info({ users: developmentUsers.length }, "Seeded development access accounts");
   }
+
+  for (const seed of seedOrderMessageTemplates) {
+    await orderMessageTemplates.updateOne(
+      { _id: seed.status },
+      {
+        $setOnInsert: {
+          ...seed,
+          _id: seed.status,
+          updatedAt: now,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    if ((await clients.countDocuments()) === 0) {
+      await clients.insertMany(
+        seedOrderClients.map((seed) => ({
+          _id: seed.id,
+          name: seed.name,
+          nameLower: seed.name.toLowerCase(),
+          phone: seed.phone,
+          address: seed.address,
+          gstin: seed.gstin,
+          prefix: seed.prefix,
+          prefixUpper: seed.prefix.toUpperCase(),
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      );
+    }
+
+    if ((await locations.countDocuments()) === 0) {
+      await locations.insertMany(
+        seedOrderLocations.map((seed) => ({
+          _id: seed.id,
+          code: seed.code,
+          codeUpper: seed.code.toUpperCase(),
+          name: seed.name,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      );
+    }
+
+    const sampleClientCount = await clients.countDocuments({
+      _id: { $in: seedOrderClients.map((client) => client.id) },
+    });
+    const sampleLocationCount = await locations.countDocuments({
+      _id: { $in: seedOrderLocations.map((location) => location.id) },
+    });
+    if (
+      (await orders.countDocuments()) === 0 &&
+      sampleClientCount === seedOrderClients.length &&
+      sampleLocationCount === seedOrderLocations.length
+    ) {
+      await orders.insertMany(
+        seedOrders.map(({ ageDays, ...seed }) => {
+          const createdAt = new Date(now.getTime() - ageDays * 24 * 60 * 60 * 1000);
+          return {
+            _id: seed.id,
+            orderId: seed.orderId,
+            sequenceNo: seed.sequenceNo,
+            clientId: seed.clientId,
+            clientName: seed.clientName,
+            clientPrefix: seed.clientPrefix,
+            clientPhone: seed.clientPhone,
+            clientAddress: seed.clientAddress,
+            clientGstin: seed.clientGstin,
+            locationCode: seed.locationCode,
+            locationName: seed.locationName,
+            status: seed.status,
+            notes: seed.notes,
+            createdBy: "admin",
+            createdAt,
+            updatedBy: null,
+            updatedAt: createdAt,
+          };
+        }),
+      );
+      logger.info({ orders: seedOrders.length }, "Seeded development order hub records");
+    }
+  }
+
+  await counters.updateOne(
+    { _id: "orderSequence" },
+    { $setOnInsert: { value: 0, updatedAt: now } },
+    { upsert: true },
+  );
+  const highestOrder = await orders.find().sort({ sequenceNo: -1 }).limit(1).next();
+  await counters.updateOne(
+    { _id: "orderSequence" },
+    { $max: { value: highestOrder?.sequenceNo ?? 0 }, $set: { updatedAt: now } },
+    { upsert: true },
+  );
 
   logger.info({ database: db.databaseName }, "Connected to MongoDB");
 }

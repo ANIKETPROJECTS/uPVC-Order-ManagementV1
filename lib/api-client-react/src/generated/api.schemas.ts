@@ -155,6 +155,202 @@ export interface SuccessResponse {
   success: boolean;
 }
 
+export interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  /** @nullable */
+  gstin: string | null;
+  prefix: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClientInput {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  name: string;
+  /**
+     * @minLength 7
+     * @maxLength 20
+     */
+  phone: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  address: string;
+  /**
+     * @maxLength 15
+     * @nullable
+     * @pattern ^[0-9A-Za-z]{15}$
+     */
+  gstin?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 8
+     * @pattern ^[A-Za-z0-9]+$
+     */
+  prefix: string;
+}
+
+export interface ClientUpdate {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  name?: string;
+  /**
+     * @minLength 7
+     * @maxLength 20
+     */
+  phone?: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  address?: string;
+  /**
+     * @maxLength 15
+     * @nullable
+     * @pattern ^[0-9A-Za-z]{15}$
+     */
+  gstin?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 8
+     * @pattern ^[A-Za-z0-9]+$
+     */
+  prefix?: string;
+  isActive?: boolean;
+}
+
+export type ClientList = Client[];
+
+export interface OrderLocation {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderLocationInput {
+  /**
+     * @minLength 2
+     * @maxLength 5
+     * @pattern ^[A-Za-z0-9]+$
+     */
+  code: string;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  name: string;
+}
+
+export interface OrderLocationUpdate {
+  /**
+     * @minLength 2
+     * @maxLength 5
+     * @pattern ^[A-Za-z0-9]+$
+     */
+  code?: string;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  name?: string;
+  isActive?: boolean;
+}
+
+export type OrderLocationList = OrderLocation[];
+
+export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
+
+
+export const OrderStatus = {
+  quotation_stage: 'quotation_stage',
+  confirmed: 'confirmed',
+  in_production: 'in_production',
+  ready: 'ready',
+  dispatched: 'dispatched',
+  installed: 'installed',
+} as const;
+
+export interface Order {
+  id: string;
+  orderId: string;
+  sequenceNo: number;
+  clientId: string;
+  clientName: string;
+  clientPrefix: string;
+  /** @nullable */
+  clientPhone: string | null;
+  /** @nullable */
+  clientAddress: string | null;
+  /** @nullable */
+  clientGstin: string | null;
+  locationCode: string;
+  locationName: string;
+  status: OrderStatus;
+  /** @nullable */
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+  /** @nullable */
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
+export interface OrderInput {
+  /** @minLength 1 */
+  clientId: string;
+  /**
+     * @minLength 2
+     * @maxLength 5
+     */
+  locationCode: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes?: string | null;
+}
+
+export interface OrderUpdate {
+  status?: OrderStatus;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes?: string | null;
+}
+
+export type OrderList = Order[];
+
+export interface OrderMessageTemplate {
+  status: OrderStatus;
+  label: string;
+  template: string;
+  updatedAt: string;
+}
+
+export interface OrderMessageTemplateUpdate {
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  template: string;
+}
+
+export type OrderMessageTemplateList = OrderMessageTemplate[];
+
 export interface Dashboard {
   userName: string;
   roleName: string;
@@ -305,4 +501,28 @@ export const ListUsersStatus = {
   active: 'active',
   inactive: 'inactive',
 } as const;
+
+export type ListClientsParams = {
+/**
+ * @maxLength 100
+ */
+q?: string;
+includeInactive?: boolean;
+};
+
+export type ListOrderLocationsParams = {
+includeInactive?: boolean;
+};
+
+export type ListOrdersParams = {
+/**
+ * @maxLength 100
+ */
+q?: string;
+status?: OrderStatus;
+clientId?: string;
+locationCode?: string;
+from?: string;
+to?: string;
+};
 

@@ -13,6 +13,8 @@ import RolesPage from '@/pages/roles';
 import UsersPage from '@/pages/users';
 import ChatGroupsPage from '@/pages/chat-groups';
 import CommunicationPage from '@/pages/communication';
+import OrderHubPage from '@/pages/order-hub';
+import OrderDetailPage from '@/pages/order-detail';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000 } } });
 
@@ -20,6 +22,8 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
   if (!user) return <LoginPage />;
   return <Switch>
     <Route path="/" component={() => <DashboardPage user={user} />} />
+    <Route path="/order-hub/:id" component={() => <OrderDetailPage user={user} />} />
+    <Route path="/order-hub" component={() => <OrderHubPage user={user} />} />
     <Route path="/admin/users" component={() => <UsersPage user={user} />} />
     <Route path="/admin/roles" component={() => <RolesPage user={user} />} />
     <Route path="/admin/groups" component={() => <ChatGroupsPage user={user} />} />

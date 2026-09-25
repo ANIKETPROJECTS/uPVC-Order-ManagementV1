@@ -100,6 +100,27 @@
   background-size: 34px 34px;
 }
 
+.order-hub-accent {
+  background:
+    radial-gradient(circle at 92% 8%, hsl(var(--accent) / 0.18), transparent 26%),
+    linear-gradient(135deg, hsl(var(--sidebar) / 0.98), hsl(204 34% 20%));
+}
+
+.order-rule {
+  position: relative;
+}
+
+.order-rule::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 2px;
+  border-radius: 99px;
+  background: hsl(var(--primary));
+}
+
 .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--sidebar-border)); border-radius: 999px; }
 

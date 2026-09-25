@@ -289,6 +289,379 @@ export const GetAdminSummaryResponse = zod.object({
 
 
 /**
+ * @summary List clients
+ */
+export const listClientsQueryQMax = 100;
+
+
+
+export const ListClientsQueryParams = zod.object({
+  "q": zod.coerce.string().max(listClientsQueryQMax).optional(),
+  "includeInactive": zod.coerce.boolean().optional()
+})
+
+export const ListClientsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "gstin": zod.string().nullable(),
+  "prefix": zod.string(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListClientsResponse = zod.array(ListClientsResponseItem)
+
+
+/**
+ * @summary Add a client and assign its order ID prefix
+ */
+export const createClientBodyNameMin = 2;
+export const createClientBodyNameMax = 120;
+
+export const createClientBodyPhoneMin = 7;
+export const createClientBodyPhoneMax = 20;
+
+export const createClientBodyAddressMin = 3;
+export const createClientBodyAddressMax = 500;
+
+export const createClientBodyGstinMax = 15;
+
+
+export const createClientBodyGstinRegExp = new RegExp('^[0-9A-Za-z]{15}$');
+export const createClientBodyPrefixMax = 8;
+
+
+export const createClientBodyPrefixRegExp = new RegExp('^[A-Za-z0-9]+$');
+
+
+export const CreateClientBody = zod.object({
+  "name": zod.string().min(createClientBodyNameMin).max(createClientBodyNameMax),
+  "phone": zod.string().min(createClientBodyPhoneMin).max(createClientBodyPhoneMax),
+  "address": zod.string().min(createClientBodyAddressMin).max(createClientBodyAddressMax),
+  "gstin": zod.string().max(createClientBodyGstinMax).regex(createClientBodyGstinRegExp).nullish(),
+  "prefix": zod.string().min(1).max(createClientBodyPrefixMax).regex(createClientBodyPrefixRegExp)
+})
+
+export const CreateClientResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "gstin": zod.string().nullable(),
+  "prefix": zod.string(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update client details or deactivate a client
+ */
+export const UpdateClientParams = zod.object({
+  "clientId": zod.coerce.string()
+})
+
+export const updateClientBodyNameMin = 2;
+export const updateClientBodyNameMax = 120;
+
+export const updateClientBodyPhoneMin = 7;
+export const updateClientBodyPhoneMax = 20;
+
+export const updateClientBodyAddressMin = 3;
+export const updateClientBodyAddressMax = 500;
+
+export const updateClientBodyGstinMax = 15;
+
+
+export const updateClientBodyGstinRegExp = new RegExp('^[0-9A-Za-z]{15}$');
+export const updateClientBodyPrefixMax = 8;
+
+
+export const updateClientBodyPrefixRegExp = new RegExp('^[A-Za-z0-9]+$');
+
+
+export const UpdateClientBody = zod.object({
+  "name": zod.string().min(updateClientBodyNameMin).max(updateClientBodyNameMax).optional(),
+  "phone": zod.string().min(updateClientBodyPhoneMin).max(updateClientBodyPhoneMax).optional(),
+  "address": zod.string().min(updateClientBodyAddressMin).max(updateClientBodyAddressMax).optional(),
+  "gstin": zod.string().max(updateClientBodyGstinMax).regex(updateClientBodyGstinRegExp).nullish(),
+  "prefix": zod.string().min(1).max(updateClientBodyPrefixMax).regex(updateClientBodyPrefixRegExp).optional(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdateClientResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "gstin": zod.string().nullable(),
+  "prefix": zod.string(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List order locations
+ */
+export const ListOrderLocationsQueryParams = zod.object({
+  "includeInactive": zod.coerce.boolean().optional()
+})
+
+export const ListOrderLocationsResponseItem = zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListOrderLocationsResponse = zod.array(ListOrderLocationsResponseItem)
+
+
+/**
+ * @summary Add an order location code
+ */
+export const createOrderLocationBodyCodeMin = 2;
+export const createOrderLocationBodyCodeMax = 5;
+
+
+export const createOrderLocationBodyCodeRegExp = new RegExp('^[A-Za-z0-9]+$');
+export const createOrderLocationBodyNameMin = 2;
+export const createOrderLocationBodyNameMax = 120;
+
+
+
+export const CreateOrderLocationBody = zod.object({
+  "code": zod.string().min(createOrderLocationBodyCodeMin).max(createOrderLocationBodyCodeMax).regex(createOrderLocationBodyCodeRegExp),
+  "name": zod.string().min(createOrderLocationBodyNameMin).max(createOrderLocationBodyNameMax)
+})
+
+export const CreateOrderLocationResponse = zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update or deactivate an order location code
+ */
+export const UpdateOrderLocationParams = zod.object({
+  "locationId": zod.coerce.string()
+})
+
+export const updateOrderLocationBodyCodeMin = 2;
+export const updateOrderLocationBodyCodeMax = 5;
+
+
+export const updateOrderLocationBodyCodeRegExp = new RegExp('^[A-Za-z0-9]+$');
+export const updateOrderLocationBodyNameMin = 2;
+export const updateOrderLocationBodyNameMax = 120;
+
+
+
+export const UpdateOrderLocationBody = zod.object({
+  "code": zod.string().min(updateOrderLocationBodyCodeMin).max(updateOrderLocationBodyCodeMax).regex(updateOrderLocationBodyCodeRegExp).optional(),
+  "name": zod.string().min(updateOrderLocationBodyNameMin).max(updateOrderLocationBodyNameMax).optional(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdateOrderLocationResponse = zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Search and filter central orders
+ */
+export const listOrdersQueryQMax = 100;
+
+
+
+export const ListOrdersQueryParams = zod.object({
+  "q": zod.coerce.string().max(listOrdersQueryQMax).optional(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
+  "clientId": zod.coerce.string().optional(),
+  "locationCode": zod.coerce.string().optional(),
+  "from": zod.date().optional(),
+  "to": zod.date().optional()
+})
+
+export const ListOrdersResponseItem = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "notes": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
+
+
+/**
+ * @summary Create an order with a canonical Order ID
+ */
+
+export const createOrderBodyLocationCodeMin = 2;
+export const createOrderBodyLocationCodeMax = 5;
+
+export const createOrderBodyNotesMax = 2000;
+
+
+
+export const CreateOrderBody = zod.object({
+  "clientId": zod.string().min(1),
+  "locationCode": zod.string().min(createOrderBodyLocationCodeMin).max(createOrderBodyLocationCodeMax),
+  "notes": zod.string().max(createOrderBodyNotesMax).nullish()
+})
+
+export const CreateOrderResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "notes": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get an order from the central hub
+ */
+export const GetOrderParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetOrderResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "notes": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update an order's lifecycle status or notes
+ */
+export const UpdateOrderParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateOrderBodyNotesMax = 2000;
+
+
+
+export const UpdateOrderBody = zod.object({
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
+  "notes": zod.string().max(updateOrderBodyNotesMax).nullish()
+})
+
+export const UpdateOrderResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "notes": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List centrally configured lifecycle message templates
+ */
+export const ListOrderMessageTemplatesResponseItem = zod.object({
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "label": zod.string(),
+  "template": zod.string(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListOrderMessageTemplatesResponse = zod.array(ListOrderMessageTemplatesResponseItem)
+
+
+/**
+ * @summary Update a lifecycle message template
+ */
+export const UpdateOrderMessageTemplateParams = zod.object({
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed'])
+})
+
+export const updateOrderMessageTemplateBodyTemplateMin = 10;
+export const updateOrderMessageTemplateBodyTemplateMax = 2000;
+
+
+
+export const UpdateOrderMessageTemplateBody = zod.object({
+  "template": zod.string().min(updateOrderMessageTemplateBodyTemplateMin).max(updateOrderMessageTemplateBodyTemplateMax)
+})
+
+export const UpdateOrderMessageTemplateResponse = zod.object({
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "label": zod.string(),
+  "template": zod.string(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List active users available for chat and group membership
  */
 export const ListChatPeopleResponseItem = zod.object({
