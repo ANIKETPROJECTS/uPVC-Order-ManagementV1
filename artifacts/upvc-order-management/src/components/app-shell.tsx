@@ -175,7 +175,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
                     aria-controls={`nav-group-${group.id}`}
                     aria-label={`${group.label}, ${expanded ? 'collapse' : 'expand'}`}
                     title={collapsed ? group.label : undefined}
-                    className={`relative flex h-9 w-full items-center rounded-lg text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors ${
+                    className={`relative flex h-10 w-full items-center rounded-lg text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors ${
                       collapsed ? 'justify-center px-0' : 'gap-2 px-3'
                     } ${
                       active
@@ -184,7 +184,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
                     }`}
                     data-testid={`button-nav-group-${group.id}`}
                   >
-                    <SidebarSectionIcon name={group.icon} size={collapsed ? 23 : 18} className="shrink-0" />
+                    <SidebarSectionIcon name={group.icon} size={30} className="shrink-0" />
                     {!collapsed && <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>}
                     <ChevronDown
                       size={collapsed ? 10 : 14}
