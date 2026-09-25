@@ -31,7 +31,7 @@ export function UserAccessNav({ active }: UserAccessNavProps) {
             }`}
             data-testid={`link-user-access-${item.id}`}
           >
-            <SidebarSectionIcon name={item.icon} size={18} />
+            <SidebarSectionIcon name={item.icon} size={24} />
             {item.label}
           </Link>
         );
