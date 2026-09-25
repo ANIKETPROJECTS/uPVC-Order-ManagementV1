@@ -17,6 +17,8 @@ export interface User {
   email: string | null;
   /** @nullable */
   phone: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
   roleId: string;
   roleName: string;
   status: UserStatus;

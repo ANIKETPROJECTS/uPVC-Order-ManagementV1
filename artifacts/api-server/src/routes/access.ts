@@ -77,6 +77,37 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+const AVATAR_DATA_URL_PREFIX = "data:image/jpeg;base64,";
+const MAX_AVATAR_DATA_URL_LENGTH = 180_000;
+
+function validateAvatarUrl(
+  value: string | null | undefined,
+): { valid: true; value: string | null | undefined } | { valid: false } {
+  if (value == null || value.trim() === "") return { valid: true, value: null };
+
+  const avatarUrl = value.trim();
+  if (avatarUrl.startsWith(AVATAR_DATA_URL_PREFIX)) {
+    const base64 = avatarUrl.slice(AVATAR_DATA_URL_PREFIX.length);
+    if (
+      avatarUrl.length > MAX_AVATAR_DATA_URL_LENGTH ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64) ||
+      Buffer.byteLength(base64, "base64") > 135_000
+    ) {
+      return { valid: false };
+    }
+    return { valid: true, value: avatarUrl };
+  }
+
+  if (avatarUrl.length > 2_048) return { valid: false };
+  try {
+    const url = new URL(avatarUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return { valid: false };
+    return { valid: true, value: avatarUrl };
+  } catch {
+    return { valid: false };
+  }
+}
+
 function effectivePermissions(
   role: RoleDocument | null,
   user: UserDocument,
@@ -201,6 +232,11 @@ router.post("/users", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const avatar = validateAvatarUrl(parsed.data.avatarUrl);
+  if (!avatar.valid) {
+    res.status(400).json({ error: "Use a valid HTTP(S) image link or a smaller JPEG profile photo." });
+    return;
+  }
   const db = await getMongoDb();
   const role = await findRole(db, parsed.data.roleId);
   if (!role) {
@@ -218,6 +254,7 @@ router.post("/users", async (req, res): Promise<void> => {
     usernameLower: username.toLowerCase(),
     email: parsed.data.email?.trim() || null,
     phone: parsed.data.phone?.trim() || null,
+    avatarUrl: avatar.value ?? null,
     roleId: role._id,
     status: "active",
     lastLogin: null,
@@ -247,6 +284,11 @@ router.patch("/users/:userId", async (req, res): Promise<void> => {
   const parsed = UpdateUserBody.safeParse(req.body);
   if (!params.success || !parsed.success) {
     res.status(400).json({ error: "Check the user details and try again." });
+    return;
+  }
+  const avatar = validateAvatarUrl(parsed.data.avatarUrl);
+  if (!avatar.valid) {
+    res.status(400).json({ error: "Use a valid HTTP(S) image link or a smaller JPEG profile photo." });
     return;
   }
 
@@ -285,6 +327,7 @@ router.patch("/users/:userId", async (req, res): Promise<void> => {
   }
   if (parsed.data.email !== undefined) update.email = parsed.data.email?.trim() || null;
   if (parsed.data.phone !== undefined) update.phone = parsed.data.phone?.trim() || null;
+  if (parsed.data.avatarUrl !== undefined) update.avatarUrl = avatar.value ?? null;
   if (parsed.data.roleId !== undefined) update.roleId = parsed.data.roleId;
   if (parsed.data.status !== undefined) update.status = parsed.data.status;
   if (parsed.data.permissionOverrides !== undefined) {

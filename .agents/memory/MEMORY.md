@@ -1,0 +1,1 @@
+- [MongoDB profile photos](mongo-profile-photos.md) — keep avatar uploads small and in MongoDB to preserve the project's Mongo-only persistence rule.

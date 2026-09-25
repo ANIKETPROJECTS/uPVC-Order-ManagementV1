@@ -291,6 +291,8 @@ components:
           type: ["string", "null"]
         phone:
           type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
         roleId:
           type: string
         roleName:
@@ -313,6 +315,7 @@ components:
         - username
         - email
         - phone
+        - avatarUrl
         - roleId
         - roleName
         - status
@@ -352,6 +355,9 @@ components:
           type: ["string", "null"]
         phone:
           type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+          maxLength: 180000
         roleId:
           type: string
         password:
@@ -375,6 +381,9 @@ components:
           type: ["string", "null"]
         phone:
           type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+          maxLength: 180000
         roleId:
           type: string
         password:

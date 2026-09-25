@@ -16,6 +16,11 @@ export interface UserInput {
   email?: string | null;
   /** @nullable */
   phone?: string | null;
+  /**
+     * @maxLength 180000
+     * @nullable
+     */
+  avatarUrl?: string | null;
   roleId: string;
   /** @minLength 8 */
   password: string;

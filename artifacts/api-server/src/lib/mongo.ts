@@ -60,6 +60,7 @@ export interface UserDocument {
   usernameLower: string;
   email: string | null;
   phone: string | null;
+  avatarUrl?: string | null;
   roleId: string;
   status: UserStatus;
   lastLogin: Date | null;
@@ -76,6 +77,7 @@ export interface PublicUser {
   username: string;
   email: string | null;
   phone: string | null;
+  avatarUrl: string | null;
   roleId: string;
   roleName: string;
   status: UserStatus;
@@ -155,6 +157,7 @@ export async function getPublicUser(
     username: user.username,
     email: user.email,
     phone: user.phone,
+    avatarUrl: user.avatarUrl ?? null,
     roleId: user.roleId,
     roleName: role?.name ?? "Unassigned",
     status: user.status,

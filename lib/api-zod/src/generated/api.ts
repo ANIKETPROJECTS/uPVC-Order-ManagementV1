@@ -28,6 +28,7 @@ export const GetAuthSessionResponse = zod.object({
   "username": zod.string(),
   "email": zod.string().nullable(),
   "phone": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
   "status": zod.enum(['active', 'inactive']),
@@ -56,6 +57,7 @@ export const LoginResponse = zod.object({
   "username": zod.string(),
   "email": zod.string().nullable(),
   "phone": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
   "status": zod.enum(['active', 'inactive']),
@@ -88,6 +90,7 @@ export const ListUsersResponseItem = zod.object({
   "username": zod.string(),
   "email": zod.string().nullable(),
   "phone": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
   "status": zod.enum(['active', 'inactive']),
@@ -104,6 +107,8 @@ export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
 export const createUserBodyUsernameMin = 3;
 
+export const createUserBodyAvatarUrlMax = 180000;
+
 export const createUserBodyPasswordMin = 8;
 
 
@@ -113,6 +118,7 @@ export const CreateUserBody = zod.object({
   "username": zod.string().min(createUserBodyUsernameMin),
   "email": zod.string().nullish(),
   "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().max(createUserBodyAvatarUrlMax).nullish(),
   "roleId": zod.string(),
   "password": zod.string().min(createUserBodyPasswordMin),
   "permissionOverrides": zod.record(zod.string(), zod.enum(['none', 'view', 'edit'])).nullish()
@@ -124,6 +130,7 @@ export const CreateUserResponse = zod.object({
   "username": zod.string(),
   "email": zod.string().nullable(),
   "phone": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
   "status": zod.enum(['active', 'inactive']),
@@ -143,6 +150,8 @@ export const UpdateUserParams = zod.object({
 
 export const updateUserBodyUsernameMin = 3;
 
+export const updateUserBodyAvatarUrlMax = 180000;
+
 export const updateUserBodyPasswordMin = 8;
 
 
@@ -152,6 +161,7 @@ export const UpdateUserBody = zod.object({
   "username": zod.string().min(updateUserBodyUsernameMin).optional(),
   "email": zod.string().nullish(),
   "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().max(updateUserBodyAvatarUrlMax).nullish(),
   "roleId": zod.string().optional(),
   "password": zod.string().min(updateUserBodyPasswordMin).optional(),
   "status": zod.enum(['active', 'inactive']).optional(),
@@ -164,6 +174,7 @@ export const UpdateUserResponse = zod.object({
   "username": zod.string(),
   "email": zod.string().nullable(),
   "phone": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
   "status": zod.enum(['active', 'inactive']),
