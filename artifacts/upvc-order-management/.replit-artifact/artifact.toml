@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "uPVC Order Management"
+description = "An internal order, quotation, and production tracking system for uPVC window and door teams, beginning with secure role-based access and administration."
+version = "1.0.0"
+id = "artifacts/upvc-order-management"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19757
+
+[services.development]
+run = "pnpm --filter @workspace/upvc-order-management run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/upvc-order-management", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/upvc-order-management/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19757"
+BASE_PATH = "/"

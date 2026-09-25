@@ -10,6 +10,12 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Session authentication
+  - name: admin
+    description: User and role administration
+  - name: dashboard
+    description: Role-specific dashboard data
 paths:
   /healthz:
     get:
@@ -24,6 +30,224 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/session:
+    get:
+      operationId: getAuthSession
+      tags: [auth]
+      summary: Get the current signed-in user
+      responses:
+        "200":
+          description: Current session state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Sign in with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Signed-in user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Invalid credentials
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: End the current session
+      responses:
+        "200":
+          description: Session ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+  /users:
+    get:
+      operationId: listUsers
+      tags: [admin]
+      summary: List users for the administration screen
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: roleId
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [admin]
+      summary: Create a user with an administrator-assigned password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /users/{userId}:
+    patch:
+      operationId: updateUser
+      tags: [admin]
+      summary: Edit a user, permissions, or password
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deactivateUser
+      tags: [admin]
+      summary: Deactivate a user without deleting audit history
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: User deactivated
+  /roles:
+    get:
+      operationId: listRoles
+      tags: [admin]
+      summary: List configurable roles and permission templates
+      responses:
+        "200":
+          description: Role records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+    post:
+      operationId: createRole
+      tags: [admin]
+      summary: Create a custom role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleInput"
+      responses:
+        "201":
+          description: Created role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+  /roles/{roleId}:
+    patch:
+      operationId: updateRole
+      tags: [admin]
+      summary: Edit a role and its default permissions
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdate"
+      responses:
+        "200":
+          description: Updated role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+    delete:
+      operationId: deleteRole
+      tags: [admin]
+      summary: Delete an unused custom role
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Role deleted
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get the signed-in user's role-specific dashboard shell
+      responses:
+        "200":
+          description: Role-specific dashboard context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /admin/summary:
+    get:
+      operationId: getAdminSummary
+      tags: [admin]
+      summary: Get user and role counts for the Master Admin
+      responses:
+        "200":
+          description: Administration summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSummary"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +257,187 @@ components:
           type: string
       required:
         - status
+    PermissionLevel:
+      type: string
+      enum: [none, view, edit]
+    PermissionMap:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/PermissionLevel"
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        isSystem:
+          type: boolean
+        permissions:
+          $ref: "#/components/schemas/PermissionMap"
+      required: [id, name, description, isSystem, permissions]
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        roleId:
+          type: string
+        roleName:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        lastLogin:
+          type: ["string", "null"]
+          format: date-time
+        permissions:
+          $ref: "#/components/schemas/PermissionMap"
+        permissionOverrides:
+          type: ["object", "null"]
+          additionalProperties:
+            $ref: "#/components/schemas/PermissionLevel"
+      required:
+        - id
+        - name
+        - username
+        - email
+        - phone
+        - roleId
+        - roleName
+        - status
+        - lastLogin
+        - permissions
+        - permissionOverrides
+    AuthSession:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/User"
+            - type: "null"
+      required: [authenticated, user]
+    LoginInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+      required: [username, password]
+    UserInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        username:
+          type: string
+          minLength: 3
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        roleId:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        permissionOverrides:
+          type: ["object", "null"]
+          additionalProperties:
+            $ref: "#/components/schemas/PermissionLevel"
+      required: [name, username, roleId, password]
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        username:
+          type: string
+          minLength: 3
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        roleId:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        status:
+          type: string
+          enum: [active, inactive]
+        permissionOverrides:
+          type: ["object", "null"]
+          additionalProperties:
+            $ref: "#/components/schemas/PermissionLevel"
+    RoleInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+        description:
+          type: ["string", "null"]
+        permissions:
+          $ref: "#/components/schemas/PermissionMap"
+      required: [name, permissions]
+    RoleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+        description:
+          type: ["string", "null"]
+        permissions:
+          $ref: "#/components/schemas/PermissionMap"
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required: [success]
+    Dashboard:
+      type: object
+      properties:
+        userName:
+          type: string
+        roleName:
+          type: string
+        roleLabel:
+          type: string
+        moduleCount:
+          type: integer
+      required: [userName, roleName, roleLabel, moduleCount]
+    AdminSummary:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        activeUsers:
+          type: integer
+        inactiveUsers:
+          type: integer
+        totalRoles:
+          type: integer
+        masterAdmins:
+          type: integer
+      required: [totalUsers, activeUsers, inactiveUsers, totalRoles, masterAdmins]
 
