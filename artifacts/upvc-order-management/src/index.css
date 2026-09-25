@@ -31,7 +31,7 @@
   --sidebar-primary-foreground: 204 37% 11%;
   --sidebar-accent: 205 31% 22%;
   --sidebar-accent-foreground: 200 25% 96%;
-  --radius: 0.9rem;
+  --radius: 0.75rem;
   --app-font-sans: 'DM Sans', sans-serif;
   --app-font-display: 'Space Grotesk', sans-serif;
   --app-font-mono: 'DM Mono', ui-monospace, monospace;
@@ -71,13 +71,6 @@
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-sidebar: hsl(var(--sidebar));
-  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
-  --color-sidebar-border: hsl(var(--sidebar-border));
-  --color-sidebar-primary: hsl(var(--sidebar-primary));
-  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
-  --color-sidebar-accent: hsl(var(--sidebar-accent));
-  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -88,7 +81,6 @@
   * { @apply border-border; }
   body { @apply bg-background text-foreground font-sans antialiased; }
   button, input, select, textarea { font: inherit; }
-  ::selection { background: hsl(var(--primary) / 0.18); color: hsl(var(--foreground)); }
 }
 
 @keyframes enter-up {
@@ -103,35 +95,9 @@
 .delay-4 { animation-delay: 280ms; }
 
 .app-grid {
-  background-image: linear-gradient(hsl(var(--border) / 0.28) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--border) / 0.28) 1px, transparent 1px);
-  background-size: 42px 42px;
-}
-
-.app-grid::before {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  content: "";
-  background: radial-gradient(circle at 75% 0%, hsl(var(--primary) / 0.08), transparent 28rem);
-}
-
-.brand-sheen {
-  background:
-    radial-gradient(circle at 80% 16%, hsl(var(--sidebar-primary) / 0.16), transparent 22rem),
-    hsl(var(--sidebar));
-}
-
-.surface-lift {
-  box-shadow: 0 18px 45px hsl(var(--foreground) / 0.08), 0 2px 8px hsl(var(--foreground) / 0.04);
-}
-
-.micro-label {
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  background-image: linear-gradient(hsl(var(--border) / 0.32) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.32) 1px, transparent 1px);
+  background-size: 34px 34px;
 }
 
 .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }

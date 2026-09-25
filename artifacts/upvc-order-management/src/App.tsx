@@ -11,7 +11,6 @@ import LoginPage from '@/pages/login';
 import NotFound from '@/pages/not-found';
 import RolesPage from '@/pages/roles';
 import UsersPage from '@/pages/users';
-import { BrandMark } from '@/components/brand-mark';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000 } } });
 
@@ -27,8 +26,8 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
 
 function Router() {
   const session = useGetAuthSession();
-   return <ErrorBoundary resetKey={window.location.pathname}>
-     {session.isLoading ? <div className="flex min-h-[100dvh] items-center justify-center bg-background"><div className="w-full max-w-sm space-y-5 px-6"><BrandMark /><div className="h-2 w-full overflow-hidden rounded-full bg-muted"><div className="h-full w-1/2 animate-pulse rounded-full bg-primary" /></div><div className="h-4 w-72 animate-pulse rounded-lg bg-muted" /></div></div> : session.isError ? <LoginPage /> : <AuthenticatedRoutes user={session.data?.user || null} />}
+  return <ErrorBoundary resetKey={window.location.pathname}>
+    {session.isLoading ? <div className="flex min-h-[100dvh] items-center justify-center bg-background"><div className="w-full max-w-sm space-y-3 px-6"><div className="h-10 w-10 animate-pulse rounded-xl bg-secondary" /><div className="h-7 w-56 animate-pulse rounded-lg bg-muted" /><div className="h-4 w-72 animate-pulse rounded-lg bg-muted" /></div></div> : session.isError ? <LoginPage /> : <AuthenticatedRoutes user={session.data?.user || null} />}
   </ErrorBoundary>;
 }
 
