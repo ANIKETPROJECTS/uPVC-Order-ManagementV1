@@ -1,6 +1,12 @@
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { MongoClient, type Collection, type Db } from "mongodb";
 import { logger } from "./logger";
+import {
+  formatOrderId,
+  normalizeLocationCode,
+  orderDailyCounterId,
+  orderDateKey,
+} from "./order-identifiers";
 
 const mongoUri = process.env.MONGODB_URI;
 
@@ -240,6 +246,76 @@ export function getOrderMessageTemplates(
 
 export function getCounters(db: Db): Collection<CounterDocument> {
   return db.collection<CounterDocument>("counters");
+}
+
+async function migrateOrderIds(db: Db, now: Date): Promise<void> {
+  const counters = getCounters(db);
+  const migrationMarkerId = "orderIdFormatV1";
+  const marker = await counters.findOne({ _id: migrationMarkerId });
+  if (marker?.value === 1) return;
+
+  const orders = await getOrders(db)
+    .find({})
+    .sort({ createdAt: 1, sequenceNo: 1, _id: 1 })
+    .toArray();
+  const nextByCounter = new Map<string, number>();
+  const planned = orders.map((order) => {
+    const dateKey = orderDateKey(order.createdAt);
+    const locationCode = normalizeLocationCode(order.locationCode);
+    const counterId = orderDailyCounterId(dateKey, locationCode);
+    const dailySequenceNo = (nextByCounter.get(counterId) ?? 0) + 1;
+    nextByCounter.set(counterId, dailySequenceNo);
+
+    return {
+      order,
+      counterId,
+      orderId: formatOrderId(dateKey, locationCode, dailySequenceNo),
+    };
+  });
+  const changed = planned.filter(({ order, orderId }) => order.orderId !== orderId);
+
+  if (changed.length > 0) {
+    const migrationToken = randomUUID();
+    await getOrders(db).bulkWrite(
+      changed.map(({ order }, index) => ({
+        updateOne: {
+          filter: { _id: order._id },
+          update: {
+            $set: { orderId: `__order_id_migration_${migrationToken}_${index}` },
+          },
+        },
+      })),
+    );
+    await getOrders(db).bulkWrite(
+      changed.map(({ order, orderId }) => ({
+        updateOne: {
+          filter: { _id: order._id },
+          update: { $set: { orderId } },
+        },
+      })),
+    );
+  }
+
+  for (const [counterId, value] of nextByCounter) {
+    await counters.updateOne(
+      { _id: counterId },
+      { $max: { value }, $set: { updatedAt: now } },
+      { upsert: true },
+    );
+  }
+
+  await counters.updateOne(
+    { _id: migrationMarkerId },
+    { $set: { value: 1, updatedAt: now } },
+    { upsert: true },
+  );
+
+  if (changed.length > 0) {
+    logger.info(
+      { migratedOrders: changed.length, dateLocationGroups: nextByCounter.size },
+      "Migrated order IDs to date/location sequence format",
+    );
+  }
 }
 
 export function emptyPermissionMap(): PermissionMap {
@@ -632,6 +708,8 @@ export async function initializeMongo(): Promise<void> {
     { $max: { value: highestOrder?.sequenceNo ?? 0 }, $set: { updatedAt: now } },
     { upsert: true },
   );
+
+  await migrateOrderIds(db, now);
 
   logger.info({ database: db.databaseName }, "Connected to MongoDB");
 }

@@ -45,6 +45,12 @@ import {
   type OrderMessageTemplateDocument,
   type OrderStatus,
 } from "../lib/mongo";
+import {
+  formatOrderId,
+  normalizeLocationCode,
+  orderDailyCounterId,
+  orderDateKey,
+} from "../lib/order-identifiers";
 
 const router: IRouter = Router();
 
@@ -521,7 +527,7 @@ router.post(
       _id: parsed.data.clientId,
       isActive: true,
     });
-    const locationCode = parsed.data.locationCode.trim().toUpperCase();
+    const locationCode = normalizeLocationCode(parsed.data.locationCode);
     const location = await getOrderLocations(db).findOne({
       codeUpper: locationCode,
       isActive: true,
@@ -546,9 +552,20 @@ router.post(
       throw new Error("The order sequence counter could not be allocated.");
     }
     const sequenceNo = counter.value;
+    const dateKey = orderDateKey(now);
+    const normalizedLocationCode = normalizeLocationCode(location.code);
+    const dailyCounter = await getCounters(db).findOneAndUpdate(
+      { _id: orderDailyCounterId(dateKey, normalizedLocationCode) },
+      { $inc: { value: 1 }, $set: { updatedAt: now } },
+      { upsert: true, returnDocument: "after" },
+    );
+    if (!dailyCounter) {
+      throw new Error("The daily order sequence could not be allocated.");
+    }
+    const dailySequenceNo = dailyCounter.value;
     const order: OrderDocument = {
       _id: randomUUID(),
-      orderId: `${client.prefix}${sequenceNo} ${location.code}`,
+      orderId: formatOrderId(dateKey, normalizedLocationCode, dailySequenceNo),
       sequenceNo,
       clientId: client._id,
       clientName: client.name,
@@ -556,7 +573,7 @@ router.post(
       clientPhone: client.phone,
       clientAddress: client.address,
       clientGstin: client.gstin,
-      locationCode: location.code,
+      locationCode: normalizedLocationCode,
       locationName: location.name,
       status: "quotation_stage",
       notes: parsed.data.notes?.trim() || null,
