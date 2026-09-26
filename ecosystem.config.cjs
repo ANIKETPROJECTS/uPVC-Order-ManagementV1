@@ -1,14 +1,18 @@
 'use strict';
 
-function requiredEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(
-      `Missing ${name}. Load deploy/production.env before starting PM2.`,
-    );
+// Replace these placeholders with the VPS production credentials.
+// Generate SESSION_SECRET with: openssl rand -hex 32
+const MONGODB_URI = 'REPLACE_WITH_YOUR_MONGODB_URI';
+const SESSION_SECRET = 'REPLACE_WITH_YOUR_SESSION_SECRET';
+
+function assertConfigured(name, value) {
+  if (!value || value.startsWith('REPLACE_')) {
+    throw new Error(`Set ${name} in ecosystem.config.cjs before starting PM2.`);
   }
-  return value;
 }
+
+assertConfigured('MONGODB_URI', MONGODB_URI);
+assertConfigured('SESSION_SECRET', SESSION_SECRET);
 
 module.exports = {
   apps: [
@@ -26,9 +30,9 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: '8080',
-        MONGODB_URI: requiredEnv('MONGODB_URI'),
-        SESSION_SECRET: requiredEnv('SESSION_SECRET'),
-        LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+        MONGODB_URI,
+        SESSION_SECRET,
+        LOG_LEVEL: 'info',
       },
     },
   ],
