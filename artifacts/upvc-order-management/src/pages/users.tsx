@@ -97,6 +97,22 @@ export default function UsersPage({ user }: { user: User }) {
   const [menuUser, setMenuUser] = useState<string | null>(null);
 
   const roleList = roles.data || [];
+  const selectedRole = roleList.find((role) => role.id === form.roleId);
+  const permissionForModule = (moduleKey: string): PermissionValue => {
+    if (Object.prototype.hasOwnProperty.call(form.permissionOverrides, moduleKey)) {
+      return form.permissionOverrides[moduleKey];
+    }
+    return selectedRole?.permissions[moduleKey] || 'none';
+  };
+  const setPermissionOverride = (moduleKey: string, value: PermissionValue) => {
+    const rolePermission = selectedRole?.permissions[moduleKey] || 'none';
+    setForm((current) => {
+      const permissionOverrides = { ...current.permissionOverrides };
+      if (value === rolePermission) delete permissionOverrides[moduleKey];
+      else permissionOverrides[moduleKey] = value;
+      return { ...current, permissionOverrides };
+    });
+  };
   const allUsers = users.data || [];
   const filteredUsers = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -649,7 +665,7 @@ export default function UsersPage({ user }: { user: User }) {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs font-bold">Permission overrides</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">Optional. These values take priority over the selected role.</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Defaults follow the selected role. Changes here become user-specific overrides.</p>
                   </div>
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground">none / view / edit</span>
                 </div>
@@ -658,8 +674,8 @@ export default function UsersPage({ user }: { user: User }) {
                     <label key={module.key} className="flex items-center justify-between rounded-lg border border-border/70 bg-card px-3 py-2.5">
                       <span className="text-xs font-medium">{module.label}</span>
                       <select
-                        value={form.permissionOverrides[module.key] || 'none'}
-                        onChange={(event) => updateField('permissionOverrides', { ...form.permissionOverrides, [module.key]: event.target.value as PermissionValue })}
+                        value={permissionForModule(module.key)}
+                        onChange={(event) => setPermissionOverride(module.key, event.target.value as PermissionValue)}
                         className="rounded-md border border-input bg-background px-2 py-1 text-[11px]"
                         data-testid={`select-override-${module.key}`}
                       >
