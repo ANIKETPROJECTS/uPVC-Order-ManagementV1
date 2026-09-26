@@ -136,6 +136,13 @@
 .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--sidebar-border)); border-radius: 999px; }
 
+.hover-reveal-actions { opacity: 1; transition: opacity 150ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .hover-reveal-actions { opacity: 0; }
+  .group:hover .hover-reveal-actions,
+  .group:focus-within .hover-reveal-actions { opacity: 1; }
+}
+
 @media (max-width: 767px) {
   .app-grid { background-size: 26px 26px; }
   input, select, textarea { max-width: 100%; }

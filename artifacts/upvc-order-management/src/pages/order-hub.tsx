@@ -206,8 +206,157 @@ export default function OrderHubPage({ user }: { user: User }) {
 
      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5 md:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><SectionHeading eyebrow="Central register" title="Orders" detail="Search by order ID, client, phone, or address." action={canEdit ? <Button onClick={() => setOrderOpen(true)} data-testid="button-create-order"><Plus size={15} /> Create order</Button> : undefined} /><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary" /> Live query</div></div><div className="mt-5 grid gap-2 md:grid-cols-[minmax(220px,1.4fr)_repeat(2,minmax(150px,0.7fr))]"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order register" className="pl-9" data-testid="input-search-orders" /></div><Select value={status} onValueChange={setStatus}><SelectTrigger data-testid="select-filter-status"><SelectValue placeholder="Any status" /></SelectTrigger><SelectContent><SelectItem value="all">Any status</SelectItem>{STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><Select value={locationCode} onValueChange={setLocationCode}><SelectTrigger data-testid="select-filter-location"><SelectValue placeholder="Any location" /></SelectTrigger><SelectContent><SelectItem value="all">Any location</SelectItem>{locationList.filter((item) => item.isActive).map((item) => <SelectItem key={item.code} value={item.code}>{item.code} · {item.name}</SelectItem>)}</SelectContent></Select></div><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]"><Select value={clientId} onValueChange={setClientId}><SelectTrigger data-testid="select-filter-client"><SelectValue placeholder="Any client" /></SelectTrigger><SelectContent><SelectItem value="all">Any client</SelectItem>{clientList.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="From date" data-testid="input-filter-from" /><Input type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="To date" data-testid="input-filter-to" /></div><Button variant="ghost" onClick={clearFilters} className="text-xs" data-testid="button-clear-order-filters"><X size={14} /> Clear</Button><label className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-border px-3 py-1 text-[11px] text-muted-foreground"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="accent-primary" data-testid="checkbox-show-inactive" /> Include inactive</label></div><div className="mt-5 overflow-hidden rounded-xl border border-border/80">{orders.isLoading ? <div className="p-4"><StatePanel type="loading" /></div> : orders.isError ? <div className="p-4"><StatePanel type="error" onRetry={() => void orders.refetch()} /></div> : orderList.length === 0 ? <div className="p-4"><StatePanel type="empty" /></div> : <><div className="divide-y divide-border/70 md:hidden">{orderList.map((order) => <Link key={order.id} href={`/order-hub/${order.id}`} className="block p-4 transition-colors hover:bg-primary/[0.025]" data-testid={`card-order-${order.id}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="break-all font-mono text-[11px] font-bold text-primary">{order.orderId}</p><p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-mobile-${order.id}`}>{statusLabel(order.status)}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-[10px]"><div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p></div><div><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div></div><div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3 text-[10px] text-muted-foreground"><span>{order.clientPhone || 'No phone recorded'}</span><span className="inline-flex items-center gap-1 font-bold text-primary">Open <ArrowRight size={13} /></span></div></Link>)}</div><table className="hidden w-full min-w-[760px] text-left text-xs md:table"><thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><tr><th className="px-4 py-3 font-bold">Order</th><th className="px-4 py-3 font-bold">Client</th><th className="px-4 py-3 font-bold">Location</th><th className="px-4 py-3 font-bold">Status</th><th className="px-4 py-3 font-bold">Created</th><th className="px-4 py-3 text-right font-bold">Open</th></tr></thead><tbody className="divide-y divide-border/70">{orderList.map((order) => <tr key={order.id} className="group hover:bg-primary/[0.025]" data-testid={`row-order-${order.id}`}><td className="px-4 py-3.5"><Link href={`/order-hub/${order.id}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-order-${order.id}`}>{order.orderId}</Link><p className="mt-1 text-[10px] text-muted-foreground">Sequence {String(order.sequenceNo).padStart(3, '0')}</p></td><td className="px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td><td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p></td><td className="px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td><td className="px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td><td className="px-4 py-3.5 text-right"><Link href={`/order-hub/${order.id}`} className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/10" data-testid={`button-open-order-${order.id}`}>View <ArrowRight size={13} /></Link></td></tr>)}</tbody></table></>}</div></section>
 
-    <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]"><Card><CardHeader className="pb-3"><SectionHeading eyebrow="Directory" title="Client records" detail="Prefixes are unique and stay attached to order history." action={canEdit ? <Button size="sm" variant="outline" onClick={() => { setEditingClient(null); setClientOpen(true); }} data-testid="button-add-client"><Plus size={14} /> Add client</Button> : undefined} /></CardHeader><CardContent><div className="space-y-2">{clients.isLoading ? <StatePanel type="loading" /> : clients.isError ? <StatePanel type="error" onRetry={() => void clients.refetch()} /> : clientList.length === 0 ? <StatePanel type="empty" /> : clientList.map((client) => <div key={client.id} className={`flex items-center gap-3 rounded-xl border px-3 py-3 ${client.isActive ? 'border-border/75 bg-background' : 'border-dashed border-border bg-muted/20 opacity-65'}`} data-testid={`row-client-${client.id}`}><div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground"><UserRound size={16} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xs font-bold" data-testid={`text-client-${client.id}`}>{client.name}</p><span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">{client.prefix}</span>{!client.isActive && <span className="text-[10px] font-bold text-muted-foreground">Inactive</span>}</div><p className="mt-1 truncate text-[10px] text-muted-foreground">{client.phone} · {client.address}</p></div>{canEdit && <div className="flex shrink-0 items-center gap-1"><button type="button" onClick={() => { setEditingClient(client); setClientOpen(true); }} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Edit ${client.name}`} data-testid={`button-edit-client-${client.id}`}><Edit3 size={14} /></button>{client.isActive && <button type="button" onClick={() => deactivateClient(client)} className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Deactivate ${client.name}`} data-testid={`button-deactivate-client-${client.id}`}><X size={14} /></button>}</div>}</div>)}</div></CardContent></Card>
-      <Card><CardHeader className="pb-3"><SectionHeading eyebrow="Operating map" title="Location codes" detail="Keep the branch vocabulary short and unambiguous." action={canEdit ? <Button size="sm" variant="outline" onClick={() => { setEditingLocation(null); setLocationOpen(true); }} data-testid="button-add-location"><Plus size={14} /> Add location</Button> : undefined} /></CardHeader><CardContent><div className="grid gap-2 sm:grid-cols-2">{locations.isLoading ? <div className="sm:col-span-2"><StatePanel type="loading" /></div> : locations.isError ? <div className="sm:col-span-2"><StatePanel type="error" onRetry={() => void locations.refetch()} /></div> : locationList.length === 0 ? <div className="sm:col-span-2"><StatePanel type="empty" /></div> : locationList.map((location) => <div key={location.id} className={`group rounded-xl border p-3 ${location.isActive ? 'border-border/75' : 'border-dashed border-border bg-muted/20 opacity-65'}`} data-testid={`row-location-${location.id}`}><div className="flex items-start justify-between gap-2"><div className="flex items-center gap-2"><div className="grid h-8 w-8 place-items-center rounded-lg bg-accent/25 text-accent-foreground"><MapPin size={15} /></div><div><p className="font-mono text-xs font-bold">{location.code}</p><p className="text-[10px] text-muted-foreground">{location.name}</p></div></div>{!location.isActive && <span className="text-[10px] font-bold text-muted-foreground">Inactive</span>}</div>{canEdit && <div className="mt-3 flex gap-1 border-t border-border/60 pt-2 opacity-0 transition-opacity group-hover:opacity-100"><button type="button" onClick={() => { setEditingLocation(location); setLocationOpen(true); }} className="text-[10px] font-bold text-primary" data-testid={`button-edit-location-${location.id}`}>Edit</button>{location.isActive && <button type="button" onClick={() => deactivateLocation(location)} className="ml-2 text-[10px] font-bold text-destructive" data-testid={`button-deactivate-location-${location.id}`}>Deactivate</button>}</div>}</div>)}</div></CardContent></Card></section>
+    <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+      <Card>
+        <CardHeader className="pb-3">
+          <SectionHeading
+            eyebrow="Directory"
+            title="Client records"
+            detail="Prefixes are unique and stay attached to order history."
+            action={canEdit ? <Button size="sm" variant="outline" onClick={() => { setEditingClient(null); setClientOpen(true); }} data-testid="button-add-client"><Plus size={14} /> Add client</Button> : undefined}
+          />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {clients.isLoading ? (
+              <StatePanel type="loading" />
+            ) : clients.isError ? (
+              <StatePanel type="error" onRetry={() => void clients.refetch()} />
+            ) : clientList.length === 0 ? (
+              <StatePanel type="empty" />
+            ) : (
+              clientList.map((client) => (
+                <div
+                  key={client.id}
+                  className={`flex min-w-0 flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:gap-3 ${client.isActive ? 'border-border/75 bg-background' : 'border-dashed border-border bg-muted/20 opacity-65'}`}
+                  data-testid={`row-client-${client.id}`}
+                >
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground">
+                      <UserRound size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="min-w-0 break-words text-xs font-bold" data-testid={`text-client-${client.id}`}>
+                          {client.name}
+                        </p>
+                        <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
+                          {client.prefix}
+                        </span>
+                        {!client.isActive && <span className="text-[10px] font-bold text-muted-foreground">Inactive</span>}
+                      </div>
+                      <div className="mt-1 grid gap-0.5 sm:hidden">
+                        <p className="break-words text-[10px] leading-4 text-muted-foreground">
+                          {client.phone || 'No phone recorded'}
+                        </p>
+                        <p className="break-words text-[10px] leading-4 text-muted-foreground">
+                          {client.address || 'No address recorded'}
+                        </p>
+                      </div>
+                      <p className="mt-1 hidden truncate text-[10px] text-muted-foreground sm:block">
+                        {client.phone} · {client.address}
+                      </p>
+                    </div>
+                  </div>
+                  {canEdit && (
+                    <div className="flex shrink-0 items-center justify-end gap-1 self-end sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => { setEditingClient(client); setClientOpen(true); }}
+                        className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        aria-label={`Edit ${client.name}`}
+                        data-testid={`button-edit-client-${client.id}`}
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      {client.isActive && (
+                        <button
+                          type="button"
+                          onClick={() => deactivateClient(client)}
+                          className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`Deactivate ${client.name}`}
+                          data-testid={`button-deactivate-client-${client.id}`}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-3">
+          <SectionHeading
+            eyebrow="Operating map"
+            title="Location codes"
+            detail="Keep the branch vocabulary short and unambiguous."
+            action={canEdit ? <Button size="sm" variant="outline" onClick={() => { setEditingLocation(null); setLocationOpen(true); }} data-testid="button-add-location"><Plus size={14} /> Add location</Button> : undefined}
+          />
+        </CardHeader>
+        <CardContent>
+          <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+            {locations.isLoading ? (
+              <div className="sm:col-span-2"><StatePanel type="loading" /></div>
+            ) : locations.isError ? (
+              <div className="sm:col-span-2"><StatePanel type="error" onRetry={() => void locations.refetch()} /></div>
+            ) : locationList.length === 0 ? (
+              <div className="sm:col-span-2"><StatePanel type="empty" /></div>
+            ) : (
+              locationList.map((location) => (
+                <div
+                  key={location.id}
+                  className={`group min-w-0 rounded-xl border p-3 ${location.isActive ? 'border-border/75' : 'border-dashed border-border bg-muted/20 opacity-65'}`}
+                  data-testid={`row-location-${location.id}`}
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent/25 text-accent-foreground">
+                        <MapPin size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs font-bold">{location.code}</p>
+                        <p className="break-words text-[10px] text-muted-foreground">{location.name}</p>
+                      </div>
+                    </div>
+                    {!location.isActive && (
+                      <span className="shrink-0 text-[10px] font-bold text-muted-foreground">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
+                  {canEdit && (
+                    <div className="hover-reveal-actions mt-3 flex min-h-7 items-center gap-3 border-t border-border/60 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setEditingLocation(location); setLocationOpen(true); }}
+                        className="text-[10px] font-bold text-primary"
+                        data-testid={`button-edit-location-${location.id}`}
+                      >
+                        Edit
+                      </button>
+                      {location.isActive && (
+                        <button
+                          type="button"
+                          onClick={() => deactivateLocation(location)}
+                          className="text-[10px] font-bold text-destructive"
+                          data-testid={`button-deactivate-location-${location.id}`}
+                        >
+                          Deactivate
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </section>
 
     {isMasterAdmin && <TemplateEditor templates={templates.data || []} canEdit={isMasterAdmin} loading={templates.isLoading} error={templates.isError} onRetry={() => void templates.refetch()} />}
     <ClientDialog open={clientOpen} onOpenChange={setClientOpen} editing={editingClient} onDone={() => { setClientOpen(false); setEditingClient(null); }} />

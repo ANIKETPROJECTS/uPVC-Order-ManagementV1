@@ -10,15 +10,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getOrderRecordIdFromQr } from '@/lib/order-qr';
 
+type ScannerError = {
+  kind: 'camera' | 'qr';
+  message: string;
+};
+
 export default function OrderScannerPage({ user }: { user: User }) {
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const handledResultRef = useRef(false);
+  const lastInvalidQrRef = useRef('');
   const permission = user.permissions?.['order-hub'];
   const canView = user.roleId === 'master-admin' || permission === 'view' || permission === 'edit';
   const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ScannerError | null>(null);
+  const needsHttps =
+    !window.isSecureContext &&
+    !['localhost', '127.0.0.1'].includes(window.location.hostname);
 
   useEffect(() => () => controlsRef.current?.stop(), []);
 
@@ -30,15 +39,24 @@ export default function OrderScannerPage({ user }: { user: User }) {
 
   const startScanner = async () => {
     if (!canView) return;
-    setError('');
+    setError(null);
     handledResultRef.current = false;
+    lastInvalidQrRef.current = '';
 
-    if (!window.isSecureContext && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-      setError('Camera access requires HTTPS when this app is opened on a remote device. Use your phone camera to scan the downloaded QR, or enable HTTPS.');
+    if (needsHttps) {
+      setError({
+        kind: 'camera',
+        message:
+          'Camera access requires HTTPS on remote devices. Open the app over HTTPS, or use your phone camera to scan the downloaded QR.',
+      });
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) {
-      setError('This browser does not support camera scanning. Try a current mobile or desktop browser.');
+      setError({
+        kind: 'camera',
+        message:
+          'This browser does not support camera scanning. Try a current mobile or desktop browser.',
+      });
       return;
     }
 
@@ -47,24 +65,35 @@ export default function OrderScannerPage({ user }: { user: User }) {
       const reader = new BrowserQRCodeReader();
       const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result, _decodeError, activeControls) => {
         if (!result || handledResultRef.current) return;
+        const recordId = getOrderRecordIdFromQr(result.getText());
+        if (!recordId) {
+          if (lastInvalidQrRef.current !== result.getText()) {
+            lastInvalidQrRef.current = result.getText();
+            setError({
+              kind: 'qr',
+              message:
+                'This code is not an order status QR. The camera is still on; scan an order QR to continue.',
+            });
+          }
+          return;
+        }
+
         handledResultRef.current = true;
         activeControls.stop();
         controlsRef.current = null;
         setScanning(false);
-
-        const recordId = getOrderRecordIdFromQr(result.getText());
-        if (!recordId) {
-          setError('This QR code is not an order status link from this app. Try another code.');
-          handledResultRef.current = false;
-          return;
-        }
+        setError(null);
         setLocation(`/order-status/${encodeURIComponent(recordId)}`);
       });
       if (handledResultRef.current) controls.stop();
       else controlsRef.current = controls;
     } catch {
       setScanning(false);
-      setError('The camera could not start. Check browser camera permission and try again.');
+      setError({
+        kind: 'camera',
+        message:
+          'The camera could not start. Check browser camera permission and try again.',
+      });
     }
   };
 
@@ -110,8 +139,10 @@ export default function OrderScannerPage({ user }: { user: User }) {
             {error && (
               <Alert variant="destructive">
                 <CircleAlert size={18} />
-                <AlertTitle>Scanner unavailable</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
+                <AlertTitle>
+                  {error.kind === 'qr' ? 'QR code not recognized' : 'Scanner unavailable'}
+                </AlertTitle>
+                <AlertDescription>{error.message}</AlertDescription>
               </Alert>
             )}
             <div className="flex flex-wrap gap-2">
@@ -129,13 +160,16 @@ export default function OrderScannerPage({ user }: { user: User }) {
             </div>
           </CardContent>
         </Card>
-        <Alert>
-          <CircleAlert size={18} />
-          <AlertTitle>Camera access on remote servers</AlertTitle>
-          <AlertDescription>
-            Browsers require HTTPS for camera access on remote devices. If this app is opened through an HTTP IP address, use your phone camera to scan the downloaded QR or switch the server to HTTPS.
-          </AlertDescription>
-        </Alert>
+        {needsHttps && (
+          <Alert>
+            <CircleAlert size={18} />
+            <AlertTitle>Camera access requires HTTPS</AlertTitle>
+            <AlertDescription>
+              Browsers block camera access on remote HTTP pages. Open this app over HTTPS
+              or scan the downloaded QR with your phone camera.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
     </AppShell>
   );
