@@ -11,6 +11,9 @@ out-tsc
 # dependencies
 node_modules
 
+# VPS deployment credentials
+/deploy/production.env
+
 # IDEs and editors
 /.idea
 .project
