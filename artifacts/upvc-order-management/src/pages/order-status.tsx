@@ -115,10 +115,10 @@ export default function OrderStatusPage({ user }: { user: User }) {
           Back to order
         </Link>
         <Card className="border-border/80">
-          <CardHeader>
+           <CardHeader className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order {record.orderId}</p>
-            <CardTitle className="text-xl">{record.clientName}</CardTitle>
-            <p className="text-sm text-muted-foreground">{record.locationCode} · {record.locationName}</p>
+             <CardTitle className="break-words text-xl">{record.clientName}</CardTitle>
+             <p className="break-words text-sm text-muted-foreground">{record.locationCode} · {record.locationName}</p>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="rounded-lg border border-border bg-muted/30 p-4">

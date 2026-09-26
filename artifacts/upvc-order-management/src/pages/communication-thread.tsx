@@ -1,5 +1,5 @@
 import { useEffect, useRef, type FormEvent } from 'react';
-import { MessageCircle, Pencil, Send, Trash2, UsersRound } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Pencil, Send, Trash2, UsersRound } from 'lucide-react';
 import type { ChatConversation, ChatMessage } from '@workspace/api-client-react';
 
 const formatTime = (date: string) =>
@@ -158,6 +158,7 @@ type CommunicationThreadProps = {
   onCancelEdit: () => void;
   onSaveEdit: (event: FormEvent<HTMLFormElement>) => void;
   onDeleteMessage: (message: ChatMessage) => void;
+  onBack?: () => void;
 };
 
 export function CommunicationThread({
@@ -182,6 +183,7 @@ export function CommunicationThread({
   onCancelEdit,
   onSaveEdit,
   onDeleteMessage,
+  onBack,
 }: CommunicationThreadProps) {
   const messageEnd = useRef<HTMLDivElement>(null);
 
@@ -191,7 +193,8 @@ export function CommunicationThread({
 
   return (
     <>
-      <header className="flex items-center gap-3 border-b border-border bg-card px-5 py-4">
+      <header className="flex min-w-0 items-center gap-3 border-b border-border bg-card px-4 py-3 sm:px-5 sm:py-4">
+        {onBack && <button type="button" onClick={onBack} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted lg:hidden" aria-label="Back to inbox" data-testid="button-back-to-inbox"><ArrowLeft size={17} /></button>}
         <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
           {conversation.type === 'group' ? <UsersRound size={18} /> : <MessageCircle size={18} />}
         </div>
@@ -213,7 +216,7 @@ export function CommunicationThread({
         </span>
       </header>
 
-      <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto p-5">
+       <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
         {messagesLoading ? (
           <>
             <div className="h-12 w-2/3 animate-pulse rounded-2xl bg-muted" />
@@ -256,20 +259,20 @@ export function CommunicationThread({
         <div ref={messageEnd} />
       </div>
 
-      <form onSubmit={onSend} className="border-t border-border bg-card p-4">
+       <form onSubmit={onSend} className="border-t border-border bg-card p-3 sm:p-4">
         {messageActionError && (
           <p className="mb-2 text-[11px] text-destructive" role="alert">
             {messageActionError}
           </p>
         )}
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-2 sm:gap-3">
           <textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
             maxLength={4000}
             rows={2}
             placeholder="Write a message..."
-            className="min-h-12 flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            className="min-h-12 min-w-0 flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
             data-testid="input-chat-message"
           />
           <button

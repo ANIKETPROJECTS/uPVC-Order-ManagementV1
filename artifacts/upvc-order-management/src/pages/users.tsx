@@ -461,7 +461,30 @@ export default function UsersPage({ user }: { user: User }) {
               {hasFilters && <button onClick={() => { setSearch(''); setStatus('all'); setRoleFilter('all'); }} className="mt-3 text-xs font-semibold text-primary hover:underline">Clear filters</button>}
             </div>
           ) : view === 'table' ? (
-            <div className="overflow-x-auto">
+            <>
+            <div className="grid gap-3 p-4 md:hidden">
+              {filteredUsers.map((item) => (
+                <article key={item.id} className="relative rounded-xl border border-border bg-background p-4" data-testid={`card-user-mobile-${item.id}`}>
+                  <div className="absolute right-3 top-3">{renderActions(item)}</div>
+                  <div className="flex min-w-0 items-center gap-3 pr-8">
+                    <UserAvatar name={item.name} src={item.avatarUrl} size="lg" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold" data-testid={`text-user-name-mobile-${item.id}`}>{item.name}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">@{item.username}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold"><ShieldCheck size={12} className="shrink-0 text-primary" /><span className="truncate">{item.roleName}</span></span>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${item.status === 'active' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`} data-testid={`status-user-mobile-${item.id}`}>{item.status}</span>
+                  </div>
+                  <div className="mt-4 border-t border-border pt-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Last sign in</p>
+                    <p className="mt-1 text-xs font-medium">{formatDate(item.lastLogin)}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[720px] text-left">
                 <thead className="border-b border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   <tr>
@@ -493,6 +516,7 @@ export default function UsersPage({ user }: { user: User }) {
                 </tbody>
               </table>
             </div>
+            </>
           ) : (
             <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredUsers.map((item) => (
@@ -521,9 +545,9 @@ export default function UsersPage({ user }: { user: User }) {
       </div>
 
       {dialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4" role="dialog" aria-modal="true" aria-labelledby="user-dialog-title">
-          <div className="max-h-[92dvh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
-            <div className="flex items-start justify-between border-b border-border p-5">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-2 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="user-dialog-title">
+          <div className="max-h-[calc(100dvh-1rem)] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[92dvh]">
+            <div className="flex items-start justify-between gap-3 border-b border-border p-4 sm:p-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{editing ? 'Edit account' : 'New account'}</p>
                 <h2 id="user-dialog-title" className="mt-1 font-display text-xl font-bold">{editing ? editing.name : 'Add a team member'}</h2>
@@ -531,7 +555,7 @@ export default function UsersPage({ user }: { user: User }) {
               <button onClick={() => setDialogOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted" aria-label="Close user form" data-testid="button-close-user-dialog"><X size={17} /></button>
             </div>
 
-            <form onSubmit={saveUser} className="space-y-5 p-5">
+            <form onSubmit={saveUser} className="space-y-5 p-4 sm:p-5">
               <section className="rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="user-photo-heading" data-testid="section-user-photo">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>

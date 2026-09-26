@@ -237,8 +237,8 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
         <button onClick={() => setCollapsed((value) => !value)} className="absolute -right-3 top-[82px] hidden h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm md:flex" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} data-testid="button-toggle-sidebar">{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button>
       </aside>
       <main className={`min-h-[100dvh] transition-[margin] duration-200 ${collapsed ? 'md:ml-[76px]' : 'md:ml-[260px]'}`}>
-        <header className="sticky top-0 z-20 flex min-h-[76px] items-center justify-between border-b border-border bg-background/90 px-5 pl-[72px] backdrop-blur md:px-8">
-          <div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow || 'Workspace'}</p><h1 className="mt-1 font-display text-xl font-bold tracking-tight text-foreground md:text-2xl">{title}</h1></div>
+         <header className="sticky top-0 z-20 flex min-h-[76px] items-center justify-between gap-3 border-b border-border bg-background/90 px-4 pl-[72px] backdrop-blur sm:px-5 md:px-8">
+           <div className="min-w-0"><p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">{eyebrow || 'Workspace'}</p><h1 className="mt-1 break-words font-display text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">{title}</h1></div>
           <div className="hidden items-center gap-3 sm:flex"><span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground"><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />{user.roleName}</span><UserAvatar name={user.name} src={user.avatarUrl} size="md" /></div>
         </header>
         <div className="app-grid min-h-[calc(100dvh-76px)] px-5 py-6 md:px-8 md:py-8">{children}</div>
