@@ -3,8 +3,8 @@
 // Replace the dummy values below before starting PM2.
 // Generate a session secret with: openssl rand -hex 32
 const MONGODB_URI =
-  'mongodb+srv://<USERNAME>:<PASSWORD>@<CLUSTER_HOST>/<DATABASE>?retryWrites=true&w=majority';
-const SESSION_SECRET = 'REPLACE_WITH_OUTPUT_OF_OPENSSL_RAND_HEX_32';
+  'mongodb+srv://raneaniket23_db_user:rSSscd98WASScFoO@windowsoftwarevishesh.lae0r4v.mongodb.net/?appName=windowsoftwarevishesh';
+const SESSION_SECRET = 'hO92ZjFjQSkakUnW0waymD8CRqhkDrn0a156IqLs4cZLiPP0RDhXUUNtHGlkO9jKrN13NVIBTe5Uc1OX3bMY3w==';
 
 function assertConfigured(name, value) {
   if (!value || value.includes('<') || value.startsWith('REPLACE_')) {
