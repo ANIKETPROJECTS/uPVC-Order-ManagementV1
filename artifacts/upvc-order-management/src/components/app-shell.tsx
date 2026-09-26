@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
-import { ChevronDown, ChevronLeft, ChevronRight, LogOut, Menu, MessageSquareText, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, LogOut, Menu, MessageSquareText, ScanLine, X } from 'lucide-react';
 import type { User } from '@workspace/api-client-react';
 import { getGetAuthSessionQueryKey, useLogout } from '@workspace/api-client-react';
 import { SidebarSectionIcon, type SidebarIconName } from '@/components/sidebar-icons';
@@ -29,6 +29,8 @@ const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : 
 const isModuleActive = (key: string, location: string) =>
   key === 'user-access'
     ? location.startsWith('/admin/users') || location.startsWith('/admin/roles') || location.startsWith('/admin/groups')
+    : key === 'order-hub'
+      ? location.startsWith('/order-hub') || location.startsWith('/order-scanner') || location.startsWith('/order-status')
     : location.startsWith(pathForModule(key));
 
 const navigationGroups: { id: string; label: string; icon: SidebarIconName; moduleKeys: string[] }[] = [
@@ -198,6 +200,26 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
                   </button>
                   <div id={`nav-group-${group.id}`} className={`mt-1 space-y-1 ${expanded ? '' : 'hidden'}`}>
                     {groupModules.map(renderModuleLink)}
+                    {group.id === 'orders' && groupModules.some((module) => module.key === 'order-hub') && (
+                      <Link
+                        href="/order-scanner"
+                        onClick={() => setMobileOpen(false)}
+                        title={collapsed ? 'QR scanner' : undefined}
+                        aria-current={location.startsWith('/order-scanner') ? 'page' : undefined}
+                        className={`flex h-12 min-w-0 items-center rounded-lg text-sm transition-colors ${
+                          collapsed ? 'justify-center px-0' : 'gap-3 px-3'
+                        } ${
+                          location.startsWith('/order-scanner')
+                            ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground'
+                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`}
+                        data-testid="link-nav-order-scanner"
+                      >
+                        <ScanLine size={24} className="mx-[2px] shrink-0" />
+                        {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">QR scanner</span>}
+                        {collapsed && <span className="sr-only">QR scanner</span>}
+                      </Link>
+                    )}
                   </div>
                 </section>
               );

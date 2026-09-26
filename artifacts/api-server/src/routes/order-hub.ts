@@ -587,19 +587,23 @@ router.post(
   },
 );
 
-router.get("/orders/:id", async (req, res): Promise<void> => {
-  const params = GetOrderParams.safeParse(req.params);
-  if (!params.success) {
-    inputError(req, res, params.error);
-    return;
-  }
-  const order = await getOrders(await getMongoDb()).findOne({ _id: params.data.id });
-  if (!order) {
-    res.status(404).json({ error: "Order not found." });
-    return;
-  }
-  res.json(GetOrderResponse.parse(orderResponse(order)));
-});
+router.get(
+  "/orders/:id",
+  requireOrderHubPermission("view"),
+  async (req, res): Promise<void> => {
+    const params = GetOrderParams.safeParse(req.params);
+    if (!params.success) {
+      inputError(req, res, params.error);
+      return;
+    }
+    const order = await getOrders(await getMongoDb()).findOne({ _id: params.data.id });
+    if (!order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    res.json(GetOrderResponse.parse(orderResponse(order)));
+  },
+);
 
 router.patch(
   "/orders/:id",
