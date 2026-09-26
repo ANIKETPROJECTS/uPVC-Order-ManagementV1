@@ -1,4 +1,6 @@
 import express, { type Express } from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import session from "express-session";
 import MongoStore from "connect-mongo";
@@ -48,12 +50,36 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: "auto",
       maxAge: 8 * 60 * 60 * 1000,
     },
   }),
 );
 
 app.use("/api", router);
+
+if (process.env.NODE_ENV === "production") {
+  const frontendDirectory = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../upvc-order-management/dist/public",
+  );
+
+  app.use(express.static(frontendDirectory));
+  app.use((req, res, next) => {
+    if (
+      req.method !== "GET" ||
+      req.path === "/api" ||
+      req.path.startsWith("/api/") ||
+      path.extname(req.path)
+    ) {
+      next();
+      return;
+    }
+
+    res.sendFile(path.join(frontendDirectory, "index.html"), (error) => {
+      if (error) next(error);
+    });
+  });
+}
 
 export default app;
