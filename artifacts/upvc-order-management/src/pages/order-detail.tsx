@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -99,18 +99,52 @@ export default function OrderDetailPage({ user }: { user: User }) {
   const canEdit = user.roleId === 'master-admin' || user.permissions?.['order-hub'] === 'edit';
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const order = useGetOrder(id, { query: { enabled: Boolean(id), queryKey: getGetOrderQueryKey(id) } });
+  const order = useGetOrder(id, {
+    query: {
+      enabled: Boolean(id),
+      queryKey: getGetOrderQueryKey(id),
+      refetchInterval: 1000,
+      refetchIntervalInBackground: true,
+    },
+  });
   const templates = useListOrderMessageTemplates({ query: { queryKey: getListOrderMessageTemplatesQueryKey() } });
   const update = useUpdateOrder();
   const [editingFacts, setEditingFacts] = useState(false);
   const record = order.data;
   const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { status: '', notes: '' } });
-  useMemo(() => { if (record) form.reset({ status: record.status, notes: record.notes || '' }); }, [record, form]);
+  const preserveDirtyValues = editingFacts && Object.keys(form.formState.dirtyFields).length > 0;
+  useEffect(() => {
+    if (record) {
+      form.reset(
+        { status: record.status, notes: record.notes || '' },
+        { keepDirtyValues: preserveDirtyValues },
+      );
+    }
+  }, [form, preserveDirtyValues, record]);
 
   if (order.isLoading) return <AppShell user={user} title="Order detail" eyebrow="Central order register"><DetailLoading /></AppShell>;
   if (order.isError || !record) return <AppShell user={user} title="Order detail" eyebrow="Central order register"><DetailError onRetry={() => void order.refetch()} /></AppShell>;
 
-  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: record.id, data: { status: values.status as Status, notes: values.notes || null } }, { onSuccess: (updated) => { queryClient.setQueryData(getGetOrderQueryKey(id), updated); void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }); setEditingFacts(false); toast({ title: 'Order record updated', description: `${updated.orderId} is now ${statusLabel(updated.status)}.` }); } });
+  const save = (values: z.infer<typeof detailSchema>) => {
+    const dirtyFields = form.formState.dirtyFields;
+    update.mutate(
+      {
+        id: record.id,
+        data: {
+          status: dirtyFields.status ? values.status as Status : record.status,
+          notes: dirtyFields.notes ? values.notes || null : record.notes || null,
+        },
+      },
+      {
+        onSuccess: (updated) => {
+          queryClient.setQueryData(getGetOrderQueryKey(id), updated);
+          void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+          setEditingFacts(false);
+          toast({ title: 'Order record updated', description: `${updated.orderId} is now ${statusLabel(updated.status)}.` });
+        },
+      },
+    );
+  };
   const timeline = STATUS_OPTIONS.map((item) => ({ ...item, active: STATUS_OPTIONS.findIndex((status) => status.value === record.status) >= STATUS_OPTIONS.findIndex((status) => status.value === item.value), current: item.value === record.status }));
 
   return <AppShell user={user} title={record.orderId} eyebrow="Module 2 · order record"><div className="space-y-6">
