@@ -11,8 +11,8 @@ function assertConfigured(name, value) {
   }
 }
 
-assertConfigured('MONGODB_URI', MONGODB_URI);
-assertConfigured('SESSION_SECRET', SESSION_SECRET);
+assertConfigured('MONGODB_URI', "mongodb+srv://raneaniket23_db_user:rSSscd98WASScFoO@windowsoftwarevishesh.lae0r4v.mongodb.net/?appName=windowsoftwarevishesh");
+assertConfigured('SESSION_SECRET', "hO92ZjFjQSkakUnW0waymD8CRqhkDrn0a156IqLs4cZLiPP0RDhXUUNtHGlkO9jKrN13NVIBTe5Uc1OX3bMY3w==");
 
 module.exports = {
   apps: [
