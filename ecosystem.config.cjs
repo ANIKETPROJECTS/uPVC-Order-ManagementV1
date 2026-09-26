@@ -1,13 +1,16 @@
 'use strict';
 
-// Replace these placeholders with the VPS production credentials.
-// Generate SESSION_SECRET with: openssl rand -hex 32
-const MONGODB_URI = 'REPLACE_WITH_YOUR_MONGODB_URI';
-const SESSION_SECRET = 'REPLACE_WITH_YOUR_SESSION_SECRET';
+// Replace the dummy values below before starting PM2.
+// Generate a session secret with: openssl rand -hex 32
+const MONGODB_URI =
+  'mongodb+srv://<USERNAME>:<PASSWORD>@<CLUSTER_HOST>/<DATABASE>?retryWrites=true&w=majority';
+const SESSION_SECRET = 'REPLACE_WITH_OUTPUT_OF_OPENSSL_RAND_HEX_32';
 
 function assertConfigured(name, value) {
-  if (!value || value.startsWith('REPLACE_')) {
-    throw new Error(`Set ${name} in ecosystem.config.cjs before starting PM2.`);
+  if (!value || value.includes('<') || value.startsWith('REPLACE_')) {
+    throw new Error(
+      `Replace the dummy ${name} value in ecosystem.config.cjs before starting PM2.`,
+    );
   }
 }
 
