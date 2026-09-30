@@ -825,6 +825,304 @@ paths:
       responses:
         "204":
           description: Communication group archived
+  /orders/{id}/windows:
+    get:
+      operationId: listOrderWindows
+      tags: [orders]
+      summary: List window records for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order windows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderWindowList"
+    post:
+      operationId: createOrderWindow
+      tags: [orders]
+      summary: Add a window to an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderWindowInput"
+      responses:
+        "201":
+          description: Created window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderWindow"
+  /orders/{id}/windows/{windowId}:
+    patch:
+      operationId: updateOrderWindow
+      tags: [orders]
+      summary: Update a window's measurements or readiness
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: windowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderWindowUpdate"
+      responses:
+        "200":
+          description: Updated window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderWindow"
+    delete:
+      operationId: archiveOrderWindow
+      tags: [orders]
+      summary: Archive a window without removing its activity history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: windowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Window archived
+  /orders/{id}/payments:
+    get:
+      operationId: listOrderPayments
+      tags: [orders]
+      summary: List payment records for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order payments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderPaymentList"
+    post:
+      operationId: recordOrderPayment
+      tags: [orders]
+      summary: Record a payment against an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderPaymentInput"
+      responses:
+        "201":
+          description: Recorded payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderPayment"
+  /orders/{id}/payments/{paymentId}:
+    patch:
+      operationId: voidOrderPayment
+      tags: [orders]
+      summary: Void a payment while retaining its audit record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderPaymentVoid"
+      responses:
+        "200":
+          description: Voided payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderPayment"
+  /orders/{id}/documents:
+    get:
+      operationId: listOrderDocuments
+      tags: [orders]
+      summary: List documents attached to an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order document metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDocumentList"
+  /orders/{id}/documents/{documentId}:
+    delete:
+      operationId: archiveOrderDocument
+      tags: [orders]
+      summary: Remove a document from the order workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Document removed
+  /orders/{id}/documents/{category}/{filename}:
+    post:
+      operationId: uploadOrderDocument
+      tags: [orders]
+      summary: Upload a document to an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: category
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/OrderDocumentCategory"
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 180
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Uploaded document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDocument"
+  /orders/{id}/documents/{documentId}/content:
+    get:
+      operationId: downloadOrderDocument
+      tags: [orders]
+      summary: Download an order document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document file content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /orders/{id}/activity:
+    get:
+      operationId: listOrderActivity
+      tags: [orders]
+      summary: List order activity newest first
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderActivityList"
+  /orders/{id}/billing:
+    patch:
+      operationId: updateOrderBilling
+      tags: [orders]
+      summary: Set the agreed order value
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderBillingUpdate"
+      responses:
+        "200":
+          description: Updated order billing value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
 components:
   schemas:
     HealthStatus:
@@ -1160,6 +1458,8 @@ components:
           $ref: "#/components/schemas/OrderStatus"
         notes:
           type: ["string", "null"]
+        orderValue:
+          type: ["number", "null"]
         createdBy:
           type: string
         createdAt:
@@ -1184,6 +1484,7 @@ components:
         - locationName
         - status
         - notes
+        - orderValue
         - createdBy
         - createdAt
         - updatedBy
@@ -1210,10 +1511,270 @@ components:
         notes:
           type: ["string", "null"]
           maxLength: 2000
+    OrderBillingUpdate:
+      type: object
+      properties:
+        orderValue:
+          type: ["number", "null"]
+          minimum: 0
+      required: [orderValue]
     OrderList:
       type: array
       items:
         $ref: "#/components/schemas/Order"
+    OrderWindowReadiness:
+      type: string
+      enum: [pending, in_progress, ready]
+    OrderGlassStatus:
+      type: string
+      enum: [pending, partial, received]
+    OrderWindow:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        windowNo:
+          type: string
+        widthMm:
+          type: number
+        heightMm:
+          type: number
+        windowType:
+          type: string
+        frameStatus:
+          $ref: "#/components/schemas/OrderWindowReadiness"
+        shutterStatus:
+          $ref: "#/components/schemas/OrderWindowReadiness"
+        glassStatus:
+          $ref: "#/components/schemas/OrderGlassStatus"
+        pendingReason:
+          type: ["string", "null"]
+        sqFt:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - orderRecordId
+        - windowNo
+        - widthMm
+        - heightMm
+        - windowType
+        - frameStatus
+        - shutterStatus
+        - glassStatus
+        - pendingReason
+        - sqFt
+        - createdAt
+        - updatedAt
+    OrderWindowInput:
+      type: object
+      properties:
+        windowNo:
+          type: string
+          minLength: 1
+          maxLength: 20
+        widthMm:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 10000
+        heightMm:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 10000
+        windowType:
+          type: string
+          minLength: 1
+          maxLength: 100
+        frameStatus:
+          $ref: "#/components/schemas/OrderWindowReadiness"
+        shutterStatus:
+          $ref: "#/components/schemas/OrderWindowReadiness"
+        glassStatus:
+          $ref: "#/components/schemas/OrderGlassStatus"
+        pendingReason:
+          type: ["string", "null"]
+          maxLength: 500
+      required:
+        - windowNo
+        - widthMm
+        - heightMm
+        - windowType
+        - frameStatus
+        - shutterStatus
+        - glassStatus
+    OrderWindowUpdate:
+      type: object
+      properties:
+        windowNo:
+          type: string
+          minLength: 1
+          maxLength: 20
+        widthMm:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 10000
+        heightMm:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 10000
+        windowType:
+          type: string
+          minLength: 1
+          maxLength: 100
+        frameStatus:
+          $ref: "#/components/schemas/OrderWindowReadiness"
+        shutterStatus:
+          $ref: "#/components/schemas/OrderWindowReadiness"
+        glassStatus:
+          $ref: "#/components/schemas/OrderGlassStatus"
+        pendingReason:
+          type: ["string", "null"]
+          maxLength: 500
+    OrderWindowList:
+      type: array
+      items:
+        $ref: "#/components/schemas/OrderWindow"
+    OrderPaymentMethod:
+      type: string
+      enum: [cash, bank_transfer, upi, cheque, other]
+    OrderPaymentStatus:
+      type: string
+      enum: [received, void]
+    OrderPayment:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        amount:
+          type: number
+        method:
+          $ref: "#/components/schemas/OrderPaymentMethod"
+        reference:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        paidAt:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/OrderPaymentStatus"
+        voidReason:
+          type: ["string", "null"]
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - orderRecordId
+        - amount
+        - method
+        - reference
+        - notes
+        - paidAt
+        - status
+        - voidReason
+        - createdBy
+        - createdAt
+    OrderPaymentInput:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: 0
+        method:
+          $ref: "#/components/schemas/OrderPaymentMethod"
+        reference:
+          type: ["string", "null"]
+          maxLength: 120
+        notes:
+          type: ["string", "null"]
+          maxLength: 500
+        paidAt:
+          type: string
+          format: date-time
+      required: [amount, method, paidAt]
+    OrderPaymentVoid:
+      type: object
+      properties:
+        voidReason:
+          type: string
+          minLength: 3
+          maxLength: 500
+      required: [voidReason]
+    OrderPaymentList:
+      type: array
+      items:
+        $ref: "#/components/schemas/OrderPayment"
+    OrderDocumentCategory:
+      type: string
+      enum: [quotation, purchase_order, drawing, invoice, other]
+    OrderDocument:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        filename:
+          type: string
+        category:
+          $ref: "#/components/schemas/OrderDocumentCategory"
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        uploadedBy:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - orderRecordId
+        - filename
+        - category
+        - contentType
+        - sizeBytes
+        - uploadedBy
+        - uploadedAt
+    OrderDocumentList:
+      type: array
+      items:
+        $ref: "#/components/schemas/OrderDocument"
+    OrderActivity:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        actorId:
+          type: string
+        actorName:
+          type: string
+        action:
+          type: string
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, orderRecordId, actorId, actorName, action, summary, createdAt]
+    OrderActivityList:
+      type: array
+      items:
+        $ref: "#/components/schemas/OrderActivity"
     OrderMessageTemplate:
       type: object
       properties:

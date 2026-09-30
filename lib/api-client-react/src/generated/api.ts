@@ -42,6 +42,11 @@ import type {
   ListUsersParams,
   LoginInput,
   Order,
+  OrderActivityList,
+  OrderBillingUpdate,
+  OrderDocument,
+  OrderDocumentCategory,
+  OrderDocumentList,
   OrderInput,
   OrderList,
   OrderLocation,
@@ -51,8 +56,16 @@ import type {
   OrderMessageTemplate,
   OrderMessageTemplateList,
   OrderMessageTemplateUpdate,
+  OrderPayment,
+  OrderPaymentInput,
+  OrderPaymentList,
+  OrderPaymentVoid,
   OrderStatus,
   OrderUpdate,
+  OrderWindow,
+  OrderWindowInput,
+  OrderWindowList,
+  OrderWindowUpdate,
   Role,
   RoleInput,
   RoleUpdate,
@@ -3299,5 +3312,1089 @@ export const useDeleteChatGroup = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteChatGroupMutationOptions(options));
+    }
+
+export const getListOrderWindowsUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/windows`
+}
+
+/**
+ * @summary List window records for an order
+ */
+export const listOrderWindows = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderWindowList> => {
+
+  return customFetch<OrderWindowList>(getListOrderWindowsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderWindowsQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/windows`
+    ] as const;
+    }
+
+
+export const getListOrderWindowsQueryOptions = <TData = Awaited<ReturnType<typeof listOrderWindows>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderWindows>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderWindowsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderWindows>>> = ({ signal }) => listOrderWindows(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderWindows>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderWindowsQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderWindows>>>
+export type ListOrderWindowsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List window records for an order
+ */
+
+export function useListOrderWindows<TData = Awaited<ReturnType<typeof listOrderWindows>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderWindows>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderWindowsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateOrderWindowUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/windows`
+}
+
+/**
+ * @summary Add a window to an order
+ */
+export const createOrderWindow = async (id: string,
+    orderWindowInput: OrderWindowInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderWindow> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderWindow>(getCreateOrderWindowUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderWindowInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOrderWindowMutationKey = () => ['createOrderWindow'] as const;
+
+export const getCreateOrderWindowMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderWindow>>, TError,CreateOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOrderWindow>>, TError,CreateOrderWindowMutationVariables, TContext> => {
+
+const mutationKey = getCreateOrderWindowMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOrderWindow>>, CreateOrderWindowMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createOrderWindow(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOrderWindowMutationResult = NonNullable<Awaited<ReturnType<typeof createOrderWindow>>>
+    export type CreateOrderWindowMutationBody = BodyType<OrderWindowInput>
+    export type CreateOrderWindowMutationError = ErrorType<unknown>
+    export type CreateOrderWindowMutationVariables = {id: string;data: BodyType<OrderWindowInput>}
+
+    /**
+ * @summary Add a window to an order
+ */
+export const useCreateOrderWindow = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderWindow>>, TError,CreateOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOrderWindow>>,
+        TError,
+        CreateOrderWindowMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOrderWindowMutationOptions(options));
+    }
+
+export const getUpdateOrderWindowUrl = (id: string,
+    windowId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/windows/${windowId}`
+}
+
+/**
+ * @summary Update a window's measurements or readiness
+ */
+export const updateOrderWindow = async (id: string,
+    windowId: string,
+    orderWindowUpdate: OrderWindowUpdate, options?: Parameters<typeof customFetch>[1]): Promise<OrderWindow> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderWindow>(getUpdateOrderWindowUrl(id,windowId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderWindowUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateOrderWindowMutationKey = () => ['updateOrderWindow'] as const;
+
+export const getUpdateOrderWindowMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrderWindow>>, TError,UpdateOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOrderWindow>>, TError,UpdateOrderWindowMutationVariables, TContext> => {
+
+const mutationKey = getUpdateOrderWindowMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOrderWindow>>, UpdateOrderWindowMutationVariables> = (props) => {
+          const {id,windowId,data} = props ?? {};
+
+          return  updateOrderWindow(id,windowId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOrderWindowMutationResult = NonNullable<Awaited<ReturnType<typeof updateOrderWindow>>>
+    export type UpdateOrderWindowMutationBody = BodyType<OrderWindowUpdate>
+    export type UpdateOrderWindowMutationError = ErrorType<unknown>
+    export type UpdateOrderWindowMutationVariables = {id: string;windowId: string;data: BodyType<OrderWindowUpdate>}
+
+    /**
+ * @summary Update a window's measurements or readiness
+ */
+export const useUpdateOrderWindow = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrderWindow>>, TError,UpdateOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOrderWindow>>,
+        TError,
+        UpdateOrderWindowMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateOrderWindowMutationOptions(options));
+    }
+
+export const getArchiveOrderWindowUrl = (id: string,
+    windowId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/windows/${windowId}`
+}
+
+/**
+ * @summary Archive a window without removing its activity history
+ */
+export const archiveOrderWindow = async (id: string,
+    windowId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getArchiveOrderWindowUrl(id,windowId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getArchiveOrderWindowMutationKey = () => ['archiveOrderWindow'] as const;
+
+export const getArchiveOrderWindowMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderWindow>>, TError,ArchiveOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveOrderWindow>>, TError,ArchiveOrderWindowMutationVariables, TContext> => {
+
+const mutationKey = getArchiveOrderWindowMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveOrderWindow>>, ArchiveOrderWindowMutationVariables> = (props) => {
+          const {id,windowId} = props ?? {};
+
+          return  archiveOrderWindow(id,windowId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveOrderWindowMutationResult = NonNullable<Awaited<ReturnType<typeof archiveOrderWindow>>>
+
+    export type ArchiveOrderWindowMutationError = ErrorType<unknown>
+    export type ArchiveOrderWindowMutationVariables = {id: string;windowId: string}
+
+    /**
+ * @summary Archive a window without removing its activity history
+ */
+export const useArchiveOrderWindow = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderWindow>>, TError,ArchiveOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof archiveOrderWindow>>,
+        TError,
+        ArchiveOrderWindowMutationVariables,
+        TContext
+      > => {
+      return useMutation(getArchiveOrderWindowMutationOptions(options));
+    }
+
+export const getListOrderPaymentsUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/payments`
+}
+
+/**
+ * @summary List payment records for an order
+ */
+export const listOrderPayments = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderPaymentList> => {
+
+  return customFetch<OrderPaymentList>(getListOrderPaymentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderPaymentsQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/payments`
+    ] as const;
+    }
+
+
+export const getListOrderPaymentsQueryOptions = <TData = Awaited<ReturnType<typeof listOrderPayments>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderPaymentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderPayments>>> = ({ signal }) => listOrderPayments(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderPayments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderPaymentsQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderPayments>>>
+export type ListOrderPaymentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List payment records for an order
+ */
+
+export function useListOrderPayments<TData = Awaited<ReturnType<typeof listOrderPayments>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderPaymentsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRecordOrderPaymentUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/payments`
+}
+
+/**
+ * @summary Record a payment against an order
+ */
+export const recordOrderPayment = async (id: string,
+    orderPaymentInput: OrderPaymentInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderPayment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderPayment>(getRecordOrderPaymentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderPaymentInput)
+  }
+);}
+
+
+
+
+
+export const getRecordOrderPaymentMutationKey = () => ['recordOrderPayment'] as const;
+
+export const getRecordOrderPaymentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordOrderPayment>>, TError,RecordOrderPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordOrderPayment>>, TError,RecordOrderPaymentMutationVariables, TContext> => {
+
+const mutationKey = getRecordOrderPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordOrderPayment>>, RecordOrderPaymentMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  recordOrderPayment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordOrderPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof recordOrderPayment>>>
+    export type RecordOrderPaymentMutationBody = BodyType<OrderPaymentInput>
+    export type RecordOrderPaymentMutationError = ErrorType<unknown>
+    export type RecordOrderPaymentMutationVariables = {id: string;data: BodyType<OrderPaymentInput>}
+
+    /**
+ * @summary Record a payment against an order
+ */
+export const useRecordOrderPayment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordOrderPayment>>, TError,RecordOrderPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordOrderPayment>>,
+        TError,
+        RecordOrderPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRecordOrderPaymentMutationOptions(options));
+    }
+
+export const getVoidOrderPaymentUrl = (id: string,
+    paymentId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/payments/${paymentId}`
+}
+
+/**
+ * @summary Void a payment while retaining its audit record
+ */
+export const voidOrderPayment = async (id: string,
+    paymentId: string,
+    orderPaymentVoid: OrderPaymentVoid, options?: Parameters<typeof customFetch>[1]): Promise<OrderPayment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderPayment>(getVoidOrderPaymentUrl(id,paymentId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderPaymentVoid)
+  }
+);}
+
+
+
+
+
+export const getVoidOrderPaymentMutationKey = () => ['voidOrderPayment'] as const;
+
+export const getVoidOrderPaymentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidOrderPayment>>, TError,VoidOrderPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof voidOrderPayment>>, TError,VoidOrderPaymentMutationVariables, TContext> => {
+
+const mutationKey = getVoidOrderPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof voidOrderPayment>>, VoidOrderPaymentMutationVariables> = (props) => {
+          const {id,paymentId,data} = props ?? {};
+
+          return  voidOrderPayment(id,paymentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VoidOrderPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof voidOrderPayment>>>
+    export type VoidOrderPaymentMutationBody = BodyType<OrderPaymentVoid>
+    export type VoidOrderPaymentMutationError = ErrorType<unknown>
+    export type VoidOrderPaymentMutationVariables = {id: string;paymentId: string;data: BodyType<OrderPaymentVoid>}
+
+    /**
+ * @summary Void a payment while retaining its audit record
+ */
+export const useVoidOrderPayment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidOrderPayment>>, TError,VoidOrderPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof voidOrderPayment>>,
+        TError,
+        VoidOrderPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getVoidOrderPaymentMutationOptions(options));
+    }
+
+export const getListOrderDocumentsUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/documents`
+}
+
+/**
+ * @summary List documents attached to an order
+ */
+export const listOrderDocuments = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocumentList> => {
+
+  return customFetch<OrderDocumentList>(getListOrderDocumentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderDocumentsQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/documents`
+    ] as const;
+    }
+
+
+export const getListOrderDocumentsQueryOptions = <TData = Awaited<ReturnType<typeof listOrderDocuments>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderDocumentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderDocuments>>> = ({ signal }) => listOrderDocuments(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderDocumentsQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderDocuments>>>
+export type ListOrderDocumentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List documents attached to an order
+ */
+
+export function useListOrderDocuments<TData = Awaited<ReturnType<typeof listOrderDocuments>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderDocumentsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getArchiveOrderDocumentUrl = (id: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/documents/${documentId}`
+}
+
+/**
+ * @summary Remove a document from the order workspace
+ */
+export const archiveOrderDocument = async (id: string,
+    documentId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getArchiveOrderDocumentUrl(id,documentId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getArchiveOrderDocumentMutationKey = () => ['archiveOrderDocument'] as const;
+
+export const getArchiveOrderDocumentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderDocument>>, TError,ArchiveOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveOrderDocument>>, TError,ArchiveOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getArchiveOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveOrderDocument>>, ArchiveOrderDocumentMutationVariables> = (props) => {
+          const {id,documentId} = props ?? {};
+
+          return  archiveOrderDocument(id,documentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof archiveOrderDocument>>>
+
+    export type ArchiveOrderDocumentMutationError = ErrorType<unknown>
+    export type ArchiveOrderDocumentMutationVariables = {id: string;documentId: string}
+
+    /**
+ * @summary Remove a document from the order workspace
+ */
+export const useArchiveOrderDocument = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderDocument>>, TError,ArchiveOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof archiveOrderDocument>>,
+        TError,
+        ArchiveOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getArchiveOrderDocumentMutationOptions(options));
+    }
+
+export const getUploadOrderDocumentUrl = (id: string,
+    category: OrderDocumentCategory,
+    filename: string,) => {
+
+
+
+
+  return `/api/orders/${id}/documents/${category}/${filename}`
+}
+
+/**
+ * @summary Upload a document to an order
+ */
+export const uploadOrderDocument = async (id: string,
+    category: OrderDocumentCategory,
+    filename: string,
+    uploadOrderDocumentBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocument>(getUploadOrderDocumentUrl(id,category,filename),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadOrderDocumentBody
+  }
+);}
+
+
+
+
+
+export const getUploadOrderDocumentMutationKey = () => ['uploadOrderDocument'] as const;
+
+export const getUploadOrderDocumentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadOrderDocument>>, TError,UploadOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadOrderDocument>>, TError,UploadOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getUploadOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadOrderDocument>>, UploadOrderDocumentMutationVariables> = (props) => {
+          const {id,category,filename,data} = props ?? {};
+
+          return  uploadOrderDocument(id,category,filename,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof uploadOrderDocument>>>
+    export type UploadOrderDocumentMutationBody = BodyType<Blob>
+    export type UploadOrderDocumentMutationError = ErrorType<unknown>
+    export type UploadOrderDocumentMutationVariables = {id: string;category: OrderDocumentCategory;filename: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Upload a document to an order
+ */
+export const useUploadOrderDocument = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadOrderDocument>>, TError,UploadOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadOrderDocument>>,
+        TError,
+        UploadOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadOrderDocumentMutationOptions(options));
+    }
+
+export const getDownloadOrderDocumentUrl = (id: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/documents/${documentId}/content`
+}
+
+/**
+ * @summary Download an order document
+ */
+export const downloadOrderDocument = async (id: string,
+    documentId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadOrderDocumentUrl(id,documentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadOrderDocumentQueryKey = (id: string,
+    documentId: string,) => {
+    return [
+    `/api/orders/${id}/documents/${documentId}/content`
+    ] as const;
+    }
+
+
+export const getDownloadOrderDocumentQueryOptions = <TData = Awaited<ReturnType<typeof downloadOrderDocument>>, TError = ErrorType<unknown>>(id: string,
+    documentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocument>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadOrderDocumentQueryKey(id,documentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadOrderDocument>>> = ({ signal }) => downloadOrderDocument(id,documentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && documentId !== null && documentId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocument>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadOrderDocumentQueryResult = NonNullable<Awaited<ReturnType<typeof downloadOrderDocument>>>
+export type DownloadOrderDocumentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Download an order document
+ */
+
+export function useDownloadOrderDocument<TData = Awaited<ReturnType<typeof downloadOrderDocument>>, TError = ErrorType<unknown>>(
+ id: string,
+    documentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocument>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadOrderDocumentQueryOptions(id,documentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListOrderActivityUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/activity`
+}
+
+/**
+ * @summary List order activity newest first
+ */
+export const listOrderActivity = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderActivityList> => {
+
+  return customFetch<OrderActivityList>(getListOrderActivityUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderActivityQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/activity`
+    ] as const;
+    }
+
+
+export const getListOrderActivityQueryOptions = <TData = Awaited<ReturnType<typeof listOrderActivity>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderActivityQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderActivity>>> = ({ signal }) => listOrderActivity(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderActivityQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderActivity>>>
+export type ListOrderActivityQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List order activity newest first
+ */
+
+export function useListOrderActivity<TData = Awaited<ReturnType<typeof listOrderActivity>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderActivityQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateOrderBillingUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/billing`
+}
+
+/**
+ * @summary Set the agreed order value
+ */
+export const updateOrderBilling = async (id: string,
+    orderBillingUpdate: OrderBillingUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Order>(getUpdateOrderBillingUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderBillingUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateOrderBillingMutationKey = () => ['updateOrderBilling'] as const;
+
+export const getUpdateOrderBillingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrderBilling>>, TError,UpdateOrderBillingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOrderBilling>>, TError,UpdateOrderBillingMutationVariables, TContext> => {
+
+const mutationKey = getUpdateOrderBillingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOrderBilling>>, UpdateOrderBillingMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateOrderBilling(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOrderBillingMutationResult = NonNullable<Awaited<ReturnType<typeof updateOrderBilling>>>
+    export type UpdateOrderBillingMutationBody = BodyType<OrderBillingUpdate>
+    export type UpdateOrderBillingMutationError = ErrorType<unknown>
+    export type UpdateOrderBillingMutationVariables = {id: string;data: BodyType<OrderBillingUpdate>}
+
+    /**
+ * @summary Set the agreed order value
+ */
+export const useUpdateOrderBilling = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrderBilling>>, TError,UpdateOrderBillingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOrderBilling>>,
+        TError,
+        UpdateOrderBillingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateOrderBillingMutationOptions(options));
     }
 

@@ -514,6 +514,7 @@ export const ListOrdersResponseItem = zod.object({
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
   "createdAt": zod.coerce.date(),
   "updatedBy": zod.string().nullable(),
@@ -553,6 +554,7 @@ export const CreateOrderResponse = zod.object({
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
   "createdAt": zod.coerce.date(),
   "updatedBy": zod.string().nullable(),
@@ -581,6 +583,7 @@ export const GetOrderResponse = zod.object({
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
   "createdAt": zod.coerce.date(),
   "updatedBy": zod.string().nullable(),
@@ -618,6 +621,7 @@ export const UpdateOrderResponse = zod.object({
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
   "createdAt": zod.coerce.date(),
   "updatedBy": zod.string().nullable(),
@@ -939,5 +943,356 @@ export const DeleteChatGroupParams = zod.object({
 })
 
 export const DeleteChatGroupResponse = zod.void()
+
+
+/**
+ * @summary List window records for an order
+ */
+export const ListOrderWindowsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListOrderWindowsResponseItem = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "windowNo": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "windowType": zod.string(),
+  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
+  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
+  "glassStatus": zod.enum(['pending', 'partial', 'received']),
+  "pendingReason": zod.string().nullable(),
+  "sqFt": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListOrderWindowsResponse = zod.array(ListOrderWindowsResponseItem)
+
+
+/**
+ * @summary Add a window to an order
+ */
+export const CreateOrderWindowParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const createOrderWindowBodyWindowNoMax = 20;
+
+export const createOrderWindowBodyWidthMmExclusiveMin = 0;
+export const createOrderWindowBodyWidthMmMax = 10000;
+
+export const createOrderWindowBodyHeightMmExclusiveMin = 0;
+export const createOrderWindowBodyHeightMmMax = 10000;
+
+export const createOrderWindowBodyWindowTypeMax = 100;
+
+export const createOrderWindowBodyPendingReasonMax = 500;
+
+
+
+export const CreateOrderWindowBody = zod.object({
+  "windowNo": zod.string().min(1).max(createOrderWindowBodyWindowNoMax),
+  "widthMm": zod.number().gt(createOrderWindowBodyWidthMmExclusiveMin).max(createOrderWindowBodyWidthMmMax),
+  "heightMm": zod.number().gt(createOrderWindowBodyHeightMmExclusiveMin).max(createOrderWindowBodyHeightMmMax),
+  "windowType": zod.string().min(1).max(createOrderWindowBodyWindowTypeMax),
+  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
+  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
+  "glassStatus": zod.enum(['pending', 'partial', 'received']),
+  "pendingReason": zod.string().max(createOrderWindowBodyPendingReasonMax).nullish()
+})
+
+export const CreateOrderWindowResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "windowNo": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "windowType": zod.string(),
+  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
+  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
+  "glassStatus": zod.enum(['pending', 'partial', 'received']),
+  "pendingReason": zod.string().nullable(),
+  "sqFt": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a window's measurements or readiness
+ */
+export const UpdateOrderWindowParams = zod.object({
+  "id": zod.coerce.string(),
+  "windowId": zod.coerce.string()
+})
+
+export const updateOrderWindowBodyWindowNoMax = 20;
+
+export const updateOrderWindowBodyWidthMmExclusiveMin = 0;
+export const updateOrderWindowBodyWidthMmMax = 10000;
+
+export const updateOrderWindowBodyHeightMmExclusiveMin = 0;
+export const updateOrderWindowBodyHeightMmMax = 10000;
+
+export const updateOrderWindowBodyWindowTypeMax = 100;
+
+export const updateOrderWindowBodyPendingReasonMax = 500;
+
+
+
+export const UpdateOrderWindowBody = zod.object({
+  "windowNo": zod.string().min(1).max(updateOrderWindowBodyWindowNoMax).optional(),
+  "widthMm": zod.number().gt(updateOrderWindowBodyWidthMmExclusiveMin).max(updateOrderWindowBodyWidthMmMax).optional(),
+  "heightMm": zod.number().gt(updateOrderWindowBodyHeightMmExclusiveMin).max(updateOrderWindowBodyHeightMmMax).optional(),
+  "windowType": zod.string().min(1).max(updateOrderWindowBodyWindowTypeMax).optional(),
+  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']).optional(),
+  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']).optional(),
+  "glassStatus": zod.enum(['pending', 'partial', 'received']).optional(),
+  "pendingReason": zod.string().max(updateOrderWindowBodyPendingReasonMax).nullish()
+})
+
+export const UpdateOrderWindowResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "windowNo": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "windowType": zod.string(),
+  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
+  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
+  "glassStatus": zod.enum(['pending', 'partial', 'received']),
+  "pendingReason": zod.string().nullable(),
+  "sqFt": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Archive a window without removing its activity history
+ */
+export const ArchiveOrderWindowParams = zod.object({
+  "id": zod.coerce.string(),
+  "windowId": zod.coerce.string()
+})
+
+export const ArchiveOrderWindowResponse = zod.void()
+
+
+/**
+ * @summary List payment records for an order
+ */
+export const ListOrderPaymentsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListOrderPaymentsResponseItem = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "amount": zod.number(),
+  "method": zod.enum(['cash', 'bank_transfer', 'upi', 'cheque', 'other']),
+  "reference": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "paidAt": zod.coerce.date(),
+  "status": zod.enum(['received', 'void']),
+  "voidReason": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListOrderPaymentsResponse = zod.array(ListOrderPaymentsResponseItem)
+
+
+/**
+ * @summary Record a payment against an order
+ */
+export const RecordOrderPaymentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const recordOrderPaymentBodyAmountExclusiveMin = 0;
+
+export const recordOrderPaymentBodyReferenceMax = 120;
+
+export const recordOrderPaymentBodyNotesMax = 500;
+
+
+
+export const RecordOrderPaymentBody = zod.object({
+  "amount": zod.number().gt(recordOrderPaymentBodyAmountExclusiveMin),
+  "method": zod.enum(['cash', 'bank_transfer', 'upi', 'cheque', 'other']),
+  "reference": zod.string().max(recordOrderPaymentBodyReferenceMax).nullish(),
+  "notes": zod.string().max(recordOrderPaymentBodyNotesMax).nullish(),
+  "paidAt": zod.coerce.date()
+})
+
+export const RecordOrderPaymentResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "amount": zod.number(),
+  "method": zod.enum(['cash', 'bank_transfer', 'upi', 'cheque', 'other']),
+  "reference": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "paidAt": zod.coerce.date(),
+  "status": zod.enum(['received', 'void']),
+  "voidReason": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Void a payment while retaining its audit record
+ */
+export const VoidOrderPaymentParams = zod.object({
+  "id": zod.coerce.string(),
+  "paymentId": zod.coerce.string()
+})
+
+export const voidOrderPaymentBodyVoidReasonMin = 3;
+export const voidOrderPaymentBodyVoidReasonMax = 500;
+
+
+
+export const VoidOrderPaymentBody = zod.object({
+  "voidReason": zod.string().min(voidOrderPaymentBodyVoidReasonMin).max(voidOrderPaymentBodyVoidReasonMax)
+})
+
+export const VoidOrderPaymentResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "amount": zod.number(),
+  "method": zod.enum(['cash', 'bank_transfer', 'upi', 'cheque', 'other']),
+  "reference": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "paidAt": zod.coerce.date(),
+  "status": zod.enum(['received', 'void']),
+  "voidReason": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List documents attached to an order
+ */
+export const ListOrderDocumentsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListOrderDocumentsResponseItem = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "filename": zod.string(),
+  "category": zod.enum(['quotation', 'purchase_order', 'drawing', 'invoice', 'other']),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})
+export const ListOrderDocumentsResponse = zod.array(ListOrderDocumentsResponseItem)
+
+
+/**
+ * @summary Remove a document from the order workspace
+ */
+export const ArchiveOrderDocumentParams = zod.object({
+  "id": zod.coerce.string(),
+  "documentId": zod.coerce.string()
+})
+
+export const ArchiveOrderDocumentResponse = zod.void()
+
+
+/**
+ * @summary Upload a document to an order
+ */
+export const uploadOrderDocumentPathFilenameMax = 180;
+
+
+
+export const UploadOrderDocumentParams = zod.object({
+  "id": zod.coerce.string(),
+  "category": zod.enum(['quotation', 'purchase_order', 'drawing', 'invoice', 'other']),
+  "filename": zod.coerce.string().min(1).max(uploadOrderDocumentPathFilenameMax)
+})
+
+export const UploadOrderDocumentResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "filename": zod.string(),
+  "category": zod.enum(['quotation', 'purchase_order', 'drawing', 'invoice', 'other']),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Download an order document
+ */
+export const DownloadOrderDocumentParams = zod.object({
+  "id": zod.coerce.string(),
+  "documentId": zod.coerce.string()
+})
+
+export const DownloadOrderDocumentResponse = zod.unknown()
+
+
+/**
+ * @summary List order activity newest first
+ */
+export const ListOrderActivityParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListOrderActivityResponseItem = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "action": zod.string(),
+  "summary": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListOrderActivityResponse = zod.array(ListOrderActivityResponseItem)
+
+
+/**
+ * @summary Set the agreed order value
+ */
+export const UpdateOrderBillingParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateOrderBillingBodyOrderValueMin = 0;
+
+
+
+export const UpdateOrderBillingBody = zod.object({
+  "orderValue": zod.number().min(updateOrderBillingBodyOrderValueMin).nullable()
+})
+
+export const UpdateOrderBillingResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
 
 

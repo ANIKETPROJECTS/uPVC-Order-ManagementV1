@@ -25,6 +25,8 @@ export interface Order {
   status: OrderStatus;
   /** @nullable */
   notes: string | null;
+  /** @nullable */
+  orderValue: number | null;
   createdBy: string;
   createdAt: Date;
   /** @nullable */

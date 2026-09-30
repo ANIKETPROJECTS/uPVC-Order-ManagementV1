@@ -19,6 +19,9 @@ import {
   UpdateClientParams,
   UpdateClientResponse,
   UpdateOrderBody,
+  UpdateOrderBillingBody,
+  UpdateOrderBillingParams,
+  UpdateOrderBillingResponse,
   UpdateOrderLocationBody,
   UpdateOrderLocationParams,
   UpdateOrderLocationResponse,
@@ -37,6 +40,8 @@ import {
   getOrderLocations,
   getOrderMessageTemplates,
   getOrders,
+  getOrderActivity,
+  getOrderPayments,
   getPublicUser,
   getUsers,
   type ClientDocument,
@@ -163,6 +168,7 @@ function orderResponse(order: OrderDocument) {
     locationName: order.locationName,
     status: order.status,
     notes: order.notes,
+    orderValue: order.orderValue ?? null,
     createdBy: order.createdBy,
     createdAt: order.createdAt.toISOString(),
     updatedBy: order.updatedBy,
@@ -577,12 +583,20 @@ router.post(
       locationName: location.name,
       status: "quotation_stage",
       notes: parsed.data.notes?.trim() || null,
+      orderValue: null,
       createdBy: actorId,
       createdAt: now,
       updatedBy: null,
       updatedAt: now,
     };
     await getOrders(db).insertOne(order);
+    const actor = await getUsers(db).findOne({ _id: actorId });
+    if (actor) {
+      await getOrderActivity(db).insertOne({
+        _id: randomUUID(), orderRecordId: order._id, actorId, actorName: actor.name,
+        action: "order.created", summary: `Created order ${order.orderId}.`, createdAt: now,
+      });
+    }
     res.status(201).json(CreateOrderResponse.parse(orderResponse(order)));
   },
 );
@@ -640,6 +654,7 @@ router.patch(
       updates.notes = parsed.data.notes?.trim() || null;
     }
     const db = await getMongoDb();
+    const before = await getOrders(db).findOne({ _id: params.data.id });
     const result = await getOrders(db).updateOne(
       { _id: params.data.id },
       { $set: updates },
@@ -653,9 +668,38 @@ router.patch(
       res.status(404).json({ error: "Order not found." });
       return;
     }
+    const actor = await getUsers(db).findOne({ _id: actorId });
+    if (before && actor && (before.status !== order.status || before.notes !== order.notes)) {
+      const changes = [before.status !== order.status ? `status to ${order.status}` : "", before.notes !== order.notes ? "internal notes" : ""].filter(Boolean).join(" and ");
+      await getOrderActivity(db).insertOne({ _id: randomUUID(), orderRecordId: order._id, actorId, actorName: actor.name, action: "order.updated", summary: `Updated ${changes}.`, createdAt: new Date() });
+    }
     res.json(UpdateOrderResponse.parse(orderResponse(order)));
   },
 );
+
+router.patch("/orders/:id/billing", requireOrderHubPermission("view"), async (req, res): Promise<void> => {
+  const params = UpdateOrderBillingParams.safeParse(req.params);
+  const parsed = UpdateOrderBillingBody.safeParse(req.body);
+  if (!params.success) { inputError(req, res, params.error); return; }
+  if (!parsed.success) { inputError(req, res, parsed.error); return; }
+  const db = await getMongoDb();
+  const userId = req.session.userId;
+  const user = userId ? await getUsers(db).findOne({ _id: userId, status: "active" }) : null;
+  const publicUser = user ? await getPublicUser(user, db) : null;
+  if (!publicUser || publicUser.permissions.payments !== "edit") { res.status(user ? 403 : 401).json({ error: user ? "Payment editing access is required." : "Sign in to continue." }); return; }
+  const order = await getOrders(db).findOne({ _id: params.data.id });
+  if (!order) { res.status(404).json({ error: "Order not found." }); return; }
+  const received = await getOrderPayments(db).aggregate([{ $match: { orderRecordId: order._id, status: "received" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).toArray();
+  const total = Number(received[0]?.total ?? 0);
+  if (parsed.data.orderValue !== null && parsed.data.orderValue < total) { res.status(400).json({ error: `Order value cannot be below received payments (${total}).` }); return; }
+  const old = order.orderValue ?? null;
+  await getOrders(db).updateOne({ _id: order._id }, { $set: { orderValue: parsed.data.orderValue, updatedAt: new Date(), updatedBy: userId } });
+  if (old !== parsed.data.orderValue) {
+    await getOrderActivity(db).insertOne({ _id: randomUUID(), orderRecordId: order._id, actorId: userId!, actorName: user!.name, action: "order.billing_updated", summary: `Changed order value from ${old ?? "unset"} to ${parsed.data.orderValue ?? "unset"}.`, createdAt: new Date() });
+  }
+  const updated = await getOrders(db).findOne({ _id: order._id });
+  res.json(UpdateOrderBillingResponse.parse(orderResponse(updated!)));
+});
 
 router.get("/order-message-templates", async (_req, res): Promise<void> => {
   const templates = await getOrderMessageTemplates(await getMongoDb()).find().toArray();

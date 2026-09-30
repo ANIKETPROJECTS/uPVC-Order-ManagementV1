@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
-import { MongoClient, type Collection, type Db } from "mongodb";
+import { GridFSBucket, MongoClient, type Collection, type Db } from "mongodb";
 import { logger } from "./logger";
 import {
   formatOrderId,
@@ -172,10 +172,35 @@ export interface OrderDocument {
   locationName: string;
   status: OrderStatus;
   notes: string | null;
+  orderValue?: number | null;
   createdBy: string;
   createdAt: Date;
   updatedBy: string | null;
   updatedAt: Date;
+}
+
+export type WindowReadiness = "pending" | "in_progress" | "ready";
+export type GlassStatus = "pending" | "partial" | "received";
+export interface OrderWindowDocument {
+  _id: string; orderRecordId: string; windowNo: string; widthMm: number; heightMm: number;
+  windowType: string; frameStatus: WindowReadiness; shutterStatus: WindowReadiness;
+  glassStatus: GlassStatus; pendingReason: string | null; sqFt: number;
+  createdBy: string; createdAt: Date; updatedBy: string; updatedAt: Date; archivedAt?: Date | null;
+}
+export type PaymentMethod = "cash" | "bank_transfer" | "upi" | "cheque" | "other";
+export type PaymentStatus = "received" | "void";
+export interface OrderPaymentDocument {
+  _id: string; orderRecordId: string; amount: number; method: PaymentMethod;
+  reference: string | null; notes: string | null; paidAt: Date; status: PaymentStatus;
+  voidReason: string | null; createdBy: string; createdAt: Date; voidedBy?: string | null; voidedAt?: Date | null;
+}
+export type DocumentCategory = "quotation" | "purchase_order" | "drawing" | "invoice" | "other";
+export interface OrderDocumentMetadataDocument {
+  _id: string; orderRecordId: string; filename: string; category: DocumentCategory;
+  contentType: string; sizeBytes: number; gridFsId: string; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
+}
+export interface OrderActivityDocument {
+  _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
 }
 
 export interface OrderMessageTemplateDocument {
@@ -247,6 +272,11 @@ export function getOrderMessageTemplates(
 export function getCounters(db: Db): Collection<CounterDocument> {
   return db.collection<CounterDocument>("counters");
 }
+export function getOrderWindows(db: Db) { return db.collection<OrderWindowDocument>("order_windows"); }
+export function getOrderPayments(db: Db) { return db.collection<OrderPaymentDocument>("order_payments"); }
+export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }
+export function getOrderActivity(db: Db) { return db.collection<OrderActivityDocument>("order_activity"); }
+export function getOrderDocumentsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "order_documents" }); }
 
 async function migrateOrderIds(db: Db, now: Date): Promise<void> {
   const counters = getCounters(db);
@@ -537,6 +567,10 @@ export async function initializeMongo(): Promise<void> {
   const orders = getOrders(db);
   const orderMessageTemplates = getOrderMessageTemplates(db);
   const counters = getCounters(db);
+  const orderWindows = getOrderWindows(db);
+  const orderPayments = getOrderPayments(db);
+  const orderDocumentMetadata = getOrderDocumentMetadata(db);
+  const orderActivity = getOrderActivity(db);
 
   await Promise.all([
     users.createIndex({ usernameLower: 1 }, { unique: true, name: "username_unique" }),
@@ -569,6 +603,11 @@ export async function initializeMongo(): Promise<void> {
     orders.createIndex({ clientId: 1, createdAt: -1 }, { name: "orders_by_client_date" }),
     orders.createIndex({ status: 1, createdAt: -1 }, { name: "orders_by_status_date" }),
     orders.createIndex({ locationCode: 1, createdAt: -1 }, { name: "orders_by_location_date" }),
+    orderWindows.createIndex({ orderRecordId: 1, windowNo: 1 }, { unique: true, partialFilterExpression: { archivedAt: null }, name: "active_window_no_unique" }),
+    orderWindows.createIndex({ orderRecordId: 1, updatedAt: -1 }, { name: "windows_by_order" }),
+    orderPayments.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "payments_by_order" }),
+    orderDocumentMetadata.createIndex({ orderRecordId: 1, uploadedAt: -1 }, { name: "documents_by_order" }),
+    orderActivity.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "activity_by_order" }),
   ]);
 
   const now = new Date();

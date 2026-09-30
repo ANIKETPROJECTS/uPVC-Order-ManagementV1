@@ -301,6 +301,8 @@ export interface Order {
   status: OrderStatus;
   /** @nullable */
   notes: string | null;
+  /** @nullable */
+  orderValue: number | null;
   createdBy: string;
   createdAt: string;
   /** @nullable */
@@ -332,7 +334,213 @@ export interface OrderUpdate {
   notes?: string | null;
 }
 
+export interface OrderBillingUpdate {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  orderValue: number | null;
+}
+
 export type OrderList = Order[];
+
+export type OrderWindowReadiness = typeof OrderWindowReadiness[keyof typeof OrderWindowReadiness];
+
+
+export const OrderWindowReadiness = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  ready: 'ready',
+} as const;
+
+export type OrderGlassStatus = typeof OrderGlassStatus[keyof typeof OrderGlassStatus];
+
+
+export const OrderGlassStatus = {
+  pending: 'pending',
+  partial: 'partial',
+  received: 'received',
+} as const;
+
+export interface OrderWindow {
+  id: string;
+  orderRecordId: string;
+  windowNo: string;
+  widthMm: number;
+  heightMm: number;
+  windowType: string;
+  frameStatus: OrderWindowReadiness;
+  shutterStatus: OrderWindowReadiness;
+  glassStatus: OrderGlassStatus;
+  /** @nullable */
+  pendingReason: string | null;
+  sqFt: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderWindowInput {
+  /**
+     * @minLength 1
+     * @maxLength 20
+     */
+  windowNo: string;
+  /**
+     * @maximum 10000
+     * @exclusiveMinimum 0
+     */
+  widthMm: number;
+  /**
+     * @maximum 10000
+     * @exclusiveMinimum 0
+     */
+  heightMm: number;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  windowType: string;
+  frameStatus: OrderWindowReadiness;
+  shutterStatus: OrderWindowReadiness;
+  glassStatus: OrderGlassStatus;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  pendingReason?: string | null;
+}
+
+export interface OrderWindowUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 20
+     */
+  windowNo?: string;
+  /**
+     * @maximum 10000
+     * @exclusiveMinimum 0
+     */
+  widthMm?: number;
+  /**
+     * @maximum 10000
+     * @exclusiveMinimum 0
+     */
+  heightMm?: number;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  windowType?: string;
+  frameStatus?: OrderWindowReadiness;
+  shutterStatus?: OrderWindowReadiness;
+  glassStatus?: OrderGlassStatus;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  pendingReason?: string | null;
+}
+
+export type OrderWindowList = OrderWindow[];
+
+export type OrderPaymentMethod = typeof OrderPaymentMethod[keyof typeof OrderPaymentMethod];
+
+
+export const OrderPaymentMethod = {
+  cash: 'cash',
+  bank_transfer: 'bank_transfer',
+  upi: 'upi',
+  cheque: 'cheque',
+  other: 'other',
+} as const;
+
+export type OrderPaymentStatus = typeof OrderPaymentStatus[keyof typeof OrderPaymentStatus];
+
+
+export const OrderPaymentStatus = {
+  received: 'received',
+  void: 'void',
+} as const;
+
+export interface OrderPayment {
+  id: string;
+  orderRecordId: string;
+  amount: number;
+  method: OrderPaymentMethod;
+  /** @nullable */
+  reference: string | null;
+  /** @nullable */
+  notes: string | null;
+  paidAt: string;
+  status: OrderPaymentStatus;
+  /** @nullable */
+  voidReason: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface OrderPaymentInput {
+  /** @exclusiveMinimum 0 */
+  amount: number;
+  method: OrderPaymentMethod;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  reference?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  notes?: string | null;
+  paidAt: string;
+}
+
+export interface OrderPaymentVoid {
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  voidReason: string;
+}
+
+export type OrderPaymentList = OrderPayment[];
+
+export type OrderDocumentCategory = typeof OrderDocumentCategory[keyof typeof OrderDocumentCategory];
+
+
+export const OrderDocumentCategory = {
+  quotation: 'quotation',
+  purchase_order: 'purchase_order',
+  drawing: 'drawing',
+  invoice: 'invoice',
+  other: 'other',
+} as const;
+
+export interface OrderDocument {
+  id: string;
+  orderRecordId: string;
+  filename: string;
+  category: OrderDocumentCategory;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export type OrderDocumentList = OrderDocument[];
+
+export interface OrderActivity {
+  id: string;
+  orderRecordId: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  summary: string;
+  createdAt: string;
+}
+
+export type OrderActivityList = OrderActivity[];
 
 export interface OrderMessageTemplate {
   status: OrderStatus;
