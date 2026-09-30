@@ -716,6 +716,8 @@ export interface WindowProfile {
   meshType: string;
   specifications: string;
   accessories: string;
+  remarks: string;
+  imageDataUrl: string | null;
   drawingType: WindowProfileDrawingType;
   /** @minimum 0 */
   ratePerSqFt: number;
@@ -751,6 +753,9 @@ export interface WindowProfileInput {
   specifications: string;
   /** @maxLength 1500 */
   accessories: string;
+  /** @maxLength 1000 */
+  remarks?: string;
+  imageDataUrl?: string | null;
   drawingType: WindowProfileDrawingType;
   /**
      * @minimum 0
@@ -783,6 +788,8 @@ export interface QuotationItem {
   meshType: string;
   specifications: string;
   accessories: string;
+  remarks?: string;
+  imageDataUrl?: string | null;
   drawingType: WindowProfileDrawingType;
   code: string;
   location: string;

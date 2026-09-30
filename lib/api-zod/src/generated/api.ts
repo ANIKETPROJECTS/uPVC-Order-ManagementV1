@@ -948,6 +948,10 @@ export const DeleteChatGroupResponse = zod.void()
 /**
  * @summary List active window profiles available to quotations
  */
+export const listWindowProfilesResponseImageDataUrlOneMax = 220000;
+
+
+export const listWindowProfilesResponseImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
 export const listWindowProfilesResponseRatePerSqFtMin = 0;
 
 export const listWindowProfilesResponseWeightKgPerSqFtMin = 0;
@@ -964,6 +968,8 @@ export const ListWindowProfilesResponseItem = zod.object({
   "meshType": zod.string(),
   "specifications": zod.string(),
   "accessories": zod.string(),
+  "remarks": zod.string(),
+  "imageDataUrl": zod.union([zod.string().max(listWindowProfilesResponseImageDataUrlOneMax).regex(listWindowProfilesResponseImageDataUrlOneRegExp),zod.null()]),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "ratePerSqFt": zod.number().min(listWindowProfilesResponseRatePerSqFtMin),
   "weightKgPerSqFt": zod.number().min(listWindowProfilesResponseWeightKgPerSqFtMin),
@@ -993,6 +999,12 @@ export const createWindowProfileBodySpecificationsMax = 3000;
 
 export const createWindowProfileBodyAccessoriesMax = 1500;
 
+export const createWindowProfileBodyRemarksMax = 1000;
+
+export const createWindowProfileBodyImageDataUrlOneMax = 220000;
+
+
+export const createWindowProfileBodyImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
 export const createWindowProfileBodyRatePerSqFtMin = 0;
 export const createWindowProfileBodyRatePerSqFtMax = 1000000;
 
@@ -1010,11 +1022,17 @@ export const CreateWindowProfileBody = zod.object({
   "meshType": zod.string().max(createWindowProfileBodyMeshTypeMax),
   "specifications": zod.string().max(createWindowProfileBodySpecificationsMax),
   "accessories": zod.string().max(createWindowProfileBodyAccessoriesMax),
+  "remarks": zod.string().max(createWindowProfileBodyRemarksMax).optional(),
+  "imageDataUrl": zod.union([zod.string().max(createWindowProfileBodyImageDataUrlOneMax).regex(createWindowProfileBodyImageDataUrlOneRegExp),zod.null()]).optional(),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "ratePerSqFt": zod.number().min(createWindowProfileBodyRatePerSqFtMin).max(createWindowProfileBodyRatePerSqFtMax),
   "weightKgPerSqFt": zod.number().min(createWindowProfileBodyWeightKgPerSqFtMin).max(createWindowProfileBodyWeightKgPerSqFtMax)
 })
 
+export const createWindowProfileResponseImageDataUrlOneMax = 220000;
+
+
+export const createWindowProfileResponseImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
 export const createWindowProfileResponseRatePerSqFtMin = 0;
 
 export const createWindowProfileResponseWeightKgPerSqFtMin = 0;
@@ -1031,6 +1049,8 @@ export const CreateWindowProfileResponse = zod.object({
   "meshType": zod.string(),
   "specifications": zod.string(),
   "accessories": zod.string(),
+  "remarks": zod.string(),
+  "imageDataUrl": zod.union([zod.string().max(createWindowProfileResponseImageDataUrlOneMax).regex(createWindowProfileResponseImageDataUrlOneRegExp),zod.null()]),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "ratePerSqFt": zod.number().min(createWindowProfileResponseRatePerSqFtMin),
   "weightKgPerSqFt": zod.number().min(createWindowProfileResponseWeightKgPerSqFtMin),
@@ -1063,6 +1083,12 @@ export const updateWindowProfileBodySpecificationsMax = 3000;
 
 export const updateWindowProfileBodyAccessoriesMax = 1500;
 
+export const updateWindowProfileBodyRemarksMax = 1000;
+
+export const updateWindowProfileBodyImageDataUrlOneMax = 220000;
+
+
+export const updateWindowProfileBodyImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
 export const updateWindowProfileBodyRatePerSqFtMin = 0;
 export const updateWindowProfileBodyRatePerSqFtMax = 1000000;
 
@@ -1080,11 +1106,17 @@ export const UpdateWindowProfileBody = zod.object({
   "meshType": zod.string().max(updateWindowProfileBodyMeshTypeMax),
   "specifications": zod.string().max(updateWindowProfileBodySpecificationsMax),
   "accessories": zod.string().max(updateWindowProfileBodyAccessoriesMax),
+  "remarks": zod.string().max(updateWindowProfileBodyRemarksMax).optional(),
+  "imageDataUrl": zod.union([zod.string().max(updateWindowProfileBodyImageDataUrlOneMax).regex(updateWindowProfileBodyImageDataUrlOneRegExp),zod.null()]).optional(),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "ratePerSqFt": zod.number().min(updateWindowProfileBodyRatePerSqFtMin).max(updateWindowProfileBodyRatePerSqFtMax),
   "weightKgPerSqFt": zod.number().min(updateWindowProfileBodyWeightKgPerSqFtMin).max(updateWindowProfileBodyWeightKgPerSqFtMax)
 })
 
+export const updateWindowProfileResponseImageDataUrlOneMax = 220000;
+
+
+export const updateWindowProfileResponseImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
 export const updateWindowProfileResponseRatePerSqFtMin = 0;
 
 export const updateWindowProfileResponseWeightKgPerSqFtMin = 0;
@@ -1101,6 +1133,8 @@ export const UpdateWindowProfileResponse = zod.object({
   "meshType": zod.string(),
   "specifications": zod.string(),
   "accessories": zod.string(),
+  "remarks": zod.string(),
+  "imageDataUrl": zod.union([zod.string().max(updateWindowProfileResponseImageDataUrlOneMax).regex(updateWindowProfileResponseImageDataUrlOneRegExp),zod.null()]),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "ratePerSqFt": zod.number().min(updateWindowProfileResponseRatePerSqFtMin),
   "weightKgPerSqFt": zod.number().min(updateWindowProfileResponseWeightKgPerSqFtMin),
@@ -1122,6 +1156,12 @@ export const ArchiveWindowProfileResponse = zod.void()
 /**
  * @summary List saved quotations
  */
+export const listQuotationsResponseItemsItemImageDataUrlOneMax = 220000;
+
+
+export const listQuotationsResponseItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
 export const ListQuotationsResponseItem = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
@@ -1142,6 +1182,8 @@ export const ListQuotationsResponseItem = zod.object({
   "meshType": zod.string(),
   "specifications": zod.string(),
   "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(listQuotationsResponseItemsItemImageDataUrlOneMax).regex(listQuotationsResponseItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "code": zod.string(),
   "location": zod.string(),
@@ -1261,6 +1303,12 @@ export const CreateQuotationBody = zod.object({
   "notes": zod.string().max(createQuotationBodyNotesMax).nullable()
 })
 
+export const createQuotationResponseItemsItemImageDataUrlOneMax = 220000;
+
+
+export const createQuotationResponseItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
 export const CreateQuotationResponse = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
@@ -1281,6 +1329,8 @@ export const CreateQuotationResponse = zod.object({
   "meshType": zod.string(),
   "specifications": zod.string(),
   "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(createQuotationResponseItemsItemImageDataUrlOneMax).regex(createQuotationResponseItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "code": zod.string(),
   "location": zod.string(),
@@ -1328,6 +1378,12 @@ export const GetQuotationParams = zod.object({
   "quotationId": zod.coerce.string()
 })
 
+export const getQuotationResponseItemsItemImageDataUrlOneMax = 220000;
+
+
+export const getQuotationResponseItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
 export const GetQuotationResponse = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
@@ -1348,6 +1404,8 @@ export const GetQuotationResponse = zod.object({
   "meshType": zod.string(),
   "specifications": zod.string(),
   "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(getQuotationResponseItemsItemImageDataUrlOneMax).regex(getQuotationResponseItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "code": zod.string(),
   "location": zod.string(),
@@ -1470,6 +1528,12 @@ export const UpdateQuotationBody = zod.object({
   "notes": zod.string().max(updateQuotationBodyNotesMax).nullable()
 })
 
+export const updateQuotationResponseItemsItemImageDataUrlOneMax = 220000;
+
+
+export const updateQuotationResponseItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
 export const UpdateQuotationResponse = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
@@ -1490,6 +1554,8 @@ export const UpdateQuotationResponse = zod.object({
   "meshType": zod.string(),
   "specifications": zod.string(),
   "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(updateQuotationResponseItemsItemImageDataUrlOneMax).regex(updateQuotationResponseItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
   "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
   "code": zod.string(),
   "location": zod.string(),

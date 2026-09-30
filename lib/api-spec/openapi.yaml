@@ -2186,6 +2186,14 @@ components:
           type: string
         accessories:
           type: string
+        remarks:
+          type: string
+        imageDataUrl:
+          anyOf:
+            - type: string
+              maxLength: 220000
+              pattern: '^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$'
+            - type: "null"
         drawingType:
           $ref: "#/components/schemas/WindowProfileDrawingType"
         ratePerSqFt:
@@ -2200,7 +2208,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, code, name, profileSystem, glass, profileColor, meshType, specifications, accessories, drawingType, ratePerSqFt, weightKgPerSqFt, createdAt, updatedAt]
+      required: [id, code, name, profileSystem, glass, profileColor, meshType, specifications, accessories, remarks, imageDataUrl, drawingType, ratePerSqFt, weightKgPerSqFt, createdAt, updatedAt]
     WindowProfileInput:
       type: object
       properties:
@@ -2231,6 +2239,15 @@ components:
         accessories:
           type: string
           maxLength: 1500
+        remarks:
+          type: string
+          maxLength: 1000
+        imageDataUrl:
+          anyOf:
+            - type: string
+              maxLength: 220000
+              pattern: '^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$'
+            - type: "null"
         drawingType:
           $ref: "#/components/schemas/WindowProfileDrawingType"
         ratePerSqFt:
@@ -2270,6 +2287,14 @@ components:
           type: string
         accessories:
           type: string
+        remarks:
+          type: string
+        imageDataUrl:
+          anyOf:
+            - type: string
+              maxLength: 220000
+              pattern: '^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$'
+            - type: "null"
         drawingType:
           $ref: "#/components/schemas/WindowProfileDrawingType"
         code:

@@ -216,6 +216,8 @@ export interface WindowProfileDocument {
   meshType: string;
   specifications: string;
   accessories: string;
+  remarks?: string;
+  imageDataUrl?: string | null;
   drawingType: WindowProfileDrawingType;
   ratePerSqFt: number;
   weightKgPerSqFt: number;
@@ -236,6 +238,8 @@ export interface QuotationItemDocument {
   meshType: string;
   specifications: string;
   accessories: string;
+  remarks?: string;
+  imageDataUrl?: string | null;
   drawingType: WindowProfileDrawingType;
   code: string;
   location: string;

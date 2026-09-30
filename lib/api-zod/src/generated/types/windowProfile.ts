@@ -17,6 +17,8 @@ export interface WindowProfile {
   meshType: string;
   specifications: string;
   accessories: string;
+  remarks: string;
+  imageDataUrl: string | null;
   drawingType: WindowProfileDrawingType;
   /** @minimum 0 */
   ratePerSqFt: number;

@@ -17,6 +17,8 @@ export interface QuotationItem {
   meshType: string;
   specifications: string;
   accessories: string;
+  remarks?: string;
+  imageDataUrl?: string | null;
   drawingType: WindowProfileDrawingType;
   code: string;
   location: string;

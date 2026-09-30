@@ -33,6 +33,9 @@ export interface WindowProfileInput {
   specifications: string;
   /** @maxLength 1500 */
   accessories: string;
+  /** @maxLength 1000 */
+  remarks?: string;
+  imageDataUrl?: string | null;
   drawingType: WindowProfileDrawingType;
   /**
      * @minimum 0
