@@ -203,6 +203,94 @@ export interface OrderActivityDocument {
   _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
 }
 
+export type WindowProfileDrawingType = "casement" | "sliding" | "mixed" | "louvre";
+export interface WindowProfileDocument {
+  _id: string;
+  code: string;
+  codeUpper: string;
+  name: string;
+  nameLower: string;
+  profileSystem: string;
+  glass: string;
+  profileColor: string;
+  meshType: string;
+  specifications: string;
+  accessories: string;
+  drawingType: WindowProfileDrawingType;
+  ratePerSqFt: number;
+  weightKgPerSqFt: number;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  archivedAt?: Date | null;
+}
+
+export interface QuotationItemDocument {
+  profileId: string;
+  profileCode: string;
+  profileName: string;
+  profileSystem: string;
+  glass: string;
+  profileColor: string;
+  meshType: string;
+  specifications: string;
+  accessories: string;
+  drawingType: WindowProfileDrawingType;
+  code: string;
+  location: string;
+  widthMm: number;
+  heightMm: number;
+  sqFtPerWindow: number;
+  ratePerSqFt: number;
+  unitPrice: number;
+  quantity: number;
+  value: number;
+  weightKgPerWindow: number;
+}
+
+export interface QuotationTotalsDocument {
+  componentCount: number;
+  totalAreaSqFt: number;
+  basicValue: number;
+  transportationCost: number;
+  loadingUnloadingCost: number;
+  additionalCharge: number;
+  subtotal: number;
+  gstPercent: number;
+  gstAmount: number;
+  grandTotal: number;
+  averagePricePerSqFt: number;
+}
+
+export interface QuotationDocument {
+  _id: string;
+  sequenceNo: number;
+  quoteNo: string;
+  clientId: string | null;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  customerGstin: string | null;
+  projectName: string;
+  quotationDate: string;
+  items: QuotationItemDocument[];
+  transportationCost: number;
+  loadingUnloadingCost: number;
+  additionalChargeDescription: string;
+  additionalChargeRate: number;
+  additionalChargeAreaSqFt: number;
+  gstPercent: number;
+  notes: string | null;
+  totals: QuotationTotalsDocument;
+  status: "draft";
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  archivedAt?: Date | null;
+}
+
 export interface OrderMessageTemplateDocument {
   _id: OrderStatus;
   status: OrderStatus;
@@ -276,6 +364,8 @@ export function getOrderWindows(db: Db) { return db.collection<OrderWindowDocume
 export function getOrderPayments(db: Db) { return db.collection<OrderPaymentDocument>("order_payments"); }
 export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }
 export function getOrderActivity(db: Db) { return db.collection<OrderActivityDocument>("order_activity"); }
+export function getWindowProfiles(db: Db) { return db.collection<WindowProfileDocument>("window_profiles"); }
+export function getQuotations(db: Db) { return db.collection<QuotationDocument>("quotations"); }
 export function getOrderDocumentsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "order_documents" }); }
 
 async function migrateOrderIds(db: Db, now: Date): Promise<void> {
@@ -491,6 +581,73 @@ const seedRoles: Array<Omit<RoleDocument, "createdAt" | "updatedAt">> = [
   },
 ];
 
+const seedWindowProfiles: Array<Omit<WindowProfileDocument, "createdAt" | "updatedAt" | "createdBy" | "updatedBy">> = [
+  {
+    _id: "profile-openable-exz",
+    code: "CASE-60",
+    codeUpper: "CASE-60",
+    name: "OPANABLE AND EXZ",
+    nameLower: "opanable and exz",
+    profileSystem: "60 mm uPVC casement with extra-z sash",
+    glass: "5 mm toughened glass",
+    profileColor: "White",
+    meshType: "No mesh",
+    specifications: "60 mm uPVC profile system\nOpenable sash with extra-z section",
+    accessories: "Stainless steel friction stay, handle and locking hardware",
+    drawingType: "casement",
+    ratePerSqFt: 644.97,
+    weightKgPerSqFt: 2.13,
+  },
+  {
+    _id: "profile-sliding-3-track",
+    code: "SLIDE-3T",
+    codeUpper: "SLIDE-3T",
+    name: "3 TRACK 2 GLASS 1 MESH",
+    nameLower: "3 track 2 glass 1 mesh",
+    profileSystem: "Three-track uPVC sliding system",
+    glass: "5 mm toughened glass",
+    profileColor: "White",
+    meshType: "Stainless steel flymesh",
+    specifications: "Three-track frame with two glass shutters and one mesh shutter",
+    accessories: "Sliding rollers, interlocks, lock and mesh hardware",
+    drawingType: "sliding",
+    ratePerSqFt: 545.08,
+    weightKgPerSqFt: 2.73,
+  },
+  {
+    _id: "profile-sliding-3-track-exz",
+    code: "MIX-3T",
+    codeUpper: "MIX-3T",
+    name: "3TRACK 2GLASS 1MESH WITH EXZ",
+    nameLower: "3track 2glass 1mesh with exz",
+    profileSystem: "Three-track uPVC sliding system with extra-z sash",
+    glass: "5 mm toughened glass",
+    profileColor: "White",
+    meshType: "Stainless steel flymesh",
+    specifications: "Three-track frame with two glass shutters, one mesh shutter and extra-z sash",
+    accessories: "Sliding rollers, interlocks, lock and mesh hardware",
+    drawingType: "mixed",
+    ratePerSqFt: 664.60,
+    weightKgPerSqFt: 2.87,
+  },
+  {
+    _id: "profile-bath-louvre-casement",
+    code: "LOUV-CASE",
+    codeUpper: "LOUV-CASE",
+    name: "BATH LOUVERS AND OPANABLE AND EXZ",
+    nameLower: "bath louvers and opanable and exz",
+    profileSystem: "uPVC casement with bath louvre section and extra-z sash",
+    glass: "5 mm toughened glass with louvre section",
+    profileColor: "White",
+    meshType: "As specified per opening",
+    specifications: "Casement opening with integrated bathroom louvre section",
+    accessories: "Stainless steel friction stay, handle, locking hardware and louvre blades",
+    drawingType: "louvre",
+    ratePerSqFt: 637.93,
+    weightKgPerSqFt: 2.1,
+  },
+];
+
 const developmentUsers = [
   { name: "Aditi Kulkarni", username: "admin", phone: "+91 98220 10001", roleId: "master-admin", password: "Admin@12345" },
   { name: "Rohan Patil", username: "operator", phone: "+91 98220 10002", roleId: "operator", password: "Demo@12345" },
@@ -571,6 +728,8 @@ export async function initializeMongo(): Promise<void> {
   const orderPayments = getOrderPayments(db);
   const orderDocumentMetadata = getOrderDocumentMetadata(db);
   const orderActivity = getOrderActivity(db);
+  const windowProfiles = getWindowProfiles(db);
+  const quotations = getQuotations(db);
 
   await Promise.all([
     users.createIndex({ usernameLower: 1 }, { unique: true, name: "username_unique" }),
@@ -608,9 +767,42 @@ export async function initializeMongo(): Promise<void> {
     orderPayments.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "payments_by_order" }),
     orderDocumentMetadata.createIndex({ orderRecordId: 1, uploadedAt: -1 }, { name: "documents_by_order" }),
     orderActivity.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "activity_by_order" }),
+    windowProfiles.createIndex(
+      { codeUpper: 1 },
+      {
+        unique: true,
+        name: "active_window_profile_code_unique",
+        partialFilterExpression: { archivedAt: null },
+      },
+    ),
+    windowProfiles.createIndex({ nameLower: 1 }, { name: "window_profiles_by_name" }),
+    quotations.createIndex({ quoteNo: 1 }, { unique: true, name: "quotation_number_unique" }),
+    quotations.createIndex({ updatedAt: -1 }, { name: "quotations_by_updated_at" }),
+    quotations.createIndex({ clientId: 1, updatedAt: -1 }, { name: "quotations_by_client" }),
   ]);
 
   const now = new Date();
+  for (const profile of seedWindowProfiles) {
+    await windowProfiles.updateOne(
+      { _id: profile._id },
+      {
+        $setOnInsert: {
+          ...profile,
+          createdBy: "system",
+          updatedBy: "system",
+          createdAt: now,
+          updatedAt: now,
+        },
+      },
+      { upsert: true },
+    );
+  }
+  await getCounters(db).updateOne(
+    { _id: "quotation-sequence" },
+    { $setOnInsert: { _id: "quotation-sequence", value: 498, updatedAt: now } },
+    { upsert: true },
+  );
+
   for (const role of seedRoles) {
     await roles.updateOne(
       { _id: role._id },

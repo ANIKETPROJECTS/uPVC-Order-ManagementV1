@@ -946,6 +946,601 @@ export const DeleteChatGroupResponse = zod.void()
 
 
 /**
+ * @summary List active window profiles available to quotations
+ */
+export const listWindowProfilesResponseRatePerSqFtMin = 0;
+
+export const listWindowProfilesResponseWeightKgPerSqFtMin = 0;
+
+
+
+export const ListWindowProfilesResponseItem = zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "ratePerSqFt": zod.number().min(listWindowProfilesResponseRatePerSqFtMin),
+  "weightKgPerSqFt": zod.number().min(listWindowProfilesResponseWeightKgPerSqFtMin),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListWindowProfilesResponse = zod.array(ListWindowProfilesResponseItem)
+
+
+/**
+ * @summary Create a window profile
+ */
+export const createWindowProfileBodyCodeMax = 24;
+
+export const createWindowProfileBodyNameMin = 2;
+export const createWindowProfileBodyNameMax = 120;
+
+export const createWindowProfileBodyProfileSystemMax = 240;
+
+export const createWindowProfileBodyGlassMax = 120;
+
+export const createWindowProfileBodyProfileColorMax = 80;
+
+export const createWindowProfileBodyMeshTypeMax = 120;
+
+export const createWindowProfileBodySpecificationsMax = 3000;
+
+export const createWindowProfileBodyAccessoriesMax = 1500;
+
+export const createWindowProfileBodyRatePerSqFtMin = 0;
+export const createWindowProfileBodyRatePerSqFtMax = 1000000;
+
+export const createWindowProfileBodyWeightKgPerSqFtMin = 0;
+export const createWindowProfileBodyWeightKgPerSqFtMax = 10000;
+
+
+
+export const CreateWindowProfileBody = zod.object({
+  "code": zod.string().min(1).max(createWindowProfileBodyCodeMax),
+  "name": zod.string().min(createWindowProfileBodyNameMin).max(createWindowProfileBodyNameMax),
+  "profileSystem": zod.string().min(1).max(createWindowProfileBodyProfileSystemMax),
+  "glass": zod.string().max(createWindowProfileBodyGlassMax),
+  "profileColor": zod.string().max(createWindowProfileBodyProfileColorMax),
+  "meshType": zod.string().max(createWindowProfileBodyMeshTypeMax),
+  "specifications": zod.string().max(createWindowProfileBodySpecificationsMax),
+  "accessories": zod.string().max(createWindowProfileBodyAccessoriesMax),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "ratePerSqFt": zod.number().min(createWindowProfileBodyRatePerSqFtMin).max(createWindowProfileBodyRatePerSqFtMax),
+  "weightKgPerSqFt": zod.number().min(createWindowProfileBodyWeightKgPerSqFtMin).max(createWindowProfileBodyWeightKgPerSqFtMax)
+})
+
+export const createWindowProfileResponseRatePerSqFtMin = 0;
+
+export const createWindowProfileResponseWeightKgPerSqFtMin = 0;
+
+
+
+export const CreateWindowProfileResponse = zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "ratePerSqFt": zod.number().min(createWindowProfileResponseRatePerSqFtMin),
+  "weightKgPerSqFt": zod.number().min(createWindowProfileResponseWeightKgPerSqFtMin),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Edit a window profile
+ */
+export const UpdateWindowProfileParams = zod.object({
+  "profileId": zod.coerce.string()
+})
+
+export const updateWindowProfileBodyCodeMax = 24;
+
+export const updateWindowProfileBodyNameMin = 2;
+export const updateWindowProfileBodyNameMax = 120;
+
+export const updateWindowProfileBodyProfileSystemMax = 240;
+
+export const updateWindowProfileBodyGlassMax = 120;
+
+export const updateWindowProfileBodyProfileColorMax = 80;
+
+export const updateWindowProfileBodyMeshTypeMax = 120;
+
+export const updateWindowProfileBodySpecificationsMax = 3000;
+
+export const updateWindowProfileBodyAccessoriesMax = 1500;
+
+export const updateWindowProfileBodyRatePerSqFtMin = 0;
+export const updateWindowProfileBodyRatePerSqFtMax = 1000000;
+
+export const updateWindowProfileBodyWeightKgPerSqFtMin = 0;
+export const updateWindowProfileBodyWeightKgPerSqFtMax = 10000;
+
+
+
+export const UpdateWindowProfileBody = zod.object({
+  "code": zod.string().min(1).max(updateWindowProfileBodyCodeMax),
+  "name": zod.string().min(updateWindowProfileBodyNameMin).max(updateWindowProfileBodyNameMax),
+  "profileSystem": zod.string().min(1).max(updateWindowProfileBodyProfileSystemMax),
+  "glass": zod.string().max(updateWindowProfileBodyGlassMax),
+  "profileColor": zod.string().max(updateWindowProfileBodyProfileColorMax),
+  "meshType": zod.string().max(updateWindowProfileBodyMeshTypeMax),
+  "specifications": zod.string().max(updateWindowProfileBodySpecificationsMax),
+  "accessories": zod.string().max(updateWindowProfileBodyAccessoriesMax),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "ratePerSqFt": zod.number().min(updateWindowProfileBodyRatePerSqFtMin).max(updateWindowProfileBodyRatePerSqFtMax),
+  "weightKgPerSqFt": zod.number().min(updateWindowProfileBodyWeightKgPerSqFtMin).max(updateWindowProfileBodyWeightKgPerSqFtMax)
+})
+
+export const updateWindowProfileResponseRatePerSqFtMin = 0;
+
+export const updateWindowProfileResponseWeightKgPerSqFtMin = 0;
+
+
+
+export const UpdateWindowProfileResponse = zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "ratePerSqFt": zod.number().min(updateWindowProfileResponseRatePerSqFtMin),
+  "weightKgPerSqFt": zod.number().min(updateWindowProfileResponseWeightKgPerSqFtMin),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Archive a window profile without changing saved quotations
+ */
+export const ArchiveWindowProfileParams = zod.object({
+  "profileId": zod.coerce.string()
+})
+
+export const ArchiveWindowProfileResponse = zod.void()
+
+
+/**
+ * @summary List saved quotations
+ */
+export const ListQuotationsResponseItem = zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft']),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListQuotationsResponse = zod.array(ListQuotationsResponseItem)
+
+
+/**
+ * @summary Create a quotation with server-calculated totals
+ */
+export const createQuotationBodyCustomerNameMax = 160;
+
+export const createQuotationBodyCustomerPhoneMax = 40;
+
+export const createQuotationBodyCustomerAddressMax = 600;
+
+export const createQuotationBodyCustomerGstinMax = 20;
+
+export const createQuotationBodyProjectNameMax = 160;
+
+
+export const createQuotationBodyItemsItemCodeMax = 24;
+
+export const createQuotationBodyItemsItemLocationMax = 160;
+
+export const createQuotationBodyItemsItemWidthMmExclusiveMin = 0;
+export const createQuotationBodyItemsItemWidthMmMax = 10000;
+
+export const createQuotationBodyItemsItemHeightMmExclusiveMin = 0;
+export const createQuotationBodyItemsItemHeightMmMax = 10000;
+
+export const createQuotationBodyItemsItemQuantityMax = 9999;
+
+export const createQuotationBodyItemsItemRatePerSqFtMin = 0;
+export const createQuotationBodyItemsItemRatePerSqFtMax = 1000000;
+
+export const createQuotationBodyItemsMax = 100;
+
+export const createQuotationBodyTransportationCostMin = 0;
+export const createQuotationBodyTransportationCostMax = 100000000;
+
+export const createQuotationBodyLoadingUnloadingCostMin = 0;
+export const createQuotationBodyLoadingUnloadingCostMax = 100000000;
+
+export const createQuotationBodyAdditionalChargeDescriptionMax = 160;
+
+export const createQuotationBodyAdditionalChargeRateMin = 0;
+export const createQuotationBodyAdditionalChargeRateMax = 1000000;
+
+export const createQuotationBodyAdditionalChargeAreaSqFtMin = 0;
+export const createQuotationBodyAdditionalChargeAreaSqFtMax = 100000;
+
+export const createQuotationBodyGstPercentMin = 0;
+export const createQuotationBodyGstPercentMax = 100;
+
+export const createQuotationBodyNotesMax = 2000;
+
+
+
+export const CreateQuotationBody = zod.object({
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string().min(1).max(createQuotationBodyCustomerNameMax),
+  "customerPhone": zod.string().max(createQuotationBodyCustomerPhoneMax),
+  "customerAddress": zod.string().max(createQuotationBodyCustomerAddressMax),
+  "customerGstin": zod.string().max(createQuotationBodyCustomerGstinMax).nullable(),
+  "projectName": zod.string().max(createQuotationBodyProjectNameMax),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string().min(1),
+  "code": zod.string().min(1).max(createQuotationBodyItemsItemCodeMax),
+  "location": zod.string().max(createQuotationBodyItemsItemLocationMax),
+  "widthMm": zod.number().gt(createQuotationBodyItemsItemWidthMmExclusiveMin).max(createQuotationBodyItemsItemWidthMmMax),
+  "heightMm": zod.number().gt(createQuotationBodyItemsItemHeightMmExclusiveMin).max(createQuotationBodyItemsItemHeightMmMax),
+  "quantity": zod.number().int().min(1).max(createQuotationBodyItemsItemQuantityMax),
+  "ratePerSqFt": zod.number().min(createQuotationBodyItemsItemRatePerSqFtMin).max(createQuotationBodyItemsItemRatePerSqFtMax).optional()
+})).min(1).max(createQuotationBodyItemsMax),
+  "transportationCost": zod.number().min(createQuotationBodyTransportationCostMin).max(createQuotationBodyTransportationCostMax),
+  "loadingUnloadingCost": zod.number().min(createQuotationBodyLoadingUnloadingCostMin).max(createQuotationBodyLoadingUnloadingCostMax),
+  "additionalChargeDescription": zod.string().max(createQuotationBodyAdditionalChargeDescriptionMax),
+  "additionalChargeRate": zod.number().min(createQuotationBodyAdditionalChargeRateMin).max(createQuotationBodyAdditionalChargeRateMax),
+  "additionalChargeAreaSqFt": zod.number().min(createQuotationBodyAdditionalChargeAreaSqFtMin).max(createQuotationBodyAdditionalChargeAreaSqFtMax),
+  "gstPercent": zod.number().min(createQuotationBodyGstPercentMin).max(createQuotationBodyGstPercentMax),
+  "notes": zod.string().max(createQuotationBodyNotesMax).nullable()
+})
+
+export const CreateQuotationResponse = zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft']),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get a saved quotation
+ */
+export const GetQuotationParams = zod.object({
+  "quotationId": zod.coerce.string()
+})
+
+export const GetQuotationResponse = zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft']),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a saved quotation
+ */
+export const UpdateQuotationParams = zod.object({
+  "quotationId": zod.coerce.string()
+})
+
+export const updateQuotationBodyCustomerNameMax = 160;
+
+export const updateQuotationBodyCustomerPhoneMax = 40;
+
+export const updateQuotationBodyCustomerAddressMax = 600;
+
+export const updateQuotationBodyCustomerGstinMax = 20;
+
+export const updateQuotationBodyProjectNameMax = 160;
+
+
+export const updateQuotationBodyItemsItemCodeMax = 24;
+
+export const updateQuotationBodyItemsItemLocationMax = 160;
+
+export const updateQuotationBodyItemsItemWidthMmExclusiveMin = 0;
+export const updateQuotationBodyItemsItemWidthMmMax = 10000;
+
+export const updateQuotationBodyItemsItemHeightMmExclusiveMin = 0;
+export const updateQuotationBodyItemsItemHeightMmMax = 10000;
+
+export const updateQuotationBodyItemsItemQuantityMax = 9999;
+
+export const updateQuotationBodyItemsItemRatePerSqFtMin = 0;
+export const updateQuotationBodyItemsItemRatePerSqFtMax = 1000000;
+
+export const updateQuotationBodyItemsMax = 100;
+
+export const updateQuotationBodyTransportationCostMin = 0;
+export const updateQuotationBodyTransportationCostMax = 100000000;
+
+export const updateQuotationBodyLoadingUnloadingCostMin = 0;
+export const updateQuotationBodyLoadingUnloadingCostMax = 100000000;
+
+export const updateQuotationBodyAdditionalChargeDescriptionMax = 160;
+
+export const updateQuotationBodyAdditionalChargeRateMin = 0;
+export const updateQuotationBodyAdditionalChargeRateMax = 1000000;
+
+export const updateQuotationBodyAdditionalChargeAreaSqFtMin = 0;
+export const updateQuotationBodyAdditionalChargeAreaSqFtMax = 100000;
+
+export const updateQuotationBodyGstPercentMin = 0;
+export const updateQuotationBodyGstPercentMax = 100;
+
+export const updateQuotationBodyNotesMax = 2000;
+
+
+
+export const UpdateQuotationBody = zod.object({
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string().min(1).max(updateQuotationBodyCustomerNameMax),
+  "customerPhone": zod.string().max(updateQuotationBodyCustomerPhoneMax),
+  "customerAddress": zod.string().max(updateQuotationBodyCustomerAddressMax),
+  "customerGstin": zod.string().max(updateQuotationBodyCustomerGstinMax).nullable(),
+  "projectName": zod.string().max(updateQuotationBodyProjectNameMax),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string().min(1),
+  "code": zod.string().min(1).max(updateQuotationBodyItemsItemCodeMax),
+  "location": zod.string().max(updateQuotationBodyItemsItemLocationMax),
+  "widthMm": zod.number().gt(updateQuotationBodyItemsItemWidthMmExclusiveMin).max(updateQuotationBodyItemsItemWidthMmMax),
+  "heightMm": zod.number().gt(updateQuotationBodyItemsItemHeightMmExclusiveMin).max(updateQuotationBodyItemsItemHeightMmMax),
+  "quantity": zod.number().int().min(1).max(updateQuotationBodyItemsItemQuantityMax),
+  "ratePerSqFt": zod.number().min(updateQuotationBodyItemsItemRatePerSqFtMin).max(updateQuotationBodyItemsItemRatePerSqFtMax).optional()
+})).min(1).max(updateQuotationBodyItemsMax),
+  "transportationCost": zod.number().min(updateQuotationBodyTransportationCostMin).max(updateQuotationBodyTransportationCostMax),
+  "loadingUnloadingCost": zod.number().min(updateQuotationBodyLoadingUnloadingCostMin).max(updateQuotationBodyLoadingUnloadingCostMax),
+  "additionalChargeDescription": zod.string().max(updateQuotationBodyAdditionalChargeDescriptionMax),
+  "additionalChargeRate": zod.number().min(updateQuotationBodyAdditionalChargeRateMin).max(updateQuotationBodyAdditionalChargeRateMax),
+  "additionalChargeAreaSqFt": zod.number().min(updateQuotationBodyAdditionalChargeAreaSqFtMin).max(updateQuotationBodyAdditionalChargeAreaSqFtMax),
+  "gstPercent": zod.number().min(updateQuotationBodyGstPercentMin).max(updateQuotationBodyGstPercentMax),
+  "notes": zod.string().max(updateQuotationBodyNotesMax).nullable()
+})
+
+export const UpdateQuotationResponse = zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft']),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Archive a quotation
+ */
+export const ArchiveQuotationParams = zod.object({
+  "quotationId": zod.coerce.string()
+})
+
+export const ArchiveQuotationResponse = zod.void()
+
+
+/**
  * @summary List window records for an order
  */
 export const ListOrderWindowsParams = zod.object({

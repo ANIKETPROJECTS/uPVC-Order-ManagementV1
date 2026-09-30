@@ -18,6 +18,8 @@ tags:
     description: Role-specific dashboard data
   - name: order-hub
     description: Client and central order management
+  - name: quotations
+    description: Window profiles and quotations
 paths:
   /healthz:
     get:
@@ -825,6 +827,171 @@ paths:
       responses:
         "204":
           description: Communication group archived
+  /window-profiles:
+    get:
+      operationId: listWindowProfiles
+      tags: [quotations]
+      summary: List active window profiles available to quotations
+      responses:
+        "200":
+          description: Window profile catalogue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WindowProfileList"
+    post:
+      operationId: createWindowProfile
+      tags: [quotations]
+      summary: Create a window profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WindowProfileInput"
+      responses:
+        "201":
+          description: Created window profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WindowProfile"
+        "400":
+          description: Invalid profile details
+        "409":
+          description: Profile code already exists
+  /window-profiles/{profileId}:
+    patch:
+      operationId: updateWindowProfile
+      tags: [quotations]
+      summary: Edit a window profile
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WindowProfileInput"
+      responses:
+        "200":
+          description: Updated window profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WindowProfile"
+        "404":
+          description: Profile not found
+        "409":
+          description: Profile code already exists
+    delete:
+      operationId: archiveWindowProfile
+      tags: [quotations]
+      summary: Archive a window profile without changing saved quotations
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Profile archived
+  /quotations:
+    get:
+      operationId: listQuotations
+      tags: [quotations]
+      summary: List saved quotations
+      responses:
+        "200":
+          description: Quotations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationList"
+    post:
+      operationId: createQuotation
+      tags: [quotations]
+      summary: Create a quotation with server-calculated totals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationInput"
+      responses:
+        "201":
+          description: Created quotation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "400":
+          description: Invalid quotation details
+        "404":
+          description: Client or profile not found
+  /quotations/{quotationId}:
+    get:
+      operationId: getQuotation
+      tags: [quotations]
+      summary: Get a saved quotation
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "404":
+          description: Quotation not found
+    patch:
+      operationId: updateQuotation
+      tags: [quotations]
+      summary: Update a saved quotation
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationInput"
+      responses:
+        "200":
+          description: Updated quotation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "404":
+          description: Quotation not found
+    delete:
+      operationId: archiveQuotation
+      tags: [quotations]
+      summary: Archive a quotation
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Quotation archived
   /orders/{id}/windows:
     get:
       operationId: listOrderWindows
@@ -1995,4 +2162,307 @@ components:
           items:
             type: string
       required: [name, memberIds]
+    WindowProfileDrawingType:
+      type: string
+      enum: [casement, sliding, mixed, louvre]
+    WindowProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        profileSystem:
+          type: string
+        glass:
+          type: string
+        profileColor:
+          type: string
+        meshType:
+          type: string
+        specifications:
+          type: string
+        accessories:
+          type: string
+        drawingType:
+          $ref: "#/components/schemas/WindowProfileDrawingType"
+        ratePerSqFt:
+          type: number
+          minimum: 0
+        weightKgPerSqFt:
+          type: number
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, code, name, profileSystem, glass, profileColor, meshType, specifications, accessories, drawingType, ratePerSqFt, weightKgPerSqFt, createdAt, updatedAt]
+    WindowProfileInput:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 24
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        profileSystem:
+          type: string
+          minLength: 1
+          maxLength: 240
+        glass:
+          type: string
+          maxLength: 120
+        profileColor:
+          type: string
+          maxLength: 80
+        meshType:
+          type: string
+          maxLength: 120
+        specifications:
+          type: string
+          maxLength: 3000
+        accessories:
+          type: string
+          maxLength: 1500
+        drawingType:
+          $ref: "#/components/schemas/WindowProfileDrawingType"
+        ratePerSqFt:
+          type: number
+          minimum: 0
+          maximum: 1000000
+        weightKgPerSqFt:
+          type: number
+          minimum: 0
+          maximum: 10000
+      required: [code, name, profileSystem, glass, profileColor, meshType, specifications, accessories, drawingType, ratePerSqFt, weightKgPerSqFt]
+    WindowProfileList:
+      type: array
+      items:
+        $ref: "#/components/schemas/WindowProfile"
+    QuotationStatus:
+      type: string
+      enum: [draft]
+    QuotationItem:
+      type: object
+      properties:
+        profileId:
+          type: string
+        profileCode:
+          type: string
+        profileName:
+          type: string
+        profileSystem:
+          type: string
+        glass:
+          type: string
+        profileColor:
+          type: string
+        meshType:
+          type: string
+        specifications:
+          type: string
+        accessories:
+          type: string
+        drawingType:
+          $ref: "#/components/schemas/WindowProfileDrawingType"
+        code:
+          type: string
+        location:
+          type: string
+        widthMm:
+          type: number
+        heightMm:
+          type: number
+        sqFtPerWindow:
+          type: number
+        ratePerSqFt:
+          type: number
+        unitPrice:
+          type: number
+        quantity:
+          type: integer
+        value:
+          type: number
+        weightKgPerWindow:
+          type: number
+      required: [profileId, profileCode, profileName, profileSystem, glass, profileColor, meshType, specifications, accessories, drawingType, code, location, widthMm, heightMm, sqFtPerWindow, ratePerSqFt, unitPrice, quantity, value, weightKgPerWindow]
+    QuotationLineInput:
+      type: object
+      properties:
+        profileId:
+          type: string
+          minLength: 1
+        code:
+          type: string
+          minLength: 1
+          maxLength: 24
+        location:
+          type: string
+          maxLength: 160
+        widthMm:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 10000
+        heightMm:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 10000
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 9999
+        ratePerSqFt:
+          type: number
+          minimum: 0
+          maximum: 1000000
+      required: [profileId, code, location, widthMm, heightMm, quantity]
+    QuotationTotals:
+      type: object
+      properties:
+        componentCount:
+          type: integer
+        totalAreaSqFt:
+          type: number
+        basicValue:
+          type: number
+        transportationCost:
+          type: number
+        loadingUnloadingCost:
+          type: number
+        additionalCharge:
+          type: number
+        subtotal:
+          type: number
+        gstPercent:
+          type: number
+        gstAmount:
+          type: number
+        grandTotal:
+          type: number
+        averagePricePerSqFt:
+          type: number
+      required: [componentCount, totalAreaSqFt, basicValue, transportationCost, loadingUnloadingCost, additionalCharge, subtotal, gstPercent, gstAmount, grandTotal, averagePricePerSqFt]
+    Quotation:
+      type: object
+      properties:
+        id:
+          type: string
+        quoteNo:
+          type: string
+        clientId:
+          type: ["string", "null"]
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        customerAddress:
+          type: string
+        customerGstin:
+          type: ["string", "null"]
+        projectName:
+          type: string
+        quotationDate:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotationItem"
+        transportationCost:
+          type: number
+        loadingUnloadingCost:
+          type: number
+        additionalChargeDescription:
+          type: string
+        additionalChargeRate:
+          type: number
+        additionalChargeAreaSqFt:
+          type: number
+        gstPercent:
+          type: number
+        notes:
+          type: ["string", "null"]
+        totals:
+          $ref: "#/components/schemas/QuotationTotals"
+        status:
+          $ref: "#/components/schemas/QuotationStatus"
+        createdBy:
+          type: string
+        updatedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, quoteNo, clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes, totals, status, createdBy, updatedBy, createdAt, updatedAt]
+    QuotationInput:
+      type: object
+      properties:
+        clientId:
+          type: ["string", "null"]
+        customerName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        customerPhone:
+          type: string
+          maxLength: 40
+        customerAddress:
+          type: string
+          maxLength: 600
+        customerGstin:
+          type: ["string", "null"]
+          maxLength: 20
+        projectName:
+          type: string
+          maxLength: 160
+        quotationDate:
+          type: string
+          format: date
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/QuotationLineInput"
+        transportationCost:
+          type: number
+          minimum: 0
+          maximum: 100000000
+        loadingUnloadingCost:
+          type: number
+          minimum: 0
+          maximum: 100000000
+        additionalChargeDescription:
+          type: string
+          maxLength: 160
+        additionalChargeRate:
+          type: number
+          minimum: 0
+          maximum: 1000000
+        additionalChargeAreaSqFt:
+          type: number
+          minimum: 0
+          maximum: 100000
+        gstPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+        notes:
+          type: ["string", "null"]
+          maxLength: 2000
+      required: [clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes]
+    QuotationList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Quotation"
 

@@ -66,6 +66,9 @@ import type {
   OrderWindowInput,
   OrderWindowList,
   OrderWindowUpdate,
+  Quotation,
+  QuotationInput,
+  QuotationList,
   Role,
   RoleInput,
   RoleUpdate,
@@ -73,7 +76,10 @@ import type {
   SuccessResponse,
   User,
   UserInput,
-  UserUpdate
+  UserUpdate,
+  WindowProfile,
+  WindowProfileInput,
+  WindowProfileList
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -3312,6 +3318,739 @@ export const useDeleteChatGroup = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteChatGroupMutationOptions(options));
+    }
+
+export const getListWindowProfilesUrl = () => {
+
+
+
+
+  return `/api/window-profiles`
+}
+
+/**
+ * @summary List active window profiles available to quotations
+ */
+export const listWindowProfiles = async ( options?: Parameters<typeof customFetch>[1]): Promise<WindowProfileList> => {
+
+  return customFetch<WindowProfileList>(getListWindowProfilesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWindowProfilesQueryKey = () => {
+    return [
+    `/api/window-profiles`
+    ] as const;
+    }
+
+
+export const getListWindowProfilesQueryOptions = <TData = Awaited<ReturnType<typeof listWindowProfiles>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWindowProfiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWindowProfilesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWindowProfiles>>> = ({ signal }) => listWindowProfiles({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWindowProfiles>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWindowProfilesQueryResult = NonNullable<Awaited<ReturnType<typeof listWindowProfiles>>>
+export type ListWindowProfilesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active window profiles available to quotations
+ */
+
+export function useListWindowProfiles<TData = Awaited<ReturnType<typeof listWindowProfiles>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWindowProfiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWindowProfilesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateWindowProfileUrl = () => {
+
+
+
+
+  return `/api/window-profiles`
+}
+
+/**
+ * @summary Create a window profile
+ */
+export const createWindowProfile = async (windowProfileInput: WindowProfileInput, options?: Parameters<typeof customFetch>[1]): Promise<WindowProfile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<WindowProfile>(getCreateWindowProfileUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(windowProfileInput)
+  }
+);}
+
+
+
+
+
+export const getCreateWindowProfileMutationKey = () => ['createWindowProfile'] as const;
+
+export const getCreateWindowProfileMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWindowProfile>>, TError,CreateWindowProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWindowProfile>>, TError,CreateWindowProfileMutationVariables, TContext> => {
+
+const mutationKey = getCreateWindowProfileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWindowProfile>>, CreateWindowProfileMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createWindowProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateWindowProfileMutationResult = NonNullable<Awaited<ReturnType<typeof createWindowProfile>>>
+    export type CreateWindowProfileMutationBody = BodyType<WindowProfileInput>
+    export type CreateWindowProfileMutationError = ErrorType<void>
+    export type CreateWindowProfileMutationVariables = {data: BodyType<WindowProfileInput>}
+
+    /**
+ * @summary Create a window profile
+ */
+export const useCreateWindowProfile = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWindowProfile>>, TError,CreateWindowProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createWindowProfile>>,
+        TError,
+        CreateWindowProfileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateWindowProfileMutationOptions(options));
+    }
+
+export const getUpdateWindowProfileUrl = (profileId: string,) => {
+
+
+
+
+  return `/api/window-profiles/${profileId}`
+}
+
+/**
+ * @summary Edit a window profile
+ */
+export const updateWindowProfile = async (profileId: string,
+    windowProfileInput: WindowProfileInput, options?: Parameters<typeof customFetch>[1]): Promise<WindowProfile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<WindowProfile>(getUpdateWindowProfileUrl(profileId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(windowProfileInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateWindowProfileMutationKey = () => ['updateWindowProfile'] as const;
+
+export const getUpdateWindowProfileMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWindowProfile>>, TError,UpdateWindowProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWindowProfile>>, TError,UpdateWindowProfileMutationVariables, TContext> => {
+
+const mutationKey = getUpdateWindowProfileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWindowProfile>>, UpdateWindowProfileMutationVariables> = (props) => {
+          const {profileId,data} = props ?? {};
+
+          return  updateWindowProfile(profileId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWindowProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updateWindowProfile>>>
+    export type UpdateWindowProfileMutationBody = BodyType<WindowProfileInput>
+    export type UpdateWindowProfileMutationError = ErrorType<void>
+    export type UpdateWindowProfileMutationVariables = {profileId: string;data: BodyType<WindowProfileInput>}
+
+    /**
+ * @summary Edit a window profile
+ */
+export const useUpdateWindowProfile = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWindowProfile>>, TError,UpdateWindowProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWindowProfile>>,
+        TError,
+        UpdateWindowProfileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateWindowProfileMutationOptions(options));
+    }
+
+export const getArchiveWindowProfileUrl = (profileId: string,) => {
+
+
+
+
+  return `/api/window-profiles/${profileId}`
+}
+
+/**
+ * @summary Archive a window profile without changing saved quotations
+ */
+export const archiveWindowProfile = async (profileId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getArchiveWindowProfileUrl(profileId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getArchiveWindowProfileMutationKey = () => ['archiveWindowProfile'] as const;
+
+export const getArchiveWindowProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveWindowProfile>>, TError,ArchiveWindowProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveWindowProfile>>, TError,ArchiveWindowProfileMutationVariables, TContext> => {
+
+const mutationKey = getArchiveWindowProfileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveWindowProfile>>, ArchiveWindowProfileMutationVariables> = (props) => {
+          const {profileId} = props ?? {};
+
+          return  archiveWindowProfile(profileId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveWindowProfileMutationResult = NonNullable<Awaited<ReturnType<typeof archiveWindowProfile>>>
+
+    export type ArchiveWindowProfileMutationError = ErrorType<unknown>
+    export type ArchiveWindowProfileMutationVariables = {profileId: string}
+
+    /**
+ * @summary Archive a window profile without changing saved quotations
+ */
+export const useArchiveWindowProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveWindowProfile>>, TError,ArchiveWindowProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof archiveWindowProfile>>,
+        TError,
+        ArchiveWindowProfileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getArchiveWindowProfileMutationOptions(options));
+    }
+
+export const getListQuotationsUrl = () => {
+
+
+
+
+  return `/api/quotations`
+}
+
+/**
+ * @summary List saved quotations
+ */
+export const listQuotations = async ( options?: Parameters<typeof customFetch>[1]): Promise<QuotationList> => {
+
+  return customFetch<QuotationList>(getListQuotationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListQuotationsQueryKey = () => {
+    return [
+    `/api/quotations`
+    ] as const;
+    }
+
+
+export const getListQuotationsQueryOptions = <TData = Awaited<ReturnType<typeof listQuotations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuotations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListQuotationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listQuotations>>> = ({ signal }) => listQuotations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listQuotations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListQuotationsQueryResult = NonNullable<Awaited<ReturnType<typeof listQuotations>>>
+export type ListQuotationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List saved quotations
+ */
+
+export function useListQuotations<TData = Awaited<ReturnType<typeof listQuotations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuotations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListQuotationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateQuotationUrl = () => {
+
+
+
+
+  return `/api/quotations`
+}
+
+/**
+ * @summary Create a quotation with server-calculated totals
+ */
+export const createQuotation = async (quotationInput: QuotationInput, options?: Parameters<typeof customFetch>[1]): Promise<Quotation> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Quotation>(getCreateQuotationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationInput)
+  }
+);}
+
+
+
+
+
+export const getCreateQuotationMutationKey = () => ['createQuotation'] as const;
+
+export const getCreateQuotationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createQuotation>>, TError,CreateQuotationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createQuotation>>, TError,CreateQuotationMutationVariables, TContext> => {
+
+const mutationKey = getCreateQuotationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createQuotation>>, CreateQuotationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createQuotation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateQuotationMutationResult = NonNullable<Awaited<ReturnType<typeof createQuotation>>>
+    export type CreateQuotationMutationBody = BodyType<QuotationInput>
+    export type CreateQuotationMutationError = ErrorType<void>
+    export type CreateQuotationMutationVariables = {data: BodyType<QuotationInput>}
+
+    /**
+ * @summary Create a quotation with server-calculated totals
+ */
+export const useCreateQuotation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createQuotation>>, TError,CreateQuotationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createQuotation>>,
+        TError,
+        CreateQuotationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateQuotationMutationOptions(options));
+    }
+
+export const getGetQuotationUrl = (quotationId: string,) => {
+
+
+
+
+  return `/api/quotations/${quotationId}`
+}
+
+/**
+ * @summary Get a saved quotation
+ */
+export const getQuotation = async (quotationId: string, options?: Parameters<typeof customFetch>[1]): Promise<Quotation> => {
+
+  return customFetch<Quotation>(getGetQuotationUrl(quotationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetQuotationQueryKey = (quotationId: string,) => {
+    return [
+    `/api/quotations/${quotationId}`
+    ] as const;
+    }
+
+
+export const getGetQuotationQueryOptions = <TData = Awaited<ReturnType<typeof getQuotation>>, TError = ErrorType<void>>(quotationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuotation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetQuotationQueryKey(quotationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQuotation>>> = ({ signal }) => getQuotation(quotationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: quotationId !== null && quotationId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQuotation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetQuotationQueryResult = NonNullable<Awaited<ReturnType<typeof getQuotation>>>
+export type GetQuotationQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a saved quotation
+ */
+
+export function useGetQuotation<TData = Awaited<ReturnType<typeof getQuotation>>, TError = ErrorType<void>>(
+ quotationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuotation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetQuotationQueryOptions(quotationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateQuotationUrl = (quotationId: string,) => {
+
+
+
+
+  return `/api/quotations/${quotationId}`
+}
+
+/**
+ * @summary Update a saved quotation
+ */
+export const updateQuotation = async (quotationId: string,
+    quotationInput: QuotationInput, options?: Parameters<typeof customFetch>[1]): Promise<Quotation> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Quotation>(getUpdateQuotationUrl(quotationId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateQuotationMutationKey = () => ['updateQuotation'] as const;
+
+export const getUpdateQuotationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQuotation>>, TError,UpdateQuotationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateQuotation>>, TError,UpdateQuotationMutationVariables, TContext> => {
+
+const mutationKey = getUpdateQuotationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateQuotation>>, UpdateQuotationMutationVariables> = (props) => {
+          const {quotationId,data} = props ?? {};
+
+          return  updateQuotation(quotationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateQuotationMutationResult = NonNullable<Awaited<ReturnType<typeof updateQuotation>>>
+    export type UpdateQuotationMutationBody = BodyType<QuotationInput>
+    export type UpdateQuotationMutationError = ErrorType<void>
+    export type UpdateQuotationMutationVariables = {quotationId: string;data: BodyType<QuotationInput>}
+
+    /**
+ * @summary Update a saved quotation
+ */
+export const useUpdateQuotation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQuotation>>, TError,UpdateQuotationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateQuotation>>,
+        TError,
+        UpdateQuotationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateQuotationMutationOptions(options));
+    }
+
+export const getArchiveQuotationUrl = (quotationId: string,) => {
+
+
+
+
+  return `/api/quotations/${quotationId}`
+}
+
+/**
+ * @summary Archive a quotation
+ */
+export const archiveQuotation = async (quotationId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getArchiveQuotationUrl(quotationId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getArchiveQuotationMutationKey = () => ['archiveQuotation'] as const;
+
+export const getArchiveQuotationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveQuotation>>, TError,ArchiveQuotationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveQuotation>>, TError,ArchiveQuotationMutationVariables, TContext> => {
+
+const mutationKey = getArchiveQuotationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveQuotation>>, ArchiveQuotationMutationVariables> = (props) => {
+          const {quotationId} = props ?? {};
+
+          return  archiveQuotation(quotationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveQuotationMutationResult = NonNullable<Awaited<ReturnType<typeof archiveQuotation>>>
+
+    export type ArchiveQuotationMutationError = ErrorType<unknown>
+    export type ArchiveQuotationMutationVariables = {quotationId: string}
+
+    /**
+ * @summary Archive a quotation
+ */
+export const useArchiveQuotation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveQuotation>>, TError,ArchiveQuotationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof archiveQuotation>>,
+        TError,
+        ArchiveQuotationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getArchiveQuotationMutationOptions(options));
     }
 
 export const getListOrderWindowsUrl = (id: string,) => {

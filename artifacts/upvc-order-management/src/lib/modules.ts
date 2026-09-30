@@ -10,7 +10,7 @@ export type ModuleDefinition = {
 export const MODULES: ModuleDefinition[] = [
   { key: 'user-access', label: 'Multi-User Architecture & Role-Based Access Control', short: 'User access', built: true },
   { key: 'order-hub', label: 'Client & Order ID Management (Central Hub)', short: 'Client & orders', built: true },
-  { key: 'quotation-builder', label: 'Digital Quotation Builder & Document Repository', short: 'Quotations' },
+  { key: 'quotation-builder', label: 'Digital Quotation Builder & Document Repository', short: 'Quotations', built: true },
   { key: 'rate-approval', label: 'Rate Approval Workflow', short: 'Rate approval' },
   { key: 'confirmation', label: 'Digital Confirmation / Purchase Order Generator', short: 'Confirmation / PO' },
   { key: 'measurements', label: 'Measurement Database (Version Control)', short: 'Measurements' },

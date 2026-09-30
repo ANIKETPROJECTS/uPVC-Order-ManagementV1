@@ -4,6 +4,7 @@ import chatRouter from "./chat";
 import healthRouter from "./health";
 import orderHubRouter from "./order-hub";
 import orderWorkspaceRouter from "./order-workspace";
+import quotationsRouter from "./quotations";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(accessRouter);
 router.use(chatRouter);
 router.use(orderHubRouter);
 router.use(orderWorkspaceRouter);
+router.use(quotationsRouter);
 
 export default router;

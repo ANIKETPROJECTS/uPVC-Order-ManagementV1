@@ -696,6 +696,242 @@ export interface ChatGroupUpdate {
   memberIds: string[];
 }
 
+export type WindowProfileDrawingType = typeof WindowProfileDrawingType[keyof typeof WindowProfileDrawingType];
+
+
+export const WindowProfileDrawingType = {
+  casement: 'casement',
+  sliding: 'sliding',
+  mixed: 'mixed',
+  louvre: 'louvre',
+} as const;
+
+export interface WindowProfile {
+  id: string;
+  code: string;
+  name: string;
+  profileSystem: string;
+  glass: string;
+  profileColor: string;
+  meshType: string;
+  specifications: string;
+  accessories: string;
+  drawingType: WindowProfileDrawingType;
+  /** @minimum 0 */
+  ratePerSqFt: number;
+  /** @minimum 0 */
+  weightKgPerSqFt: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WindowProfileInput {
+  /**
+     * @minLength 1
+     * @maxLength 24
+     */
+  code: string;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  name: string;
+  /**
+     * @minLength 1
+     * @maxLength 240
+     */
+  profileSystem: string;
+  /** @maxLength 120 */
+  glass: string;
+  /** @maxLength 80 */
+  profileColor: string;
+  /** @maxLength 120 */
+  meshType: string;
+  /** @maxLength 3000 */
+  specifications: string;
+  /** @maxLength 1500 */
+  accessories: string;
+  drawingType: WindowProfileDrawingType;
+  /**
+     * @minimum 0
+     * @maximum 1000000
+     */
+  ratePerSqFt: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  weightKgPerSqFt: number;
+}
+
+export type WindowProfileList = WindowProfile[];
+
+export type QuotationStatus = typeof QuotationStatus[keyof typeof QuotationStatus];
+
+
+export const QuotationStatus = {
+  draft: 'draft',
+} as const;
+
+export interface QuotationItem {
+  profileId: string;
+  profileCode: string;
+  profileName: string;
+  profileSystem: string;
+  glass: string;
+  profileColor: string;
+  meshType: string;
+  specifications: string;
+  accessories: string;
+  drawingType: WindowProfileDrawingType;
+  code: string;
+  location: string;
+  widthMm: number;
+  heightMm: number;
+  sqFtPerWindow: number;
+  ratePerSqFt: number;
+  unitPrice: number;
+  quantity: number;
+  value: number;
+  weightKgPerWindow: number;
+}
+
+export interface QuotationLineInput {
+  /** @minLength 1 */
+  profileId: string;
+  /**
+     * @minLength 1
+     * @maxLength 24
+     */
+  code: string;
+  /** @maxLength 160 */
+  location: string;
+  /**
+     * @maximum 10000
+     * @exclusiveMinimum 0
+     */
+  widthMm: number;
+  /**
+     * @maximum 10000
+     * @exclusiveMinimum 0
+     */
+  heightMm: number;
+  /**
+     * @minimum 1
+     * @maximum 9999
+     */
+  quantity: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000
+     */
+  ratePerSqFt?: number;
+}
+
+export interface QuotationTotals {
+  componentCount: number;
+  totalAreaSqFt: number;
+  basicValue: number;
+  transportationCost: number;
+  loadingUnloadingCost: number;
+  additionalCharge: number;
+  subtotal: number;
+  gstPercent: number;
+  gstAmount: number;
+  grandTotal: number;
+  averagePricePerSqFt: number;
+}
+
+export interface Quotation {
+  id: string;
+  quoteNo: string;
+  /** @nullable */
+  clientId: string | null;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  /** @nullable */
+  customerGstin: string | null;
+  projectName: string;
+  quotationDate: string;
+  items: QuotationItem[];
+  transportationCost: number;
+  loadingUnloadingCost: number;
+  additionalChargeDescription: string;
+  additionalChargeRate: number;
+  additionalChargeAreaSqFt: number;
+  gstPercent: number;
+  /** @nullable */
+  notes: string | null;
+  totals: QuotationTotals;
+  status: QuotationStatus;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuotationInput {
+  /** @nullable */
+  clientId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  customerName: string;
+  /** @maxLength 40 */
+  customerPhone: string;
+  /** @maxLength 600 */
+  customerAddress: string;
+  /**
+     * @maxLength 20
+     * @nullable
+     */
+  customerGstin: string | null;
+  /** @maxLength 160 */
+  projectName: string;
+  quotationDate: string;
+  /**
+     * @minItems 1
+     * @maxItems 100
+     */
+  items: QuotationLineInput[];
+  /**
+     * @minimum 0
+     * @maximum 100000000
+     */
+  transportationCost: number;
+  /**
+     * @minimum 0
+     * @maximum 100000000
+     */
+  loadingUnloadingCost: number;
+  /** @maxLength 160 */
+  additionalChargeDescription: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000
+     */
+  additionalChargeRate: number;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  additionalChargeAreaSqFt: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  gstPercent: number;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes: string | null;
+}
+
+export type QuotationList = Quotation[];
+
 export type ListUsersParams = {
 status?: ListUsersStatus;
 roleId?: string;

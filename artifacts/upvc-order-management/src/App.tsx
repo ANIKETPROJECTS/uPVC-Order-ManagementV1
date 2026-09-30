@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from 'next-themes';
 import { useGetAuthSession } from '@workspace/api-client-react';
 import type { User } from '@workspace/api-client-react';
 import { Route, Router as WouterRouter, Switch } from 'wouter';
@@ -17,6 +18,7 @@ import OrderHubPage from '@/pages/order-hub';
 import OrderDetailPage from '@/pages/order-detail';
 import OrderScannerPage from '@/pages/order-scanner';
 import OrderStatusPage from '@/pages/order-status';
+import QuotationBuilderPage from '@/pages/quotation-builder';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000 } } });
 
@@ -32,6 +34,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/admin/roles" component={() => <RolesPage user={user} />} />
     <Route path="/admin/groups" component={() => <ChatGroupsPage user={user} />} />
     <Route path="/communication" component={() => <CommunicationPage user={user} />} />
+    <Route path="/quotation-builder" component={() => <QuotationBuilderPage user={user} />} />
     <Route component={NotFound} />
   </Switch>;
 }
@@ -44,7 +47,7 @@ function Router() {
 }
 
 function App() {
-  return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
+  return <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="framewise-theme" disableTransitionOnChange><QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider></ThemeProvider>;
 }
 
 export default App;

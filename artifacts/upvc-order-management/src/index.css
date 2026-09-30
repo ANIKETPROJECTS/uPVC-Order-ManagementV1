@@ -5,32 +5,34 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: 42 33% 96%;
-  --foreground: 213 32% 17%;
-  --card: 0 0% 100%;
-  --card-foreground: 213 32% 17%;
-  --border: 39 23% 86%;
-  --input: 39 23% 86%;
-  --ring: 173 65% 35%;
-  --primary: 173 65% 35%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 188 32% 92%;
-  --secondary-foreground: 191 39% 22%;
-  --muted: 40 24% 92%;
-  --muted-foreground: 213 13% 46%;
-  --accent: 29 89% 61%;
-  --accent-foreground: 25 49% 18%;
+  color-scheme: light;
+  --background: 42 38% 95%;
+  --foreground: 197 36% 18%;
+  --card: 42 46% 99%;
+  --card-foreground: 197 36% 18%;
+  --border: 39 25% 84%;
+  --input: 39 25% 80%;
+  --ring: 168 58% 35%;
+  --primary: 168 58% 35%;
+  --primary-foreground: 42 46% 99%;
+  --secondary: 174 28% 88%;
+  --secondary-foreground: 185 38% 20%;
+  --muted: 40 27% 90%;
+  --muted-foreground: 198 15% 45%;
+  --accent: 31 84% 57%;
+  --accent-foreground: 25 43% 17%;
   --destructive: 1 68% 48%;
-  --destructive-foreground: 0 0% 100%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 213 32% 17%;
-  --sidebar: 42 33% 96%;
-  --sidebar-foreground: 213 32% 17%;
-  --sidebar-border: 39 23% 86%;
-  --sidebar-primary: 172 66% 86%;
-  --sidebar-primary-foreground: 204 37% 11%;
-  --sidebar-accent: 188 32% 92%;
-  --sidebar-accent-foreground: 213 32% 17%;
+  --destructive-foreground: 42 46% 99%;
+  --popover: 42 46% 99%;
+  --popover-foreground: 197 36% 18%;
+  /* Sidebar brand colors are intentionally independent from card/surface tokens. */
+  --sidebar: 196 38% 18%;
+  --sidebar-foreground: 42 35% 93%;
+  --sidebar-border: 194 29% 27%;
+  --sidebar-primary: 169 64% 78%;
+  --sidebar-primary-foreground: 196 38% 17%;
+  --sidebar-accent: 194 28% 25%;
+  --sidebar-accent-foreground: 42 35% 94%;
   --radius: 0.75rem;
   --app-font-sans: 'DM Sans', sans-serif;
   --app-font-display: 'Space Grotesk', sans-serif;
@@ -38,6 +40,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: 210 25% 10%;
   --foreground: 40 25% 93%;
   --card: 210 24% 14%;
@@ -48,6 +51,14 @@
   --muted-foreground: 210 12% 66%;
   --popover: 210 24% 14%;
   --popover-foreground: 40 25% 93%;
+  /* Keep the Framewise sidebar stable when the workspace surfaces change theme. */
+  --sidebar: 196 38% 18%;
+  --sidebar-foreground: 42 35% 93%;
+  --sidebar-border: 194 29% 27%;
+  --sidebar-primary: 169 64% 78%;
+  --sidebar-primary-foreground: 196 38% 17%;
+  --sidebar-accent: 194 28% 25%;
+  --sidebar-accent-foreground: 42 35% 94%;
 }
 
 @theme inline {
@@ -116,6 +127,423 @@
   background:
     radial-gradient(circle at 92% 8%, rgb(231 163 83 / 0.14), transparent 26%),
     linear-gradient(135deg, #173b48 0%, #123241 58%, #0d2938 100%);
+}
+
+.quotation-hero {
+  position: relative;
+  background:
+    radial-gradient(circle at 82% 24%, rgb(78 214 192 / 0.18), transparent 24%),
+    linear-gradient(135deg, #173b48 0%, #123241 58%, #0d2938 100%);
+}
+
+.quotation-hero-mark {
+  position: absolute;
+  right: 8%;
+  top: 15%;
+  display: grid;
+  width: 180px;
+  height: 180px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  opacity: .8;
+  transform: rotate(8deg);
+}
+
+.quotation-hero-mark span {
+  border: 1px solid rgb(169 241 224 / .4);
+  border-radius: 18px;
+  background: rgb(91 213 176 / .08);
+}
+
+.quotation-hero-mark span:nth-child(2),
+.quotation-hero-mark span:nth-child(3) {
+  border-color: rgb(255 197 104 / .4);
+}
+
+.quotation-print-document {
+  display: none;
+}
+
+@media print {
+  body.print-quotation > * {
+    visibility: hidden;
+  }
+
+  body.print-quotation .quotation-print-document,
+  body.print-quotation .quotation-print-document * {
+    visibility: visible;
+  }
+
+  body.print-quotation .quotation-print-document {
+    position: absolute;
+    inset: 0;
+    display: block !important;
+    background: #fff;
+    color: #18323c;
+  }
+
+  .print-page {
+    position: relative;
+    display: flex;
+    min-height: 268mm;
+    flex-direction: column;
+    box-sizing: border-box;
+    break-after: page;
+    padding: 14mm 15mm 13mm;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .print-header {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr .8fr;
+    gap: 10px;
+    border-bottom: 1px solid #c9d8d3;
+    padding-bottom: 8px;
+    color: #18323c;
+    font-size: 8px;
+    line-height: 1.45;
+  }
+
+  .print-mark {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+  }
+
+  .print-roof {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #237e72;
+    border-radius: 3px;
+    transform: rotate(45deg);
+  }
+
+  .print-contact,
+  .print-meta {
+    text-align: right;
+  }
+
+  .print-section-label {
+    grid-column: 1 / -1;
+    color: #237e72;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+
+  .print-cover {
+    margin: auto 0;
+    max-width: 150mm;
+  }
+
+  .print-kicker {
+    color: #237e72;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
+  .print-cover h1,
+  .print-total-intro h1 {
+    margin: 7mm 0 4mm;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 34px;
+    letter-spacing: -.04em;
+  }
+
+  .print-address {
+    color: #5a7077;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .print-cover-rule {
+    width: 38mm;
+    height: 2px;
+    margin: 9mm 0;
+    background: #efaa46;
+  }
+
+  .print-cover p:not(.print-kicker):not(.print-address) {
+    font-size: 11px;
+    line-height: 1.72;
+  }
+
+  .print-cover-note {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr 1fr;
+    gap: 5px;
+    margin-top: 12mm;
+    border-top: 1px solid #c9d8d3;
+    padding-top: 5mm;
+    font-size: 9px;
+  }
+
+  .print-cover-note span {
+    color: #6d8389;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: .12em;
+  }
+
+  .print-window-grid {
+    display: grid;
+    flex: 1;
+    grid-template-rows: repeat(2, 1fr);
+    gap: 8mm;
+    padding-top: 8mm;
+  }
+
+  .print-window-card {
+    display: grid;
+    grid-template-columns: 40mm 1fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 5mm;
+    border: 1px solid #c9d8d3;
+    padding: 5mm;
+  }
+
+  .print-window-title {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #e0e8e5;
+    padding-bottom: 3mm;
+  }
+
+  .print-window-title span {
+    color: #efaa46;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .print-window-title h2 {
+    margin: 0;
+    flex: 1;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+  }
+
+  .print-window-title strong {
+    color: #237e72;
+    font-family: monospace;
+    font-size: 9px;
+  }
+
+  .window-diagram {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 46mm;
+    background: #eff6f3;
+  }
+
+  .window-drawing {
+    display: grid;
+    width: 25mm;
+    height: 32mm;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2px;
+    border: 3px solid #237e72;
+    background: #bfe5df;
+  }
+
+  .window-drawing span {
+    border: 1px solid #237e72;
+    background: rgb(255 255 255 / .5);
+  }
+
+  .window-drawing.sliding {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .window-drawing.louvre {
+    display: block;
+    padding: 5px;
+  }
+
+  .window-drawing.louvre span {
+    display: block;
+    height: 5px;
+    margin: 4px 0;
+  }
+
+  .dimension {
+    position: absolute;
+    color: #5a7077;
+    font-size: 8px;
+  }
+
+  .dimension-width {
+    bottom: 3mm;
+  }
+
+  .dimension-height {
+    right: 2mm;
+    top: 50%;
+    transform: rotate(-90deg);
+  }
+
+  .diagram-caption {
+    position: absolute;
+    bottom: 2mm;
+    left: 0;
+    right: 0;
+    color: #237e72;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .print-window-spec {
+    display: grid;
+    align-content: start;
+    gap: 2.2mm;
+    font-size: 8px;
+    line-height: 1.25;
+  }
+
+  .print-window-spec p {
+    display: grid;
+    grid-template-columns: 27mm 1fr;
+    gap: 2mm;
+    margin: 0;
+  }
+
+  .print-window-spec b {
+    color: #6d8389;
+    font-size: 7px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .print-window-values {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid #e0e8e5;
+    padding-top: 3mm;
+    color: #5a7077;
+    font-size: 9px;
+  }
+
+  .print-window-values strong {
+    color: #18323c;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+  }
+
+  .print-total-intro {
+    margin: 22mm 0 10mm;
+  }
+
+  .print-total-intro p:last-child {
+    color: #5a7077;
+    font-size: 10px;
+  }
+
+  .print-summary-table {
+    width: 100%;
+    max-width: 150mm;
+  }
+
+  .print-summary-table p {
+    display: flex;
+    justify-content: space-between;
+    margin: 0;
+    border-bottom: 1px solid #e0e8e5;
+    padding: 4mm 0;
+    font-size: 10px;
+  }
+
+  .print-summary-table .grand-total {
+    border-top: 2px solid #237e72;
+    border-bottom: 0;
+    color: #18323c;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+  }
+
+  .print-average {
+    width: fit-content;
+    margin-top: 8mm;
+    background: #eff6f3;
+    padding: 4mm 6mm;
+    color: #5a7077;
+    font-size: 10px;
+  }
+
+  .print-average strong {
+    margin-left: 14mm;
+    color: #18323c;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+  }
+
+  .print-terms {
+    columns: 2;
+    column-gap: 10mm;
+    margin-top: 7mm;
+    font-size: 8px;
+    line-height: 1.45;
+  }
+
+  .print-terms h2 {
+    break-after: avoid;
+    margin: 4mm 0 2mm;
+    color: #237e72;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+  }
+
+  .print-terms h2:first-child {
+    margin-top: 0;
+  }
+
+  .print-terms p {
+    break-inside: avoid;
+    margin: 0 0 2.2mm;
+  }
+
+  .print-acceptance {
+    margin-top: auto;
+    border-top: 1px solid #c9d8d3;
+    padding-top: 5mm;
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .print-signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30mm;
+    margin-top: 18mm;
+    color: #5a7077;
+    font-size: 9px;
+  }
+
+  .print-footer {
+    position: absolute;
+    bottom: 7mm;
+    left: 15mm;
+    right: 15mm;
+    border-top: 1px solid #e0e8e5;
+    padding-top: 3mm;
+    color: #809297;
+    font-size: 7px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
 }
 
 .order-rule {
