@@ -25,14 +25,21 @@
   --destructive-foreground: 42 46% 99%;
   --popover: 42 46% 99%;
   --popover-foreground: 197 36% 18%;
-  /* Sidebar brand colors are intentionally independent from card/surface tokens. */
-  --sidebar: 196 38% 18%;
-  --sidebar-foreground: 42 35% 93%;
-  --sidebar-border: 194 29% 27%;
-  --sidebar-primary: 169 64% 78%;
-  --sidebar-primary-foreground: 196 38% 17%;
-  --sidebar-accent: 194 28% 25%;
-  --sidebar-accent-foreground: 42 35% 94%;
+  /* Navigation and hero accents have their own palette; workspace surfaces stay light. */
+  --sidebar: 42 33% 96%;
+  --sidebar-foreground: 213 32% 17%;
+  --sidebar-border: 39 23% 86%;
+  --sidebar-primary: 172 66% 86%;
+  --sidebar-primary-foreground: 204 37% 11%;
+  --sidebar-accent: 188 32% 92%;
+  --sidebar-accent-foreground: 213 32% 17%;
+  --hero-foreground: 197 36% 18%;
+  --hero-muted-foreground: 198 15% 45%;
+  --hero-kicker: 168 58% 35%;
+  --hero-decoration: 168 58% 35%;
+  --hero-surface-start: #f8fcfa;
+  --hero-surface-middle: #e8f4f0;
+  --hero-surface-end: #d9ebe6;
   --radius: 0.75rem;
   --app-font-sans: 'DM Sans', sans-serif;
   --app-font-display: 'Space Grotesk', sans-serif;
@@ -40,18 +47,7 @@
 }
 
 .dark {
-  color-scheme: dark;
-  --background: 210 25% 10%;
-  --foreground: 40 25% 93%;
-  --card: 210 24% 14%;
-  --card-foreground: 40 25% 93%;
-  --border: 210 18% 25%;
-  --input: 210 18% 25%;
-  --muted: 210 18% 21%;
-  --muted-foreground: 210 12% 66%;
-  --popover: 210 24% 14%;
-  --popover-foreground: 40 25% 93%;
-  /* Keep the Framewise sidebar stable when the workspace surfaces change theme. */
+  /* Only the sidebar and selected hero panels respond to the theme preference. */
   --sidebar: 196 38% 18%;
   --sidebar-foreground: 42 35% 93%;
   --sidebar-border: 194 29% 27%;
@@ -59,6 +55,13 @@
   --sidebar-primary-foreground: 196 38% 17%;
   --sidebar-accent: 194 28% 25%;
   --sidebar-accent-foreground: 42 35% 94%;
+  --hero-foreground: 42 35% 93%;
+  --hero-muted-foreground: 42 35% 82%;
+  --hero-kicker: 169 64% 78%;
+  --hero-decoration: 169 64% 78%;
+  --hero-surface-start: #173b48;
+  --hero-surface-middle: #123241;
+  --hero-surface-end: #0d2938;
 }
 
 @theme inline {
@@ -126,14 +129,46 @@
 .order-hub-accent {
   background:
     radial-gradient(circle at 92% 8%, rgb(231 163 83 / 0.14), transparent 26%),
-    linear-gradient(135deg, #173b48 0%, #123241 58%, #0d2938 100%);
+    linear-gradient(135deg, var(--hero-surface-start) 0%, var(--hero-surface-middle) 58%, var(--hero-surface-end) 100%);
 }
 
 .quotation-hero {
   position: relative;
   background:
-    radial-gradient(circle at 82% 24%, rgb(78 214 192 / 0.18), transparent 24%),
-    linear-gradient(135deg, #173b48 0%, #123241 58%, #0d2938 100%);
+    radial-gradient(circle at 82% 24%, hsl(var(--hero-decoration) / 0.18), transparent 24%),
+    linear-gradient(135deg, var(--hero-surface-start) 0%, var(--hero-surface-middle) 58%, var(--hero-surface-end) 100%);
+}
+
+:is(.order-hub-accent, .quotation-hero) {
+  color: hsl(var(--hero-foreground));
+}
+
+:is(.order-hub-accent, .quotation-hero) [class~='text-white'] {
+  color: hsl(var(--hero-foreground));
+}
+
+:is(.order-hub-accent, .quotation-hero) [class~='text-white/70'] {
+  color: hsl(var(--hero-muted-foreground) / 0.9);
+}
+
+:is(.order-hub-accent, .quotation-hero) [class~='text-white/65'] {
+  color: hsl(var(--hero-muted-foreground) / 0.82);
+}
+
+:is(.order-hub-accent, .quotation-hero) [class~='text-white/40'] {
+  color: hsl(var(--hero-muted-foreground) / 0.62);
+}
+
+:is(.order-hub-accent, .quotation-hero) [class~='text-sidebar-primary'] {
+  color: hsl(var(--hero-kicker));
+}
+
+:is(.order-hub-accent, .quotation-hero) [class~='bg-white/10'] {
+  background-color: hsl(var(--hero-foreground) / 0.08);
+}
+
+:is(.order-hub-accent, .quotation-hero) [class~='border-sidebar-primary/20'] {
+  border-color: hsl(var(--hero-decoration) / 0.28);
 }
 
 .quotation-hero-mark {
@@ -150,14 +185,14 @@
 }
 
 .quotation-hero-mark span {
-  border: 1px solid rgb(169 241 224 / .4);
+  border: 1px solid hsl(var(--hero-decoration) / 0.4);
   border-radius: 18px;
-  background: rgb(91 213 176 / .08);
+  background: hsl(var(--hero-decoration) / 0.08);
 }
 
 .quotation-hero-mark span:nth-child(2),
 .quotation-hero-mark span:nth-child(3) {
-  border-color: rgb(255 197 104 / .4);
+  border-color: hsl(var(--accent) / 0.45);
 }
 
 .quotation-print-document {

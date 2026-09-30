@@ -2,8 +2,9 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import * as RechartsPrimitive from 'recharts';
 
-// Format: { THEME_NAME: CSS_SELECTOR }
-const THEMES = { light: '', dark: '.dark' } as const;
+// Charts stay on the light workspace palette; this selector is opt-in and never
+// follows the sidebar/hero preference on the document root.
+const THEMES = { light: '', dark: '.chart-dark-palette' } as const;
 
 export type ChartConfig = {
   [k in string]: {

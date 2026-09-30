@@ -2,3 +2,4 @@
 - [Communication deletion](communication-deletion.md) — hide chats per user; delete individual messages for everyone; new activity restores hidden threads.
 - [pnpm workspace installs](pnpm-dependency-installs.md) — the package helper targets the workspace root; use the filtered pnpm package command for app-only dependencies.
 - [Quotation profile snapshots](quotation-snapshots.md) — keep saved proposal details stable when the reusable profile catalogue changes.
+- [Scoped workspace themes](workspace-theme-scope.md) — theme choice affects the sidebar and selected hero panels; workspace content remains light.

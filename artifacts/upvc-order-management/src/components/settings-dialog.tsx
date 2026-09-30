@@ -30,7 +30,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Choose how the workspace looks. Your choice is saved on this device.
+            Choose the sidebar and hero-panel theme. The rest of the workspace stays light.
           </DialogDescription>
         </DialogHeader>
 
@@ -38,7 +38,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <div>
             <h3 className="text-sm font-semibold">Appearance</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              The sidebar keeps its separate Framewise brand colors in both themes.
+              Your choice is saved on this device. Cards, forms, and page sections stay light.
             </p>
           </div>
 
@@ -56,7 +56,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </span>
                 <span>
                   <span className="block text-sm font-semibold">Light</span>
-                  <span className="mt-0.5 block text-[11px] text-muted-foreground">Bright surfaces</span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">Light sidebar and heroes</span>
                 </span>
               </span>
               {activeTheme === 'light' && <Check size={17} className="shrink-0 text-primary" aria-hidden="true" />}
@@ -75,7 +75,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </span>
                 <span>
                   <span className="block text-sm font-semibold">Dark</span>
-                  <span className="mt-0.5 block text-[11px] text-muted-foreground">Dim surfaces</span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">Dark sidebar and heroes</span>
                 </span>
               </span>
               {activeTheme === 'dark' && <Check size={17} className="shrink-0 text-primary" aria-hidden="true" />}

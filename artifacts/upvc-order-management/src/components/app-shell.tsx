@@ -51,6 +51,7 @@ type DesktopFlyout = {
 
 export function AppShell({ user, children, title, eyebrow }: { user: User; children: React.ReactNode; title: string; eyebrow?: string }) {
   const [location, setLocation] = useLocation();
+  const isDesktopViewport = window.matchMedia('(min-width: 768px)').matches;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -132,8 +133,9 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
     if (!window.matchMedia('(min-width: 768px)').matches) return;
     clearFlyoutClose();
     const rect = trigger.getBoundingClientRect();
-    const estimatedHeight = Math.min(window.innerHeight - 24, 88 + itemCount * 48);
-    const top = Math.max(12, Math.min(rect.top, window.innerHeight - estimatedHeight - 12));
+    const estimatedHeight = Math.min(window.innerHeight - 24, Math.max(180, 88 + itemCount * 48));
+    const preferredTop = rect.top + (rect.height - estimatedHeight) / 2;
+    const top = Math.max(12, Math.min(preferredTop, window.innerHeight - estimatedHeight - 12));
     setDesktopFlyout({
       groupId,
       top,
@@ -374,9 +376,9 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
                         window.setTimeout(() => focusFirstFlyoutLink(group.id), 0);
                       }
                     }}
-                    aria-expanded={flyoutOpen || expanded}
-                    aria-controls={flyoutOpen ? `nav-flyout-${group.id}` : `nav-group-${group.id}`}
-                    aria-label={`${group.label}, ${flyoutOpen || expanded ? 'expanded' : 'collapsed'}`}
+                    aria-expanded={isDesktopViewport ? flyoutOpen : expanded}
+                    aria-controls={isDesktopViewport ? (flyoutOpen ? `nav-flyout-${group.id}` : undefined) : `nav-group-${group.id}`}
+                    aria-label={`${group.label}, ${(isDesktopViewport ? flyoutOpen : expanded) ? 'expanded' : 'collapsed'}`}
                     title={collapsed ? group.label : undefined}
                     className={`relative flex h-12 w-full items-center rounded-lg text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors ${
                       collapsed ? 'justify-center px-0' : 'gap-2 px-3'
@@ -391,7 +393,12 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
                     {!collapsed && <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>}
                     <ChevronDown
                       size={collapsed ? 12 : 16}
-                      className={`shrink-0 transition-transform ${flyoutOpen ? '-rotate-90' : expanded ? 'rotate-180' : ''} ${collapsed ? 'absolute bottom-1 right-2' : ''}`}
+                      className={`shrink-0 transition-transform md:hidden ${expanded ? 'rotate-180' : ''} ${collapsed ? 'absolute bottom-1 right-2' : ''}`}
+                      aria-hidden="true"
+                    />
+                    <ChevronRight
+                      size={collapsed ? 12 : 16}
+                      className={`hidden shrink-0 transition-transform md:block ${flyoutOpen ? 'translate-x-0.5' : ''} ${collapsed ? 'absolute bottom-1 right-2' : ''}`}
                       aria-hidden="true"
                     />
                   </button>
