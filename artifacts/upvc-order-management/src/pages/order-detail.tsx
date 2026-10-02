@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   CircleAlert,
   Download,
+  Eye,
   FileText,
   IndianRupee,
   Grid2X2,
@@ -58,6 +59,7 @@ import {
   useListOrderPayments,
   useListOrderWindows,
   useRecordOrderPayment,
+  useReplaceOrderDocument,
   useUpdateOrder,
   useUpdateOrderBilling,
   useUpdateOrderDocumentCategory,
@@ -84,6 +86,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { DocumentPreviewDialog } from '@/components/document-preview';
 
 type Status = (typeof OrderStatus)[keyof typeof OrderStatus];
 type Readiness = (typeof OrderWindowReadiness)[keyof typeof OrderWindowReadiness];
@@ -324,6 +327,7 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
   const query = useListOrderDocuments(orderId, { query: { queryKey: getListOrderDocumentsQueryKey(orderId) } });
   const categoryQuery = useListOrderDocumentCategories({ query: { queryKey: getListOrderDocumentCategoriesQueryKey(), refetchOnWindowFocus: true } });
   const upload = useUploadOrderDocument();
+  const replace = useReplaceOrderDocument();
   const archive = useArchiveOrderDocument();
   const createCategory = useCreateOrderDocumentCategory();
   const updateCategory = useUpdateOrderDocumentCategory();
@@ -331,6 +335,9 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
   const [category, setCategory] = useState<DocumentCategory>('other');
   const [fileKey, setFileKey] = useState(0);
   const [downloadId, setDownloadId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [replacingDocumentId, setReplacingDocumentId] = useState<string | null>(null);
+  const replaceInputs = useRef<Record<string, HTMLInputElement | null>>({});
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
@@ -340,6 +347,7 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
   const [categoryName, setCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const download = useDownloadOrderDocument(orderId, downloadId || '', { query: { enabled: Boolean(downloadId), queryKey: getDownloadOrderDocumentQueryKey(orderId, downloadId || '') } });
+  const preview = useDownloadOrderDocument(orderId, previewId || '', { query: { enabled: Boolean(previewId), queryKey: getDownloadOrderDocumentQueryKey(orderId, previewId || '') } });
   const documents = query.data || [];
   const categories = categoryQuery.data || [];
   const categoriesById = useMemo(() => new Map(categories.map((item) => [item.id, item])), [categories]);
@@ -367,6 +375,11 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
     toast({ title: 'Document download failed', description: 'Please try downloading it again.', variant: 'destructive' });
     setDownloadId(null);
   }, [download.isError, downloadId, toast]);
+  useEffect(() => {
+    if (!previewId || !preview.isError) return;
+    toast({ title: 'Document preview failed', description: 'Download the file to open it in another app.', variant: 'destructive' });
+    setPreviewId(null);
+  }, [preview.isError, previewId, toast]);
 
   const categoryLabel = (id: string) => categoriesById.get(id)?.label || readable(id);
   const categoryModule = (id: string) => categoriesById.get(id)?.requiredModule || 'order-hub';
@@ -400,7 +413,39 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
       toast({ title: 'Unsupported document type', description: 'Choose a PDF, PNG, JPEG, WebP, DOCX, or XLSX file.', variant: 'destructive' });
       return;
     }
-    upload.mutate({ id: orderId, category, filename: file.name, data: file }, { onSuccess: () => { toast({ title: 'Document uploaded' }); setFileKey((value) => value + 1); void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Document could not be uploaded', variant: 'destructive' as const }) });
+    upload.mutate({ id: orderId, category, filename: encodeURIComponent(file.name), data: file }, { onSuccess: () => { toast({ title: 'Document uploaded' }); setFileKey((value) => value + 1); void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Document could not be uploaded', variant: 'destructive' as const }) });
+  };
+
+  const replaceFile = (event: ChangeEvent<HTMLInputElement>, documentRecord: OrderDocument) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !hasPermission(user, categoryModule(documentRecord.category))) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Document is too large', description: 'Choose a file that is 10 MiB or smaller.', variant: 'destructive' });
+      return;
+    }
+    if (!/\.(pdf|png|jpe?g|webp|docx|xlsx)$/i.test(file.name)) {
+      toast({ title: 'Unsupported document type', description: 'Choose a PDF, PNG, JPEG, WebP, DOCX, or XLSX file.', variant: 'destructive' });
+      return;
+    }
+    setReplacingDocumentId(documentRecord.id);
+    replace.mutate({ id: orderId, documentId: documentRecord.id, filename: encodeURIComponent(file.name), data: file }, {
+      onSuccess: (updated) => {
+        setReplacingDocumentId(null);
+        setPreviewId(null);
+        queryClient.setQueryData<OrderDocument[]>(getListOrderDocumentsQueryKey(orderId), (current) =>
+          current?.map((item) => item.id === updated.id ? updated : item) ?? [],
+        );
+        void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) });
+        void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
+        void queryClient.invalidateQueries({ queryKey: getDownloadOrderDocumentQueryKey(orderId, documentRecord.id) });
+        toast({ title: 'Document replaced', description: `${updated.filename} now replaces ${documentRecord.filename}.` });
+      },
+      onError: () => {
+        setReplacingDocumentId(null);
+        toast({ title: 'Document could not be replaced', description: 'Check the file type, size and your category access.', variant: 'destructive' });
+      },
+    });
   };
 
   const remove = (documentRecord: OrderDocument) => {
@@ -450,9 +495,25 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
   };
 
   const canSaveCategory = !createCategory.isPending && !updateCategory.isPending;
-  const documentActions = (item: OrderDocument) => <div className="flex shrink-0 gap-2">
-    <Button variant="outline" size="sm" disabled={downloadId === item.id} onClick={() => setDownloadId(item.id)} data-testid={`button-download-document-${item.id}`}>{downloadId === item.id ? <Loader2 className="animate-spin" size={13} /> : <Download size={13} />} Download</Button>
-    {hasPermission(user, categoryModule(item.category)) && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => remove(item)} aria-label={`Remove ${item.filename}`} data-testid={`button-remove-document-${item.id}`}><Trash2 size={14} /></Button>}
+  const documentActions = (item: OrderDocument) => <div className="flex shrink-0 flex-wrap justify-end gap-2">
+    <Button type="button" variant="outline" size="sm" onClick={() => setPreviewId(item.id)} data-testid={`button-preview-document-${item.id}`}><Eye size={13} /> View</Button>
+    <Button type="button" variant="outline" size="sm" disabled={downloadId === item.id} onClick={() => setDownloadId(item.id)} data-testid={`button-download-document-${item.id}`}>{downloadId === item.id ? <Loader2 className="animate-spin" size={13} /> : <Download size={13} />} Download</Button>
+    {hasPermission(user, categoryModule(item.category)) && <>
+      <input
+        ref={(node) => { replaceInputs.current[item.id] = node; }}
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx"
+        className="sr-only"
+        aria-label={`Choose a replacement for ${item.filename}`}
+        disabled={replace.isPending}
+        onChange={(event) => replaceFile(event, item)}
+        data-testid={`input-replace-document-${item.id}`}
+      />
+      <Button type="button" variant="outline" size="sm" disabled={replace.isPending} onClick={() => replaceInputs.current[item.id]?.click()} data-testid={`button-replace-document-${item.id}`}>
+        {replacingDocumentId === item.id ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {replacingDocumentId === item.id ? 'Replacing…' : 'Replace file'}
+      </Button>
+      <Button type="button" variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => remove(item)} aria-label={`Remove ${item.filename}`} data-testid={`button-remove-document-${item.id}`}><Trash2 size={14} /></Button>
+    </>}
   </div>;
 
   return <div className="space-y-5">
@@ -553,6 +614,12 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
         </div>
       </section>
     </div>}
+    {previewId && documents.find((item) => item.id === previewId) && <DocumentPreviewDialog
+      documentRecord={documents.find((item) => item.id === previewId)!}
+      file={preview.data}
+      loading={preview.isLoading}
+      onClose={() => setPreviewId(null)}
+    />}
   </div>;
 }
 

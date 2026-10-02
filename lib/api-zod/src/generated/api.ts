@@ -2425,6 +2425,35 @@ export const DownloadOrderDocumentResponse = zod.unknown()
 
 
 /**
+ * @summary Replace an order document file without changing its category
+ */
+export const replaceOrderDocumentPathFilenameMax = 180;
+
+
+
+export const ReplaceOrderDocumentParams = zod.object({
+  "id": zod.coerce.string(),
+  "documentId": zod.coerce.string(),
+  "filename": zod.coerce.string().min(1).max(replaceOrderDocumentPathFilenameMax)
+})
+
+export const replaceOrderDocumentResponseCategoryMax = 64;
+
+
+
+export const ReplaceOrderDocumentResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "filename": zod.string(),
+  "category": zod.string().min(1).max(replaceOrderDocumentResponseCategoryMax),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List order activity newest first
  */
 export const ListOrderActivityParams = zod.object({

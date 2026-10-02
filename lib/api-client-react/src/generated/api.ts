@@ -6657,6 +6657,99 @@ export function useDownloadOrderDocument<TData = Awaited<ReturnType<typeof downl
 
 
 
+export const getReplaceOrderDocumentUrl = (id: string,
+    documentId: string,
+    filename: string,) => {
+
+
+
+
+  return `/api/orders/${id}/documents/${documentId}/content/${filename}`
+}
+
+/**
+ * @summary Replace an order document file without changing its category
+ */
+export const replaceOrderDocument = async (id: string,
+    documentId: string,
+    filename: string,
+    replaceOrderDocumentBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocument>(getReplaceOrderDocumentUrl(id,documentId,filename),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: replaceOrderDocumentBody
+  }
+);}
+
+
+
+
+
+export const getReplaceOrderDocumentMutationKey = () => ['replaceOrderDocument'] as const;
+
+export const getReplaceOrderDocumentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replaceOrderDocument>>, TError,ReplaceOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof replaceOrderDocument>>, TError,ReplaceOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getReplaceOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof replaceOrderDocument>>, ReplaceOrderDocumentMutationVariables> = (props) => {
+          const {id,documentId,filename,data} = props ?? {};
+
+          return  replaceOrderDocument(id,documentId,filename,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReplaceOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof replaceOrderDocument>>>
+    export type ReplaceOrderDocumentMutationBody = BodyType<Blob>
+    export type ReplaceOrderDocumentMutationError = ErrorType<void>
+    export type ReplaceOrderDocumentMutationVariables = {id: string;documentId: string;filename: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Replace an order document file without changing its category
+ */
+export const useReplaceOrderDocument = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replaceOrderDocument>>, TError,ReplaceOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof replaceOrderDocument>>,
+        TError,
+        ReplaceOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReplaceOrderDocumentMutationOptions(options));
+    }
+
 export const getListOrderActivityUrl = (id: string,) => {
 
 

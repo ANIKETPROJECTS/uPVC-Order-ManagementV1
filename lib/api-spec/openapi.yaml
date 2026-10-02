@@ -1702,6 +1702,53 @@ paths:
               schema:
                 type: string
                 format: binary
+  /orders/{id}/documents/{documentId}/content/{filename}:
+    put:
+      operationId: replaceOrderDocument
+      tags: [orders]
+      summary: Replace an order document file without changing its category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 180
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Replaced document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDocument"
+        "400":
+          description: Unsupported document file
+        "401":
+          description: Sign in required
+        "403":
+          description: Document category edit access required
+        "404":
+          description: Order document not found
+        "413":
+          description: Document exceeds 10 MiB
   /orders/{id}/activity:
     get:
       operationId: listOrderActivity

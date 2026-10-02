@@ -12,6 +12,7 @@ import {
   ListOrderPaymentsParams, ListOrderPaymentsResponse, ListOrderWindowsParams, ListOrderWindowsResponse,
   OpenPaymentReminderParams,
   RecordOrderPaymentBody, RecordOrderPaymentParams, RecordOrderPaymentResponse, UpdateOrderWindowBody,
+  ReplaceOrderDocumentParams, ReplaceOrderDocumentResponse,
   UpdateOrderDocumentCategoryBody, UpdateOrderDocumentCategoryParams, UpdateOrderDocumentCategoryResponse,
   UpdateOrderWindowParams, UpdateOrderWindowResponse, VoidOrderPaymentBody, VoidOrderPaymentParams, VoidOrderPaymentResponse,
   UploadOrderDocumentParams, UploadOrderDocumentResponse,
@@ -410,6 +411,89 @@ router.get("/orders/:id/documents/:documentId/content", async (req, res, next): 
   const stream = getOrderDocumentsBucket(db).openDownloadStream(gridId);
   stream.on("error", next);
   stream.pipe(res);
+});
+router.put("/orders/:id/documents/:documentId/content/:filename", async (req, res, next): Promise<void> => {
+  const p = ReplaceOrderDocumentParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const documents = getOrderDocumentMetadata(db);
+  const meta = await documents.findOne({
+    _id: p.data.documentId,
+    orderRecordId: p.data.id,
+    archivedAt: { $exists: false },
+  });
+  if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
+  await ensureDefaultOrderDocumentCategories(db);
+  const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
+  if (!category) { res.status(409).json({ error: "The document category is no longer available." }); return; }
+  if (!requireModuleEdit(actor, res, category.requiredModule)) return;
+
+  expressRaw(req, res, next, async () => {
+    const body = req.body as Buffer;
+    const declaredType = String(req.headers["content-type"] ?? "").split(";")[0];
+    const ext = p.data.filename.toLowerCase().split(".").pop() ?? "";
+    const type = mimeByExt[ext]?.[0];
+    if (!body?.length || !type || (declaredType !== "application/octet-stream" && declaredType !== type)) {
+      res.status(400).json({ error: "Unsupported document. Allowed files are PDF, PNG, JPEG, WebP, DOCX and XLSX up to 10 MiB." });
+      return;
+    }
+
+    const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
+    const uploadedAt = new Date();
+    let replaced;
+    try {
+      replaced = await documents.updateOne(
+        {
+          _id: meta._id,
+          orderRecordId: p.data.id,
+          archivedAt: { $exists: false },
+          filename: meta.filename,
+          uploadedAt: meta.uploadedAt,
+          storagePath: meta.storagePath ?? null,
+          gridFsId: meta.gridFsId ?? null,
+        },
+        {
+          $set: {
+            filename: p.data.filename,
+            contentType: type,
+            sizeBytes: body.length,
+            storagePath,
+            gridFsId: null,
+            uploadedBy: actor.id,
+            uploadedAt,
+          },
+        },
+      );
+    } catch (error) {
+      await removeProjectUpload(storagePath).catch((cleanupError: unknown) => req.log.error({ err: cleanupError }, "Failed to clean up an orphaned replacement upload"));
+      throw error;
+    }
+
+    if (replaced.modifiedCount !== 1) {
+      await removeProjectUpload(storagePath).catch((cleanupError: unknown) => req.log.error({ err: cleanupError }, "Failed to clean up an unused replacement upload"));
+      res.status(409).json({ error: "This document changed while the replacement was uploading. Refresh and try again." });
+      return;
+    }
+
+    const updated = await documents.findOne({ _id: meta._id });
+    if (!updated) { res.status(404).json({ error: "Replaced document could not be loaded." }); return; }
+    if (meta.storagePath) {
+      await removeProjectUpload(meta.storagePath).catch((error: unknown) => req.log.warn({ err: error, storagePath: meta.storagePath }, "Failed to remove replaced order document bytes"));
+    }
+    if (meta.gridFsId && ObjectId.isValid(meta.gridFsId)) {
+      const bucket = getOrderDocumentsBucket(db);
+      const gridId = new ObjectId(meta.gridFsId);
+      try {
+        if (await bucket.find({ _id: gridId }).next()) await bucket.delete(gridId);
+      } catch (error) {
+        req.log.warn({ err: error, gridFsId: meta.gridFsId }, "Failed to remove replaced legacy order document bytes");
+      }
+    }
+    await event(p.data.id, actor, "document.replaced", `Replaced ${meta.filename} with ${updated.filename}.`);
+    res.json(ReplaceOrderDocumentResponse.parse(docResponse(updated)));
+  });
 });
 router.get("/orders/:id/activity", async (req, res): Promise<void> => { const p = ListOrderActivityParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } const actor = await context(req, res); if (!actor || !(await orderExists(p.data.id, res))) return; const rows = await getOrderActivity(await getMongoDb()).find({ orderRecordId: p.data.id }).sort({ createdAt: -1 }).toArray(); res.json(ListOrderActivityResponse.parse(rows.map(activityResponse))); });
 
