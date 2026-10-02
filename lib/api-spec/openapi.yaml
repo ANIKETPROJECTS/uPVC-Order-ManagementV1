@@ -2558,9 +2558,11 @@ components:
           type: number
         windowCount:
           type: integer
+        productionReady:
+          type: boolean
         canOpenWhatsApp:
           type: boolean
-      required: [orderRecordId, orderId, clientName, locationName, orderValue, totalCollected, balance, windowCount, canOpenWhatsApp]
+      required: [orderRecordId, orderId, clientName, locationName, orderValue, totalCollected, balance, windowCount, productionReady, canOpenWhatsApp]
     PaymentReminderOrderList:
       type: array
       items:
