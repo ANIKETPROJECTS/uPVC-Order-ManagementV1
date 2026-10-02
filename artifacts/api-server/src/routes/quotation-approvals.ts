@@ -29,6 +29,11 @@ import {
   type QuotationRateSubmissionDocument,
   type UserDocument,
 } from "../lib/mongo";
+import {
+  removeProjectUpload,
+  resolveProjectUploadPath,
+  storeProjectUpload,
+} from "../lib/project-upload-storage";
 
 const router = Router();
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -340,41 +345,33 @@ router.post(
         return;
       }
 
-      const bucket = getQuotationRatePdfsBucket(db);
-      const gridId = new ObjectId();
-      const upload = bucket.openUploadStreamWithId(gridId, filename, {
-        contentType: "application/pdf",
-        metadata: { submissionId: item._id },
-      });
+      const storagePath = await storeProjectUpload("quotation-rate-pdfs", filename, body);
+
+      let updated: QuotationRateSubmissionDocument | null;
       try {
-        await new Promise<void>((resolve, reject) => {
-          upload.once("finish", resolve);
-          upload.once("error", reject);
-          upload.end(body);
-        });
+        updated = await submissions.findOneAndUpdate(
+          { _id: item._id, status: "awaiting_pdf" },
+          {
+            $set: {
+              status: "pending_review",
+              pdfFilename: filename,
+              pdfSizeBytes: body.length,
+              pdfGridFsId: null,
+              pdfStoragePath: storagePath,
+              updatedAt: new Date(),
+            },
+          },
+          { returnDocument: "after" },
+        );
       } catch (error) {
-        await bucket.delete(gridId).catch((cleanupError: unknown) =>
-          req.log.error({ err: cleanupError }, "Failed to clean up a partial quotation PDF upload"),
+        await removeProjectUpload(storagePath).catch((cleanupError: unknown) =>
+          req.log.error({ err: cleanupError }, "Failed to clean up a quotation PDF after a database error"),
         );
         throw error;
       }
-
-      const updated = await submissions.findOneAndUpdate(
-        { _id: item._id, status: "awaiting_pdf" },
-        {
-          $set: {
-            status: "pending_review",
-            pdfFilename: filename,
-            pdfSizeBytes: body.length,
-            pdfGridFsId: gridId.toHexString(),
-            updatedAt: new Date(),
-          },
-        },
-        { returnDocument: "after" },
-      );
       if (!updated) {
-        await bucket.delete(gridId).catch((cleanupError: unknown) =>
-          req.log.error({ err: cleanupError }, "Failed to clean up a duplicate quotation PDF upload"),
+        await removeProjectUpload(storagePath).catch((cleanupError: unknown) =>
+          req.log.error({ err: cleanupError }, "Failed to clean up a duplicate project quotation PDF upload"),
         );
         res.status(409).json({ error: "This submission has already been routed for review." });
         return;
@@ -394,12 +391,32 @@ router.get("/quotation-rate-submissions/:submissionId/pdf", async (req, res, nex
   if (!actor) return;
   const db = await getMongoDb();
   const item = await getQuotationRateSubmissions(db).findOne({ _id: parsed.data.submissionId });
-  if (!item?.pdfGridFsId || !ObjectId.isValid(item.pdfGridFsId)) {
+  if (!item || (!item.pdfStoragePath && !item.pdfGridFsId)) {
     res.status(404).json({ error: "Quotation PDF not found." });
     return;
   }
   if (item.submittedBy !== actor.id && !item.approverIds.includes(actor.id)) {
     res.status(403).json({ error: "You do not have access to this quotation PDF." });
+    return;
+  }
+  const safeFilename = (item.pdfFilename ?? "quotation.pdf").replace(/[\x00-\x1f\x7f"]/g, "_");
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  if (item.pdfStoragePath) {
+    const filePath = resolveProjectUploadPath(item.pdfStoragePath);
+    if (!filePath) {
+      res.status(404).json({ error: "Quotation PDF content not found." });
+      return;
+    }
+    res.sendFile(filePath, { dotfiles: "deny" }, (error) => {
+      if (error && !res.headersSent) res.status(404).json({ error: "Quotation PDF content not found." });
+      else if (error) req.log.error({ err: error, storagePath: item.pdfStoragePath }, "Failed to serve a quotation PDF upload");
+    });
+    return;
+  }
+  if (!item.pdfGridFsId || !ObjectId.isValid(item.pdfGridFsId)) {
+    res.status(404).json({ error: "Quotation PDF not found." });
     return;
   }
   const gridId = new ObjectId(item.pdfGridFsId);
@@ -408,10 +425,6 @@ router.get("/quotation-rate-submissions/:submissionId/pdf", async (req, res, nex
     res.status(404).json({ error: "Quotation PDF content not found." });
     return;
   }
-  const safeFilename = (item.pdfFilename ?? "quotation.pdf").replace(/[\x00-\x1f\x7f"]/g, "_");
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
-  res.setHeader("X-Content-Type-Options", "nosniff");
   const stream = bucket.openDownloadStream(gridId);
   stream.on("error", next);
   stream.pipe(res);

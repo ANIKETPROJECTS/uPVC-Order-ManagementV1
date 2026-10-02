@@ -197,7 +197,7 @@ export interface OrderPaymentDocument {
 export type DocumentCategory = "quotation" | "purchase_order" | "confirmation" | "drawing" | "invoice" | "other";
 export interface OrderDocumentMetadataDocument {
   _id: string; orderRecordId: string; filename: string; category: DocumentCategory;
-  contentType: string; sizeBytes: number; gridFsId: string; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
+  contentType: string; sizeBytes: number; gridFsId: string | null; storagePath?: string | null; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
 }
 export interface OrderActivityDocument {
   _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
@@ -315,6 +315,7 @@ export interface QuotationRateSubmissionDocument {
   pdfFilename: string | null;
   pdfSizeBytes: number | null;
   pdfGridFsId: string | null;
+  pdfStoragePath?: string | null;
   submittedBy: string;
   submittedByName: string;
   approverIds: string[];
@@ -343,7 +344,8 @@ export interface MeasurementVersionDocument {
   filename: string;
   contentType: string;
   sizeBytes: number;
-  gridFsId: string;
+  gridFsId: string | null;
+  storagePath?: string | null;
   uploadedBy: string;
   uploadedByName: string;
   uploadedAt: Date;

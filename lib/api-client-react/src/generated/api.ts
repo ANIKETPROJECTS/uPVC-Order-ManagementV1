@@ -440,6 +440,88 @@ export const useLogout = <TError = ErrorType<unknown>,
       return useMutation(getLogoutMutationOptions(options));
     }
 
+export const getServeProjectUploadUrl = (category: 'avatars' | 'window-profiles',
+    filename: string,) => {
+
+
+
+
+  return `/api/uploads/${category}/${filename}`
+}
+
+/**
+ * @summary Serve an uploaded avatar or window-profile image
+ */
+export const serveProjectUpload = async (category: 'avatars' | 'window-profiles',
+    filename: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getServeProjectUploadUrl(category,filename),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getServeProjectUploadQueryKey = (category: 'avatars' | 'window-profiles',
+    filename: string,) => {
+    return [
+    `/api/uploads/${category}/${filename}`
+    ] as const;
+    }
+
+
+export const getServeProjectUploadQueryOptions = <TData = Awaited<ReturnType<typeof serveProjectUpload>>, TError = ErrorType<void>>(category: 'avatars' | 'window-profiles',
+    filename: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof serveProjectUpload>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getServeProjectUploadQueryKey(category,filename);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof serveProjectUpload>>> = ({ signal }) => serveProjectUpload(category,filename, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: category !== null && category !== undefined && filename !== null && filename !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof serveProjectUpload>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ServeProjectUploadQueryResult = NonNullable<Awaited<ReturnType<typeof serveProjectUpload>>>
+export type ServeProjectUploadQueryError = ErrorType<void>
+
+
+/**
+ * @summary Serve an uploaded avatar or window-profile image
+ */
+
+export function useServeProjectUpload<TData = Awaited<ReturnType<typeof serveProjectUpload>>, TError = ErrorType<void>>(
+ category: 'avatars' | 'window-profiles',
+    filename: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof serveProjectUpload>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getServeProjectUploadQueryOptions(category,filename,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getListUsersUrl = (params?: ListUsersParams,) => {
   const normalizedParams = new URLSearchParams();
 

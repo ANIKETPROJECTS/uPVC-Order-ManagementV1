@@ -14,6 +14,11 @@ import {
   getMongoDb, getOrderActivity, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPayments,
   getOrders, getOrderWindows, getPublicUser, getUsers, type DocumentCategory, type OrderWindowDocument,
 } from "../lib/mongo";
+import {
+  removeProjectUpload,
+  resolveProjectUploadPath,
+  storeProjectUpload,
+} from "../lib/project-upload-storage";
 
 const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
@@ -111,24 +116,12 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
       return;
     }
     const db = await getMongoDb();
-    const bucket = getOrderDocumentsBucket(db);
-    const gridId = new ObjectId();
-    const stream = bucket.openUploadStreamWithId(gridId, p.data.filename, { contentType: type, metadata: { orderRecordId: p.data.id, category: p.data.category } });
-    try {
-      await new Promise<void>((resolve, reject) => {
-        stream.once("finish", resolve);
-        stream.once("error", reject);
-        stream.end(body);
-      });
-    } catch (error) {
-      await bucket.delete(gridId).catch((cleanupError: unknown) => req.log.error({ err: cleanupError }, "Failed to clean up a partial GridFS upload"));
-      throw error;
-    }
-    const meta = { _id: randomUUID(), orderRecordId: p.data.id, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: gridId.toHexString(), uploadedBy: actor.id, uploadedAt: new Date() };
+    const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
+    const meta = { _id: randomUUID(), orderRecordId: p.data.id, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: null, storagePath, uploadedBy: actor.id, uploadedAt: new Date() };
     try {
       await getOrderDocumentMetadata(db).insertOne(meta);
     } catch (error) {
-      await bucket.delete(gridId).catch((cleanupError: unknown) => req.log.error({ err: cleanupError }, "Failed to clean up an orphaned GridFS upload"));
+      await removeProjectUpload(storagePath).catch((cleanupError: unknown) => req.log.error({ err: cleanupError }, "Failed to clean up an orphaned project upload"));
       throw error;
     }
     await event(p.data.id, actor, "document.uploaded", `Uploaded ${meta.filename}.`);
@@ -144,11 +137,12 @@ router.delete("/orders/:id/documents/:documentId", async (req, res): Promise<voi
   const meta = await getOrderDocumentMetadata(db).findOne({ _id: p.data.documentId, orderRecordId: p.data.id, archivedAt: { $exists: false } });
   if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
   if (!requireModuleEdit(actor, res, categoryModule[meta.category])) return;
-  if (ObjectId.isValid(meta.gridFsId)) {
+  if (meta.gridFsId && ObjectId.isValid(meta.gridFsId)) {
     const bucket = getOrderDocumentsBucket(db);
     const gridId = new ObjectId(meta.gridFsId);
     if (await bucket.find({ _id: gridId }).next()) await bucket.delete(gridId);
   }
+  if (meta.storagePath) await removeProjectUpload(meta.storagePath);
   await getOrderDocumentMetadata(db).updateOne({ _id: meta._id }, { $set: { archivedAt: new Date(), removedBy: actor.id } });
   await event(p.data.id, actor, "document.removed", `Removed ${meta.filename}.`);
   res.status(204).send();
@@ -160,14 +154,24 @@ router.get("/orders/:id/documents/:documentId/content", async (req, res, next): 
   if (!actor) return;
   const db = await getMongoDb();
   const meta = await getOrderDocumentMetadata(db).findOne({ _id: p.data.documentId, orderRecordId: p.data.id, archivedAt: { $exists: false } });
-  if (!meta || !ObjectId.isValid(meta.gridFsId)) { res.status(404).json({ error: "Document not found." }); return; }
-  const gridId = new ObjectId(meta.gridFsId);
-  const file = await getOrderDocumentsBucket(db).find({ _id: gridId }).next();
-  if (!file) { res.status(404).json({ error: "Document content not found." }); return; }
+  if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
   const safeFilename = meta.filename.replace(/[\x00-\x1f\x7f"]/g, "_") || "order-document";
   res.setHeader("Content-Type", meta.contentType);
   res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
   res.setHeader("X-Content-Type-Options", "nosniff");
+  if (meta.storagePath) {
+    const filePath = resolveProjectUploadPath(meta.storagePath);
+    if (!filePath) { res.status(404).json({ error: "Document content not found." }); return; }
+    res.sendFile(filePath, { dotfiles: "deny" }, (error) => {
+      if (error && !res.headersSent) res.status(404).json({ error: "Document content not found." });
+      else if (error) req.log.error({ err: error, storagePath: meta.storagePath }, "Failed to serve an order document upload");
+    });
+    return;
+  }
+  if (!meta.gridFsId || !ObjectId.isValid(meta.gridFsId)) { res.status(404).json({ error: "Document not found." }); return; }
+  const gridId = new ObjectId(meta.gridFsId);
+  const file = await getOrderDocumentsBucket(db).find({ _id: gridId }).next();
+  if (!file) { res.status(404).json({ error: "Document content not found." }); return; }
   const stream = getOrderDocumentsBucket(db).openDownloadStream(gridId);
   stream.on("error", next);
   stream.pipe(res);

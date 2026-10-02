@@ -34,9 +34,15 @@ import {
   type QuotationTotalsDocument,
   type WindowProfileDocument,
 } from "../lib/mongo";
+import {
+  localImageStoragePath,
+  removeProjectUpload,
+  storeImageDataUrl,
+} from "../lib/project-upload-storage";
 
 const router: IRouter = Router();
 const SQ_FT_PER_SQUARE_MM = 92903.04;
+const MAX_WINDOW_PROFILE_IMAGE_BYTES = 1_000_000;
 
 interface UserContext {
   id: string;
@@ -339,6 +345,16 @@ router.post("/window-profiles", async (req, res): Promise<void> => {
     return;
   }
   const input: WindowProfileInput = parsed.data;
+  const imageDataUrl = input.imageDataUrl
+    ? await storeImageDataUrl(input.imageDataUrl, "window-profiles", MAX_WINDOW_PROFILE_IMAGE_BYTES)
+    : null;
+  if (input.imageDataUrl && !imageDataUrl) {
+    res.status(400).json({ error: "Choose a valid JPEG, PNG, or WebP profile drawing." });
+    return;
+  }
+  const createdImagePath = input.imageDataUrl?.startsWith("data:")
+    ? localImageStoragePath(imageDataUrl ?? "", "window-profiles")
+    : null;
   const now = new Date();
   const code = input.code.trim();
   const document: WindowProfileDocument = {
@@ -354,7 +370,7 @@ router.post("/window-profiles", async (req, res): Promise<void> => {
     specifications: input.specifications.trim(),
     accessories: input.accessories.trim(),
     remarks: (input.remarks ?? "").trim(),
-    imageDataUrl: input.imageDataUrl ?? null,
+    imageDataUrl,
     drawingType: input.drawingType,
     ratePerSqFt: input.ratePerSqFt,
     weightKgPerSqFt: input.weightKgPerSqFt,
@@ -369,6 +385,11 @@ router.post("/window-profiles", async (req, res): Promise<void> => {
       CreateWindowProfileResponse.parse(windowProfileResponse(document)),
     );
   } catch (error) {
+    if (createdImagePath) {
+      await removeProjectUpload(createdImagePath).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError }, "Failed to clean up an unused profile image"),
+      );
+    }
     if (isDuplicateKeyError(error)) {
       res.status(409).json({ error: "A window profile with that code already exists." });
       return;
@@ -391,6 +412,16 @@ router.patch("/window-profiles/:profileId", async (req, res): Promise<void> => {
     return;
   }
   const input: WindowProfileInput = parsedBody.data;
+  const imageDataUrl = input.imageDataUrl
+    ? await storeImageDataUrl(input.imageDataUrl, "window-profiles", MAX_WINDOW_PROFILE_IMAGE_BYTES)
+    : null;
+  if (input.imageDataUrl && !imageDataUrl) {
+    res.status(400).json({ error: "Choose a valid JPEG, PNG, or WebP profile drawing." });
+    return;
+  }
+  const createdImagePath = input.imageDataUrl?.startsWith("data:")
+    ? localImageStoragePath(imageDataUrl ?? "", "window-profiles")
+    : null;
   const code = input.code.trim();
   const now = new Date();
   try {
@@ -409,7 +440,7 @@ router.patch("/window-profiles/:profileId", async (req, res): Promise<void> => {
           specifications: input.specifications.trim(),
           accessories: input.accessories.trim(),
           remarks: (input.remarks ?? "").trim(),
-          imageDataUrl: input.imageDataUrl ?? null,
+          imageDataUrl,
           drawingType: input.drawingType,
           ratePerSqFt: input.ratePerSqFt,
           weightKgPerSqFt: input.weightKgPerSqFt,
@@ -420,11 +451,21 @@ router.patch("/window-profiles/:profileId", async (req, res): Promise<void> => {
       { returnDocument: "after" },
     );
     if (!updated) {
+      if (createdImagePath) {
+        await removeProjectUpload(createdImagePath).catch((cleanupError: unknown) =>
+          req.log.error({ err: cleanupError }, "Failed to clean up an unused profile image"),
+        );
+      }
       res.status(404).json({ error: "Window profile not found." });
       return;
     }
     res.json(UpdateWindowProfileResponse.parse(windowProfileResponse(updated)));
   } catch (error) {
+    if (createdImagePath) {
+      await removeProjectUpload(createdImagePath).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError }, "Failed to clean up an unused profile image"),
+      );
+    }
     if (isDuplicateKeyError(error)) {
       res.status(409).json({ error: "A window profile with that code already exists." });
       return;

@@ -28,6 +28,11 @@ import {
   type MeasurementVersionDocument,
   type OrderDocument,
 } from "../lib/mongo";
+import {
+  removeProjectUpload,
+  resolveProjectUploadPath,
+  storeProjectUpload,
+} from "../lib/project-upload-storage";
 
 const router = Router();
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -305,32 +310,27 @@ router.post("/measurement-records/:recordId/versions/:filename", async (req, res
       return;
     }
 
-    const bucket = getMeasurementSheetsBucket(db);
-    const gridId = new ObjectId();
-    const upload = bucket.openUploadStreamWithId(gridId, parsed.data.filename, {
-      contentType,
-      metadata: { recordId: record._id },
-    });
+    const storagePath = await storeProjectUpload(
+      "measurement-sheets",
+      parsed.data.filename,
+      body,
+    );
+
+    let versionedRecord: MeasurementRecordDocument | null;
     try {
-      await new Promise<void>((resolve, reject) => {
-        upload.once("finish", resolve);
-        upload.once("error", reject);
-        upload.end(body);
-      });
+      versionedRecord = await getMeasurementRecords(db).findOneAndUpdate(
+        { _id: record._id },
+        { $inc: { versionCount: 1 }, $set: { updatedAt: new Date() } },
+        { returnDocument: "after" },
+      );
     } catch (error) {
-      await bucket.delete(gridId).catch((cleanupError: unknown) =>
-        req.log.error({ err: cleanupError }, "Failed to clean up a partial measurement sheet upload"),
+      await removeProjectUpload(storagePath).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError }, "Failed to clean up a measurement sheet after a database error"),
       );
       throw error;
     }
-
-    const versionedRecord = await getMeasurementRecords(db).findOneAndUpdate(
-      { _id: record._id },
-      { $inc: { versionCount: 1 }, $set: { updatedAt: new Date() } },
-      { returnDocument: "after" },
-    );
     if (!versionedRecord) {
-      await bucket.delete(gridId).catch((cleanupError: unknown) =>
+      await removeProjectUpload(storagePath).catch((cleanupError: unknown) =>
         req.log.error({ err: cleanupError }, "Failed to clean up an orphaned measurement sheet upload"),
       );
       res.status(404).json({ error: "Measurement record not found." });
@@ -343,7 +343,8 @@ router.post("/measurement-records/:recordId/versions/:filename", async (req, res
       filename: parsed.data.filename,
       contentType,
       sizeBytes: body.length,
-      gridFsId: gridId.toHexString(),
+      gridFsId: null,
+      storagePath,
       uploadedBy: actor.id,
       uploadedByName: actor.name,
       uploadedAt: new Date(),
@@ -351,7 +352,7 @@ router.post("/measurement-records/:recordId/versions/:filename", async (req, res
     try {
       await getMeasurementVersions(db).insertOne(version);
     } catch (error) {
-      await bucket.delete(gridId).catch((cleanupError: unknown) =>
+      await removeProjectUpload(storagePath).catch((cleanupError: unknown) =>
         req.log.error({ err: cleanupError }, "Failed to clean up an orphaned measurement version"),
       );
       throw error;
@@ -375,7 +376,27 @@ router.get(
       _id: parsed.data.versionId,
       recordId: parsed.data.recordId,
     });
-    if (!version || !ObjectId.isValid(version.gridFsId)) {
+    if (!version) {
+      res.status(404).json({ error: "Measurement sheet version not found." });
+      return;
+    }
+    if (version.storagePath) {
+      const filePath = resolveProjectUploadPath(version.storagePath);
+      if (!filePath) {
+        res.status(404).json({ error: "Measurement sheet content not found." });
+        return;
+      }
+      const safeFilename = version.filename.replace(/[\x00-\x1f\x7f"]/g, "_");
+      res.setHeader("Content-Type", version.contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.sendFile(filePath, { dotfiles: "deny" }, (error) => {
+        if (error && !res.headersSent) res.status(404).json({ error: "Measurement sheet content not found." });
+        else if (error) req.log.error({ err: error, storagePath: version.storagePath }, "Failed to serve a measurement sheet upload");
+      });
+      return;
+    }
+    if (!version.gridFsId || !ObjectId.isValid(version.gridFsId)) {
       res.status(404).json({ error: "Measurement sheet version not found." });
       return;
     }

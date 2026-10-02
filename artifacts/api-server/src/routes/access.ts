@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type RequestHandler } from "express";
 import {
+  isLocalImageUrl,
+  localImageStoragePath,
+  removeProjectUpload,
+  resolveProjectUploadPath,
+  storeImageDataUrl,
+} from "../lib/project-upload-storage";
+import {
   CreateRoleBody,
   CreateRoleResponse,
   CreateUserBody,
@@ -79,6 +86,7 @@ function escapeRegex(value: string): string {
 
 const AVATAR_DATA_URL_PREFIX = "data:image/jpeg;base64,";
 const MAX_AVATAR_DATA_URL_LENGTH = 180_000;
+const MAX_AVATAR_BYTES = 135_000;
 
 function validateAvatarUrl(
   value: string | null | undefined,
@@ -91,10 +99,13 @@ function validateAvatarUrl(
     if (
       avatarUrl.length > MAX_AVATAR_DATA_URL_LENGTH ||
       !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64) ||
-      Buffer.byteLength(base64, "base64") > 135_000
+      Buffer.byteLength(base64, "base64") > MAX_AVATAR_BYTES
     ) {
       return { valid: false };
     }
+    return { valid: true, value: avatarUrl };
+  }
+  if (isLocalImageUrl(avatarUrl, "avatars")) {
     return { valid: true, value: avatarUrl };
   }
 
@@ -140,6 +151,55 @@ router.get("/auth/session", async (req, res): Promise<void> => {
     : { authenticated: false, user: null };
   res.setHeader("Cache-Control", "no-store");
   res.json(GetAuthSessionResponse.parse(response));
+});
+
+router.get("/uploads/:category/:filename", async (req, res): Promise<void> => {
+  const category = req.params.category;
+  const filename = req.params.filename;
+  if (
+    (category !== "avatars" && category !== "window-profiles") ||
+    typeof filename !== "string"
+  ) {
+    res.status(404).json({ error: "Image not found." });
+    return;
+  }
+  const db = await getMongoDb();
+  const user = await getSignedInUser(req, db);
+  if (!user) {
+    res.status(401).json({ error: "Sign in to view uploaded images." });
+    return;
+  }
+  if (category === "window-profiles") {
+    const publicUser = await getPublicUser(user, db);
+    if (
+      publicUser.roleId !== "master-admin" &&
+      publicUser.permissions["quotation-builder"] === "none"
+    ) {
+      res.status(403).json({ error: "Quotation access is required to view profile drawings." });
+      return;
+    }
+  }
+  const storagePath = `${category}/${filename}`;
+  const filePath = resolveProjectUploadPath(storagePath);
+  if (!filePath) {
+    res.status(404).json({ error: "Image not found." });
+    return;
+  }
+  const contentType = filename.toLowerCase().endsWith(".png")
+    ? "image/png"
+    : filename.toLowerCase().endsWith(".webp")
+      ? "image/webp"
+      : "image/jpeg";
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.sendFile(filePath, { dotfiles: "deny" }, (error) => {
+    if (error && !res.headersSent) {
+      res.status(404).json({ error: "Image not found." });
+    } else if (error) {
+      req.log.error({ err: error, storagePath }, "Failed to serve a project image upload");
+    }
+  });
 });
 
 router.post("/auth/login", async (req, res): Promise<void> => {
@@ -244,6 +304,18 @@ router.post("/users", async (req, res): Promise<void> => {
     return;
   }
 
+  let avatarUrl = avatar.value ?? null;
+  let createdAvatarPath: string | null = null;
+  if (avatarUrl?.startsWith(AVATAR_DATA_URL_PREFIX)) {
+    const stored = await storeImageDataUrl(avatarUrl, "avatars", MAX_AVATAR_BYTES);
+    if (!stored) {
+      res.status(400).json({ error: "The profile photo is not a valid JPEG image." });
+      return;
+    }
+    avatarUrl = stored;
+    createdAvatarPath = localImageStoragePath(stored, "avatars");
+  }
+
   const now = new Date();
   const { salt, hash } = hashPassword(parsed.data.password);
   const username = parsed.data.username.trim();
@@ -254,7 +326,7 @@ router.post("/users", async (req, res): Promise<void> => {
     usernameLower: username.toLowerCase(),
     email: parsed.data.email?.trim() || null,
     phone: parsed.data.phone?.trim() || null,
-    avatarUrl: avatar.value ?? null,
+    avatarUrl,
     roleId: role._id,
     status: "active",
     lastLogin: null,
@@ -268,6 +340,11 @@ router.post("/users", async (req, res): Promise<void> => {
   try {
     await getUsers(db).insertOne(user);
   } catch (error) {
+    if (createdAvatarPath) {
+      await removeProjectUpload(createdAvatarPath).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError }, "Failed to clean up an unused avatar upload"),
+      );
+    }
     if (isDuplicateKey(error)) {
       res.status(409).json({ error: "That username is already in use." });
       return;
@@ -299,6 +376,17 @@ router.patch("/users/:userId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "User not found." });
     return;
   }
+  let avatarUrl = avatar.value;
+  let createdAvatarPath: string | null = null;
+  if (parsed.data.avatarUrl !== undefined && avatarUrl?.startsWith(AVATAR_DATA_URL_PREFIX)) {
+    const stored = await storeImageDataUrl(avatarUrl, "avatars", MAX_AVATAR_BYTES);
+    if (!stored) {
+      res.status(400).json({ error: "The profile photo is not a valid JPEG image." });
+      return;
+    }
+    avatarUrl = stored;
+    createdAvatarPath = localImageStoragePath(stored, "avatars");
+  }
   if (parsed.data.roleId && !(await findRole(db, parsed.data.roleId))) {
     res.status(400).json({ error: "Choose an existing role." });
     return;
@@ -327,7 +415,7 @@ router.patch("/users/:userId", async (req, res): Promise<void> => {
   }
   if (parsed.data.email !== undefined) update.email = parsed.data.email?.trim() || null;
   if (parsed.data.phone !== undefined) update.phone = parsed.data.phone?.trim() || null;
-  if (parsed.data.avatarUrl !== undefined) update.avatarUrl = avatar.value ?? null;
+  if (parsed.data.avatarUrl !== undefined) update.avatarUrl = avatarUrl ?? null;
   if (parsed.data.roleId !== undefined) update.roleId = parsed.data.roleId;
   if (parsed.data.status !== undefined) update.status = parsed.data.status;
   if (parsed.data.permissionOverrides !== undefined) {
@@ -342,6 +430,11 @@ router.patch("/users/:userId", async (req, res): Promise<void> => {
   try {
     await users.updateOne({ _id: existing._id }, { $set: update });
   } catch (error) {
+    if (createdAvatarPath) {
+      await removeProjectUpload(createdAvatarPath).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError }, "Failed to clean up an unused avatar upload"),
+      );
+    }
     if (isDuplicateKey(error)) {
       res.status(409).json({ error: "That username is already in use." });
       return;

@@ -1,4 +1,4 @@
-- [MongoDB profile photos](mongo-profile-photos.md) — keep avatar uploads small and in MongoDB to preserve the project's Mongo-only persistence rule.
+- [Project-root upload storage](project-root-uploads.md) — use categorized local folders for new upload bytes; preserve the owner-accepted restart/publish durability caveat.
 - [Communication deletion](communication-deletion.md) — hide chats per user; delete individual messages for everyone; new activity restores hidden threads.
 - [pnpm workspace installs](pnpm-dependency-installs.md) — the package helper targets the workspace root; use the filtered pnpm package command for app-only dependencies.
 - [Quotation profile snapshots](quotation-snapshots.md) — keep saved proposal details stable when the reusable profile catalogue changes.

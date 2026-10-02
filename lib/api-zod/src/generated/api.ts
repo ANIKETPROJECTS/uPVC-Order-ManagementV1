@@ -76,6 +76,20 @@ export const LogoutResponse = zod.object({
 
 
 /**
+ * @summary Serve an uploaded avatar or window-profile image
+ */
+export const serveProjectUploadPathFilenameRegExp = new RegExp('^[A-Za-z0-9-]+\\.(jpg|png|webp)$');
+
+
+export const ServeProjectUploadParams = zod.object({
+  "category": zod.enum(['avatars', 'window-profiles']),
+  "filename": zod.coerce.string().regex(serveProjectUploadPathFilenameRegExp)
+})
+
+export const ServeProjectUploadResponse = zod.unknown()
+
+
+/**
  * @summary List users for the administration screen
  */
 export const ListUsersQueryParams = zod.object({

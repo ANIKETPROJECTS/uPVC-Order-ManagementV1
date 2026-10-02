@@ -78,6 +78,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+  /uploads/{category}/{filename}:
+    get:
+      operationId: serveProjectUpload
+      tags: [admin]
+      summary: Serve an uploaded avatar or window-profile image
+      parameters:
+        - name: category
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [avatars, window-profiles]
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9-]+\\.(jpg|png|webp)$"
+      responses:
+        "200":
+          description: Uploaded image bytes
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Sign-in is required
+        "403":
+          description: Required module access is missing
+        "404":
+          description: Image not found
   /users:
     get:
       operationId: listUsers
