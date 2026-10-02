@@ -17,7 +17,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'qr-assembly', label: 'QR Code Generation & Assembly Tracking', short: 'QR assembly' },
   { key: 'window-readiness', label: 'Window-wise Readiness Tracking', short: 'Window readiness' },
   { key: 'glass-procurement', label: 'Glass Procurement & Delivery Tracking', short: 'Glass procurement' },
-  { key: 'payments', label: 'Order Value & Payment Tracking', short: 'Payments' },
+  { key: 'payments', label: 'Order Value & Payment Tracking', short: 'Payments', built: true },
   { key: 'balance-payment', label: 'Balance Payment Automated Message Generator', short: 'Balance payment' },
   { key: 'dispatch', label: 'Dispatch QR Scan & WhatsApp Payment Alert Gate', short: 'Dispatch' },
   { key: 'installation', label: 'Installation Scheduling', short: 'Installation' },

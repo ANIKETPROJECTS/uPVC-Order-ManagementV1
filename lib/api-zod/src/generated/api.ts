@@ -286,7 +286,66 @@ export const GetDashboardResponse = zod.object({
   "userName": zod.string(),
   "roleName": zod.string(),
   "roleLabel": zod.string(),
-  "moduleCount": zod.number().int()
+  "moduleCount": zod.number().int(),
+  "liveActivity": zod.array(zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "summary": zod.string(),
+  "actorName": zod.string(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Get payment totals, balance reminders, and recent payment entries
+ */
+export const GetPaymentOverviewResponse = zod.object({
+  "totalCollected": zod.number(),
+  "totalOutstanding": zod.number(),
+  "ordersWithBalance": zod.number().int(),
+  "reminderOrders": zod.array(zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderValue": zod.number(),
+  "totalCollected": zod.number(),
+  "balance": zod.number(),
+  "windowCount": zod.number().int()
+})),
+  "recentPayments": zod.array(zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "amount": zod.number(),
+  "method": zod.enum(['cash', 'bank_transfer', 'upi', 'cheque', 'other']),
+  "paidAt": zod.coerce.date(),
+  "recordedBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "reminderAvailable": zod.boolean(),
+  "reminderUnavailableReason": zod.string().nullable()
+})
+
+
+/**
+ * @summary Send an approved WhatsApp balance reminder for an eligible order
+ */
+export const SendPaymentReminderParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const SendPaymentReminderResponse = zod.object({
+  "accepted": zod.boolean(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "balance": zod.number(),
+  "acceptedAt": zod.coerce.date()
 })
 
 

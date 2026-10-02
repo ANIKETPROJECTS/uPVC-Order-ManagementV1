@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { DashboardLiveActivityList } from './dashboardLiveActivityList';
 
 export interface Dashboard {
   userName: string;
   roleName: string;
   roleLabel: string;
   moduleCount: number;
+  liveActivity: DashboardLiveActivityList;
 }

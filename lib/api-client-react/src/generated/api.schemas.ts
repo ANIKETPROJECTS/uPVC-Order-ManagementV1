@@ -563,11 +563,71 @@ export interface OrderMessageTemplateUpdate {
 
 export type OrderMessageTemplateList = OrderMessageTemplate[];
 
+export interface DashboardLiveActivity {
+  id: string;
+  orderRecordId: string;
+  orderId: string;
+  summary: string;
+  actorName: string;
+  createdAt: string;
+}
+
+export type DashboardLiveActivityList = DashboardLiveActivity[];
+
 export interface Dashboard {
   userName: string;
   roleName: string;
   roleLabel: string;
   moduleCount: number;
+  liveActivity: DashboardLiveActivityList;
+}
+
+export interface PaymentReminderOrder {
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  orderValue: number;
+  totalCollected: number;
+  balance: number;
+  windowCount: number;
+}
+
+export type PaymentReminderOrderList = PaymentReminderOrder[];
+
+export interface RecentPaymentUpdate {
+  id: string;
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  amount: number;
+  method: OrderPaymentMethod;
+  paidAt: string;
+  recordedBy: string;
+  createdAt: string;
+}
+
+export type RecentPaymentUpdateList = RecentPaymentUpdate[];
+
+export interface PaymentOverview {
+  totalCollected: number;
+  totalOutstanding: number;
+  ordersWithBalance: number;
+  reminderOrders: PaymentReminderOrderList;
+  recentPayments: RecentPaymentUpdateList;
+  reminderAvailable: boolean;
+  /** @nullable */
+  reminderUnavailableReason: string | null;
+}
+
+export interface PaymentReminderResult {
+  accepted: boolean;
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  balance: number;
+  acceptedAt: string;
 }
 
 export interface AdminSummary {

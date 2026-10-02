@@ -72,6 +72,8 @@ import type {
   OrderWindowInput,
   OrderWindowList,
   OrderWindowUpdate,
+  PaymentOverview,
+  PaymentReminderResult,
   Quotation,
   QuotationInput,
   QuotationList,
@@ -1261,6 +1263,157 @@ export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>
 
 
 
+
+export const getGetPaymentOverviewUrl = () => {
+
+
+
+
+  return `/api/payments/overview`
+}
+
+/**
+ * @summary Get payment totals, balance reminders, and recent payment entries
+ */
+export const getPaymentOverview = async ( options?: Parameters<typeof customFetch>[1]): Promise<PaymentOverview> => {
+
+  return customFetch<PaymentOverview>(getGetPaymentOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPaymentOverviewQueryKey = () => {
+    return [
+    `/api/payments/overview`
+    ] as const;
+    }
+
+
+export const getGetPaymentOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getPaymentOverview>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaymentOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPaymentOverviewQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaymentOverview>>> = ({ signal }) => getPaymentOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPaymentOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPaymentOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getPaymentOverview>>>
+export type GetPaymentOverviewQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get payment totals, balance reminders, and recent payment entries
+ */
+
+export function useGetPaymentOverview<TData = Awaited<ReturnType<typeof getPaymentOverview>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaymentOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPaymentOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendPaymentReminderUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/payment-reminder`
+}
+
+/**
+ * @summary Send an approved WhatsApp balance reminder for an eligible order
+ */
+export const sendPaymentReminder = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<PaymentReminderResult> => {
+
+  return customFetch<PaymentReminderResult>(getSendPaymentReminderUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSendPaymentReminderMutationKey = () => ['sendPaymentReminder'] as const;
+
+export const getSendPaymentReminderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPaymentReminder>>, TError,SendPaymentReminderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendPaymentReminder>>, TError,SendPaymentReminderMutationVariables, TContext> => {
+
+const mutationKey = getSendPaymentReminderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendPaymentReminder>>, SendPaymentReminderMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  sendPaymentReminder(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendPaymentReminderMutationResult = NonNullable<Awaited<ReturnType<typeof sendPaymentReminder>>>
+
+    export type SendPaymentReminderMutationError = ErrorType<void>
+    export type SendPaymentReminderMutationVariables = {id: string}
+
+    /**
+ * @summary Send an approved WhatsApp balance reminder for an eligible order
+ */
+export const useSendPaymentReminder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPaymentReminder>>, TError,SendPaymentReminderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendPaymentReminder>>,
+        TError,
+        SendPaymentReminderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSendPaymentReminderMutationOptions(options));
+    }
 
 export const getGetAdminSummaryUrl = () => {
 

@@ -280,6 +280,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /payments/overview:
+    get:
+      operationId: getPaymentOverview
+      tags: [payments]
+      summary: Get payment totals, balance reminders, and recent payment entries
+      responses:
+        "200":
+          description: Payments dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentOverview"
+  /orders/{id}/payment-reminder:
+    post:
+      operationId: openPaymentReminder
+      tags: [payments]
+      summary: Open a manual WhatsApp balance reminder for an eligible order
+      description: The signed-in user reviews and sends the drafted message manually in WhatsApp. The API does not send or confirm delivery.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "303":
+          description: Redirect to the WhatsApp chat with the reminder text prefilled
+          headers:
+            Location:
+              schema:
+                type: string
+        "409":
+          description: The order is not eligible or has no usable client WhatsApp number
   /admin/summary:
     get:
       operationId: getAdminSummary
@@ -2324,7 +2357,104 @@ components:
           type: string
         moduleCount:
           type: integer
-      required: [userName, roleName, roleLabel, moduleCount]
+        liveActivity:
+          $ref: "#/components/schemas/DashboardLiveActivityList"
+      required: [userName, roleName, roleLabel, moduleCount, liveActivity]
+    DashboardLiveActivity:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        summary:
+          type: string
+        actorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, orderRecordId, orderId, summary, actorName, createdAt]
+    DashboardLiveActivityList:
+      type: array
+      items:
+        $ref: "#/components/schemas/DashboardLiveActivity"
+    PaymentReminderOrder:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        orderValue:
+          type: number
+        totalCollected:
+          type: number
+        balance:
+          type: number
+        windowCount:
+          type: integer
+        canOpenWhatsApp:
+          type: boolean
+      required: [orderRecordId, orderId, clientName, locationName, orderValue, totalCollected, balance, windowCount, canOpenWhatsApp]
+    PaymentReminderOrderList:
+      type: array
+      items:
+        $ref: "#/components/schemas/PaymentReminderOrder"
+    RecentPaymentUpdate:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        amount:
+          type: number
+        method:
+          $ref: "#/components/schemas/OrderPaymentMethod"
+        paidAt:
+          type: string
+          format: date-time
+        recordedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, orderRecordId, orderId, clientName, locationName, amount, method, paidAt, recordedBy, createdAt]
+    RecentPaymentUpdateList:
+      type: array
+      items:
+        $ref: "#/components/schemas/RecentPaymentUpdate"
+    PaymentOverview:
+      type: object
+      properties:
+        totalCollected:
+          type: number
+        totalOutstanding:
+          type: number
+        ordersWithBalance:
+          type: integer
+        reminderOrders:
+          $ref: "#/components/schemas/PaymentReminderOrderList"
+        recentPayments:
+          $ref: "#/components/schemas/RecentPaymentUpdateList"
+        reminderAvailable:
+          type: boolean
+        reminderUnavailableReason:
+          type: ["string", "null"]
+      required: [totalCollected, totalOutstanding, ordersWithBalance, reminderOrders, recentPayments, reminderAvailable, reminderUnavailableReason]
     AdminSummary:
       type: object
       properties:
