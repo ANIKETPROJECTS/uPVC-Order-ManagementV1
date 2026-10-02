@@ -326,8 +326,12 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
       </button>
       {mobileOpen && <button className="fixed inset-0 z-30 bg-foreground/25 md:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation overlay" data-testid="button-close-navigation-overlay" />}
       <aside className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-200 ${collapsed ? 'w-[76px]' : 'w-[260px]'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="flex h-[76px] items-center gap-3 border-b border-sidebar-border px-5">
-          <div className="grid h-14 w-14 shrink-0 place-items-center"><SidebarSectionIcon name="brand" size={56} /></div>
+        <div className={`flex h-[76px] items-center gap-3 border-b border-sidebar-border ${collapsed ? 'justify-center px-2' : 'px-5'}`}>
+          <img
+            src={`${import.meta.env.BASE_URL}shree-sai-window-mark.png`}
+            alt="Shree Sai Wintech window logo"
+            className={`block h-auto shrink-0 rounded-sm bg-white object-contain ${collapsed ? 'w-14' : 'w-16'}`}
+          />
           {!collapsed && <div className="min-w-0"><p className="font-display text-sm font-bold tracking-tight">Framewise</p><p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">Order operations</p></div>}
         </div>
         <div className="scrollbar-thin flex-1 overflow-y-auto px-3 py-5">

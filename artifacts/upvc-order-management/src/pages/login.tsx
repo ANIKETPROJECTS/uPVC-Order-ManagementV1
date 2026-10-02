@@ -32,12 +32,12 @@ export default function LoginPage() {
         aria-hidden="true"
       />
       <section className="relative z-10 hidden w-[46%] flex-col justify-between p-10 text-white lg:flex xl:p-14">
-        <div className="flex items-center gap-3">
-          <img src={`${import.meta.env.BASE_URL}window-logo.svg`} alt="" aria-hidden="true" className="h-16 w-16 shrink-0 object-contain drop-shadow-lg" />
-          <div>
-            <p className="font-display font-bold">Framewise</p>
-            <p className="text-[10px] uppercase tracking-[0.2em]">Order operations</p>
-          </div>
+        <div>
+          <img
+            src={`${import.meta.env.BASE_URL}shree-sai-wintech.png`}
+            alt="Shree Sai Wintech — uPVC Windows & Doors"
+            className="block w-56 max-w-full rounded-lg bg-white shadow-lg sm:w-64"
+          />
         </div>
         <div className="max-w-md">
           <p className="mb-5 text-xs font-semibold uppercase tracking-[0.2em]">A clearer handoff</p>
@@ -54,9 +54,11 @@ export default function LoginPage() {
       <main className="relative z-10 flex flex-1 items-center justify-center px-5 py-10 sm:px-10">
         <div className="w-full max-w-[420px]">
           <div className="mb-7 lg:hidden">
-            <img src={`${import.meta.env.BASE_URL}window-logo.svg`} alt="" aria-hidden="true" className="mb-4 h-16 w-16 object-contain drop-shadow-lg" />
-            <p className="font-display text-2xl font-bold">Framewise</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.2em]">Order operations</p>
+            <img
+              src={`${import.meta.env.BASE_URL}shree-sai-wintech.png`}
+              alt="Shree Sai Wintech — uPVC Windows & Doors"
+              className="block w-52 max-w-full rounded-lg bg-white shadow-lg"
+            />
           </div>
           <div className="rounded-3xl bg-white/95 p-6 text-foreground shadow-2xl backdrop-blur-md sm:p-8">
             <div className="mb-8">
