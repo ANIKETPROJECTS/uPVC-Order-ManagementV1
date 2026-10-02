@@ -77,6 +77,8 @@
   "dependencies": {
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
-    "qrcode.react": "^4.2.0"
+    "mammoth": "^1.13.0",
+    "qrcode.react": "^4.2.0",
+    "xlsx": "^0.18.5"
   }
 }
