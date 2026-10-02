@@ -506,12 +506,16 @@ export interface OrderPaymentVoid {
 
 export type OrderPaymentList = OrderPayment[];
 
+/**
+ * The drawing identifier is retained for existing documents and is displayed as Elevation.
+ */
 export type OrderDocumentCategory = typeof OrderDocumentCategory[keyof typeof OrderDocumentCategory];
 
 
 export const OrderDocumentCategory = {
   quotation: 'quotation',
   purchase_order: 'purchase_order',
+  confirmation: 'confirmation',
   drawing: 'drawing',
   invoice: 'invoice',
   other: 'other',

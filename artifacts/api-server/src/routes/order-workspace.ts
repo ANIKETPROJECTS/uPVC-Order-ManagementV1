@@ -19,7 +19,7 @@ const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
 const MAX_FILE_MESSAGE = "Document must be 10 MiB or smaller.";
 const mimeByExt: Record<string, string[]> = { pdf: ["application/pdf"], png: ["image/png"], jpg: ["image/jpeg"], jpeg: ["image/jpeg"], webp: ["image/webp"], docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"], xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] };
-const categoryModule: Record<string, string> = { quotation: "quotation-builder", purchase_order: "confirmation", drawing: "measurements", invoice: "payments", other: "order-hub" };
+const categoryModule: Record<DocumentCategory, string> = { quotation: "quotation-builder", purchase_order: "confirmation", confirmation: "confirmation", drawing: "measurements", invoice: "payments", other: "order-hub" };
 type UserContext = { id: string; name: string; permissions: Record<string, string>; masterAdmin: boolean };
 
 async function context(req: Parameters<RequestHandler>[0], res: Parameters<RequestHandler>[1], module?: string, edit = false): Promise<UserContext | null> {

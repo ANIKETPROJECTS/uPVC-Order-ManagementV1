@@ -1845,7 +1845,7 @@ export const ListOrderDocumentsResponseItem = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
   "filename": zod.string(),
-  "category": zod.enum(['quotation', 'purchase_order', 'drawing', 'invoice', 'other']),
+  "category": zod.enum(['quotation', 'purchase_order', 'confirmation', 'drawing', 'invoice', 'other']).describe('The drawing identifier is retained for existing documents and is displayed as Elevation.'),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
@@ -1874,7 +1874,7 @@ export const uploadOrderDocumentPathFilenameMax = 180;
 
 export const UploadOrderDocumentParams = zod.object({
   "id": zod.coerce.string(),
-  "category": zod.enum(['quotation', 'purchase_order', 'drawing', 'invoice', 'other']),
+  "category": zod.enum(['quotation', 'purchase_order', 'confirmation', 'drawing', 'invoice', 'other']),
   "filename": zod.coerce.string().min(1).max(uploadOrderDocumentPathFilenameMax)
 })
 
@@ -1882,7 +1882,7 @@ export const UploadOrderDocumentResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
   "filename": zod.string(),
-  "category": zod.enum(['quotation', 'purchase_order', 'drawing', 'invoice', 'other']),
+  "category": zod.enum(['quotation', 'purchase_order', 'confirmation', 'drawing', 'invoice', 'other']).describe('The drawing identifier is retained for existing documents and is displayed as Elevation.'),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),

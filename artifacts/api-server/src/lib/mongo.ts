@@ -194,7 +194,7 @@ export interface OrderPaymentDocument {
   reference: string | null; notes: string | null; paidAt: Date; status: PaymentStatus;
   voidReason: string | null; createdBy: string; createdAt: Date; voidedBy?: string | null; voidedAt?: Date | null;
 }
-export type DocumentCategory = "quotation" | "purchase_order" | "drawing" | "invoice" | "other";
+export type DocumentCategory = "quotation" | "purchase_order" | "confirmation" | "drawing" | "invoice" | "other";
 export interface OrderDocumentMetadataDocument {
   _id: string; orderRecordId: string; filename: string; category: DocumentCategory;
   contentType: string; sizeBytes: number; gridFsId: string; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;

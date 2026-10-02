@@ -1885,7 +1885,8 @@ components:
         $ref: "#/components/schemas/OrderPayment"
     OrderDocumentCategory:
       type: string
-      enum: [quotation, purchase_order, drawing, invoice, other]
+      description: The drawing identifier is retained for existing documents and is displayed as Elevation.
+      enum: [quotation, purchase_order, confirmation, drawing, invoice, other]
     OrderDocument:
       type: object
       properties:
