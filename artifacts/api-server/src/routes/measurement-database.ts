@@ -11,6 +11,7 @@ import {
   UpdateMeasurementRecordParams,
   UpdateMeasurementRecordResponse,
   UploadMeasurementVersionParams,
+  UploadMeasurementVersionHeader,
   UploadMeasurementVersionResponse,
 } from "@workspace/api-zod";
 import { Router, type Request, type RequestHandler } from "express";
@@ -92,6 +93,7 @@ function versionResponse(version: MeasurementVersionDocument) {
     sizeBytes: version.sizeBytes,
     uploadedBy: version.uploadedBy,
     uploadedByName: version.uploadedByName,
+    name: version.name ?? null,
     uploadedAt: version.uploadedAt.toISOString(),
   };
 }
@@ -288,6 +290,27 @@ router.post("/measurement-records/:recordId/versions/:filename", async (req, res
     res.status(404).json({ error: "Measurement record not found." });
     return;
   }
+  const parsedHeader = UploadMeasurementVersionHeader.safeParse({
+    "X-Measurement-Sheet-Name": req.headers["x-measurement-sheet-name"],
+  });
+  if (!parsedHeader.success) {
+    res.status(400).json({ error: "Sheet name must be 160 characters or fewer." });
+    return;
+  }
+  const encodedName = parsedHeader.data["X-Measurement-Sheet-Name"];
+  let name: string | null = null;
+  if (encodedName) {
+    try {
+      name = decodeURIComponent(encodedName).trim() || null;
+    } catch {
+      res.status(400).json({ error: "Sheet name could not be decoded." });
+      return;
+    }
+    if (name && name.length > 160) {
+      res.status(400).json({ error: "Sheet name must be 160 characters or fewer." });
+      return;
+    }
+  }
   readRawFile(req, res, next, async (body) => {
     const extension = parsed.data.filename.toLowerCase().split(".").pop() ?? "";
     const contentType = sheetTypes[extension];
@@ -341,6 +364,7 @@ router.post("/measurement-records/:recordId/versions/:filename", async (req, res
       recordId: record._id,
       versionNumber: versionedRecord.versionCount ?? 1,
       filename: parsed.data.filename,
+      name,
       contentType,
       sizeBytes: body.length,
       gridFsId: null,

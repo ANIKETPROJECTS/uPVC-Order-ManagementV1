@@ -1113,6 +1113,11 @@ export interface MeasurementVersion {
   sizeBytes: number;
   uploadedBy: string;
   uploadedByName: string;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  name: string | null;
   uploadedAt: string;
 }
 

@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   ClipboardList,
@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Save,
   Upload,
+  X,
 } from 'lucide-react';
 import {
   getDownloadMeasurementVersionUrl,
@@ -22,7 +23,7 @@ import {
   useListMeasurementRecords,
   useListOrders,
   useUpdateMeasurementRecord,
-  useUploadMeasurementVersion,
+  uploadMeasurementVersion,
 } from '@workspace/api-client-react';
 import type { MeasurementRecord, Order, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
@@ -42,6 +43,13 @@ type MeasurementEdit = {
   linkQuotationSubmissionId: string | null;
   quotationLabel: string;
 };
+type MeasurementSheetDraft = { id: number; file: File; name: string };
+let nextMeasurementSheetDraftId = 0;
+const measurementSheetDraft = (file: File): MeasurementSheetDraft => ({
+  id: ++nextMeasurementSheetDraftId,
+  file,
+  name: '',
+});
 const acceptedExtensions = ['pdf', 'xlsx', 'csv'];
 const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 const sizeLabel = (size: number) => size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1024 / 1024).toFixed(2)} MiB`;
@@ -61,11 +69,18 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
   const ordersQuery = useListOrders({}, { query: { queryKey: getListOrdersQueryKey({}) } });
   const create = useCreateMeasurementRecord();
   const update = useUpdateMeasurementRecord();
-  const upload = useUploadMeasurementVersion();
+  const upload = useMutation({
+    mutationFn: ({ recordId, file, name }: { recordId: string; file: File; name: string }) =>
+      uploadMeasurementVersion(recordId, encodeURIComponent(file.name), file, {
+        headers: name.trim() ? { 'X-Measurement-Sheet-Name': encodeURIComponent(name.trim()) } : undefined,
+      }),
+  });
   const [clientName, setClientName] = useState('');
   const [location, setLocation] = useState('');
   const [orderRecordId, setOrderRecordId] = useState('');
-  const [initialFile, setInitialFile] = useState<File | null>(null);
+  const [initialFiles, setInitialFiles] = useState<MeasurementSheetDraft[]>([]);
+  const [versionFiles, setVersionFiles] = useState<Record<string, MeasurementSheetDraft[]>>({});
+  const [uploadingBatch, setUploadingBatch] = useState(false);
   const [edits, setEdits] = useState<Record<string, MeasurementEdit>>({});
   const records = recordsQuery.data || [];
   const orders = ordersQuery.data || [];
@@ -83,15 +98,50 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
     }
     return true;
   };
-  const uploadVersion = (recordId: string, file: File) => {
-    if (!validateFile(file)) return;
-    upload.mutate({ recordId, filename: file.name, data: file }, {
-      onSuccess: () => {
-        invalidateRecords();
-        toast({ title: 'Measurement version added', description: `${file.name} is retained in the record history.` });
-      },
-      onError: () => toast({ title: 'Upload failed', description: 'No version was added. You can retry without replacing previous files.', variant: 'destructive' }),
-    });
+  const addInitialFiles = (files: File[]) => {
+    const additions = files.filter(validateFile).map(measurementSheetDraft);
+    if (additions.length) setInitialFiles((current) => [...current, ...additions]);
+  };
+  const addVersionFiles = (recordId: string, files: File[]) => {
+    const additions = files.filter(validateFile).map(measurementSheetDraft);
+    if (additions.length) {
+      setVersionFiles((current) => ({
+        ...current,
+        [recordId]: [...(current[recordId] || []), ...additions],
+      }));
+    }
+  };
+  const uploadSheets = async (recordId: string, drafts: MeasurementSheetDraft[], creatingRecord = false) => {
+    if (drafts.length === 0) return [];
+    setUploadingBatch(true);
+    let uploaded = 0;
+    const failed: MeasurementSheetDraft[] = [];
+    try {
+      for (const draft of drafts) {
+        try {
+          await upload.mutateAsync({ recordId, file: draft.file, name: draft.name.trim() });
+          uploaded += 1;
+        } catch {
+          failed.push(draft);
+        }
+      }
+    } finally {
+      setUploadingBatch(false);
+    }
+    invalidateRecords();
+    if (failed.length) {
+      toast({
+        title: creatingRecord ? 'Record created; some sheets failed' : `${uploaded} of ${drafts.length} sheets uploaded`,
+        description: `${failed.length} failed and remain in the upload queue so you can retry.`,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: creatingRecord ? 'Measurement record created' : 'Measurement sheets added',
+        description: `${uploaded} ${uploaded === 1 ? 'sheet was' : 'sheets were'} added to the record history.`,
+      });
+    }
+    return failed;
   };
   const createRecord = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -99,17 +149,21 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
       toast({ title: 'Client name is required', variant: 'destructive' });
       return;
     }
-    if (initialFile && !validateFile(initialFile)) return;
+    if (initialFiles.some((draft) => !validateFile(draft.file))) return;
+    const sheetsToUpload = initialFiles;
     create.mutate({ data: { clientName: clientName.trim(), location: location.trim() || null, orderRecordId: orderRecordId || null } }, {
-      onSuccess: (record) => {
+      onSuccess: async (record) => {
         invalidateRecords();
         setClientName('');
         setLocation('');
         setOrderRecordId('');
-        const file = initialFile;
-        setInitialFile(null);
-        if (file) uploadVersion(record.id, file);
-        else toast({ title: 'Measurement record created', description: `${record.clientName} is ready for sheet versions.` });
+        setInitialFiles([]);
+        if (sheetsToUpload.length) {
+          const failed = await uploadSheets(record.id, sheetsToUpload, true);
+          if (failed.length) setVersionFiles((current) => ({ ...current, [record.id]: failed }));
+        } else {
+          toast({ title: 'Measurement record created', description: `${record.clientName} is ready for sheet versions.` });
+        }
       },
       onError: () => toast({ title: 'Could not create measurement record', description: 'Check the details and try again.', variant: 'destructive' }),
     });
@@ -162,10 +216,25 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
         next.linkQuotationSubmissionId = null;
         next.quotationLabel = '';
       }
+      if (key === 'orderRecordId' && typeof value === 'string' && value) {
+        const selectedOrder = orders.find((order) => order.id === value);
+        if (selectedOrder) {
+          next.clientName = selectedOrder.clientName;
+          next.location = selectedOrder.locationName;
+        }
+      }
       return { ...current, [record.id]: next };
     });
   };
   const orderOption = (order: Order) => `${order.orderId} · ${order.clientName} · ${order.locationName}`;
+  const assignNewRecordOrder = (value: string) => {
+    setOrderRecordId(value);
+    const selectedOrder = orders.find((order) => order.id === value);
+    if (selectedOrder) {
+      setClientName(selectedOrder.clientName);
+      setLocation(selectedOrder.locationName);
+    }
+  };
   const OrderSelect = ({ value, onChange, testId }: { value: string; onChange: (value: string) => void; testId: string }) => (
     <Select value={value || 'unassigned'} onValueChange={(selected) => onChange(selected === 'unassigned' ? '' : selected)}>
       <SelectTrigger data-testid={testId}><SelectValue placeholder="No order assigned" /></SelectTrigger>
@@ -183,25 +252,32 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
           <div className="relative z-10 max-w-3xl">
             <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-sidebar-primary"><span>Traceable fabrication records</span><span className="h-1 w-1 rounded-full bg-accent" /><span>PDF · XLSX · CSV</span></p>
             <h2 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-[-0.05em] md:text-4xl">Every measurement sheet, kept with its history.</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">File sheets by client and site, then connect an order when it is known. New uploads add versions; they never overwrite the record.</p>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">File multiple sheets by client and site, optionally name each one, then connect an order when it is known. New uploads add versions; they never overwrite the record.</p>
             <div className="mt-5 flex flex-wrap gap-2"><span className="rounded-lg bg-white/10 px-3 py-2 text-xs"><strong className="font-display text-base">{records.length}</strong><span className="ml-2 text-white/65">client records</span></span><span className="rounded-lg bg-white/10 px-3 py-2 text-xs"><strong className="font-display text-base">{records.reduce((count, record) => count + record.versions.length, 0)}</strong><span className="ml-2 text-white/65">retained versions</span></span></div>
           </div>
           <div className="quotation-hero-mark" aria-hidden="true"><span /><span /><span /><span /></div>
         </section>
 
         {canEdit && <Card className="border-border/80" data-testid="card-new-measurement-record">
-          <CardHeader className="border-b border-border/70 pb-4"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">New client file</p><CardTitle className="mt-1 font-display text-lg">Create measurement record</CardTitle><p className="text-xs text-muted-foreground">An initial sheet is optional. You can add more versions at any time.</p></CardHeader>
+          <CardHeader className="border-b border-border/70 pb-4"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">New client file</p><CardTitle className="mt-1 font-display text-lg">Create measurement record</CardTitle><p className="text-xs text-muted-foreground">Initial sheets are optional. Select several files and give each an optional name; you can add more versions later.</p></CardHeader>
           <CardContent className="p-5">
             <form className="grid gap-4 lg:grid-cols-[1fr_1fr_1.2fr_1.3fr_auto]" onSubmit={createRecord} data-testid="form-new-measurement-record">
-              <label className="space-y-1.5 text-xs font-semibold">Client name<Input value={clientName} onChange={(event) => setClientName(event.target.value)} maxLength={160} required placeholder="Client or company" data-testid="input-measurement-client-name" /></label>
-              <label className="space-y-1.5 text-xs font-semibold">Location <span className="font-normal text-muted-foreground">optional</span><Input value={location} onChange={(event) => setLocation(event.target.value)} maxLength={160} placeholder="Site or city" data-testid="input-measurement-location" /></label>
-              <label className="space-y-1.5 text-xs font-semibold">Order assignment <span className="font-normal text-muted-foreground">optional</span><OrderSelect value={orderRecordId} onChange={setOrderRecordId} testId="select-measurement-order" /></label>
-              <label className="space-y-1.5 text-xs font-semibold">First sheet <span className="font-normal text-muted-foreground">PDF / XLSX / CSV · max 10 MiB</span><Input type="file" accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-testid="input-measurement-initial-file" onChange={(event) => {
-                const file = event.target.files?.[0] || null;
-                if (file && validateFile(file)) setInitialFile(file);
-                else setInitialFile(null);
+              <label className="space-y-1.5 text-xs font-semibold">Client name<Input value={clientName} onChange={(event) => setClientName(event.target.value)} maxLength={160} disabled={create.isPending || uploadingBatch} required placeholder="Client or company" data-testid="input-measurement-client-name" /></label>
+              <label className="space-y-1.5 text-xs font-semibold">Location <span className="font-normal text-muted-foreground">optional</span><Input value={location} onChange={(event) => setLocation(event.target.value)} maxLength={160} disabled={create.isPending || uploadingBatch} placeholder="Site or city" data-testid="input-measurement-location" /></label>
+              <label className="space-y-1.5 text-xs font-semibold">Order assignment <span className="font-normal text-muted-foreground">optional</span><OrderSelect value={orderRecordId} onChange={assignNewRecordOrder} testId="select-measurement-order" /></label>
+              <label className="space-y-1.5 text-xs font-semibold">Initial sheets <span className="font-normal text-muted-foreground">PDF / XLSX / CSV · max 10 MiB each</span><Input type="file" multiple accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-testid="input-measurement-initial-file" disabled={create.isPending || uploadingBatch} onChange={(event) => {
+                addInitialFiles(Array.from(event.currentTarget.files || []));
+                event.currentTarget.value = '';
               }} /></label>
-              <div className="flex items-end"><Button type="submit" disabled={create.isPending || upload.isPending} className="w-full lg:w-auto" data-testid="button-create-measurement-record"><Plus size={15} /> {create.isPending ? 'Creating…' : 'Create record'}</Button></div>
+              <div className="flex items-end"><Button type="submit" disabled={create.isPending || uploadingBatch || upload.isPending} className="w-full lg:w-auto" data-testid="button-create-measurement-record"><Plus size={15} /> {create.isPending ? 'Creating…' : uploadingBatch ? 'Uploading sheets…' : 'Create record'}</Button></div>
+              {initialFiles.length > 0 && <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 p-3 lg:col-span-full" data-testid="list-initial-measurement-sheets">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Files to attach</p>
+                {initialFiles.map((draft) => <div key={draft.id} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,0.8fr)_auto] sm:items-center" data-testid={`row-initial-measurement-sheet-${draft.id}`}>
+                  <div className="min-w-0"><p className="truncate text-xs font-semibold">{draft.file.name}</p><p className="text-[10px] text-muted-foreground">{sizeLabel(draft.file.size)}</p></div>
+                  <Input value={draft.name} onChange={(event) => setInitialFiles((current) => current.map((item) => item.id === draft.id ? { ...item, name: event.target.value } : item))} maxLength={160} disabled={create.isPending || uploadingBatch} placeholder="Sheet name (optional)" aria-label={`Optional name for ${draft.file.name}`} data-testid={`input-initial-measurement-sheet-name-${draft.id}`} />
+                  <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${draft.file.name}`} disabled={create.isPending || uploadingBatch} onClick={() => setInitialFiles((current) => current.filter((item) => item.id !== draft.id))} data-testid={`button-remove-initial-measurement-sheet-${draft.id}`}><X size={15} /></Button>
+                </div>)}
+              </div>}
             </form>
           </CardContent>
         </Card>}
@@ -221,6 +297,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                   : <div className="divide-y divide-border/70">
                     {records.map((record) => {
                       const edit = currentEdit(record);
+                      const pendingSheets = versionFiles[record.id] || [];
                       return <article key={record.id} className="space-y-4 p-4 sm:p-5" data-testid={`row-measurement-record-${record.id}`}>
                         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(210px,1fr)_auto] xl:items-end">
                           <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Client name<Input value={edit.clientName} readOnly={!canEdit} onChange={(event) => setEdit(record, 'clientName', event.target.value)} maxLength={160} data-testid={`input-measurement-client-${record.id}`} /></label>
@@ -255,17 +332,29 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                         </div>}
                         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5">
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground"><span className="inline-flex items-center gap-1.5 font-semibold text-foreground"><FileText size={14} className="text-primary" /> {record.versions.length} {record.versions.length === 1 ? 'version' : 'versions'}</span><span className="inline-flex items-center gap-1.5"><MapPin size={13} /> {record.location || 'Location not specified'}</span><span>Updated {dateLabel(record.updatedAt)}</span></div>
-                          {canEdit && <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold transition-colors hover:bg-muted" data-testid={`label-add-measurement-version-${record.id}`}><Upload size={14} /> Add version
-                            <input type="file" className="sr-only" accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-testid={`input-add-measurement-version-${record.id}`} onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              if (file) uploadVersion(record.id, file);
+                          {canEdit && <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold transition-colors hover:bg-muted ${uploadingBatch ? 'pointer-events-none opacity-50' : ''}`} data-testid={`label-add-measurement-version-${record.id}`}><Upload size={14} /> Add sheets
+                            <input type="file" multiple className="sr-only" disabled={uploadingBatch} accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-testid={`input-add-measurement-version-${record.id}`} onChange={(event) => {
+                              addVersionFiles(record.id, Array.from(event.currentTarget.files || []));
                               event.currentTarget.value = '';
                             }} />
                           </label>}
                         </div>
+                        {canEdit && pendingSheets.length > 0 && <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3" data-testid={`list-pending-measurement-sheets-${record.id}`}>
+                          <div className="space-y-2">
+                            {pendingSheets.map((draft) => <div key={draft.id} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,0.8fr)_auto] sm:items-center" data-testid={`row-pending-measurement-sheet-${draft.id}`}>
+                              <div className="min-w-0"><p className="truncate text-xs font-semibold">{draft.file.name}</p><p className="text-[10px] text-muted-foreground">{sizeLabel(draft.file.size)}</p></div>
+                              <Input value={draft.name} onChange={(event) => setVersionFiles((current) => ({ ...current, [record.id]: (current[record.id] || []).map((item) => item.id === draft.id ? { ...item, name: event.target.value } : item) }))} maxLength={160} disabled={uploadingBatch} placeholder="Sheet name (optional)" aria-label={`Optional name for ${draft.file.name}`} data-testid={`input-measurement-sheet-name-${draft.id}`} />
+                              <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${draft.file.name}`} disabled={uploadingBatch} onClick={() => setVersionFiles((current) => ({ ...current, [record.id]: (current[record.id] || []).filter((item) => item.id !== draft.id) }))} data-testid={`button-remove-measurement-sheet-${draft.id}`}><X size={15} /></Button>
+                            </div>)}
+                          </div>
+                          <div className="flex justify-end"><Button type="button" size="sm" disabled={uploadingBatch || upload.isPending} onClick={async () => {
+                            const failed = await uploadSheets(record.id, pendingSheets);
+                            setVersionFiles((current) => ({ ...current, [record.id]: failed }));
+                          }} data-testid={`button-upload-measurement-sheets-${record.id}`}><Upload size={14} /> {uploadingBatch ? 'Uploading…' : `Upload ${pendingSheets.length} ${pendingSheets.length === 1 ? 'sheet' : 'sheets'}`}</Button></div>
+                        </div>}
                         {record.versions.length > 0 ? <ol className="space-y-2" aria-label={`Version history for ${record.clientName}`} data-testid={`list-measurement-versions-${record.id}`}>
                           {record.versions.slice().sort((a, b) => b.versionNumber - a.versionNumber).map((version) => <li key={version.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5" data-testid={`row-measurement-version-${version.id}`}>
-                            <div className="flex min-w-0 items-center gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><FileSpreadsheet size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-semibold">{version.filename}</p><p className="mt-0.5 text-[10px] text-muted-foreground">Version {version.versionNumber} · {sizeLabel(version.sizeBytes)} · {dateLabel(version.uploadedAt)} · {version.uploadedByName}</p></div></div>
+                            <div className="flex min-w-0 items-center gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><FileSpreadsheet size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-semibold">{version.name || version.filename}</p>{version.name && <p className="mt-0.5 truncate text-[10px] text-muted-foreground">File: {version.filename}</p>}<p className="mt-0.5 text-[10px] text-muted-foreground">Version {version.versionNumber} · {sizeLabel(version.sizeBytes)} · {dateLabel(version.uploadedAt)} · {version.uploadedByName}</p></div></div>
                             <a href={getDownloadMeasurementVersionUrl(record.id, version.id)} download={version.filename} className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/5" data-testid={`link-download-measurement-version-${version.id}`}><Download size={14} /> Download</a>
                           </li>)}
                         </ol> : <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground" data-testid={`state-measurement-versions-empty-${record.id}`}>No sheet uploaded yet. Add the first version when it is ready.</div>}

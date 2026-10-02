@@ -350,6 +350,7 @@ export interface MeasurementVersionDocument {
   recordId: string;
   versionNumber: number;
   filename: string;
+  name?: string | null;
   contentType: string;
   sizeBytes: number;
   gridFsId: string | null;

@@ -1895,6 +1895,10 @@ export const DecideQuotationRateSubmissionResponse = zod.object({
 /**
  * @summary List measurement sheets and retained versions
  */
+export const listMeasurementRecordsResponseVersionsItemNameMax = 160;
+
+
+
 export const ListMeasurementRecordsResponseItem = zod.object({
   "id": zod.string(),
   "clientName": zod.string(),
@@ -1909,6 +1913,7 @@ export const ListMeasurementRecordsResponseItem = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
   "uploadedByName": zod.string(),
+  "name": zod.string().max(listMeasurementRecordsResponseVersionsItemNameMax).nullable(),
   "uploadedAt": zod.coerce.date()
 })),
   "createdBy": zod.string(),
@@ -1933,6 +1938,10 @@ export const CreateMeasurementRecordBody = zod.object({
   "orderRecordId": zod.string().nullable()
 })
 
+export const createMeasurementRecordResponseVersionsItemNameMax = 160;
+
+
+
 export const CreateMeasurementRecordResponse = zod.object({
   "id": zod.string(),
   "clientName": zod.string(),
@@ -1947,6 +1956,7 @@ export const CreateMeasurementRecordResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
   "uploadedByName": zod.string(),
+  "name": zod.string().max(createMeasurementRecordResponseVersionsItemNameMax).nullable(),
   "uploadedAt": zod.coerce.date()
 })),
   "createdBy": zod.string(),
@@ -1995,6 +2005,10 @@ export const UpdateMeasurementRecordBody = zod.object({
   "linkQuotationSubmissionId": zod.string().optional()
 })
 
+export const updateMeasurementRecordResponseVersionsItemNameMax = 160;
+
+
+
 export const UpdateMeasurementRecordResponse = zod.object({
   "id": zod.string(),
   "clientName": zod.string(),
@@ -2009,6 +2023,7 @@ export const UpdateMeasurementRecordResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
   "uploadedByName": zod.string(),
+  "name": zod.string().max(updateMeasurementRecordResponseVersionsItemNameMax).nullable(),
   "uploadedAt": zod.coerce.date()
 })),
   "createdBy": zod.string(),
@@ -2029,6 +2044,18 @@ export const UploadMeasurementVersionParams = zod.object({
   "filename": zod.coerce.string().min(1).max(uploadMeasurementVersionPathFilenameMax)
 })
 
+export const uploadMeasurementVersionHeaderXMeasurementSheetNameMax = 1440;
+
+
+
+export const UploadMeasurementVersionHeader = zod.object({
+  "X-Measurement-Sheet-Name": zod.string().max(uploadMeasurementVersionHeaderXMeasurementSheetNameMax).optional().describe('Optional UTF-8 sheet name encoded with encodeURIComponent')
+})
+
+export const uploadMeasurementVersionResponseNameMax = 160;
+
+
+
 export const UploadMeasurementVersionResponse = zod.object({
   "id": zod.string(),
   "versionNumber": zod.number().int(),
@@ -2037,6 +2064,7 @@ export const UploadMeasurementVersionResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
   "uploadedByName": zod.string(),
+  "name": zod.string().max(uploadMeasurementVersionResponseNameMax).nullable(),
   "uploadedAt": zod.coerce.date()
 })
 

@@ -1164,13 +1164,6 @@ paths:
             type: string
             minLength: 1
             maxLength: 180
-        - name: X-Measurement-Sheet-Name
-          in: header
-          required: false
-          description: Optional UTF-8 sheet name encoded with encodeURIComponent
-          schema:
-            type: string
-            maxLength: 1440
       requestBody:
         required: true
         content:
@@ -1333,6 +1326,13 @@ paths:
             type: string
             minLength: 1
             maxLength: 180
+        - name: X-Measurement-Sheet-Name
+          in: header
+          required: false
+          description: Optional UTF-8 sheet name encoded with encodeURIComponent
+          schema:
+            type: string
+            maxLength: 1440
       requestBody:
         required: true
         content:
