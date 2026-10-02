@@ -1607,6 +1607,384 @@ export const ArchiveQuotationResponse = zod.void()
 
 
 /**
+ * @summary List the current user's rate submissions and assigned approval queue
+ */
+export const ListQuotationRateSubmissionsResponseItem = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListQuotationRateSubmissionsResponse = zod.array(ListQuotationRateSubmissionsResponseItem)
+
+
+/**
+ * @summary Submit quotation details for rate approval
+ */
+export const createQuotationRateSubmissionBodyClientNameMax = 160;
+
+export const createQuotationRateSubmissionBodyLocationMax = 160;
+
+export const createQuotationRateSubmissionBodyWindowQtyMax = 100000;
+
+export const createQuotationRateSubmissionBodyTotalSqFtMin = 0.01;
+export const createQuotationRateSubmissionBodyTotalSqFtMax = 10000000;
+
+export const createQuotationRateSubmissionBodyGlassTypeMax = 120;
+
+
+
+export const CreateQuotationRateSubmissionBody = zod.object({
+  "clientName": zod.string().min(1).max(createQuotationRateSubmissionBodyClientNameMax),
+  "location": zod.string().max(createQuotationRateSubmissionBodyLocationMax).nullable(),
+  "windowQty": zod.number().int().min(1).max(createQuotationRateSubmissionBodyWindowQtyMax),
+  "totalSqFt": zod.number().min(createQuotationRateSubmissionBodyTotalSqFtMin).max(createQuotationRateSubmissionBodyTotalSqFtMax),
+  "glassType": zod.string().min(1).max(createQuotationRateSubmissionBodyGlassTypeMax)
+})
+
+export const CreateQuotationRateSubmissionResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Search rate submission IDs for order linking
+ */
+export const searchQuotationRateSubmissionsQueryQueryMax = 80;
+
+
+
+export const SearchQuotationRateSubmissionsQueryParams = zod.object({
+  "query": zod.coerce.string().min(1).max(searchQuotationRateSubmissionsQueryQueryMax)
+})
+
+export const SearchQuotationRateSubmissionsResponseItem = zod.object({
+  "id": zod.string(),
+  "clientName": zod.string(),
+  "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "orderId": zod.string().nullable()
+})
+export const SearchQuotationRateSubmissionsResponse = zod.array(SearchQuotationRateSubmissionsResponseItem)
+
+
+/**
+ * @summary Link a quotation request to an order and optional measurement sheet
+ */
+export const LinkQuotationRateSubmissionOrderParams = zod.object({
+  "submissionId": zod.coerce.string()
+})
+
+export const LinkQuotationRateSubmissionOrderBody = zod.object({
+  "orderRecordId": zod.string(),
+  "measurementRecordId": zod.string().nullable()
+})
+
+export const LinkQuotationRateSubmissionOrderResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Attach the Eva Software quotation PDF
+ */
+export const uploadQuotationRateSubmissionPdfPathFilenameMax = 180;
+
+
+
+export const UploadQuotationRateSubmissionPdfParams = zod.object({
+  "submissionId": zod.coerce.string(),
+  "filename": zod.coerce.string().min(1).max(uploadQuotationRateSubmissionPdfPathFilenameMax)
+})
+
+export const UploadQuotationRateSubmissionPdfResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Download the attached Eva Software quotation PDF
+ */
+export const DownloadQuotationRateSubmissionPdfParams = zod.object({
+  "submissionId": zod.coerce.string()
+})
+
+export const DownloadQuotationRateSubmissionPdfResponse = zod.unknown()
+
+
+/**
+ * @summary Approve or reject a rate submission
+ */
+export const DecideQuotationRateSubmissionParams = zod.object({
+  "submissionId": zod.coerce.string()
+})
+
+export const decideQuotationRateSubmissionBodyCommentMax = 1000;
+
+
+
+export const DecideQuotationRateSubmissionBody = zod.object({
+  "decision": zod.enum(['approved', 'rejected']),
+  "comment": zod.string().max(decideQuotationRateSubmissionBodyCommentMax)
+})
+
+export const DecideQuotationRateSubmissionResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List measurement sheets and retained versions
+ */
+export const ListMeasurementRecordsResponseItem = zod.object({
+  "id": zod.string(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "versions": zod.array(zod.object({
+  "id": zod.string(),
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedByName": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListMeasurementRecordsResponse = zod.array(ListMeasurementRecordsResponseItem)
+
+
+/**
+ * @summary Create a measurement sheet record
+ */
+export const createMeasurementRecordBodyClientNameMax = 160;
+
+export const createMeasurementRecordBodyLocationMax = 160;
+
+
+
+export const CreateMeasurementRecordBody = zod.object({
+  "clientName": zod.string().min(1).max(createMeasurementRecordBodyClientNameMax),
+  "location": zod.string().max(createMeasurementRecordBodyLocationMax).nullable(),
+  "orderRecordId": zod.string().nullable()
+})
+
+export const CreateMeasurementRecordResponse = zod.object({
+  "id": zod.string(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "versions": zod.array(zod.object({
+  "id": zod.string(),
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedByName": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Search measurement sheets for quotation linking
+ */
+export const searchMeasurementRecordsQueryQueryMax = 160;
+
+
+
+export const SearchMeasurementRecordsQueryParams = zod.object({
+  "query": zod.coerce.string().min(1).max(searchMeasurementRecordsQueryQueryMax)
+})
+
+export const SearchMeasurementRecordsResponseItem = zod.object({
+  "id": zod.string(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "orderId": zod.string().nullable()
+})
+export const SearchMeasurementRecordsResponse = zod.array(SearchMeasurementRecordsResponseItem)
+
+
+/**
+ * @summary Update measurement record details or assign it to an order
+ */
+export const UpdateMeasurementRecordParams = zod.object({
+  "recordId": zod.coerce.string()
+})
+
+export const updateMeasurementRecordBodyClientNameMax = 160;
+
+export const updateMeasurementRecordBodyLocationMax = 160;
+
+
+
+export const UpdateMeasurementRecordBody = zod.object({
+  "clientName": zod.string().min(1).max(updateMeasurementRecordBodyClientNameMax).optional(),
+  "location": zod.string().max(updateMeasurementRecordBodyLocationMax).nullish(),
+  "orderRecordId": zod.string().nullish(),
+  "linkQuotationSubmissionId": zod.string().optional()
+})
+
+export const UpdateMeasurementRecordResponse = zod.object({
+  "id": zod.string(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "versions": zod.array(zod.object({
+  "id": zod.string(),
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedByName": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Add a retained measurement sheet version
+ */
+export const uploadMeasurementVersionPathFilenameMax = 180;
+
+
+
+export const UploadMeasurementVersionParams = zod.object({
+  "recordId": zod.coerce.string(),
+  "filename": zod.coerce.string().min(1).max(uploadMeasurementVersionPathFilenameMax)
+})
+
+export const UploadMeasurementVersionResponse = zod.object({
+  "id": zod.string(),
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedByName": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Download a retained measurement sheet version
+ */
+export const DownloadMeasurementVersionParams = zod.object({
+  "recordId": zod.coerce.string(),
+  "versionId": zod.coerce.string()
+})
+
+export const DownloadMeasurementVersionResponse = zod.unknown()
+
+
+/**
  * @summary List window records for an order
  */
 export const ListOrderWindowsParams = zod.object({

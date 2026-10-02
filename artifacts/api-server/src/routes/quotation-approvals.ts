@@ -1,0 +1,507 @@
+import { ObjectId } from "mongodb";
+import {
+  CreateQuotationRateSubmissionBody,
+  CreateQuotationRateSubmissionResponse,
+  DecideQuotationRateSubmissionBody,
+  DecideQuotationRateSubmissionParams,
+  DecideQuotationRateSubmissionResponse,
+  DownloadQuotationRateSubmissionPdfParams,
+  LinkQuotationRateSubmissionOrderBody,
+  LinkQuotationRateSubmissionOrderParams,
+  LinkQuotationRateSubmissionOrderResponse,
+  ListQuotationRateSubmissionsResponse,
+  SearchQuotationRateSubmissionsQueryParams,
+  SearchQuotationRateSubmissionsResponse,
+  UploadQuotationRateSubmissionPdfParams,
+  UploadQuotationRateSubmissionPdfResponse,
+} from "@workspace/api-zod";
+import { Router, type Request, type RequestHandler } from "express";
+import {
+  getMongoDb,
+  getMongoClient,
+  getPublicUser,
+  getCounters,
+  getMeasurementRecords,
+  getOrders,
+  getQuotationRatePdfsBucket,
+  getQuotationRateSubmissions,
+  getUsers,
+  type QuotationRateSubmissionDocument,
+  type UserDocument,
+} from "../lib/mongo";
+
+const router = Router();
+const MAX_PDF_BYTES = 10 * 1024 * 1024;
+
+class LinkConflict extends Error {}
+
+type Actor = {
+  id: string;
+  name: string;
+  permissions: Record<string, string>;
+  masterAdmin: boolean;
+};
+
+async function getActor(req: Request, res: Parameters<RequestHandler>[1]): Promise<Actor | null> {
+  const db = await getMongoDb();
+  const user = req.session.userId
+    ? await getUsers(db).findOne({ _id: req.session.userId, status: "active" })
+    : null;
+  if (!user) {
+    res.status(401).json({ error: "Sign in to continue." });
+    return null;
+  }
+  const publicUser = await getPublicUser(user, db);
+  return {
+    id: user._id,
+    name: user.name,
+    permissions: publicUser.permissions,
+    masterAdmin: publicUser.roleId === "master-admin",
+  };
+}
+
+function canSubmit(actor: Actor): boolean {
+  return actor.masterAdmin || actor.permissions["quotation-builder"] === "edit";
+}
+
+function canApprove(actor: Actor): boolean {
+  return actor.masterAdmin || actor.permissions["rate-approval"] === "edit";
+}
+
+function response(item: QuotationRateSubmissionDocument) {
+  return {
+    id: item._id,
+    orderRecordId: item.orderRecordId ?? null,
+    orderId: item.orderId ?? null,
+    clientName: item.clientName,
+    location: item.location,
+    windowQty: item.windowQty,
+    totalSqFt: item.totalSqFt,
+    glassType: item.glassType,
+    averageSqFtPerQty: item.averageSqFtPerQty,
+    status: item.status,
+    pdfFilename: item.pdfFilename,
+    pdfSizeBytes: item.pdfSizeBytes,
+    submittedBy: item.submittedBy,
+    submittedByName: item.submittedByName,
+    approverIds: item.approverIds,
+    decisionComment: item.decisionComment,
+    decidedBy: item.decidedBy,
+    decidedByName: item.decidedByName,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+async function findApprovers(users: UserDocument[]): Promise<UserDocument[]> {
+  const db = await getMongoDb();
+  const usersWithAccess = await Promise.all(
+    users.map(async (user) => ({
+      user,
+      publicUser: await getPublicUser(user, db),
+    })),
+  );
+  return usersWithAccess
+    .filter(({ user, publicUser }) =>
+      user.roleId === "master-admin" || publicUser.permissions["rate-approval"] === "edit",
+    )
+    .map(({ user }) => user);
+}
+
+router.get("/quotation-rate-submissions", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const filter = canApprove(actor)
+    ? { $or: [{ submittedBy: actor.id }, { approverIds: actor.id }] }
+    : { submittedBy: actor.id };
+  const items = await getQuotationRateSubmissions(db)
+    .find(filter)
+    .sort({ createdAt: -1 })
+    .toArray();
+  res.json(ListQuotationRateSubmissionsResponse.parse(items.map(response)));
+});
+
+router.get("/quotation-rate-submissions/lookup", async (req, res): Promise<void> => {
+  const query = SearchQuotationRateSubmissionsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  if (!actor.masterAdmin && actor.permissions.measurements !== "edit" && !canApprove(actor)) {
+    res.status(403).json({ error: "Measurement editing or rate approval access is required." });
+    return;
+  }
+  const escaped = query.data.query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const items = await getQuotationRateSubmissions(await getMongoDb())
+    .find({ _id: { $regex: `^${escaped}`, $options: "i" } })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .toArray();
+  res.json(SearchQuotationRateSubmissionsResponse.parse(items.map((item) => ({
+    id: item._id,
+    clientName: item.clientName,
+    status: item.status,
+    orderId: item.orderId ?? null,
+  }))));
+});
+
+router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  if (!canSubmit(actor)) {
+    res.status(403).json({ error: "Quotation member editing access is required." });
+    return;
+  }
+  const parsed = CreateQuotationRateSubmissionBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const db = await getMongoDb();
+  const activeUsers = await getUsers(db).find({ status: "active" }).toArray();
+  const approvers = await findApprovers(activeUsers);
+  if (!approvers.length) {
+    res.status(503).json({ error: "No active quotation rate approver is available." });
+    return;
+  }
+  const now = new Date();
+  const { clientName, location, windowQty, totalSqFt, glassType } = parsed.data;
+  const counters = getCounters(db);
+  await counters.updateOne(
+    { _id: "quotation-rate-sequence" },
+    { $setOnInsert: { _id: "quotation-rate-sequence", value: 999, updatedAt: now } },
+    { upsert: true },
+  );
+  const counter = await counters.findOneAndUpdate(
+    { _id: "quotation-rate-sequence" },
+    { $inc: { value: 1 }, $set: { updatedAt: now } },
+    { returnDocument: "after" },
+  );
+  if (!counter) {
+    res.status(503).json({ error: "A temporary quotation ID could not be allocated." });
+    return;
+  }
+  const item: QuotationRateSubmissionDocument = {
+    _id: `RA-${counter.value}`,
+    orderRecordId: null,
+    orderId: null,
+    clientName: clientName.trim(),
+    clientNameLower: clientName.trim().toLowerCase(),
+    location: location?.trim() || null,
+    windowQty,
+    totalSqFt,
+    glassType: glassType.trim(),
+    averageSqFtPerQty: Math.round((totalSqFt / windowQty + Number.EPSILON) * 10000) / 10000,
+    status: "awaiting_pdf",
+    pdfFilename: null,
+    pdfSizeBytes: null,
+    pdfGridFsId: null,
+    submittedBy: actor.id,
+    submittedByName: actor.name,
+    approverIds: approvers.map((user) => user._id),
+    decisionComment: null,
+    decidedBy: null,
+    decidedByName: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await getQuotationRateSubmissions(db).insertOne(item);
+  res.status(201).json(CreateQuotationRateSubmissionResponse.parse(response(item)));
+});
+
+router.patch(
+  "/quotation-rate-submissions/:submissionId/order",
+  async (req, res): Promise<void> => {
+    const parsedParams = LinkQuotationRateSubmissionOrderParams.safeParse(req.params);
+    const parsedBody = LinkQuotationRateSubmissionOrderBody.safeParse(req.body);
+    if (!parsedParams.success || !parsedBody.success) {
+      res.status(400).json({
+        error: !parsedParams.success ? parsedParams.error.message : parsedBody.success ? "" : parsedBody.error.message,
+      });
+      return;
+    }
+    const actor = await getActor(req, res);
+    if (!actor) return;
+    const db = await getMongoDb();
+    const submissions = getQuotationRateSubmissions(db);
+    const item = await submissions.findOne({ _id: parsedParams.data.submissionId });
+    if (!item) {
+      res.status(404).json({ error: "Quotation rate submission not found." });
+      return;
+    }
+    if (!actor.masterAdmin && !canApprove(actor) && (!canSubmit(actor) || item.submittedBy !== actor.id)) {
+      res.status(403).json({ error: "Only the submitter or assigned rate approver can link this quotation." });
+      return;
+    }
+    const order = await getOrders(db).findOne({ _id: parsedBody.data.orderRecordId });
+    if (!order) {
+      res.status(404).json({ error: "The selected order could not be found." });
+      return;
+    }
+    const measurement = parsedBody.data.measurementRecordId
+      ? await getMeasurementRecords(db).findOne({ _id: parsedBody.data.measurementRecordId })
+      : null;
+    if (parsedBody.data.measurementRecordId && !measurement) {
+      res.status(404).json({ error: "The selected measurement sheet could not be found." });
+      return;
+    }
+
+    const session = (await getMongoClient()).startSession();
+    let updated: QuotationRateSubmissionDocument | null = null;
+    try {
+      await session.withTransaction(async () => {
+        const quoteResult = await submissions.findOneAndUpdate(
+          {
+            _id: item._id,
+            $or: [
+              { orderRecordId: null },
+              { orderRecordId: order._id },
+              { orderRecordId: { $exists: false } },
+            ],
+          },
+          { $set: { orderRecordId: order._id, orderId: order.orderId, updatedAt: new Date() } },
+          { returnDocument: "after", session },
+        );
+        if (!quoteResult) throw new LinkConflict("This quotation is already linked to another order.");
+        if (measurement) {
+          const measurementResult = await getMeasurementRecords(db).updateOne(
+            {
+              _id: measurement._id,
+              $or: [
+                { orderRecordId: null },
+                { orderRecordId: order._id },
+                { orderRecordId: { $exists: false } },
+              ],
+            },
+            { $set: { orderRecordId: order._id, updatedAt: new Date() } },
+            { session },
+          );
+          if (!measurementResult.matchedCount) {
+            throw new LinkConflict("This measurement sheet is already linked to another order.");
+          }
+        }
+        updated = quoteResult;
+      });
+    } catch (error) {
+      if (error instanceof LinkConflict) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+    if (!updated) {
+      res.status(409).json({ error: "The link could not be saved. Refresh and try again." });
+      return;
+    }
+    res.json(LinkQuotationRateSubmissionOrderResponse.parse(response(updated)));
+  },
+);
+
+router.post(
+  "/quotation-rate-submissions/:submissionId/pdf/:filename",
+  async (req, res, next): Promise<void> => {
+    const parsed = UploadQuotationRateSubmissionPdfParams.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const actor = await getActor(req, res);
+    if (!actor) return;
+    const db = await getMongoDb();
+    const submissions = getQuotationRateSubmissions(db);
+    const item = await submissions.findOne({ _id: parsed.data.submissionId });
+    if (!item) {
+      res.status(404).json({ error: "Quotation rate submission not found." });
+      return;
+    }
+    if (item.submittedBy !== actor.id || !canSubmit(actor)) {
+      res.status(403).json({ error: "Only the submitting quotation member can attach the PDF." });
+      return;
+    }
+    if (item.status !== "awaiting_pdf") {
+      res.status(409).json({ error: "A PDF can only be attached before the submission enters review." });
+      return;
+    }
+
+    readRawFile(req, res, next, async (body) => {
+      const filename = parsed.data.filename;
+      if (!filename.toLowerCase().endsWith(".pdf") || body.length < 5 || body.subarray(0, 5).toString("ascii") !== "%PDF-") {
+        res.status(400).json({ error: "Attach a non-empty PDF file." });
+        return;
+      }
+      const declaredType = String(req.headers["content-type"] ?? "").split(";")[0];
+      if (declaredType !== "application/pdf" && declaredType !== "application/octet-stream") {
+        res.status(400).json({ error: "The attached file must be a PDF." });
+        return;
+      }
+
+      const bucket = getQuotationRatePdfsBucket(db);
+      const gridId = new ObjectId();
+      const upload = bucket.openUploadStreamWithId(gridId, filename, {
+        contentType: "application/pdf",
+        metadata: { submissionId: item._id },
+      });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          upload.once("finish", resolve);
+          upload.once("error", reject);
+          upload.end(body);
+        });
+      } catch (error) {
+        await bucket.delete(gridId).catch((cleanupError: unknown) =>
+          req.log.error({ err: cleanupError }, "Failed to clean up a partial quotation PDF upload"),
+        );
+        throw error;
+      }
+
+      const updated = await submissions.findOneAndUpdate(
+        { _id: item._id, status: "awaiting_pdf" },
+        {
+          $set: {
+            status: "pending_review",
+            pdfFilename: filename,
+            pdfSizeBytes: body.length,
+            pdfGridFsId: gridId.toHexString(),
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
+      if (!updated) {
+        await bucket.delete(gridId).catch((cleanupError: unknown) =>
+          req.log.error({ err: cleanupError }, "Failed to clean up a duplicate quotation PDF upload"),
+        );
+        res.status(409).json({ error: "This submission has already been routed for review." });
+        return;
+      }
+      res.json(UploadQuotationRateSubmissionPdfResponse.parse(response(updated)));
+    });
+  },
+);
+
+router.get("/quotation-rate-submissions/:submissionId/pdf", async (req, res, next): Promise<void> => {
+  const parsed = DownloadQuotationRateSubmissionPdfParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const item = await getQuotationRateSubmissions(db).findOne({ _id: parsed.data.submissionId });
+  if (!item?.pdfGridFsId || !ObjectId.isValid(item.pdfGridFsId)) {
+    res.status(404).json({ error: "Quotation PDF not found." });
+    return;
+  }
+  if (item.submittedBy !== actor.id && !item.approverIds.includes(actor.id)) {
+    res.status(403).json({ error: "You do not have access to this quotation PDF." });
+    return;
+  }
+  const gridId = new ObjectId(item.pdfGridFsId);
+  const bucket = getQuotationRatePdfsBucket(db);
+  if (!(await bucket.find({ _id: gridId }).next())) {
+    res.status(404).json({ error: "Quotation PDF content not found." });
+    return;
+  }
+  const safeFilename = (item.pdfFilename ?? "quotation.pdf").replace(/[\x00-\x1f\x7f"]/g, "_");
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  const stream = bucket.openDownloadStream(gridId);
+  stream.on("error", next);
+  stream.pipe(res);
+});
+
+router.post("/quotation-rate-submissions/:submissionId/decision", async (req, res): Promise<void> => {
+  const parsedParams = DecideQuotationRateSubmissionParams.safeParse(req.params);
+  const parsedBody = DecideQuotationRateSubmissionBody.safeParse(req.body);
+  if (!parsedParams.success || !parsedBody.success) {
+    res.status(400).json({
+      error: !parsedParams.success ? parsedParams.error.message : parsedBody.success ? "" : parsedBody.error.message,
+    });
+    return;
+  }
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  if (!canApprove(actor)) {
+    res.status(403).json({ error: "Rate approval editing access is required." });
+    return;
+  }
+  const collection = getQuotationRateSubmissions(await getMongoDb());
+  const updated = await collection.findOneAndUpdate(
+    {
+      _id: parsedParams.data.submissionId,
+      status: "pending_review",
+      ...(actor.masterAdmin ? {} : { approverIds: actor.id }),
+    },
+    {
+      $set: {
+        status: parsedBody.data.decision,
+        decisionComment: parsedBody.data.comment.trim() || null,
+        decidedBy: actor.id,
+        decidedByName: actor.name,
+        updatedAt: new Date(),
+      },
+    },
+    { returnDocument: "after" },
+  );
+  if (!updated) {
+    const existing = await collection.findOne({ _id: parsedParams.data.submissionId });
+    if (!existing) {
+      res.status(404).json({ error: "Quotation rate submission not found." });
+      return;
+    }
+    res.status(409).json({ error: "This submission is no longer waiting for a decision." });
+    return;
+  }
+  res.json(DecideQuotationRateSubmissionResponse.parse(response(updated)));
+});
+
+function readRawFile(
+  req: Request,
+  res: Parameters<RequestHandler>[1],
+  next: (error?: unknown) => void,
+  done: (body: Buffer) => Promise<void>,
+): void {
+  const run = (body: Buffer) => { void Promise.resolve().then(() => done(body)).catch(next); };
+  if (Buffer.isBuffer(req.body)) {
+    if (req.body.length > MAX_PDF_BYTES) {
+      res.status(413).json({ error: "PDF must be 10 MiB or smaller." });
+      return;
+    }
+    run(req.body);
+    return;
+  }
+  const declaredLength = Number(req.headers["content-length"]);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_PDF_BYTES) {
+    res.status(413).json({ error: "PDF must be 10 MiB or smaller." });
+    req.resume();
+    return;
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  let tooLarge = false;
+  req.on("data", (chunk: Buffer) => {
+    if (tooLarge) return;
+    size += chunk.length;
+    if (size > MAX_PDF_BYTES) {
+      tooLarge = true;
+      chunks.length = 0;
+      if (!res.headersSent) res.status(413).json({ error: "PDF must be 10 MiB or smaller." });
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on("end", () => {
+    if (!tooLarge) run(Buffer.concat(chunks, size));
+  });
+  req.on("aborted", () => next(new Error("Quotation PDF upload was interrupted.")));
+  req.on("error", next);
+}
+
+export default router;

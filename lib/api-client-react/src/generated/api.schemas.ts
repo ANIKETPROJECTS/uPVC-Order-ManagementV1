@@ -943,6 +943,177 @@ export interface QuotationInput {
 
 export type QuotationList = Quotation[];
 
+export type QuotationRateSubmissionStatus = typeof QuotationRateSubmissionStatus[keyof typeof QuotationRateSubmissionStatus];
+
+
+export const QuotationRateSubmissionStatus = {
+  awaiting_pdf: 'awaiting_pdf',
+  pending_review: 'pending_review',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface QuotationRateSubmission {
+  id: string;
+  /** @nullable */
+  orderRecordId: string | null;
+  /** @nullable */
+  orderId: string | null;
+  clientName: string;
+  /** @nullable */
+  location: string | null;
+  windowQty: number;
+  totalSqFt: number;
+  glassType: string;
+  averageSqFtPerQty: number;
+  status: QuotationRateSubmissionStatus;
+  /** @nullable */
+  pdfFilename: string | null;
+  /** @nullable */
+  pdfSizeBytes: number | null;
+  submittedBy: string;
+  submittedByName: string;
+  approverIds: string[];
+  /** @nullable */
+  decisionComment: string | null;
+  /** @nullable */
+  decidedBy: string | null;
+  /** @nullable */
+  decidedByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type QuotationRateSubmissionList = QuotationRateSubmission[];
+
+export interface QuotationRateSubmissionLookup {
+  id: string;
+  clientName: string;
+  status: QuotationRateSubmissionStatus;
+  /** @nullable */
+  orderId: string | null;
+}
+
+export type QuotationRateSubmissionLookupList = QuotationRateSubmissionLookup[];
+
+export interface QuotationOrderLinkInput {
+  orderRecordId: string;
+  /** @nullable */
+  measurementRecordId: string | null;
+}
+
+export interface QuotationRateSubmissionInput {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  clientName: string;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  location: string | null;
+  /**
+     * @minimum 1
+     * @maximum 100000
+     */
+  windowQty: number;
+  /**
+     * @minimum 0.01
+     * @maximum 10000000
+     */
+  totalSqFt: number;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  glassType: string;
+}
+
+export type QuotationRateDecisionInputDecision = typeof QuotationRateDecisionInputDecision[keyof typeof QuotationRateDecisionInputDecision];
+
+
+export const QuotationRateDecisionInputDecision = {
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface QuotationRateDecisionInput {
+  decision: QuotationRateDecisionInputDecision;
+  /** @maxLength 1000 */
+  comment: string;
+}
+
+export interface MeasurementVersion {
+  id: string;
+  versionNumber: number;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  uploadedByName: string;
+  uploadedAt: string;
+}
+
+export interface MeasurementRecord {
+  id: string;
+  clientName: string;
+  /** @nullable */
+  location: string | null;
+  /** @nullable */
+  orderRecordId: string | null;
+  /** @nullable */
+  orderId: string | null;
+  versions: MeasurementVersion[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MeasurementRecordList = MeasurementRecord[];
+
+export interface MeasurementRecordLookup {
+  id: string;
+  clientName: string;
+  /** @nullable */
+  location: string | null;
+  /** @nullable */
+  orderId: string | null;
+}
+
+export type MeasurementRecordLookupList = MeasurementRecordLookup[];
+
+export interface MeasurementRecordInput {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  clientName: string;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  location: string | null;
+  /** @nullable */
+  orderRecordId: string | null;
+}
+
+export interface MeasurementRecordUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  clientName?: string;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  location?: string | null;
+  /** @nullable */
+  orderRecordId?: string | null;
+  linkQuotationSubmissionId?: string;
+}
+
 export type ListUsersParams = {
 status?: ListUsersStatus;
 roleId?: string;
@@ -979,5 +1150,21 @@ clientId?: string;
 locationCode?: string;
 from?: string;
 to?: string;
+};
+
+export type SearchQuotationRateSubmissionsParams = {
+/**
+ * @minLength 1
+ * @maxLength 80
+ */
+query: string;
+};
+
+export type SearchMeasurementRecordsParams = {
+/**
+ * @minLength 1
+ * @maxLength 160
+ */
+query: string;
 };
 

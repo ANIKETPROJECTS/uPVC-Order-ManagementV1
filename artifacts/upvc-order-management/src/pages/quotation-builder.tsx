@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -7,11 +7,15 @@ import {
   Archive,
   BookOpen,
   Calculator,
+  Check,
   CircleAlert,
   Copy,
+  Download,
   FilePlus2,
   FileText,
   LayoutGrid,
+  Link2,
+  MapPin,
   Pencil,
   Plus,
   Printer,
@@ -20,20 +24,32 @@ import {
   Settings2,
   Trash2,
   UserRound,
+  X,
 } from 'lucide-react';
 import {
   getGetQuotationQueryKey,
   getListClientsQueryKey,
+  getListMeasurementRecordsQueryKey,
+  getListOrdersQueryKey,
+  getListQuotationRateSubmissionsQueryKey,
   getListQuotationsQueryKey,
   getListWindowProfilesQueryKey,
+  getDownloadQuotationRateSubmissionPdfUrl,
+  useLinkQuotationRateSubmissionOrder,
   useArchiveQuotation,
   useArchiveWindowProfile,
   useCreateQuotation,
+  useCreateQuotationRateSubmission,
   useCreateWindowProfile,
+  useDecideQuotationRateSubmission,
   useGetQuotation,
   useListClients,
+  useListOrders,
+  useListQuotationRateSubmissions,
   useListQuotations,
   useListWindowProfiles,
+  useSearchMeasurementRecords,
+  useUploadQuotationRateSubmissionPdf,
   useUpdateQuotation,
   useUpdateWindowProfile,
 } from '@workspace/api-client-react';
@@ -42,6 +58,9 @@ import type {
   Quotation,
   QuotationInput,
   QuotationItem,
+  QuotationRateSubmission,
+  MeasurementRecordLookup,
+  Order,
   User,
   WindowProfile,
   WindowProfileInput,
@@ -56,6 +75,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WindowProfileImageInput } from '@/components/window-profile-image-input';
+import { MeasurementSheetLookup } from '@/components/link-record-lookups';
 import { useToast } from '@/hooks/use-toast';
 
 const drawingTypes = ['casement', 'sliding', 'mixed', 'louvre'] as const;
@@ -70,6 +90,7 @@ const roundTo = (value: number, places: number) => {
   return Math.round((value + Number.EPSILON) * factor) / factor;
 };
 const SQ_FT_PER_SQUARE_MM = 92903.04;
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 const profileSchema = z.object({
   code: z.string().min(1, 'Add a catalogue code.').max(24),
@@ -575,10 +596,296 @@ function QuotationPrintDocument({ quote }: { quote: Quotation }) {
   );
 }
 
+function RateApprovalDesk({ user }: { user: User }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const rateDesk = user.roleId === 'master-admin' || user.permissions?.['rate-approval'] === 'edit';
+  const canSubmit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
+  const submissionsQuery = useListQuotationRateSubmissions({ query: { queryKey: getListQuotationRateSubmissionsQueryKey() } });
+  const ordersQuery = useListOrders({}, { query: { queryKey: getListOrdersQueryKey({}) } });
+  const create = useCreateQuotationRateSubmission();
+  const upload = useUploadQuotationRateSubmissionPdf();
+  const decide = useDecideQuotationRateSubmission();
+  const linkOrder = useLinkQuotationRateSubmissionOrder();
+  const [clientName, setClientName] = useState('');
+  const [location, setLocation] = useState('');
+  const [windowQty, setWindowQty] = useState('');
+  const [totalSqFt, setTotalSqFt] = useState('');
+  const [glassType, setGlassType] = useState('');
+  const [pdf, setPdf] = useState<File | null>(null);
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const [linkingSubmission, setLinkingSubmission] = useState<QuotationRateSubmission | null>(null);
+  const [linkOrderRecordId, setLinkOrderRecordId] = useState('');
+  const [linkMeasurementSheet, setLinkMeasurementSheet] = useState(false);
+  const [linkMeasurementId, setLinkMeasurementId] = useState<string | null>(null);
+  const [linkMeasurementLabel, setLinkMeasurementLabel] = useState('');
+  const submissions = submissionsQuery.data || [];
+  const pending = submissions.filter((item) => item.status === 'pending_review');
+  const awaiting = submissions.filter((item) => item.status === 'awaiting_pdf');
+  const approved = submissions.filter((item) => item.status === 'approved');
+
+  const validatePdf = (file: File | undefined) => {
+    if (!file) return false;
+    if (!file.name.toLowerCase().endsWith('.pdf') || (file.type && file.type !== 'application/pdf' && file.type !== 'application/octet-stream')) {
+      toast({ title: 'PDF file required', description: 'Attach the Eva Software quotation as a PDF.', variant: 'destructive' });
+      return false;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast({ title: 'File exceeds 10 MiB', description: 'Choose a smaller PDF before uploading.', variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+  const refreshSubmissions = () => void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
+  const uploadPdf = (submissionId: string, file: File) => {
+    if (!validatePdf(file)) return;
+    upload.mutate({ submissionId, filename: file.name, data: file }, {
+      onSuccess: () => {
+        refreshSubmissions();
+        toast({ title: 'PDF attached', description: 'The rate request is now in the approval queue.' });
+      },
+      onError: () => toast({ title: 'PDF upload failed', description: 'The request remains available for another upload attempt.', variant: 'destructive' }),
+    });
+  };
+  const submitRate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!clientName.trim() || !glassType.trim() || Number(windowQty) < 1 || Number(totalSqFt) <= 0) {
+      toast({ title: 'Complete the rate request', description: 'Add a client, glass type, positive window quantity, and total area.', variant: 'destructive' });
+      return;
+    }
+    if (!pdf) {
+      toast({ title: 'Eva Software PDF required', description: 'Attach the quotation PDF before submitting this rate request.', variant: 'destructive' });
+      return;
+    }
+    if (!validatePdf(pdf)) return;
+    create.mutate({
+      data: {
+        clientName: clientName.trim(),
+        location: location.trim() || null,
+        windowQty: Number(windowQty),
+        totalSqFt: Number(totalSqFt),
+        glassType: glassType.trim(),
+      },
+    }, {
+      onSuccess: (submission) => {
+        refreshSubmissions();
+        setClientName('');
+        setLocation('');
+        setWindowQty('');
+        setTotalSqFt('');
+        setGlassType('');
+        const attached = pdf;
+        setPdf(null);
+        if (attached) uploadPdf(submission.id, attached);
+      },
+      onError: () => toast({ title: 'Could not create rate request', description: 'Check the fields and try again.', variant: 'destructive' }),
+    });
+  };
+  const makeDecision = (submission: QuotationRateSubmission, decision: 'approved' | 'rejected') => {
+    decide.mutate({ submissionId: submission.id, data: { decision, comment: comments[submission.id] || '' } }, {
+      onSuccess: () => {
+        refreshSubmissions();
+        toast({ title: decision === 'approved' ? 'Rate request approved' : 'Rate request rejected', description: submission.clientName });
+      },
+      onError: () => toast({ title: 'Decision was not saved', description: 'The request is unchanged. Try again.', variant: 'destructive' }),
+    });
+  };
+  const openOrderLink = (submission: QuotationRateSubmission) => {
+    setLinkingSubmission(submission);
+    setLinkOrderRecordId(submission.orderRecordId || '');
+    setLinkMeasurementSheet(false);
+    setLinkMeasurementId(null);
+    setLinkMeasurementLabel('');
+  };
+  const saveOrderLink = () => {
+    if (!linkingSubmission || !linkOrderRecordId) {
+      toast({ title: 'Choose an order', description: 'Select the order before saving the link.', variant: 'destructive' });
+      return;
+    }
+    if (linkMeasurementSheet && !linkMeasurementId) {
+      toast({ title: 'Choose a measurement sheet', description: 'Search and select the sheet to link to this order.', variant: 'destructive' });
+      return;
+    }
+    linkOrder.mutate({
+      submissionId: linkingSubmission.id,
+      data: { orderRecordId: linkOrderRecordId, measurementRecordId: linkMeasurementSheet ? linkMeasurementId : null },
+    }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
+        setLinkingSubmission(null);
+        toast({ title: 'Quotation linked to order', description: linkMeasurementSheet ? 'The measurement sheet is linked to the same order.' : 'The quotation request is now linked.' });
+      },
+      onError: () => toast({ title: 'Could not link the quotation', description: 'The order links were not changed. Refresh and try again.', variant: 'destructive' }),
+    });
+  };
+  const canLinkSubmission = (submission: QuotationRateSubmission) =>
+    user.roleId === 'master-admin'
+    || user.permissions?.['rate-approval'] === 'edit'
+    || (canSubmit && submission.submittedBy === user.id);
+  const statusStyle = (status: string) => status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : status === 'pending_review' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-border bg-muted text-muted-foreground';
+  const statusName = (status: string) => status === 'pending_review' ? 'Awaiting Approval' : status === 'awaiting_pdf' ? 'Awaiting PDF' : status === 'approved' ? 'Approved' : 'Rejected';
+  const pdfInput = (submission: QuotationRateSubmission) => (
+    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold transition-colors hover:bg-muted" data-testid={`label-upload-rate-pdf-${submission.id}`}>
+      <FilePlus2 size={14} /> Attach Eva PDF
+      <input
+        type="file"
+        accept="application/pdf,.pdf"
+        className="sr-only"
+        data-testid={`input-upload-rate-pdf-${submission.id}`}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) uploadPdf(submission.id, file);
+          event.currentTarget.value = '';
+        }}
+      />
+    </label>
+  );
+
+  return (
+    <div className="space-y-5" data-testid="section-rate-approval-desk">
+      <div className="grid gap-3 sm:grid-cols-2" data-testid="rate-approval-summary">
+        <Card className="border-amber-200/70 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20">
+          <CardContent className="flex items-center justify-between p-4">
+            <div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-amber-800 dark:text-amber-300">Awaiting Approval</p><p className="mt-1 text-xs text-muted-foreground">Requests waiting for a decision</p></div>
+            <strong className="font-display text-3xl font-bold text-amber-900 dark:text-amber-200">{pending.length}</strong>
+          </CardContent>
+        </Card>
+        <Card className="border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+          <CardContent className="flex items-center justify-between p-4">
+            <div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-emerald-800 dark:text-emerald-300">Approved</p><p className="mt-1 text-xs text-muted-foreground">Rate requests approved</p></div>
+            <strong className="font-display text-3xl font-bold text-emerald-900 dark:text-emerald-200">{approved.length}</strong>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(280px,.8fr)_minmax(0,1.5fr)]">
+        <Card className="border-border/80" data-testid="card-rate-request-form">
+          <CardHeader className="border-b border-border/70 pb-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Rate request</p>
+            <CardTitle className="mt-1 font-display text-lg">Send a rate for review</CardTitle>
+            <p className="text-xs leading-5 text-muted-foreground">Enter Eva Software totals. The average area per window is calculated by the server.</p>
+          </CardHeader>
+          <CardContent className="p-5">
+            {canSubmit ? <form className="space-y-4" onSubmit={submitRate} data-testid="form-rate-submission">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5 text-xs font-semibold sm:col-span-2">Client name<Input value={clientName} onChange={(event) => setClientName(event.target.value)} maxLength={160} required placeholder="Client or project" data-testid="input-rate-client-name" /></label>
+                <label className="space-y-1.5 text-xs font-semibold sm:col-span-2">Location <span className="font-normal text-muted-foreground">optional</span><Input value={location} onChange={(event) => setLocation(event.target.value)} maxLength={160} placeholder="Site or city" data-testid="input-rate-location" /></label>
+                <label className="space-y-1.5 text-xs font-semibold">Window quantity<Input type="number" min="1" max="100000" value={windowQty} onChange={(event) => setWindowQty(event.target.value)} required data-testid="input-rate-window-quantity" /></label>
+                <label className="space-y-1.5 text-xs font-semibold">Total sq. ft.<Input type="number" min="0.01" step="0.01" value={totalSqFt} onChange={(event) => setTotalSqFt(event.target.value)} required data-testid="input-rate-total-sqft" /></label>
+                <label className="space-y-1.5 text-xs font-semibold">Average (SqFt / Qty)<Input readOnly value={Number(windowQty) > 0 && Number(totalSqFt) > 0 ? (Number(totalSqFt) / Number(windowQty)).toFixed(2) : ''} placeholder="Calculated from total area and quantity" data-testid="input-rate-average-sqft" /></label>
+                <label className="space-y-1.5 text-xs font-semibold sm:col-span-2">Glass type<Input value={glassType} onChange={(event) => setGlassType(event.target.value)} maxLength={120} required placeholder="Clear, toughened, laminated…" data-testid="input-rate-glass-type" /></label>
+              </div>
+              <label className="block rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs font-semibold" data-testid="label-rate-pdf">
+                Eva Software PDF <span className="font-normal text-muted-foreground">· PDF, up to 10 MiB</span>
+                 <Input className="mt-2" type="file" accept="application/pdf,.pdf" required data-testid="input-new-rate-pdf" onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  if (file && validatePdf(file)) setPdf(file);
+                  else setPdf(null);
+                }} />
+                {pdf && <span className="mt-2 block truncate text-[11px] text-primary">{pdf.name} · {(pdf.size / 1024 / 1024).toFixed(2)} MiB</span>}
+              </label>
+              <Button type="submit" className="w-full" disabled={create.isPending || upload.isPending} data-testid="button-submit-rate-request">
+                {create.isPending || upload.isPending ? 'Submitting…' : 'Create rate request'} <FilePlus2 size={15} />
+              </Button>
+            </form> : <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-submit-read-only">You have view access to this desk. A quotation team member can prepare a rate request.</div>}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80" data-testid="card-rate-queue">
+          <CardHeader className="border-b border-border/70 pb-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Live workflow</p><CardTitle className="mt-1 font-display text-lg">Quotation requests</CardTitle><p className="mt-1 text-xs text-muted-foreground">Temporary IDs, approval history, order links, and Eva PDFs stay together.</p></div>
+              <div className="flex gap-2 text-[10px] font-semibold"><span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">{pending.length} to review</span><span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{awaiting.length} awaiting PDF</span></div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {submissionsQuery.isLoading ? <div className="space-y-3 p-5" data-testid="state-rate-submissions-loading"><div className="h-24 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted/70" /></div>
+              : submissionsQuery.isError ? <div className="p-5" data-testid="state-rate-submissions-error"><StatePanel kind="error" onRetry={() => void submissionsQuery.refetch()} /></div>
+                : submissions.length === 0 ? <div className="grid min-h-52 place-items-center p-7 text-center" data-testid="state-rate-submissions-empty"><div><div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Calculator size={18} /></div><p className="mt-3 text-sm font-bold">No rate requests yet</p><p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">A new submission will appear here with its PDF and decision history.</p></div></div>
+                  : <div className="overflow-x-auto">
+                    <table className="w-full min-w-[1120px] border-collapse text-left text-xs" data-testid="table-rate-submissions">
+                      <thead className="bg-muted/50 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">
+                        <tr><th className="px-4 py-3">Request ID</th><th className="px-4 py-3">Client / Order</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Sq.Ft</th><th className="px-3 py-3">Glass Type</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Status</th><th className="px-4 py-3">Action</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/70">
+                        {submissions.map((submission) => <tr key={submission.id} className="align-top" data-testid={`row-rate-submission-${submission.id}`}>
+                          <td className="px-4 py-3">
+                            <code className="font-mono text-[11px] font-bold text-primary" data-testid={`text-rate-request-id-${submission.id}`}>{submission.id}</code>
+                            <p className="mt-1 text-[10px] text-muted-foreground">Avg. {Number(submission.averageSqFtPerQty).toFixed(2)} sq. ft. / window</p>
+                          </td>
+                          <td className="max-w-[220px] px-4 py-3">
+                            <p className="truncate font-semibold">{submission.clientName}</p>
+                            {submission.orderId && <p className="mt-1 text-[10px] font-semibold text-primary" data-testid={`text-rate-order-id-${submission.id}`}>{submission.orderId}</p>}
+                            <p className="mt-1 text-[10px] text-muted-foreground">Submitted by {submission.submittedByName}</p>
+                            {submission.pdfFilename ? <a href={getDownloadQuotationRateSubmissionPdfUrl(submission.id)} download={submission.pdfFilename} className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate text-[10px] font-semibold text-primary hover:underline" data-testid={`link-download-rate-pdf-${submission.id}`}><Download size={12} /> {submission.pdfFilename}</a> : submission.status === 'awaiting_pdf' && canSubmit ? pdfInput(submission) : null}
+                          </td>
+                          <td className="px-3 py-3 tabular-nums">{submission.windowQty}</td>
+                          <td className="px-3 py-3 tabular-nums">{submission.totalSqFt.toLocaleString('en-IN')}</td>
+                          <td className="px-3 py-3">{submission.glassType}</td>
+                          <td className="px-3 py-3">{submission.location || <span className="text-muted-foreground">—</span>}</td>
+                          <td className="px-3 py-3">
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.12em] ${statusStyle(submission.status)}`} data-testid={`status-rate-submission-${submission.id}`}>{statusName(submission.status)}</span>
+                            {(submission.status === 'approved' || submission.status === 'rejected') && <p className="mt-1 max-w-[130px] text-[10px] leading-4 text-muted-foreground">by {submission.decidedByName || 'approver'}</p>}
+                            {submission.decisionComment && <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-muted-foreground">{submission.decisionComment}</p>}
+                          </td>
+                          <td className="min-w-[260px] px-4 py-3">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {canLinkSubmission(submission) && <Button size="sm" variant="outline" onClick={() => openOrderLink(submission)} data-testid={`button-link-rate-order-${submission.id}`}><Link2 size={13} /> {submission.orderId ? 'Update links' : 'Link to order'}</Button>}
+                              {submission.status === 'pending_review' && rateDesk ? <><Button size="sm" onClick={() => makeDecision(submission, 'approved')} disabled={decide.isPending} data-testid={`button-approve-rate-${submission.id}`}><Check size={13} /> Approve</Button><Button size="sm" variant="outline" className="text-destructive" onClick={() => makeDecision(submission, 'rejected')} disabled={decide.isPending} data-testid={`button-reject-rate-${submission.id}`}><X size={13} /> Reject</Button></> : submission.status === 'approved' || submission.status === 'rejected' ? <span className="px-2 text-muted-foreground" data-testid={`text-rate-action-complete-${submission.id}`}>—</span> : null}
+                            </div>
+                            {submission.status === 'pending_review' && rateDesk && <label className="mt-2 block space-y-1 text-[10px] font-semibold text-muted-foreground">Optional decision note<Textarea rows={2} maxLength={1000} value={comments[submission.id] || ''} onChange={(event) => setComments((current) => ({ ...current, [submission.id]: event.target.value }))} placeholder="Context for the submitter" data-testid={`input-rate-decision-comment-${submission.id}`} /></label>}
+                          </td>
+                        </tr>)}
+                      </tbody>
+                    </table>
+                  </div>}
+          </CardContent>
+        </Card>
+      </div>
+      <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-desk-note"><MapPin size={15} className="mt-0.5 shrink-0 text-primary" /><p>Rate requests receive a temporary RA ID, and the server calculates Average (SqFt / Qty). Linking an order is optional and can be done later.</p></div>
+      <Dialog open={Boolean(linkingSubmission)} onOpenChange={(open) => { if (!open) setLinkingSubmission(null); }}>
+        <DialogContent data-testid="dialog-link-quotation-order">
+          <DialogHeader>
+            <DialogTitle>Link quotation to an order</DialogTitle>
+            <DialogDescription>{linkingSubmission ? `${linkingSubmission.id} · ${linkingSubmission.clientName}` : 'Choose an order for this quotation request.'}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label className="block space-y-1.5 text-xs font-semibold">Order ID
+              <Select value={linkOrderRecordId || 'unassigned'} onValueChange={(value) => { setLinkOrderRecordId(value === 'unassigned' ? '' : value); setLinkMeasurementId(null); setLinkMeasurementLabel(''); }}>
+                <SelectTrigger data-testid="select-link-quotation-order"><SelectValue placeholder="Select an order" /></SelectTrigger>
+                <SelectContent>
+                  {ordersQuery.isLoading ? <SelectItem value="loading" disabled>Loading orders…</SelectItem>
+                    : (ordersQuery.data || []).map((order) => <SelectItem key={order.id} value={order.id}>{order.orderId} · {order.clientName} · {order.locationName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+            {ordersQuery.isError && <p className="text-xs text-destructive">Orders could not be loaded. Close and retry after refreshing the order list.</p>}
+            {linkOrderRecordId && <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+              <label className="flex items-center gap-2 text-xs font-semibold">
+                <input type="checkbox" checked={linkMeasurementSheet} onChange={(event) => { setLinkMeasurementSheet(event.target.checked); if (!event.target.checked) { setLinkMeasurementId(null); setLinkMeasurementLabel(''); } }} className="h-4 w-4 accent-primary" data-testid="checkbox-link-measurement-from-quotation" />
+                Do you also want to link the Measurement Sheet?
+              </label>
+              {linkMeasurementSheet && <MeasurementSheetLookup
+                selectedId={linkMeasurementId}
+                selectedLabel={linkMeasurementLabel}
+                onSelect={(item) => { setLinkMeasurementId(item.id); setLinkMeasurementLabel(`${item.clientName}${item.location ? ` · ${item.location}` : ''}`); }}
+              />}
+            </div>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkingSubmission(null)} data-testid="button-cancel-link-quotation">Cancel</Button>
+            <Button onClick={saveOrderLink} disabled={linkOrder.isPending || ordersQuery.isError} data-testid="button-save-quotation-order-link">{linkOrder.isPending ? 'Saving…' : 'Save links'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function QuotationBuilderPage({ user }: { user: User }) {
   const canEdit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'new' | 'profiles' | 'drafts'>('new');
+  const [activeSection, setActiveSection] = useState<'new' | 'profiles' | 'drafts' | 'rates'>('new');
   const [search, setSearch] = useState('');
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<WindowProfile | null>(null);
@@ -635,7 +942,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
   };
 
   return (
-    <AppShell user={user} title="Quotation builder" eyebrow="Module 3 · quotation desk">
+    <AppShell user={user} title="Quotation & Rate Approval" eyebrow="Module 3 · quotation and approval desk">
       <div className="quotation-builder-page space-y-6">
         <section className="quotation-hero animate-enter-up overflow-hidden rounded-2xl p-6 text-white shadow-sm md:p-8">
           <div className="relative z-10 max-w-4xl">
@@ -659,11 +966,12 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
           <Card className="animate-enter-up delay-3 border-border/80"><CardContent className="p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Default series</p><Settings2 size={16} className="text-primary" /></div><p className="mt-3 font-display text-xl font-bold">₹644.97</p><p className="mt-1 text-xs text-muted-foreground">editable starting rate / sq.ft.</p></CardContent></Card>
         </section>
 
-        <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as 'new' | 'profiles' | 'drafts')} className="w-full" data-testid="tabs-quotation-sections">
-          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl bg-secondary/70 p-1">
+        <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as 'new' | 'profiles' | 'drafts' | 'rates')} className="w-full" data-testid="tabs-quotation-sections">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 sm:grid-cols-4">
             <TabsTrigger value="new" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-new-quotation"><FilePlus2 size={15} /> New quotation</TabsTrigger>
             <TabsTrigger value="profiles" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-window-profiles"><BookOpen size={15} /> Window profiles</TabsTrigger>
             <TabsTrigger value="drafts" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-saved-work"><FileText size={15} /> Saved work (Drafts)</TabsTrigger>
+            <TabsTrigger value="rates" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-rate-approval"><Calculator size={15} /> Rate approvals</TabsTrigger>
           </TabsList>
 
           <TabsContent value="new" className="mt-5" data-testid="section-new-quotation">
@@ -737,6 +1045,10 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
                 </div>}
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="rates" className="mt-5" data-testid="section-rate-approval">
+            <RateApprovalDesk user={user} />
           </TabsContent>
         </Tabs>
 

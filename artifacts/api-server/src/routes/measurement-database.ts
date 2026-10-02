@@ -1,0 +1,440 @@
+import { randomUUID } from "node:crypto";
+import { ObjectId } from "mongodb";
+import {
+  CreateMeasurementRecordBody,
+  CreateMeasurementRecordResponse,
+  DownloadMeasurementVersionParams,
+  ListMeasurementRecordsResponse,
+  SearchMeasurementRecordsQueryParams,
+  SearchMeasurementRecordsResponse,
+  UpdateMeasurementRecordBody,
+  UpdateMeasurementRecordParams,
+  UpdateMeasurementRecordResponse,
+  UploadMeasurementVersionParams,
+  UploadMeasurementVersionResponse,
+} from "@workspace/api-zod";
+import { Router, type Request, type RequestHandler } from "express";
+import {
+  getMeasurementRecords,
+  getMongoClient,
+  getMeasurementSheetsBucket,
+  getMeasurementVersions,
+  getMongoDb,
+  getOrders,
+  getPublicUser,
+  getQuotationRateSubmissions,
+  getUsers,
+  type MeasurementRecordDocument,
+  type MeasurementVersionDocument,
+  type OrderDocument,
+} from "../lib/mongo";
+
+const router = Router();
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+class LinkConflict extends Error {}
+const sheetTypes: Record<string, string> = {
+  pdf: "application/pdf",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv: "text/csv",
+};
+
+type Actor = {
+  id: string;
+  name: string;
+  permissions: Record<string, string>;
+  masterAdmin: boolean;
+};
+
+async function actorContext(
+  req: Request,
+  res: Parameters<RequestHandler>[1],
+  edit = false,
+  quotationLinkLookup = false,
+): Promise<Actor | null> {
+  const db = await getMongoDb();
+  const user = req.session.userId
+    ? await getUsers(db).findOne({ _id: req.session.userId, status: "active" })
+    : null;
+  if (!user) {
+    res.status(401).json({ error: "Sign in to continue." });
+    return null;
+  }
+  const publicUser = await getPublicUser(user, db);
+  const permission = publicUser.permissions.measurements ?? "none";
+  const canLinkQuotation = publicUser.permissions["quotation-builder"] === "edit"
+    || publicUser.permissions["rate-approval"] === "edit";
+  const hasMeasurementAccess = permission !== "none" && (!edit || permission === "edit");
+  if (publicUser.roleId !== "master-admin" && !hasMeasurementAccess && !(quotationLinkLookup && canLinkQuotation)) {
+    res.status(403).json({
+      error: edit ? "Measurement database editing access is required." : "Measurement database access is required.",
+    });
+    return null;
+  }
+  return {
+    id: user._id,
+    name: user.name,
+    permissions: publicUser.permissions,
+    masterAdmin: publicUser.roleId === "master-admin",
+  };
+}
+
+function versionResponse(version: MeasurementVersionDocument) {
+  return {
+    id: version._id,
+    versionNumber: version.versionNumber,
+    filename: version.filename,
+    contentType: version.contentType,
+    sizeBytes: version.sizeBytes,
+    uploadedBy: version.uploadedBy,
+    uploadedByName: version.uploadedByName,
+    uploadedAt: version.uploadedAt.toISOString(),
+  };
+}
+
+async function recordResponse(record: MeasurementRecordDocument) {
+  const db = await getMongoDb();
+  const [versions, order] = await Promise.all([
+    getMeasurementVersions(db).find({ recordId: record._id }).sort({ versionNumber: -1 }).toArray(),
+    record.orderRecordId ? getOrders(db).findOne({ _id: record.orderRecordId }) : Promise.resolve(null),
+  ]);
+  return {
+    id: record._id,
+    clientName: record.clientName,
+    location: record.location,
+    orderRecordId: record.orderRecordId,
+    orderId: order?.orderId ?? null,
+    versions: versions.map(versionResponse),
+    createdBy: record.createdBy,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
+}
+
+router.get("/measurement-records", async (req, res): Promise<void> => {
+  const actor = await actorContext(req, res);
+  if (!actor) return;
+  const records = await getMeasurementRecords(await getMongoDb()).find({}).sort({ updatedAt: -1 }).toArray();
+  const response = await Promise.all(records.map(recordResponse));
+  res.json(ListMeasurementRecordsResponse.parse(response));
+});
+
+router.get("/measurement-records/lookup", async (req, res): Promise<void> => {
+  const query = SearchMeasurementRecordsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const actor = await actorContext(req, res, false, true);
+  if (!actor) return;
+  const escaped = query.data.query.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const records = await getMeasurementRecords(await getMongoDb())
+    .find({ $or: [{ _id: { $regex: escaped, $options: "i" } }, { clientNameLower: { $regex: escaped } }] })
+    .sort({ updatedAt: -1 })
+    .limit(20)
+    .toArray();
+  const db = await getMongoDb();
+  const response = await Promise.all(records.map(async (record) => ({
+    id: record._id,
+    clientName: record.clientName,
+    location: record.location,
+    orderId: record.orderRecordId ? (await getOrders(db).findOne({ _id: record.orderRecordId }))?.orderId ?? null : null,
+  })));
+  res.json(SearchMeasurementRecordsResponse.parse(response));
+});
+
+router.post("/measurement-records", async (req, res): Promise<void> => {
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const parsed = CreateMeasurementRecordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const db = await getMongoDb();
+  if (parsed.data.orderRecordId) {
+    const order = await getOrders(db).findOne({ _id: parsed.data.orderRecordId });
+    if (!order) {
+      res.status(404).json({ error: "The selected order could not be found." });
+      return;
+    }
+  }
+  const now = new Date();
+  const record: MeasurementRecordDocument = {
+    _id: randomUUID(),
+    clientName: parsed.data.clientName.trim(),
+    clientNameLower: parsed.data.clientName.trim().toLowerCase(),
+    location: parsed.data.location?.trim() || null,
+    orderRecordId: parsed.data.orderRecordId,
+    versionCount: 0,
+    createdBy: actor.id,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await getMeasurementRecords(db).insertOne(record);
+  res.status(201).json(CreateMeasurementRecordResponse.parse(await recordResponse(record)));
+});
+
+router.patch("/measurement-records/:recordId", async (req, res): Promise<void> => {
+  const parsedParams = UpdateMeasurementRecordParams.safeParse(req.params);
+  const parsedBody = UpdateMeasurementRecordBody.safeParse(req.body);
+  if (!parsedParams.success || !parsedBody.success) {
+    res.status(400).json({
+      error: !parsedParams.success ? parsedParams.error.message : parsedBody.success ? "" : parsedBody.error.message,
+    });
+    return;
+  }
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const collection = getMeasurementRecords(db);
+  const old = await collection.findOne({ _id: parsedParams.data.recordId });
+  if (!old) {
+    res.status(404).json({ error: "Measurement record not found." });
+    return;
+  }
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (parsedBody.data.clientName !== undefined) {
+    const clientName = parsedBody.data.clientName.trim();
+    updates.clientName = clientName;
+    updates.clientNameLower = clientName.toLowerCase();
+  }
+  if (parsedBody.data.location !== undefined) updates.location = parsedBody.data.location?.trim() || null;
+  let selectedOrder: OrderDocument | null = null;
+  if (parsedBody.data.orderRecordId !== undefined) {
+    if (parsedBody.data.orderRecordId) {
+      selectedOrder = await getOrders(db).findOne({ _id: parsedBody.data.orderRecordId });
+      if (!selectedOrder) {
+        res.status(404).json({ error: "The selected order could not be found." });
+        return;
+      }
+    }
+    updates.orderRecordId = parsedBody.data.orderRecordId;
+  }
+  if (parsedBody.data.linkQuotationSubmissionId) {
+    if (!parsedBody.data.orderRecordId || !selectedOrder) {
+      res.status(400).json({ error: "Select an order before linking a quotation." });
+      return;
+    }
+  }
+  if (Object.keys(updates).length === 1) {
+    res.status(400).json({ error: "Provide at least one field to update." });
+    return;
+  }
+  if (parsedBody.data.linkQuotationSubmissionId && selectedOrder) {
+    const quotation = await getQuotationRateSubmissions(db).findOne({ _id: parsedBody.data.linkQuotationSubmissionId });
+    if (!quotation) {
+      res.status(404).json({ error: "The selected quotation request could not be found." });
+      return;
+    }
+    const session = (await getMongoClient()).startSession();
+    try {
+      await session.withTransaction(async () => {
+        const linkedQuotation = await getQuotationRateSubmissions(db).updateOne(
+          {
+            _id: quotation._id,
+            $or: [
+              { orderRecordId: null },
+              { orderRecordId: selectedOrder._id },
+              { orderRecordId: { $exists: false } },
+            ],
+          },
+          { $set: { orderRecordId: selectedOrder._id, orderId: selectedOrder.orderId, updatedAt: new Date() } },
+          { session },
+        );
+        if (!linkedQuotation.matchedCount) {
+          throw new LinkConflict("This quotation is already linked to another order.");
+        }
+        const updatedRecord = await collection.updateOne(
+          { _id: old._id, orderRecordId: old.orderRecordId ?? null },
+          { $set: updates },
+          { session },
+        );
+        if (!updatedRecord.matchedCount) {
+          throw new LinkConflict("This measurement sheet changed while linking. Refresh and try again.");
+        }
+      });
+    } catch (error) {
+      if (error instanceof LinkConflict) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+  } else {
+    await collection.updateOne({ _id: old._id }, { $set: updates });
+  }
+  const updated = await collection.findOne({ _id: old._id });
+  res.json(UpdateMeasurementRecordResponse.parse(await recordResponse(updated!)));
+});
+
+router.post("/measurement-records/:recordId/versions/:filename", async (req, res, next): Promise<void> => {
+  const parsed = UploadMeasurementVersionParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const record = await getMeasurementRecords(db).findOne({ _id: parsed.data.recordId });
+  if (!record) {
+    res.status(404).json({ error: "Measurement record not found." });
+    return;
+  }
+  readRawFile(req, res, next, async (body) => {
+    const extension = parsed.data.filename.toLowerCase().split(".").pop() ?? "";
+    const contentType = sheetTypes[extension];
+    const declaredType = String(req.headers["content-type"] ?? "").split(";")[0];
+    if (!contentType || !body.length) {
+      res.status(400).json({ error: "Choose a non-empty PDF, XLSX, or CSV measurement sheet." });
+      return;
+    }
+    const validFileSignature = extension === "pdf"
+      ? body.subarray(0, 5).toString("ascii") === "%PDF-"
+      : extension === "xlsx"
+        ? body.subarray(0, 4).toString("ascii") === "PK\u0003\u0004"
+        : !body.includes(0);
+    if (!validFileSignature) {
+      res.status(400).json({ error: "The file contents do not match the selected measurement sheet type." });
+      return;
+    }
+    if (declaredType !== contentType && declaredType !== "application/octet-stream") {
+      res.status(400).json({ error: "File content type does not match the measurement sheet." });
+      return;
+    }
+
+    const bucket = getMeasurementSheetsBucket(db);
+    const gridId = new ObjectId();
+    const upload = bucket.openUploadStreamWithId(gridId, parsed.data.filename, {
+      contentType,
+      metadata: { recordId: record._id },
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        upload.once("finish", resolve);
+        upload.once("error", reject);
+        upload.end(body);
+      });
+    } catch (error) {
+      await bucket.delete(gridId).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError }, "Failed to clean up a partial measurement sheet upload"),
+      );
+      throw error;
+    }
+
+    const versionedRecord = await getMeasurementRecords(db).findOneAndUpdate(
+      { _id: record._id },
+      { $inc: { versionCount: 1 }, $set: { updatedAt: new Date() } },
+      { returnDocument: "after" },
+    );
+    if (!versionedRecord) {
+      await bucket.delete(gridId).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError }, "Failed to clean up an orphaned measurement sheet upload"),
+      );
+      res.status(404).json({ error: "Measurement record not found." });
+      return;
+    }
+    const version: MeasurementVersionDocument = {
+      _id: randomUUID(),
+      recordId: record._id,
+      versionNumber: versionedRecord.versionCount ?? 1,
+      filename: parsed.data.filename,
+      contentType,
+      sizeBytes: body.length,
+      gridFsId: gridId.toHexString(),
+      uploadedBy: actor.id,
+      uploadedByName: actor.name,
+      uploadedAt: new Date(),
+    };
+    try {
+      await getMeasurementVersions(db).insertOne(version);
+    } catch (error) {
+      await bucket.delete(gridId).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError }, "Failed to clean up an orphaned measurement version"),
+      );
+      throw error;
+    }
+    res.status(201).json(UploadMeasurementVersionResponse.parse(versionResponse(version)));
+  });
+});
+
+router.get(
+  "/measurement-records/:recordId/versions/:versionId/content",
+  async (req, res, next): Promise<void> => {
+    const parsed = DownloadMeasurementVersionParams.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const actor = await actorContext(req, res);
+    if (!actor) return;
+    const db = await getMongoDb();
+    const version = await getMeasurementVersions(db).findOne({
+      _id: parsed.data.versionId,
+      recordId: parsed.data.recordId,
+    });
+    if (!version || !ObjectId.isValid(version.gridFsId)) {
+      res.status(404).json({ error: "Measurement sheet version not found." });
+      return;
+    }
+    const gridId = new ObjectId(version.gridFsId);
+    const bucket = getMeasurementSheetsBucket(db);
+    if (!(await bucket.find({ _id: gridId }).next())) {
+      res.status(404).json({ error: "Measurement sheet content not found." });
+      return;
+    }
+    const safeFilename = version.filename.replace(/[\x00-\x1f\x7f"]/g, "_");
+    res.setHeader("Content-Type", version.contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    const stream = bucket.openDownloadStream(gridId);
+    stream.on("error", next);
+    stream.pipe(res);
+  },
+);
+
+function readRawFile(
+  req: Request,
+  res: Parameters<RequestHandler>[1],
+  next: (error?: unknown) => void,
+  done: (body: Buffer) => Promise<void>,
+): void {
+  const run = (body: Buffer) => { void Promise.resolve().then(() => done(body)).catch(next); };
+  if (Buffer.isBuffer(req.body)) {
+    if (req.body.length > MAX_FILE_BYTES) {
+      res.status(413).json({ error: "Measurement sheet must be 10 MiB or smaller." });
+      return;
+    }
+    run(req.body);
+    return;
+  }
+  const declaredLength = Number(req.headers["content-length"]);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_FILE_BYTES) {
+    res.status(413).json({ error: "Measurement sheet must be 10 MiB or smaller." });
+    req.resume();
+    return;
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  let tooLarge = false;
+  req.on("data", (chunk: Buffer) => {
+    if (tooLarge) return;
+    size += chunk.length;
+    if (size > MAX_FILE_BYTES) {
+      tooLarge = true;
+      chunks.length = 0;
+      if (!res.headersSent) res.status(413).json({ error: "Measurement sheet must be 10 MiB or smaller." });
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on("end", () => {
+    if (!tooLarge) run(Buffer.concat(chunks, size));
+  });
+  req.on("aborted", () => next(new Error("Measurement sheet upload was interrupted.")));
+  req.on("error", next);
+}
+
+export default router;

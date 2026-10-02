@@ -32,8 +32,8 @@ export type UserStatus = "active" | "inactive";
 export const MODULES = [
   { id: "user-access", label: "Multi-User Access & Roles" },
   { id: "order-hub", label: "Client & Order ID Hub" },
-  { id: "quotation-builder", label: "Digital Quotation Builder" },
-  { id: "rate-approval", label: "Rate Approval Workflow" },
+  { id: "quotation-builder", label: "Quotation & Rate Approval" },
+  { id: "rate-approval", label: "Rate Approval Queue" },
   { id: "confirmation", label: "Confirmation / Purchase Order" },
   { id: "measurements", label: "Measurement Database" },
   { id: "qr-assembly", label: "QR Code & Assembly Tracking" },
@@ -295,6 +295,60 @@ export interface QuotationDocument {
   archivedAt?: Date | null;
 }
 
+export type QuotationRateSubmissionStatus =
+  | "awaiting_pdf"
+  | "pending_review"
+  | "approved"
+  | "rejected";
+export interface QuotationRateSubmissionDocument {
+  _id: string;
+  orderRecordId: string | null;
+  orderId: string | null;
+  clientName: string;
+  clientNameLower: string;
+  location: string | null;
+  windowQty: number;
+  totalSqFt: number;
+  glassType: string;
+  averageSqFtPerQty: number;
+  status: QuotationRateSubmissionStatus;
+  pdfFilename: string | null;
+  pdfSizeBytes: number | null;
+  pdfGridFsId: string | null;
+  submittedBy: string;
+  submittedByName: string;
+  approverIds: string[];
+  decisionComment: string | null;
+  decidedBy: string | null;
+  decidedByName: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MeasurementRecordDocument {
+  _id: string;
+  clientName: string;
+  clientNameLower: string;
+  location: string | null;
+  orderRecordId: string | null;
+  versionCount?: number;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+export interface MeasurementVersionDocument {
+  _id: string;
+  recordId: string;
+  versionNumber: number;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  gridFsId: string;
+  uploadedBy: string;
+  uploadedByName: string;
+  uploadedAt: Date;
+}
+
 export interface OrderMessageTemplateDocument {
   _id: OrderStatus;
   status: OrderStatus;
@@ -371,6 +425,11 @@ export function getOrderActivity(db: Db) { return db.collection<OrderActivityDoc
 export function getWindowProfiles(db: Db) { return db.collection<WindowProfileDocument>("window_profiles"); }
 export function getQuotations(db: Db) { return db.collection<QuotationDocument>("quotations"); }
 export function getOrderDocumentsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "order_documents" }); }
+export function getQuotationRateSubmissions(db: Db) { return db.collection<QuotationRateSubmissionDocument>("quotation_rate_submissions"); }
+export function getQuotationRatePdfsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "quotation_rate_pdfs" }); }
+export function getMeasurementRecords(db: Db) { return db.collection<MeasurementRecordDocument>("measurement_records"); }
+export function getMeasurementVersions(db: Db) { return db.collection<MeasurementVersionDocument>("measurement_versions"); }
+export function getMeasurementSheetsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "measurement_sheets" }); }
 
 async function migrateOrderIds(db: Db, now: Date): Promise<void> {
   const counters = getCounters(db);
@@ -581,6 +640,30 @@ const seedRoles: Array<Omit<RoleDocument, "createdAt" | "updatedAt">> = [
       "rate-approval": "view",
       confirmation: "view",
       measurements: "view",
+    }),
+  },
+  {
+    _id: "quotation-member",
+    name: "Quotation Member",
+    nameLower: "quotation member",
+    description: "Submits quotation details and Eva Software PDFs for rate review.",
+    isSystem: false,
+    permissions: makePermissionMap({
+      "order-hub": "view",
+      "quotation-builder": "edit",
+      "rate-approval": "view",
+      measurements: "view",
+    }),
+  },
+  {
+    _id: "measurement-editor",
+    name: "Measurement Editor",
+    nameLower: "measurement editor",
+    description: "Maintains client measurement sheets and their retained versions.",
+    isSystem: false,
+    permissions: makePermissionMap({
+      "order-hub": "view",
+      measurements: "edit",
     }),
   },
 ];
@@ -804,6 +887,11 @@ export async function initializeMongo(): Promise<void> {
   await getCounters(db).updateOne(
     { _id: "quotation-sequence" },
     { $setOnInsert: { _id: "quotation-sequence", value: 498, updatedAt: now } },
+    { upsert: true },
+  );
+  await getCounters(db).updateOne(
+    { _id: "quotation-rate-sequence" },
+    { $setOnInsert: { _id: "quotation-rate-sequence", value: 999, updatedAt: now } },
     { upsert: true },
   );
 

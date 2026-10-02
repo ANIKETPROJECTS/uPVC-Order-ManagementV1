@@ -1,0 +1,31 @@
+Create the "Quotation & Rate Approval" module with the structure below.
+
+**1. Summary cards (top)**
+- Awaiting Approval: count of pending requests
+- Approved: count of approved requests
+
+**2. Requests table**
+
+| Column | Details |
+|---|---|
+| Request ID | Auto-generated temporary quotation ID (e.g., RA-1000, RA-1001) |
+| Client / Order | Client name, with the linked Order ID shown below it once linked (blank until then) |
+| Qty | Window Qty |
+| Sq.Ft | Total SqFt |
+| Glass Type | Glass type entered by the member |
+| Location | Optional |
+| Status | Awaiting Approval / Approved / Rejected, with "by [approver name]" shown below once actioned |
+| Action | Approve / Reject buttons, visible only to the approving user. Shows "—" once actioned |
+
+**3. Creating a request**
+- Users with the "Quotation Member" role create a request by entering Client Name, Location (optional), Window Qty, SqFt, Glass Type and Average (SqFt/Qty).
+- They also attach the quotation PDF created in Eva Software, for reference.
+- On submission, the request is automatically sent to the designated approver for approval.
+
+**4. Linking to an Order ID (done later)**
+- The Quotation can be linked to an Order ID after the order is created. The Measurement Sheet is managed in its own dedicated section and can also be linked to an Order ID from there.
+- **Linking from the Measurement Sheet section:** When linking a Measurement Sheet to an Order ID, show an additional option below: "Do you also want to link the Quotation?"
+  - If **No**: link only the Measurement Sheet.
+  - If **Yes**: show a search bar to search for the temporary quotation ID (Request ID, e.g., RA-1000). On selection, link that quotation to the same Order ID.
+- **Linking from the Quotation & Rate Approval section:** The same option is available here. Each request has a "Link to Order" action, and when linking a Quotation to an Order ID, show an additional option: "Do you also want to link the Measurement Sheet?" If Yes, show a search bar to find the Measurement Sheet from its dedicated section.
+- Once linked, the Order ID appears under the client name in the Client / Order column.

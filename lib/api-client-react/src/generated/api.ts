@@ -41,6 +41,12 @@ import type {
   ListOrdersParams,
   ListUsersParams,
   LoginInput,
+  MeasurementRecord,
+  MeasurementRecordInput,
+  MeasurementRecordList,
+  MeasurementRecordLookupList,
+  MeasurementRecordUpdate,
+  MeasurementVersion,
   Order,
   OrderActivityList,
   OrderBillingUpdate,
@@ -69,9 +75,17 @@ import type {
   Quotation,
   QuotationInput,
   QuotationList,
+  QuotationOrderLinkInput,
+  QuotationRateDecisionInput,
+  QuotationRateSubmission,
+  QuotationRateSubmissionInput,
+  QuotationRateSubmissionList,
+  QuotationRateSubmissionLookupList,
   Role,
   RoleInput,
   RoleUpdate,
+  SearchMeasurementRecordsParams,
+  SearchQuotationRateSubmissionsParams,
   StartDirectConversationInput,
   SuccessResponse,
   User,
@@ -4052,6 +4066,1112 @@ export const useArchiveQuotation = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getArchiveQuotationMutationOptions(options));
     }
+
+export const getListQuotationRateSubmissionsUrl = () => {
+
+
+
+
+  return `/api/quotation-rate-submissions`
+}
+
+/**
+ * @summary List the current user's rate submissions and assigned approval queue
+ */
+export const listQuotationRateSubmissions = async ( options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmissionList> => {
+
+  return customFetch<QuotationRateSubmissionList>(getListQuotationRateSubmissionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListQuotationRateSubmissionsQueryKey = () => {
+    return [
+    `/api/quotation-rate-submissions`
+    ] as const;
+    }
+
+
+export const getListQuotationRateSubmissionsQueryOptions = <TData = Awaited<ReturnType<typeof listQuotationRateSubmissions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuotationRateSubmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListQuotationRateSubmissionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listQuotationRateSubmissions>>> = ({ signal }) => listQuotationRateSubmissions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listQuotationRateSubmissions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListQuotationRateSubmissionsQueryResult = NonNullable<Awaited<ReturnType<typeof listQuotationRateSubmissions>>>
+export type ListQuotationRateSubmissionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the current user's rate submissions and assigned approval queue
+ */
+
+export function useListQuotationRateSubmissions<TData = Awaited<ReturnType<typeof listQuotationRateSubmissions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuotationRateSubmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListQuotationRateSubmissionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateQuotationRateSubmissionUrl = () => {
+
+
+
+
+  return `/api/quotation-rate-submissions`
+}
+
+/**
+ * @summary Submit quotation details for rate approval
+ */
+export const createQuotationRateSubmission = async (quotationRateSubmissionInput: QuotationRateSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QuotationRateSubmission>(getCreateQuotationRateSubmissionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationRateSubmissionInput)
+  }
+);}
+
+
+
+
+
+export const getCreateQuotationRateSubmissionMutationKey = () => ['createQuotationRateSubmission'] as const;
+
+export const getCreateQuotationRateSubmissionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createQuotationRateSubmission>>, TError,CreateQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createQuotationRateSubmission>>, TError,CreateQuotationRateSubmissionMutationVariables, TContext> => {
+
+const mutationKey = getCreateQuotationRateSubmissionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createQuotationRateSubmission>>, CreateQuotationRateSubmissionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createQuotationRateSubmission(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateQuotationRateSubmissionMutationResult = NonNullable<Awaited<ReturnType<typeof createQuotationRateSubmission>>>
+    export type CreateQuotationRateSubmissionMutationBody = BodyType<QuotationRateSubmissionInput>
+    export type CreateQuotationRateSubmissionMutationError = ErrorType<void>
+    export type CreateQuotationRateSubmissionMutationVariables = {data: BodyType<QuotationRateSubmissionInput>}
+
+    /**
+ * @summary Submit quotation details for rate approval
+ */
+export const useCreateQuotationRateSubmission = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createQuotationRateSubmission>>, TError,CreateQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createQuotationRateSubmission>>,
+        TError,
+        CreateQuotationRateSubmissionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateQuotationRateSubmissionMutationOptions(options));
+    }
+
+export const getSearchQuotationRateSubmissionsUrl = (params: SearchQuotationRateSubmissionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/quotation-rate-submissions/lookup?${stringifiedParams}` : `/api/quotation-rate-submissions/lookup`
+}
+
+/**
+ * @summary Search rate submission IDs for order linking
+ */
+export const searchQuotationRateSubmissions = async (params: SearchQuotationRateSubmissionsParams, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmissionLookupList> => {
+
+  return customFetch<QuotationRateSubmissionLookupList>(getSearchQuotationRateSubmissionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchQuotationRateSubmissionsQueryKey = (params?: SearchQuotationRateSubmissionsParams,) => {
+    return [
+    `/api/quotation-rate-submissions/lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchQuotationRateSubmissionsQueryOptions = <TData = Awaited<ReturnType<typeof searchQuotationRateSubmissions>>, TError = ErrorType<unknown>>(params: SearchQuotationRateSubmissionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchQuotationRateSubmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchQuotationRateSubmissionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchQuotationRateSubmissions>>> = ({ signal }) => searchQuotationRateSubmissions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchQuotationRateSubmissions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchQuotationRateSubmissionsQueryResult = NonNullable<Awaited<ReturnType<typeof searchQuotationRateSubmissions>>>
+export type SearchQuotationRateSubmissionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search rate submission IDs for order linking
+ */
+
+export function useSearchQuotationRateSubmissions<TData = Awaited<ReturnType<typeof searchQuotationRateSubmissions>>, TError = ErrorType<unknown>>(
+ params: SearchQuotationRateSubmissionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchQuotationRateSubmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchQuotationRateSubmissionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getLinkQuotationRateSubmissionOrderUrl = (submissionId: string,) => {
+
+
+
+
+  return `/api/quotation-rate-submissions/${submissionId}/order`
+}
+
+/**
+ * @summary Link a quotation request to an order and optional measurement sheet
+ */
+export const linkQuotationRateSubmissionOrder = async (submissionId: string,
+    quotationOrderLinkInput: QuotationOrderLinkInput, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QuotationRateSubmission>(getLinkQuotationRateSubmissionOrderUrl(submissionId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationOrderLinkInput)
+  }
+);}
+
+
+
+
+
+export const getLinkQuotationRateSubmissionOrderMutationKey = () => ['linkQuotationRateSubmissionOrder'] as const;
+
+export const getLinkQuotationRateSubmissionOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkQuotationRateSubmissionOrder>>, TError,LinkQuotationRateSubmissionOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof linkQuotationRateSubmissionOrder>>, TError,LinkQuotationRateSubmissionOrderMutationVariables, TContext> => {
+
+const mutationKey = getLinkQuotationRateSubmissionOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof linkQuotationRateSubmissionOrder>>, LinkQuotationRateSubmissionOrderMutationVariables> = (props) => {
+          const {submissionId,data} = props ?? {};
+
+          return  linkQuotationRateSubmissionOrder(submissionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LinkQuotationRateSubmissionOrderMutationResult = NonNullable<Awaited<ReturnType<typeof linkQuotationRateSubmissionOrder>>>
+    export type LinkQuotationRateSubmissionOrderMutationBody = BodyType<QuotationOrderLinkInput>
+    export type LinkQuotationRateSubmissionOrderMutationError = ErrorType<void>
+    export type LinkQuotationRateSubmissionOrderMutationVariables = {submissionId: string;data: BodyType<QuotationOrderLinkInput>}
+
+    /**
+ * @summary Link a quotation request to an order and optional measurement sheet
+ */
+export const useLinkQuotationRateSubmissionOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkQuotationRateSubmissionOrder>>, TError,LinkQuotationRateSubmissionOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof linkQuotationRateSubmissionOrder>>,
+        TError,
+        LinkQuotationRateSubmissionOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getLinkQuotationRateSubmissionOrderMutationOptions(options));
+    }
+
+export const getUploadQuotationRateSubmissionPdfUrl = (submissionId: string,
+    filename: string,) => {
+
+
+
+
+  return `/api/quotation-rate-submissions/${submissionId}/pdf/${filename}`
+}
+
+/**
+ * @summary Attach the Eva Software quotation PDF
+ */
+export const uploadQuotationRateSubmissionPdf = async (submissionId: string,
+    filename: string,
+    uploadQuotationRateSubmissionPdfBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QuotationRateSubmission>(getUploadQuotationRateSubmissionPdfUrl(submissionId,filename),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadQuotationRateSubmissionPdfBody
+  }
+);}
+
+
+
+
+
+export const getUploadQuotationRateSubmissionPdfMutationKey = () => ['uploadQuotationRateSubmissionPdf'] as const;
+
+export const getUploadQuotationRateSubmissionPdfMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadQuotationRateSubmissionPdf>>, TError,UploadQuotationRateSubmissionPdfMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadQuotationRateSubmissionPdf>>, TError,UploadQuotationRateSubmissionPdfMutationVariables, TContext> => {
+
+const mutationKey = getUploadQuotationRateSubmissionPdfMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadQuotationRateSubmissionPdf>>, UploadQuotationRateSubmissionPdfMutationVariables> = (props) => {
+          const {submissionId,filename,data} = props ?? {};
+
+          return  uploadQuotationRateSubmissionPdf(submissionId,filename,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadQuotationRateSubmissionPdfMutationResult = NonNullable<Awaited<ReturnType<typeof uploadQuotationRateSubmissionPdf>>>
+    export type UploadQuotationRateSubmissionPdfMutationBody = BodyType<Blob>
+    export type UploadQuotationRateSubmissionPdfMutationError = ErrorType<void>
+    export type UploadQuotationRateSubmissionPdfMutationVariables = {submissionId: string;filename: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Attach the Eva Software quotation PDF
+ */
+export const useUploadQuotationRateSubmissionPdf = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadQuotationRateSubmissionPdf>>, TError,UploadQuotationRateSubmissionPdfMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadQuotationRateSubmissionPdf>>,
+        TError,
+        UploadQuotationRateSubmissionPdfMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadQuotationRateSubmissionPdfMutationOptions(options));
+    }
+
+export const getDownloadQuotationRateSubmissionPdfUrl = (submissionId: string,) => {
+
+
+
+
+  return `/api/quotation-rate-submissions/${submissionId}/pdf`
+}
+
+/**
+ * @summary Download the attached Eva Software quotation PDF
+ */
+export const downloadQuotationRateSubmissionPdf = async (submissionId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadQuotationRateSubmissionPdfUrl(submissionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadQuotationRateSubmissionPdfQueryKey = (submissionId: string,) => {
+    return [
+    `/api/quotation-rate-submissions/${submissionId}/pdf`
+    ] as const;
+    }
+
+
+export const getDownloadQuotationRateSubmissionPdfQueryOptions = <TData = Awaited<ReturnType<typeof downloadQuotationRateSubmissionPdf>>, TError = ErrorType<void>>(submissionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadQuotationRateSubmissionPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadQuotationRateSubmissionPdfQueryKey(submissionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadQuotationRateSubmissionPdf>>> = ({ signal }) => downloadQuotationRateSubmissionPdf(submissionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: submissionId !== null && submissionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadQuotationRateSubmissionPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadQuotationRateSubmissionPdfQueryResult = NonNullable<Awaited<ReturnType<typeof downloadQuotationRateSubmissionPdf>>>
+export type DownloadQuotationRateSubmissionPdfQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download the attached Eva Software quotation PDF
+ */
+
+export function useDownloadQuotationRateSubmissionPdf<TData = Awaited<ReturnType<typeof downloadQuotationRateSubmissionPdf>>, TError = ErrorType<void>>(
+ submissionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadQuotationRateSubmissionPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadQuotationRateSubmissionPdfQueryOptions(submissionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDecideQuotationRateSubmissionUrl = (submissionId: string,) => {
+
+
+
+
+  return `/api/quotation-rate-submissions/${submissionId}/decision`
+}
+
+/**
+ * @summary Approve or reject a rate submission
+ */
+export const decideQuotationRateSubmission = async (submissionId: string,
+    quotationRateDecisionInput: QuotationRateDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QuotationRateSubmission>(getDecideQuotationRateSubmissionUrl(submissionId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationRateDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getDecideQuotationRateSubmissionMutationKey = () => ['decideQuotationRateSubmission'] as const;
+
+export const getDecideQuotationRateSubmissionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideQuotationRateSubmission>>, TError,DecideQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideQuotationRateSubmission>>, TError,DecideQuotationRateSubmissionMutationVariables, TContext> => {
+
+const mutationKey = getDecideQuotationRateSubmissionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideQuotationRateSubmission>>, DecideQuotationRateSubmissionMutationVariables> = (props) => {
+          const {submissionId,data} = props ?? {};
+
+          return  decideQuotationRateSubmission(submissionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideQuotationRateSubmissionMutationResult = NonNullable<Awaited<ReturnType<typeof decideQuotationRateSubmission>>>
+    export type DecideQuotationRateSubmissionMutationBody = BodyType<QuotationRateDecisionInput>
+    export type DecideQuotationRateSubmissionMutationError = ErrorType<void>
+    export type DecideQuotationRateSubmissionMutationVariables = {submissionId: string;data: BodyType<QuotationRateDecisionInput>}
+
+    /**
+ * @summary Approve or reject a rate submission
+ */
+export const useDecideQuotationRateSubmission = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideQuotationRateSubmission>>, TError,DecideQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideQuotationRateSubmission>>,
+        TError,
+        DecideQuotationRateSubmissionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDecideQuotationRateSubmissionMutationOptions(options));
+    }
+
+export const getListMeasurementRecordsUrl = () => {
+
+
+
+
+  return `/api/measurement-records`
+}
+
+/**
+ * @summary List measurement sheets and retained versions
+ */
+export const listMeasurementRecords = async ( options?: Parameters<typeof customFetch>[1]): Promise<MeasurementRecordList> => {
+
+  return customFetch<MeasurementRecordList>(getListMeasurementRecordsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMeasurementRecordsQueryKey = () => {
+    return [
+    `/api/measurement-records`
+    ] as const;
+    }
+
+
+export const getListMeasurementRecordsQueryOptions = <TData = Awaited<ReturnType<typeof listMeasurementRecords>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMeasurementRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMeasurementRecordsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMeasurementRecords>>> = ({ signal }) => listMeasurementRecords({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMeasurementRecords>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMeasurementRecordsQueryResult = NonNullable<Awaited<ReturnType<typeof listMeasurementRecords>>>
+export type ListMeasurementRecordsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List measurement sheets and retained versions
+ */
+
+export function useListMeasurementRecords<TData = Awaited<ReturnType<typeof listMeasurementRecords>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMeasurementRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMeasurementRecordsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateMeasurementRecordUrl = () => {
+
+
+
+
+  return `/api/measurement-records`
+}
+
+/**
+ * @summary Create a measurement sheet record
+ */
+export const createMeasurementRecord = async (measurementRecordInput: MeasurementRecordInput, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementRecord> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MeasurementRecord>(getCreateMeasurementRecordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(measurementRecordInput)
+  }
+);}
+
+
+
+
+
+export const getCreateMeasurementRecordMutationKey = () => ['createMeasurementRecord'] as const;
+
+export const getCreateMeasurementRecordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMeasurementRecord>>, TError,CreateMeasurementRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMeasurementRecord>>, TError,CreateMeasurementRecordMutationVariables, TContext> => {
+
+const mutationKey = getCreateMeasurementRecordMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMeasurementRecord>>, CreateMeasurementRecordMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMeasurementRecord(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMeasurementRecordMutationResult = NonNullable<Awaited<ReturnType<typeof createMeasurementRecord>>>
+    export type CreateMeasurementRecordMutationBody = BodyType<MeasurementRecordInput>
+    export type CreateMeasurementRecordMutationError = ErrorType<unknown>
+    export type CreateMeasurementRecordMutationVariables = {data: BodyType<MeasurementRecordInput>}
+
+    /**
+ * @summary Create a measurement sheet record
+ */
+export const useCreateMeasurementRecord = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMeasurementRecord>>, TError,CreateMeasurementRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMeasurementRecord>>,
+        TError,
+        CreateMeasurementRecordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateMeasurementRecordMutationOptions(options));
+    }
+
+export const getSearchMeasurementRecordsUrl = (params: SearchMeasurementRecordsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/measurement-records/lookup?${stringifiedParams}` : `/api/measurement-records/lookup`
+}
+
+/**
+ * @summary Search measurement sheets for quotation linking
+ */
+export const searchMeasurementRecords = async (params: SearchMeasurementRecordsParams, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementRecordLookupList> => {
+
+  return customFetch<MeasurementRecordLookupList>(getSearchMeasurementRecordsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchMeasurementRecordsQueryKey = (params?: SearchMeasurementRecordsParams,) => {
+    return [
+    `/api/measurement-records/lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchMeasurementRecordsQueryOptions = <TData = Awaited<ReturnType<typeof searchMeasurementRecords>>, TError = ErrorType<unknown>>(params: SearchMeasurementRecordsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchMeasurementRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchMeasurementRecordsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchMeasurementRecords>>> = ({ signal }) => searchMeasurementRecords(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchMeasurementRecords>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchMeasurementRecordsQueryResult = NonNullable<Awaited<ReturnType<typeof searchMeasurementRecords>>>
+export type SearchMeasurementRecordsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search measurement sheets for quotation linking
+ */
+
+export function useSearchMeasurementRecords<TData = Awaited<ReturnType<typeof searchMeasurementRecords>>, TError = ErrorType<unknown>>(
+ params: SearchMeasurementRecordsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchMeasurementRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchMeasurementRecordsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateMeasurementRecordUrl = (recordId: string,) => {
+
+
+
+
+  return `/api/measurement-records/${recordId}`
+}
+
+/**
+ * @summary Update measurement record details or assign it to an order
+ */
+export const updateMeasurementRecord = async (recordId: string,
+    measurementRecordUpdate: MeasurementRecordUpdate, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementRecord> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MeasurementRecord>(getUpdateMeasurementRecordUrl(recordId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(measurementRecordUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateMeasurementRecordMutationKey = () => ['updateMeasurementRecord'] as const;
+
+export const getUpdateMeasurementRecordMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementRecord>>, TError,UpdateMeasurementRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementRecord>>, TError,UpdateMeasurementRecordMutationVariables, TContext> => {
+
+const mutationKey = getUpdateMeasurementRecordMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMeasurementRecord>>, UpdateMeasurementRecordMutationVariables> = (props) => {
+          const {recordId,data} = props ?? {};
+
+          return  updateMeasurementRecord(recordId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMeasurementRecordMutationResult = NonNullable<Awaited<ReturnType<typeof updateMeasurementRecord>>>
+    export type UpdateMeasurementRecordMutationBody = BodyType<MeasurementRecordUpdate>
+    export type UpdateMeasurementRecordMutationError = ErrorType<void>
+    export type UpdateMeasurementRecordMutationVariables = {recordId: string;data: BodyType<MeasurementRecordUpdate>}
+
+    /**
+ * @summary Update measurement record details or assign it to an order
+ */
+export const useUpdateMeasurementRecord = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementRecord>>, TError,UpdateMeasurementRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMeasurementRecord>>,
+        TError,
+        UpdateMeasurementRecordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateMeasurementRecordMutationOptions(options));
+    }
+
+export const getUploadMeasurementVersionUrl = (recordId: string,
+    filename: string,) => {
+
+
+
+
+  return `/api/measurement-records/${recordId}/versions/${filename}`
+}
+
+/**
+ * @summary Add a retained measurement sheet version
+ */
+export const uploadMeasurementVersion = async (recordId: string,
+    filename: string,
+    uploadMeasurementVersionBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementVersion> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MeasurementVersion>(getUploadMeasurementVersionUrl(recordId,filename),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadMeasurementVersionBody
+  }
+);}
+
+
+
+
+
+export const getUploadMeasurementVersionMutationKey = () => ['uploadMeasurementVersion'] as const;
+
+export const getUploadMeasurementVersionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadMeasurementVersion>>, TError,UploadMeasurementVersionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadMeasurementVersion>>, TError,UploadMeasurementVersionMutationVariables, TContext> => {
+
+const mutationKey = getUploadMeasurementVersionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadMeasurementVersion>>, UploadMeasurementVersionMutationVariables> = (props) => {
+          const {recordId,filename,data} = props ?? {};
+
+          return  uploadMeasurementVersion(recordId,filename,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadMeasurementVersionMutationResult = NonNullable<Awaited<ReturnType<typeof uploadMeasurementVersion>>>
+    export type UploadMeasurementVersionMutationBody = BodyType<Blob>
+    export type UploadMeasurementVersionMutationError = ErrorType<void>
+    export type UploadMeasurementVersionMutationVariables = {recordId: string;filename: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Add a retained measurement sheet version
+ */
+export const useUploadMeasurementVersion = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadMeasurementVersion>>, TError,UploadMeasurementVersionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadMeasurementVersion>>,
+        TError,
+        UploadMeasurementVersionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadMeasurementVersionMutationOptions(options));
+    }
+
+export const getDownloadMeasurementVersionUrl = (recordId: string,
+    versionId: string,) => {
+
+
+
+
+  return `/api/measurement-records/${recordId}/versions/${versionId}/content`
+}
+
+/**
+ * @summary Download a retained measurement sheet version
+ */
+export const downloadMeasurementVersion = async (recordId: string,
+    versionId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadMeasurementVersionUrl(recordId,versionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadMeasurementVersionQueryKey = (recordId: string,
+    versionId: string,) => {
+    return [
+    `/api/measurement-records/${recordId}/versions/${versionId}/content`
+    ] as const;
+    }
+
+
+export const getDownloadMeasurementVersionQueryOptions = <TData = Awaited<ReturnType<typeof downloadMeasurementVersion>>, TError = ErrorType<void>>(recordId: string,
+    versionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadMeasurementVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadMeasurementVersionQueryKey(recordId,versionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadMeasurementVersion>>> = ({ signal }) => downloadMeasurementVersion(recordId,versionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: recordId !== null && recordId !== undefined && versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadMeasurementVersion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadMeasurementVersionQueryResult = NonNullable<Awaited<ReturnType<typeof downloadMeasurementVersion>>>
+export type DownloadMeasurementVersionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download a retained measurement sheet version
+ */
+
+export function useDownloadMeasurementVersion<TData = Awaited<ReturnType<typeof downloadMeasurementVersion>>, TError = ErrorType<void>>(
+ recordId: string,
+    versionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadMeasurementVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadMeasurementVersionQueryOptions(recordId,versionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListOrderWindowsUrl = (id: string,) => {
 

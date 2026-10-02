@@ -36,7 +36,7 @@ const isModuleActive = (key: string, location: string) =>
 
 const navigationGroups: { id: string; label: string; icon: SidebarIconName; moduleKeys: string[] }[] = [
   { id: 'management', label: 'Admin & reports', icon: 'user-access', moduleKeys: ['user-access', 'reporting'] },
-  { id: 'orders', label: 'Sales & orders', icon: 'order-hub', moduleKeys: ['order-hub', 'quotation-builder', 'rate-approval', 'confirmation'] },
+  { id: 'orders', label: 'Sales & orders', icon: 'order-hub', moduleKeys: ['order-hub', 'quotation-builder', 'confirmation'] },
   { id: 'production', label: 'Production', icon: 'measurements', moduleKeys: ['measurements', 'qr-assembly', 'window-readiness', 'glass-procurement'] },
   { id: 'finance', label: 'Finance', icon: 'payments', moduleKeys: ['payments', 'balance-payment'] },
   { id: 'fulfillment', label: 'Fulfillment', icon: 'dispatch', moduleKeys: ['dispatch', 'installation'] },

@@ -992,6 +992,311 @@ paths:
       responses:
         "204":
           description: Quotation archived
+  /quotation-rate-submissions:
+    get:
+      operationId: listQuotationRateSubmissions
+      tags: [quotations]
+      summary: List the current user's rate submissions and assigned approval queue
+      responses:
+        "200":
+          description: Accessible rate submissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationRateSubmissionList"
+    post:
+      operationId: createQuotationRateSubmission
+      tags: [quotations]
+      summary: Submit quotation details for rate approval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationRateSubmissionInput"
+      responses:
+        "201":
+          description: Submission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationRateSubmission"
+        "400":
+          description: Invalid submission details
+        "503":
+          description: No active rate approver is available
+  /quotation-rate-submissions/lookup:
+    get:
+      operationId: searchQuotationRateSubmissions
+      tags: [quotations]
+      summary: Search rate submission IDs for order linking
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 80
+      responses:
+        "200":
+          description: Matching quotation requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationRateSubmissionLookupList"
+  /quotation-rate-submissions/{submissionId}/order:
+    patch:
+      operationId: linkQuotationRateSubmissionOrder
+      tags: [quotations]
+      summary: Link a quotation request to an order and optional measurement sheet
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationOrderLinkInput"
+      responses:
+        "200":
+          description: Quotation linked to the order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationRateSubmission"
+        "404":
+          description: Quotation, order, or measurement sheet not found
+        "409":
+          description: A linked record already belongs to another order
+  /quotation-rate-submissions/{submissionId}/pdf/{filename}:
+    post:
+      operationId: uploadQuotationRateSubmissionPdf
+      tags: [quotations]
+      summary: Attach the Eva Software quotation PDF
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 180
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: PDF attached and submission routed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationRateSubmission"
+        "400":
+          description: Invalid PDF
+        "404":
+          description: Submission not found
+  /quotation-rate-submissions/{submissionId}/pdf:
+    get:
+      operationId: downloadQuotationRateSubmissionPdf
+      tags: [quotations]
+      summary: Download the attached Eva Software quotation PDF
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotation PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: PDF not found
+  /quotation-rate-submissions/{submissionId}/decision:
+    post:
+      operationId: decideQuotationRateSubmission
+      tags: [quotations]
+      summary: Approve or reject a rate submission
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationRateDecisionInput"
+      responses:
+        "200":
+          description: Updated submission decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationRateSubmission"
+        "403":
+          description: Rate approval access required
+        "404":
+          description: Submission not found
+        "409":
+          description: Submission already decided
+  /measurement-records:
+    get:
+      operationId: listMeasurementRecords
+      tags: [orders]
+      summary: List measurement sheets and retained versions
+      responses:
+        "200":
+          description: Measurement sheet records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementRecordList"
+    post:
+      operationId: createMeasurementRecord
+      tags: [orders]
+      summary: Create a measurement sheet record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeasurementRecordInput"
+      responses:
+        "201":
+          description: Measurement record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementRecord"
+  /measurement-records/lookup:
+    get:
+      operationId: searchMeasurementRecords
+      tags: [orders]
+      summary: Search measurement sheets for quotation linking
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 160
+      responses:
+        "200":
+          description: Matching measurement records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementRecordLookupList"
+  /measurement-records/{recordId}:
+    patch:
+      operationId: updateMeasurementRecord
+      tags: [orders]
+      summary: Update measurement record details or assign it to an order
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeasurementRecordUpdate"
+      responses:
+        "200":
+          description: Updated measurement record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementRecord"
+        "404":
+          description: Measurement record or order not found
+  /measurement-records/{recordId}/versions/{filename}:
+    post:
+      operationId: uploadMeasurementVersion
+      tags: [orders]
+      summary: Add a retained measurement sheet version
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 180
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: New measurement version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementVersion"
+        "400":
+          description: Invalid measurement sheet
+        "404":
+          description: Measurement record not found
+  /measurement-records/{recordId}/versions/{versionId}/content:
+    get:
+      operationId: downloadMeasurementVersion
+      tags: [orders]
+      summary: Download a retained measurement sheet version
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Measurement sheet file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Version not found
   /orders/{id}/windows:
     get:
       operationId: listOrderWindows
@@ -2491,4 +2796,210 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Quotation"
+    QuotationRateSubmissionStatus:
+      type: string
+      enum: [awaiting_pdf, pending_review, approved, rejected]
+    QuotationRateSubmission:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: ["string", "null"]
+        orderId:
+          type: ["string", "null"]
+        clientName:
+          type: string
+        location:
+          type: ["string", "null"]
+        windowQty:
+          type: integer
+        totalSqFt:
+          type: number
+        glassType:
+          type: string
+        averageSqFtPerQty:
+          type: number
+        status:
+          $ref: "#/components/schemas/QuotationRateSubmissionStatus"
+        pdfFilename:
+          type: ["string", "null"]
+        pdfSizeBytes:
+          type: ["integer", "null"]
+        submittedBy:
+          type: string
+        submittedByName:
+          type: string
+        approverIds:
+          type: array
+          items:
+            type: string
+        decisionComment:
+          type: ["string", "null"]
+        decidedBy:
+          type: ["string", "null"]
+        decidedByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, orderRecordId, orderId, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, createdAt, updatedAt]
+    QuotationRateSubmissionList:
+      type: array
+      items:
+        $ref: "#/components/schemas/QuotationRateSubmission"
+    QuotationRateSubmissionLookup:
+      type: object
+      properties:
+        id:
+          type: string
+        clientName:
+          type: string
+        status:
+          $ref: "#/components/schemas/QuotationRateSubmissionStatus"
+        orderId:
+          type: ["string", "null"]
+      required: [id, clientName, status, orderId]
+    QuotationRateSubmissionLookupList:
+      type: array
+      items:
+        $ref: "#/components/schemas/QuotationRateSubmissionLookup"
+    QuotationOrderLinkInput:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        measurementRecordId:
+          type: ["string", "null"]
+      required: [orderRecordId, measurementRecordId]
+    QuotationRateSubmissionInput:
+      type: object
+      properties:
+        clientName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        location:
+          type: ["string", "null"]
+          maxLength: 160
+        windowQty:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        totalSqFt:
+          type: number
+          minimum: 0.01
+          maximum: 10000000
+        glassType:
+          type: string
+          minLength: 1
+          maxLength: 120
+      required: [clientName, location, windowQty, totalSqFt, glassType]
+    QuotationRateDecisionInput:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected]
+        comment:
+          type: string
+          maxLength: 1000
+      required: [decision, comment]
+    MeasurementVersion:
+      type: object
+      properties:
+        id:
+          type: string
+        versionNumber:
+          type: integer
+        filename:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        uploadedBy:
+          type: string
+        uploadedByName:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+      required: [id, versionNumber, filename, contentType, sizeBytes, uploadedBy, uploadedByName, uploadedAt]
+    MeasurementRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        clientName:
+          type: string
+        location:
+          type: ["string", "null"]
+        orderRecordId:
+          type: ["string", "null"]
+        orderId:
+          type: ["string", "null"]
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MeasurementVersion"
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, clientName, location, orderRecordId, orderId, versions, createdBy, createdAt, updatedAt]
+    MeasurementRecordList:
+      type: array
+      items:
+        $ref: "#/components/schemas/MeasurementRecord"
+    MeasurementRecordLookup:
+      type: object
+      properties:
+        id:
+          type: string
+        clientName:
+          type: string
+        location:
+          type: ["string", "null"]
+        orderId:
+          type: ["string", "null"]
+      required: [id, clientName, location, orderId]
+    MeasurementRecordLookupList:
+      type: array
+      items:
+        $ref: "#/components/schemas/MeasurementRecordLookup"
+    MeasurementRecordInput:
+      type: object
+      properties:
+        clientName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        location:
+          type: ["string", "null"]
+          maxLength: 160
+        orderRecordId:
+          type: ["string", "null"]
+      required: [clientName, location, orderRecordId]
+    MeasurementRecordUpdate:
+      type: object
+      properties:
+        clientName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        location:
+          type: ["string", "null"]
+          maxLength: 160
+        orderRecordId:
+          type: ["string", "null"]
+        linkQuotationSubmissionId:
+          type: string
 

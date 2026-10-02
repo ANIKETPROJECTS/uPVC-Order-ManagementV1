@@ -10,10 +10,10 @@ export type ModuleDefinition = {
 export const MODULES: ModuleDefinition[] = [
   { key: 'user-access', label: 'Multi-User Architecture & Role-Based Access Control', short: 'User access', built: true },
   { key: 'order-hub', label: 'Client & Order ID Management (Central Hub)', short: 'Client & orders', built: true },
-  { key: 'quotation-builder', label: 'Digital Quotation Builder & Document Repository', short: 'Quotations', built: true },
-  { key: 'rate-approval', label: 'Rate Approval Workflow', short: 'Rate approval' },
+  { key: 'quotation-builder', label: 'Quotation & Rate Approval', short: 'Quotation & approval', built: true },
+  { key: 'rate-approval', label: 'Rate Approval Queue', short: 'Approval queue' },
   { key: 'confirmation', label: 'Digital Confirmation / Purchase Order Generator', short: 'Confirmation / PO' },
-  { key: 'measurements', label: 'Measurement Database (Version Control)', short: 'Measurements' },
+  { key: 'measurements', label: 'Measurement Database (Version Control)', short: 'Measurements', built: true },
   { key: 'qr-assembly', label: 'QR Code Generation & Assembly Tracking', short: 'QR assembly' },
   { key: 'window-readiness', label: 'Window-wise Readiness Tracking', short: 'Window readiness' },
   { key: 'glass-procurement', label: 'Glass Procurement & Delivery Tracking', short: 'Glass procurement' },
