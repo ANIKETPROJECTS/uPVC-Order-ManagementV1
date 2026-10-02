@@ -35,6 +35,8 @@ import {
   allEditPermissions,
   emptyPermissionMap,
   getMongoDb,
+  getOrderActivity,
+  getOrders,
   getPublicUser,
   getRoles,
   getUsers,
@@ -625,6 +627,26 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   const role = await findRole(db, user.roleId);
   const permissions = effectivePermissions(role, user);
   const moduleCount = Object.values(permissions).filter((level) => level !== "none").length;
+  const paymentActivityRows = permissions.payments === "none"
+    ? []
+    : await getOrderActivity(db).find({ action: "payment.reminder_prepared" }).sort({ createdAt: -1 }).limit(10).toArray();
+  const activityOrderIds = [...new Set(paymentActivityRows.map((item) => item.orderRecordId))];
+  const activityOrders = activityOrderIds.length
+    ? await getOrders(db).find({ _id: { $in: activityOrderIds } }).project({ _id: 1, orderId: 1 }).toArray()
+    : [];
+  const orderIdsByRecord = new Map(activityOrders.map((order) => [order._id, order.orderId]));
+  const liveActivity = paymentActivityRows.flatMap((item) => {
+    const orderId = orderIdsByRecord.get(item.orderRecordId);
+    if (!orderId) return [];
+    return [{
+      id: item._id,
+      orderRecordId: item.orderRecordId,
+      orderId,
+      summary: item.summary,
+      actorName: item.actorName,
+      createdAt: item.createdAt.toISOString(),
+    }];
+  });
   const labels: Record<string, string> = {
     "master-admin": "System overview",
     operator: "Production floor",
@@ -639,6 +661,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
       roleName: role?.name ?? "Unassigned",
       roleLabel: labels[user.roleId] ?? "Team workspace",
       moduleCount,
+      liveActivity,
     }),
   );
 });

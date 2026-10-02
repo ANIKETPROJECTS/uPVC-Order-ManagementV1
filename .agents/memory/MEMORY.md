@@ -3,3 +3,4 @@
 - [pnpm workspace installs](pnpm-dependency-installs.md) — the package helper targets the workspace root; use the filtered pnpm package command for app-only dependencies.
 - [Quotation profile snapshots](quotation-snapshots.md) — keep saved proposal details stable when the reusable profile catalogue changes.
 - [Scoped workspace themes](workspace-theme-scope.md) — theme choice affects the sidebar and selected hero panels; workspace content remains light.
+- [Manual WhatsApp reminders](manual-whatsapp-reminders.md) — open a drafted message for an employee to send; never use Meta APIs or WhatsApp credentials.

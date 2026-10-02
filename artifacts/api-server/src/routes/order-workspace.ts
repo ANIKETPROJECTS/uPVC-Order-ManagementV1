@@ -3,17 +3,28 @@ import { ObjectId } from "mongodb";
 import { Router as ExpressRouter, type RequestHandler } from "express";
 import {
   ArchiveOrderDocumentParams, ArchiveOrderWindowParams,
+  CreateOrderDocumentCategoryBody, CreateOrderDocumentCategoryResponse,
   CreateOrderWindowBody, CreateOrderWindowParams, CreateOrderWindowResponse, DownloadOrderDocumentParams,
+  DeleteOrderDocumentCategoryParams,
+  GetPaymentOverviewResponse,
+  ListOrderDocumentCategoriesResponse,
   ListOrderActivityParams, ListOrderActivityResponse, ListOrderDocumentsParams, ListOrderDocumentsResponse,
   ListOrderPaymentsParams, ListOrderPaymentsResponse, ListOrderWindowsParams, ListOrderWindowsResponse,
+  OpenPaymentReminderParams,
   RecordOrderPaymentBody, RecordOrderPaymentParams, RecordOrderPaymentResponse, UpdateOrderWindowBody,
+  UpdateOrderDocumentCategoryBody, UpdateOrderDocumentCategoryParams, UpdateOrderDocumentCategoryResponse,
   UpdateOrderWindowParams, UpdateOrderWindowResponse, VoidOrderPaymentBody, VoidOrderPaymentParams, VoidOrderPaymentResponse,
   UploadOrderDocumentParams, UploadOrderDocumentResponse,
 } from "@workspace/api-zod";
 import {
-  getMongoDb, getOrderActivity, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPayments,
+  getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPayments,
   getOrders, getOrderWindows, getPublicUser, getUsers, type DocumentCategory, type OrderWindowDocument,
 } from "../lib/mongo";
+import {
+  ensureDefaultOrderDocumentCategories,
+  normalizeDocumentCategoryName,
+  orderDocumentCategoryResponse,
+} from "../lib/order-document-categories";
 import {
   removeProjectUpload,
   resolveProjectUploadPath,
@@ -24,7 +35,6 @@ const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
 const MAX_FILE_MESSAGE = "Document must be 10 MiB or smaller.";
 const mimeByExt: Record<string, string[]> = { pdf: ["application/pdf"], png: ["image/png"], jpg: ["image/jpeg"], jpeg: ["image/jpeg"], webp: ["image/webp"], docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"], xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] };
-const categoryModule: Record<DocumentCategory, string> = { quotation: "quotation-builder", purchase_order: "confirmation", confirmation: "confirmation", drawing: "measurements", invoice: "payments", other: "order-hub" };
 type UserContext = { id: string; name: string; permissions: Record<string, string>; masterAdmin: boolean };
 
 async function context(req: Parameters<RequestHandler>[0], res: Parameters<RequestHandler>[1], module?: string, edit = false): Promise<UserContext | null> {
@@ -58,6 +68,12 @@ const paymentResponse = (p: any) => ({ ...p, id: p._id, paidAt: p.paidAt.toISOSt
 const docResponse = (d: any) => ({ id: d._id, orderRecordId: d.orderRecordId, filename: d.filename, category: d.category, contentType: d.contentType, sizeBytes: d.sizeBytes, uploadedBy: d.uploadedBy, uploadedAt: d.uploadedAt.toISOString() });
 const activityResponse = (a: any) => ({ ...a, id: a._id, createdAt: a.createdAt.toISOString() });
 const gridFsOptions = (contentType: string, orderRecordId: string, category: string) => ({ contentType, metadata: { orderRecordId, category } });
+const toWhatsAppNumber = (value: string | null | undefined) => {
+  const digits = (value ?? "").replace(/\D/g, "");
+  const normalized = digits.length === 10 ? `91${digits}` : digits;
+  return normalized.length >= 8 && normalized.length <= 15 ? normalized : null;
+};
+const formatReminderAmount = (value: number) => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(value);
 
 router.get("/orders/:id/windows", async (req, res): Promise<void> => {
   const p = ListOrderWindowsParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
@@ -100,11 +116,228 @@ router.get("/orders/:id/payments", async (req, res): Promise<void> => { const p 
 router.post("/orders/:id/payments", async (req, res): Promise<void> => { const p = RecordOrderPaymentParams.safeParse(req.params), b = RecordOrderPaymentBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; } const actor = await context(req, res, "payments", true); const order = actor ? await orderExists(p.data.id, res) : null; if (!actor || !order) return; const db = await getMongoDb(); const total = await getOrderPayments(db).aggregate([{ $match: { orderRecordId: p.data.id, status: "received" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).toArray(); if (order.orderValue != null && Number(total[0]?.total ?? 0) + b.data.amount > order.orderValue) { res.status(400).json({ error: "Payment exceeds the remaining order balance." }); return; } const paidAt = new Date(b.data.paidAt); if (Number.isNaN(paidAt.getTime())) { res.status(400).json({ error: "Invalid payment date." }); return; } const payment = { _id: randomUUID(), orderRecordId: p.data.id, amount: b.data.amount, method: b.data.method, reference: b.data.reference ?? null, notes: b.data.notes ?? null, paidAt, status: "received" as const, voidReason: null, createdBy: actor.id, createdAt: new Date() }; await getOrderPayments(db).insertOne(payment); await event(p.data.id, actor, "payment.recorded", `Recorded payment of ${payment.amount}.`); res.status(201).json(RecordOrderPaymentResponse.parse(paymentResponse(payment))); });
 router.patch("/orders/:id/payments/:paymentId", async (req, res): Promise<void> => { const p = VoidOrderPaymentParams.safeParse(req.params), b = VoidOrderPaymentBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; } const actor = await context(req, res, "payments", true); if (!actor || !(await orderExists(p.data.id, res))) return; const db = await getMongoDb(); const old = await getOrderPayments(db).findOne({ _id: p.data.paymentId, orderRecordId: p.data.id }); if (!old) { res.status(404).json({ error: "Payment not found." }); return; } if (old.status === "void") { res.status(400).json({ error: "Payment is already void." }); return; } await getOrderPayments(db).updateOne({ _id: old._id }, { $set: { status: "void", voidReason: b.data.voidReason, voidedBy: actor.id, voidedAt: new Date() } }); const updated = await getOrderPayments(db).findOne({ _id: old._id }); await event(p.data.id, actor, "payment.voided", `Voided payment of ${old.amount}.`); res.json(VoidOrderPaymentResponse.parse(paymentResponse(updated))); });
 
+router.get("/payments/overview", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "payments");
+  if (!actor) return;
+  const db = await getMongoDb();
+  const [orders, paymentTotals, recentPayments] = await Promise.all([
+    getOrders(db).find({}).toArray(),
+    getOrderPayments(db).aggregate<{ _id: string; total: number }>([
+      { $match: { status: "received" } },
+      { $group: { _id: "$orderRecordId", total: { $sum: "$amount" } } },
+    ]).toArray(),
+    getOrderPayments(db).find({ status: "received" }).sort({ createdAt: -1, _id: -1 }).limit(12).toArray(),
+  ]);
+  const orderById = new Map(orders.map((order) => [order._id, order]));
+  const collectedByOrder = new Map(paymentTotals.map((row) => [row._id, Number(row.total) || 0]));
+  const totalCollected = paymentTotals.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
+  const totalOutstanding = orders.reduce((sum, order) => {
+    if (order.orderValue == null) return sum;
+    return sum + Math.max(0, order.orderValue - (collectedByOrder.get(order._id) ?? 0));
+  }, 0);
+  const outstandingOrders = orders.filter((order) => order.orderValue != null
+    && order.orderValue - (collectedByOrder.get(order._id) ?? 0) > 0);
+  const activeWindows = await getOrderWindows(db).find({
+    orderRecordId: { $in: outstandingOrders.map((order) => order._id) },
+    archivedAt: { $exists: false },
+  }).toArray();
+  const windowsByOrder = new Map<string, OrderWindowDocument[]>();
+  for (const window of activeWindows) {
+    const rows = windowsByOrder.get(window.orderRecordId) ?? [];
+    rows.push(window);
+    windowsByOrder.set(window.orderRecordId, rows);
+  }
+  const reminderOrders = outstandingOrders.flatMap((order) => {
+    const windows = windowsByOrder.get(order._id) ?? [];
+    const collected = collectedByOrder.get(order._id) ?? 0;
+    const balance = order.orderValue! - collected;
+    if (windows.length === 0 || windows.some((window) => window.frameStatus !== "ready"
+      || window.shutterStatus !== "ready" || window.glassStatus !== "received")) return [];
+    return [{
+      orderRecordId: order._id,
+      orderId: order.orderId,
+      clientName: order.clientName,
+      locationName: order.locationName,
+      orderValue: order.orderValue!,
+      totalCollected: collected,
+      balance,
+      windowCount: windows.length,
+      canOpenWhatsApp: Boolean(toWhatsAppNumber(order.clientPhone)),
+    }];
+  }).sort((a, b) => b.balance - a.balance);
+
+  const recentOrderIds = new Set(recentPayments.map((payment) => payment.orderRecordId));
+  const recorderIds = [...new Set(recentPayments.map((payment) => payment.createdBy))];
+  const recorders = await getUsers(db).find({ _id: { $in: recorderIds } }).project({ _id: 1, name: 1 }).toArray();
+  const recorderNames = new Map(recorders.map((recorder) => [recorder._id, recorder.name]));
+  const recentUpdates = recentPayments.flatMap((payment) => {
+    const order = orderById.get(payment.orderRecordId);
+    if (!order || !recentOrderIds.has(payment.orderRecordId)) return [];
+    return [{
+      id: payment._id,
+      orderRecordId: payment.orderRecordId,
+      orderId: order.orderId,
+      clientName: order.clientName,
+      locationName: order.locationName,
+      amount: payment.amount,
+      method: payment.method,
+      paidAt: payment.paidAt.toISOString(),
+      recordedBy: recorderNames.get(payment.createdBy) ?? "Former user",
+      createdAt: payment.createdAt.toISOString(),
+    }];
+  });
+  const reminderAvailable = reminderOrders.some((order) => order.canOpenWhatsApp);
+  res.json(GetPaymentOverviewResponse.parse({
+    totalCollected,
+    totalOutstanding,
+    ordersWithBalance: outstandingOrders.length,
+    reminderOrders,
+    recentPayments: recentUpdates,
+    reminderAvailable,
+    reminderUnavailableReason: reminderOrders.length > 0 && !reminderAvailable
+      ? "A valid client WhatsApp number is required to open a reminder draft."
+      : null,
+  }));
+});
+
+router.post("/orders/:id/payment-reminder", async (req, res): Promise<void> => {
+  const p = OpenPaymentReminderParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
+  const db = await getMongoDb();
+  const windows = await getOrderWindows(db).find({
+    orderRecordId: order._id,
+    archivedAt: { $exists: false },
+  }).toArray();
+  if (windows.length === 0 || windows.some((window) => window.frameStatus !== "ready"
+    || window.shutterStatus !== "ready" || window.glassStatus !== "received")) {
+    res.status(409).json({ error: "Every active window must have a ready frame, ready shutter, and received glass before opening a reminder." });
+    return;
+  }
+  if (order.orderValue == null) {
+    res.status(409).json({ error: "Set the order value before opening a balance reminder." });
+    return;
+  }
+  const paymentTotal = await getOrderPayments(db).aggregate<{ total: number }>([
+    { $match: { orderRecordId: order._id, status: "received" } },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]).toArray();
+  const balance = order.orderValue - Number(paymentTotal[0]?.total ?? 0);
+  if (balance <= 0) {
+    res.status(409).json({ error: "This order no longer has an outstanding balance." });
+    return;
+  }
+  const phoneNumber = toWhatsAppNumber(order.clientPhone);
+  if (!phoneNumber) {
+    res.status(409).json({ error: "Add a valid WhatsApp number to this order before opening a reminder." });
+    return;
+  }
+  const message = `Hello ${order.clientName}, the outstanding balance of ₹${formatReminderAmount(balance)} is due for your uPVC order ${order.orderId} at ${order.locationName}. All windows are ready. Please contact us to arrange payment. Thank you.`;
+  const whatsappUrl = new URL(`https://wa.me/${phoneNumber}`);
+  whatsappUrl.searchParams.set("text", message);
+  await event(
+    order._id,
+    actor,
+    "payment.reminder_prepared",
+    `Prepared a manual WhatsApp balance reminder for ${order.clientName} on order ${order.orderId}. The message opens as a draft; sending is manual and delivery is not confirmed.`,
+  );
+  res.redirect(303, whatsappUrl.toString());
+});
+
+router.get("/order-document-categories", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "order-hub");
+  if (!actor) return;
+  const db = await getMongoDb();
+  await ensureDefaultOrderDocumentCategories(db);
+  const categories = await getOrderDocumentCategories(db).find({}).sort({ label: 1 }).toArray();
+  res.json(ListOrderDocumentCategoriesResponse.parse(categories.map(orderDocumentCategoryResponse)));
+});
+
+router.post("/order-document-categories", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "order-hub", true);
+  if (!actor) return;
+  const body = CreateOrderDocumentCategoryBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: body.error.message }); return; }
+  const label = normalizeDocumentCategoryName(body.data.name);
+  if (!label) { res.status(400).json({ error: "Category name cannot be blank." }); return; }
+  const db = await getMongoDb();
+  await ensureDefaultOrderDocumentCategories(db);
+  const categories = getOrderDocumentCategories(db);
+  const labelNormalized = label.toLocaleLowerCase();
+  if (await categories.findOne({ labelNormalized })) {
+    res.status(409).json({ error: "A document category with that name already exists." });
+    return;
+  }
+  const now = new Date();
+  const category = {
+    _id: randomUUID(),
+    label,
+    labelNormalized,
+    requiredModule: "order-hub",
+    createdAt: now,
+    updatedAt: now,
+  };
+  await categories.insertOne(category);
+  res.status(201).json(CreateOrderDocumentCategoryResponse.parse(orderDocumentCategoryResponse(category)));
+});
+
+router.patch("/order-document-categories/:categoryId", async (req, res): Promise<void> => {
+  const p = UpdateOrderDocumentCategoryParams.safeParse(req.params);
+  const body = UpdateOrderDocumentCategoryBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!body.success) { res.status(400).json({ error: body.error.message }); return; }
+  const actor = await context(req, res, "order-hub", true);
+  if (!actor) return;
+  const label = normalizeDocumentCategoryName(body.data.name);
+  if (!label) { res.status(400).json({ error: "Category name cannot be blank." }); return; }
+  const db = await getMongoDb();
+  await ensureDefaultOrderDocumentCategories(db);
+  const categories = getOrderDocumentCategories(db);
+  const current = await categories.findOne({ _id: p.data.categoryId });
+  if (!current) { res.status(404).json({ error: "Document category not found." }); return; }
+  const labelNormalized = label.toLocaleLowerCase();
+  if (await categories.findOne({ _id: { $ne: current._id }, labelNormalized })) {
+    res.status(409).json({ error: "A document category with that name already exists." });
+    return;
+  }
+  await categories.updateOne(
+    { _id: current._id },
+    { $set: { label, labelNormalized, updatedAt: new Date() } },
+  );
+  const updated = await categories.findOne({ _id: current._id });
+  if (!updated) { res.status(404).json({ error: "Document category not found." }); return; }
+  res.json(UpdateOrderDocumentCategoryResponse.parse(orderDocumentCategoryResponse(updated)));
+});
+
+router.delete("/order-document-categories/:categoryId", async (req, res): Promise<void> => {
+  const p = DeleteOrderDocumentCategoryParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "order-hub", true);
+  if (!actor) return;
+  const db = await getMongoDb();
+  await ensureDefaultOrderDocumentCategories(db);
+  const categories = getOrderDocumentCategories(db);
+  const category = await categories.findOne({ _id: p.data.categoryId });
+  if (!category) { res.status(404).json({ error: "Document category not found." }); return; }
+  if (await getOrderDocumentMetadata(db).countDocuments({ category: category._id })) {
+    res.status(409).json({ error: "This category is assigned to documents and cannot be deleted." });
+    return;
+  }
+  await categories.deleteOne({ _id: category._id });
+  res.status(204).send();
+});
+
 router.get("/orders/:id/documents", async (req, res): Promise<void> => { const p = ListOrderDocumentsParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } const actor = await context(req, res); if (!actor || !(await orderExists(p.data.id, res))) return; const rows = await getOrderDocumentMetadata(await getMongoDb()).find({ orderRecordId: p.data.id, archivedAt: { $exists: false } }).sort({ uploadedAt: -1 }).toArray(); res.json(ListOrderDocumentsResponse.parse(rows.map(docResponse))); });
 router.post("/orders/:id/documents/:category/:filename", async (req, res, next): Promise<void> => {
   const p = UploadOrderDocumentParams.safeParse(req.params);
   if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
-  const actor = await context(req, res, categoryModule[p.data.category], true);
+  const db = await getMongoDb();
+  await ensureDefaultOrderDocumentCategories(db);
+  const category = await getOrderDocumentCategories(db).findOne({ _id: p.data.category });
+  if (!category) { res.status(400).json({ error: "Choose an active document category." }); return; }
+  const actor = await context(req, res, category.requiredModule, true);
   if (!actor || !(await orderExists(p.data.id, res))) return;
   expressRaw(req, res, next, async () => {
     const body = req.body as Buffer;
@@ -115,7 +348,6 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
       res.status(400).json({ error: "Unsupported document. Allowed files are PDF, PNG, JPEG, WebP, DOCX and XLSX up to 10 MiB." });
       return;
     }
-    const db = await getMongoDb();
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
     const meta = { _id: randomUUID(), orderRecordId: p.data.id, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: null, storagePath, uploadedBy: actor.id, uploadedAt: new Date() };
     try {
@@ -136,7 +368,10 @@ router.delete("/orders/:id/documents/:documentId", async (req, res): Promise<voi
   const db = await getMongoDb();
   const meta = await getOrderDocumentMetadata(db).findOne({ _id: p.data.documentId, orderRecordId: p.data.id, archivedAt: { $exists: false } });
   if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
-  if (!requireModuleEdit(actor, res, categoryModule[meta.category])) return;
+  await ensureDefaultOrderDocumentCategories(db);
+  const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
+  if (!category) { res.status(409).json({ error: "The document category is no longer available." }); return; }
+  if (!requireModuleEdit(actor, res, category.requiredModule)) return;
   if (meta.gridFsId && ObjectId.isValid(meta.gridFsId)) {
     const bucket = getOrderDocumentsBucket(db);
     const gridId = new ObjectId(meta.gridFsId);

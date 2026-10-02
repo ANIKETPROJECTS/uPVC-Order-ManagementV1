@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-/**
- * @minLength 1
- * @maxLength 64
- */
-export type OrderDocumentCategory = string;
+export interface OrderDocumentCategoryInput {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     */
+  name: string;
+}

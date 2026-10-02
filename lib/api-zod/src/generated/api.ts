@@ -313,7 +313,8 @@ export const GetPaymentOverviewResponse = zod.object({
   "orderValue": zod.number(),
   "totalCollected": zod.number(),
   "balance": zod.number(),
-  "windowCount": zod.number().int()
+  "windowCount": zod.number().int(),
+  "canOpenWhatsApp": zod.boolean()
 })),
   "recentPayments": zod.array(zod.object({
   "id": zod.string(),
@@ -333,20 +334,14 @@ export const GetPaymentOverviewResponse = zod.object({
 
 
 /**
- * @summary Send an approved WhatsApp balance reminder for an eligible order
+ * The signed-in user reviews and sends the drafted message manually in WhatsApp. The API does not send or confirm delivery.
+ * @summary Open a manual WhatsApp balance reminder for an eligible order
  */
-export const SendPaymentReminderParams = zod.object({
+export const OpenPaymentReminderParams = zod.object({
   "id": zod.coerce.string()
 })
 
-export const SendPaymentReminderResponse = zod.object({
-  "accepted": zod.boolean(),
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "balance": zod.number(),
-  "acceptedAt": zod.coerce.date()
-})
+export const OpenPaymentReminderResponse = zod.void()
 
 
 /**
@@ -2292,17 +2287,88 @@ export const ListOrderDocumentsParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const listOrderDocumentsResponseCategoryMax = 64;
+
+
+
 export const ListOrderDocumentsResponseItem = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
   "filename": zod.string(),
-  "category": zod.enum(['quotation', 'purchase_order', 'confirmation', 'drawing', 'invoice', 'other']).describe('The drawing identifier is retained for existing documents and is displayed as Elevation.'),
+  "category": zod.string().min(1).max(listOrderDocumentsResponseCategoryMax),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
   "uploadedAt": zod.coerce.date()
 })
 export const ListOrderDocumentsResponse = zod.array(ListOrderDocumentsResponseItem)
+
+
+/**
+ * @summary List configured order document categories
+ */
+export const ListOrderDocumentCategoriesResponseItem = zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "requiredModule": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListOrderDocumentCategoriesResponse = zod.array(ListOrderDocumentCategoriesResponseItem)
+
+
+/**
+ * @summary Add an order document category
+ */
+export const createOrderDocumentCategoryBodyNameMax = 64;
+
+
+
+export const CreateOrderDocumentCategoryBody = zod.object({
+  "name": zod.string().min(1).max(createOrderDocumentCategoryBodyNameMax)
+})
+
+export const CreateOrderDocumentCategoryResponse = zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "requiredModule": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Rename an order document category
+ */
+export const UpdateOrderDocumentCategoryParams = zod.object({
+  "categoryId": zod.coerce.string()
+})
+
+export const updateOrderDocumentCategoryBodyNameMax = 64;
+
+
+
+export const UpdateOrderDocumentCategoryBody = zod.object({
+  "name": zod.string().min(1).max(updateOrderDocumentCategoryBodyNameMax)
+})
+
+export const UpdateOrderDocumentCategoryResponse = zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "requiredModule": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete an unused order document category
+ */
+export const DeleteOrderDocumentCategoryParams = zod.object({
+  "categoryId": zod.coerce.string()
+})
+
+export const DeleteOrderDocumentCategoryResponse = zod.void()
 
 
 /**
@@ -2319,21 +2385,27 @@ export const ArchiveOrderDocumentResponse = zod.void()
 /**
  * @summary Upload a document to an order
  */
+export const uploadOrderDocumentPathCategoryMax = 64;
+
 export const uploadOrderDocumentPathFilenameMax = 180;
 
 
 
 export const UploadOrderDocumentParams = zod.object({
   "id": zod.coerce.string(),
-  "category": zod.enum(['quotation', 'purchase_order', 'confirmation', 'drawing', 'invoice', 'other']),
+  "category": zod.coerce.string().min(1).max(uploadOrderDocumentPathCategoryMax),
   "filename": zod.coerce.string().min(1).max(uploadOrderDocumentPathFilenameMax)
 })
+
+export const uploadOrderDocumentResponseCategoryMax = 64;
+
+
 
 export const UploadOrderDocumentResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
   "filename": zod.string(),
-  "category": zod.enum(['quotation', 'purchase_order', 'confirmation', 'drawing', 'invoice', 'other']).describe('The drawing identifier is retained for existing documents and is displayed as Elevation.'),
+  "category": zod.string().min(1).max(uploadOrderDocumentResponseCategoryMax),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),

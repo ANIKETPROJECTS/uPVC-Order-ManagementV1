@@ -1546,6 +1546,82 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrderDocumentList"
+  /order-document-categories:
+    get:
+      operationId: listOrderDocumentCategories
+      tags: [orders]
+      summary: List configured order document categories
+      responses:
+        "200":
+          description: Active document categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDocumentCategoryConfigList"
+    post:
+      operationId: createOrderDocumentCategory
+      tags: [orders]
+      summary: Add an order document category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderDocumentCategoryInput"
+      responses:
+        "201":
+          description: Created document category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDocumentCategoryConfig"
+        "409":
+          description: A category with this name already exists
+  /order-document-categories/{categoryId}:
+    patch:
+      operationId: updateOrderDocumentCategory
+      tags: [orders]
+      summary: Rename an order document category
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderDocumentCategoryInput"
+      responses:
+        "200":
+          description: Updated document category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDocumentCategoryConfig"
+        "404":
+          description: Category not found
+        "409":
+          description: A category with this name already exists
+    delete:
+      operationId: deleteOrderDocumentCategory
+      tags: [orders]
+      summary: Delete an unused order document category
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Category deleted
+        "404":
+          description: Category not found
+        "409":
+          description: Category is assigned to one or more documents
   /orders/{id}/documents/{documentId}:
     delete:
       operationId: archiveOrderDocument
@@ -2263,8 +2339,36 @@ components:
         $ref: "#/components/schemas/OrderPayment"
     OrderDocumentCategory:
       type: string
-      description: The drawing identifier is retained for existing documents and is displayed as Elevation.
-      enum: [quotation, purchase_order, confirmation, drawing, invoice, other]
+      minLength: 1
+      maxLength: 64
+    OrderDocumentCategoryConfig:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        requiredModule:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, label, requiredModule, createdAt, updatedAt]
+    OrderDocumentCategoryConfigList:
+      type: array
+      items:
+        $ref: "#/components/schemas/OrderDocumentCategoryConfig"
+    OrderDocumentCategoryInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required: [name]
     OrderDocument:
       type: object
       properties:

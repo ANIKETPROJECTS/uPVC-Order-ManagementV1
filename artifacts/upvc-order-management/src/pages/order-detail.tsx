@@ -15,12 +15,16 @@ import {
   Download,
   FileText,
   IndianRupee,
+  Grid2X2,
+  List,
   Loader2,
   MessageSquareText,
   Pencil,
   Plus,
   RefreshCw,
   Save,
+  Search,
+  Settings2,
   Trash2,
   Upload,
   Wrench,
@@ -28,13 +32,13 @@ import {
 import {
   getDownloadOrderDocumentQueryKey,
   getGetOrderQueryKey,
+  getListOrderDocumentCategoriesQueryKey,
   getListOrderActivityQueryKey,
   getListOrderDocumentsQueryKey,
   getListOrderMessageTemplatesQueryKey,
   getListOrderPaymentsQueryKey,
   getListOrderWindowsQueryKey,
   getListOrdersQueryKey,
-  OrderDocumentCategory,
   OrderGlassStatus,
   OrderPaymentMethod,
   OrderPaymentStatus,
@@ -42,10 +46,13 @@ import {
   OrderWindowReadiness,
   useArchiveOrderDocument,
   useArchiveOrderWindow,
+  useCreateOrderDocumentCategory,
   useCreateOrderWindow,
+  useDeleteOrderDocumentCategory,
   useDownloadOrderDocument,
   useGetOrder,
   useListOrderActivity,
+  useListOrderDocumentCategories,
   useListOrderDocuments,
   useListOrderMessageTemplates,
   useListOrderPayments,
@@ -53,6 +60,7 @@ import {
   useRecordOrderPayment,
   useUpdateOrder,
   useUpdateOrderBilling,
+  useUpdateOrderDocumentCategory,
   useUpdateOrderWindow,
   useUploadOrderDocument,
   useVoidOrderPayment,
@@ -60,6 +68,8 @@ import {
 import type {
   Order,
   OrderDocument,
+  OrderDocumentCategory,
+  OrderDocumentCategoryConfig,
   OrderPayment,
   OrderWindow,
   User,
@@ -79,7 +89,7 @@ type Status = (typeof OrderStatus)[keyof typeof OrderStatus];
 type Readiness = (typeof OrderWindowReadiness)[keyof typeof OrderWindowReadiness];
 type GlassStatus = (typeof OrderGlassStatus)[keyof typeof OrderGlassStatus];
 type PaymentMethod = (typeof OrderPaymentMethod)[keyof typeof OrderPaymentMethod];
-type DocumentCategory = (typeof OrderDocumentCategory)[keyof typeof OrderDocumentCategory];
+type DocumentCategory = OrderDocumentCategory;
 
 const STATUS_OPTIONS: { value: Status; label: string; tone: string }[] = [
   { value: OrderStatus.quotation_stage, label: 'Quotation stage', tone: 'bg-slate-100 text-slate-700' },
@@ -108,15 +118,6 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: OrderPaymentMethod.cash, label: 'Cash' },
   { value: OrderPaymentMethod.cheque, label: 'Cheque' },
   { value: OrderPaymentMethod.other, label: 'Other' },
-];
-
-const DOCUMENT_CATEGORIES: { value: DocumentCategory; label: string }[] = [
-  { value: OrderDocumentCategory.quotation, label: 'Quotation' },
-  { value: OrderDocumentCategory.purchase_order, label: 'Purchase order' },
-  { value: OrderDocumentCategory.confirmation, label: 'Confirmation' },
-  { value: OrderDocumentCategory.drawing, label: 'Elevation' },
-  { value: OrderDocumentCategory.invoice, label: 'Invoice' },
-  { value: OrderDocumentCategory.other, label: 'Other' },
 ];
 
 const statusLabel = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.label || status.replaceAll('_', ' ');
@@ -317,19 +318,40 @@ function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; 
   return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-3"><SummaryStat label="Order value" value={inr(order.orderValue)} detail={order.orderValue == null ? 'Unknown' : 'Agreed value'} testId="text-billing-order-value" /><SummaryStat label="Received" value={plainInr(received)} detail="Status: received only" testId="text-payments-received" /><SummaryStat label="Balance" value={balance == null ? 'Unknown' : plainInr(balance)} detail={balance == null ? 'Set order value to calculate' : balance < 0 ? 'Received exceeds order value' : 'Order value less received'} testId="text-payment-balance" /></div><Card className="border-border/80" data-testid="card-payments"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Payment register</p><CardTitle className="mt-1 text-base">Receipts and voids</CardTitle><p className="mt-1 text-xs text-muted-foreground">Voids retain the original record and audit trail.</p></div>{canEdit && <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="button-record-payment"><Plus size={14} /> Record payment</Button>}</CardHeader><CardContent>{query.isLoading ? <div className="space-y-3" data-testid="state-payments-loading">{[1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Payment records could not be loaded." testId="state-payments-error" /> : payments.length === 0 ? <ZeroState icon={IndianRupee} title="No payment records" description={canEdit ? 'Record the first receipt when funds arrive.' : 'No payments have been persisted for this order.'} testId="state-payments-empty" /> : <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Paid at</th><th className="px-3 py-3">Amount</th><th className="px-3 py-3">Method</th><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Action</th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/50 last:border-0" data-testid={`row-payment-${payment.id}`}><td className="px-3 py-3"><p>{dateLabel(payment.paidAt)}</p><p className="mt-1 text-[10px] text-muted-foreground">by {payment.createdBy}</p></td><td className="px-3 py-3 font-semibold" data-testid={`text-payment-amount-${payment.id}`}>{plainInr(payment.amount)}</td><td className="px-3 py-3 capitalize">{readable(payment.method)}</td><td className="px-3 py-3 text-muted-foreground">{payment.reference || '—'}</td><td className="px-3 py-3"><span className={`rounded-md px-2 py-1 text-[10px] font-bold ${payment.status === OrderPaymentStatus.received ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{payment.status === OrderPaymentStatus.received ? 'Received' : 'Void'}</span>{payment.voidReason && <p className="mt-1 max-w-[160px] truncate text-[10px] text-muted-foreground" title={payment.voidReason}>{payment.voidReason}</p>}</td><td className="px-3 py-3 text-right">{canEdit && payment.status === OrderPaymentStatus.received && <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={voidingId === payment.id} onClick={() => voidPaymentRecord(payment)} data-testid={`button-void-payment-${payment.id}`}>{voidingId === payment.id ? <Loader2 className="animate-spin" size={13} /> : <Archive size={13} />} Void</Button>}</td></tr>)}</tbody></table></div>}</CardContent></Card><PaymentDialog orderId={orderId} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderPaymentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></div>;
 }
 
-const documentPermission: Record<DocumentCategory, string> = { quotation: 'quotation-builder', purchase_order: 'confirmation', confirmation: 'confirmation', drawing: 'measurements', invoice: 'payments', other: 'order-hub' };
-
 function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const query = useListOrderDocuments(orderId, { query: { queryKey: getListOrderDocumentsQueryKey(orderId) } });
+  const categoryQuery = useListOrderDocumentCategories({ query: { queryKey: getListOrderDocumentCategoriesQueryKey(), refetchOnWindowFocus: true } });
   const upload = useUploadOrderDocument();
   const archive = useArchiveOrderDocument();
-  const [category, setCategory] = useState<DocumentCategory>(OrderDocumentCategory.other);
+  const createCategory = useCreateOrderDocumentCategory();
+  const updateCategory = useUpdateOrderDocumentCategory();
+  const deleteCategory = useDeleteOrderDocumentCategory();
+  const [category, setCategory] = useState<DocumentCategory>('other');
   const [fileKey, setFileKey] = useState(0);
   const [downloadId, setDownloadId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+  const [layout, setLayout] = useState<'list' | 'grid'>('list');
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const download = useDownloadOrderDocument(orderId, downloadId || '', { query: { enabled: Boolean(downloadId), queryKey: getDownloadOrderDocumentQueryKey(orderId, downloadId || '') } });
   const documents = query.data || [];
+  const categories = categoryQuery.data || [];
+  const categoriesById = useMemo(() => new Map(categories.map((item) => [item.id, item])), [categories]);
+  const selectedModule = categoriesById.get(category)?.requiredModule || 'order-hub';
+  const canConfigureCategories = hasPermission(user, 'order-hub');
+
+  useEffect(() => {
+    if (categories.length && !categoriesById.has(category)) {
+      setCategory(categoriesById.has('other') ? 'other' : categories[0].id);
+    }
+  }, [categories, categoriesById, category]);
+
   useEffect(() => {
     if (!download.data || !downloadId) return;
     const url = URL.createObjectURL(download.data);
@@ -345,10 +367,31 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
     toast({ title: 'Document download failed', description: 'Please try downloading it again.', variant: 'destructive' });
     setDownloadId(null);
   }, [download.isError, downloadId, toast]);
+
+  const categoryLabel = (id: string) => categoriesById.get(id)?.label || readable(id);
+  const categoryModule = (id: string) => categoriesById.get(id)?.requiredModule || 'order-hub';
+  const filteredDocuments = useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase();
+    const result = documents.filter((item) => {
+      const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+      const haystack = `${item.filename} ${categoryLabel(item.category)} ${item.contentType} ${item.uploadedBy}`.toLocaleLowerCase();
+      return matchesCategory && (!needle || haystack.includes(needle));
+    });
+    return result.sort((a, b) => {
+      if (sortBy === 'name-asc') return a.filename.localeCompare(b.filename);
+      if (sortBy === 'name-desc') return b.filename.localeCompare(a.filename);
+      if (sortBy === 'size-desc') return b.sizeBytes - a.sizeBytes;
+      if (sortBy === 'size-asc') return a.sizeBytes - b.sizeBytes;
+      const dateA = new Date(a.uploadedAt).getTime() || 0;
+      const dateB = new Date(b.uploadedAt).getTime() || 0;
+      return sortBy === 'oldest' ? dateA - dateB : dateB - dateA;
+    });
+  }, [documents, search, categoryFilter, sortBy, categoriesById]);
+
   const uploadFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || !hasPermission(user, documentPermission[category])) return;
+    if (!file || !hasPermission(user, selectedModule)) return;
     if (file.size > 10 * 1024 * 1024) {
       toast({ title: 'Document is too large', description: 'Choose a file that is 10 MiB or smaller.', variant: 'destructive' });
       return;
@@ -359,11 +402,158 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
     }
     upload.mutate({ id: orderId, category, filename: file.name, data: file }, { onSuccess: () => { toast({ title: 'Document uploaded' }); setFileKey((value) => value + 1); void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Document could not be uploaded', variant: 'destructive' as const }) });
   };
+
   const remove = (documentRecord: OrderDocument) => {
-    if (!hasPermission(user, documentPermission[documentRecord.category]) || !window.confirm(`Remove ${documentRecord.filename}?`)) return;
+    if (!hasPermission(user, categoryModule(documentRecord.category)) || !window.confirm(`Remove ${documentRecord.filename}?`)) return;
     archive.mutate({ id: orderId, documentId: documentRecord.id }, { onSuccess: () => { toast({ title: 'Document removed' }); void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Document could not be removed', variant: 'destructive' as const }) });
   };
-  return <div className="space-y-5"><Card className="border-border/80" data-testid="card-document-upload"><CardHeader className="pb-3"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Document intake</p><CardTitle className="mt-1 text-base">Attach to order</CardTitle><p className="mt-1 text-xs text-muted-foreground">Category access controls both upload and removal.</p></CardHeader><CardContent><div className="flex flex-col gap-3 sm:flex-row sm:items-end"><div className="w-full sm:max-w-xs"><label className="text-xs font-semibold" htmlFor="document-category">Category</label><Select value={category} onValueChange={(value) => setCategory(value as DocumentCategory)}><SelectTrigger id="document-category" className="mt-1" data-testid="select-document-category"><SelectValue /></SelectTrigger><SelectContent>{DOCUMENT_CATEGORIES.map((item) => <SelectItem value={item.value} key={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-[10px] text-muted-foreground">Requires {documentPermission[category]} edit</p></div><label className={`inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 ${!hasPermission(user, documentPermission[category]) || upload.isPending ? 'pointer-events-none opacity-50' : ''}`} data-testid="button-upload-document"><Upload size={14} /> {upload.isPending ? 'Uploading…' : 'Choose file'}<input key={fileKey} type="file" className="sr-only" disabled={!hasPermission(user, documentPermission[category]) || upload.isPending} onChange={uploadFile} data-testid="input-upload-document" /></label></div></CardContent></Card><Card className="border-border/80" data-testid="card-documents"><CardHeader className="pb-3"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order repository</p><CardTitle className="mt-1 text-base">Documents <span className="font-mono text-xs font-normal text-muted-foreground">{documents.length}</span></CardTitle></CardHeader><CardContent>{query.isLoading ? <div className="space-y-3" data-testid="state-documents-loading">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Documents could not be loaded." testId="state-documents-error" /> : documents.length === 0 ? <ZeroState icon={FileText} title="No documents attached" description="This order has no persisted documents in its repository." testId="state-documents-empty" /> : <div className="divide-y divide-border/60">{documents.map((item) => <div key={item.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between" data-testid={`row-document-${item.id}`}><div className="flex min-w-0 items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground"><FileText size={16} /></div><div className="min-w-0"><p className="truncate text-sm font-semibold" data-testid={`text-document-name-${item.id}`}>{item.filename}</p><p className="mt-1 text-[11px] capitalize text-muted-foreground">{readable(item.category)} · {item.contentType} · {formatBytes(item.sizeBytes)}</p><p className="mt-1 text-[10px] text-muted-foreground">Uploaded by {item.uploadedBy} · {dateLabel(item.uploadedAt)}</p></div></div><div className="flex shrink-0 gap-2 sm:pl-4"><Button variant="outline" size="sm" disabled={downloadId === item.id} onClick={() => setDownloadId(item.id)} data-testid={`button-download-document-${item.id}`}>{downloadId === item.id ? <Loader2 className="animate-spin" size={13} /> : <Download size={13} />} Download</Button>{hasPermission(user, documentPermission[item.category]) && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => remove(item)} data-testid={`button-remove-document-${item.id}`}><Trash2 size={14} /></Button>}</div></div>)}</div>}</CardContent></Card></div>;
+
+  const saveCategory = () => {
+    const name = categoryName.trim().replace(/\s+/g, ' ');
+    if (!name) { setCategoryError('Enter a category name.'); return; }
+    setCategoryError(null);
+    const onSuccess = () => {
+      setCategoryName('');
+      setEditingCategoryId(null);
+      setCategoryError(null);
+      toast({ title: editingCategoryId ? 'Category updated' : 'Category added' });
+      void queryClient.invalidateQueries({ queryKey: getListOrderDocumentCategoriesQueryKey() });
+    };
+    const onError = (error: Error) => setCategoryError(error.message || 'Category could not be saved.');
+    if (editingCategoryId) {
+      updateCategory.mutate({ categoryId: editingCategoryId, data: { name } }, { onSuccess, onError });
+    } else {
+      createCategory.mutate({ data: { name } }, { onSuccess, onError });
+    }
+  };
+
+  const editCategory = (item: OrderDocumentCategoryConfig) => {
+    setEditingCategoryId(item.id);
+    setCategoryName(item.label);
+    setCategoryError(null);
+  };
+
+  const removeCategory = (item: OrderDocumentCategoryConfig) => {
+    if (!window.confirm(`Delete the "${item.label}" category? Categories used by documents cannot be deleted.`)) return;
+    setCategoryError(null);
+    deleteCategory.mutate({ categoryId: item.id }, {
+      onSuccess: () => {
+        if (category === item.id) setCategory('other');
+        setEditingCategoryId(null);
+        setCategoryName('');
+        setCategoryError(null);
+        toast({ title: 'Category deleted' });
+        void queryClient.invalidateQueries({ queryKey: getListOrderDocumentCategoriesQueryKey() });
+      },
+      onError: (error) => setCategoryError(error.message || 'Category could not be deleted.'),
+    });
+  };
+
+  const canSaveCategory = !createCategory.isPending && !updateCategory.isPending;
+  const documentActions = (item: OrderDocument) => <div className="flex shrink-0 gap-2">
+    <Button variant="outline" size="sm" disabled={downloadId === item.id} onClick={() => setDownloadId(item.id)} data-testid={`button-download-document-${item.id}`}>{downloadId === item.id ? <Loader2 className="animate-spin" size={13} /> : <Download size={13} />} Download</Button>
+    {hasPermission(user, categoryModule(item.category)) && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => remove(item)} aria-label={`Remove ${item.filename}`} data-testid={`button-remove-document-${item.id}`}><Trash2 size={14} /></Button>}
+  </div>;
+
+  return <div className="space-y-5">
+    <Card className="border-border/80" data-testid="card-document-upload">
+      <CardHeader className="pb-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Document intake</p>
+        <CardTitle className="mt-1 text-base">Attach to order</CardTitle>
+        <p className="mt-1 text-xs text-muted-foreground">Category access controls both upload and removal.</p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 sm:grid-cols-[minmax(16rem,24rem)_1fr] sm:items-end">
+          <div className="min-w-0">
+            <label className="text-xs font-semibold" htmlFor="document-category">Category</label>
+            <Select value={category} onValueChange={(value) => setCategory(value)} disabled={categoryQuery.isLoading || categories.length === 0}>
+              <SelectTrigger id="document-category" className="mt-1 h-10" data-testid="select-document-category"><SelectValue placeholder="Choose a category" /></SelectTrigger>
+              <SelectContent>{categories.map((item) => <SelectItem value={item.id} key={item.id}>{item.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className={`inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 ${!hasPermission(user, selectedModule) || upload.isPending || categories.length === 0 ? 'pointer-events-none opacity-50' : ''}`} data-testid="button-upload-document">
+              <Upload size={14} /> {upload.isPending ? 'Uploading…' : 'Choose file'}
+              <input key={fileKey} type="file" className="sr-only" disabled={!hasPermission(user, selectedModule) || upload.isPending || categories.length === 0} onChange={uploadFile} data-testid="input-upload-document" />
+            </label>
+            {canConfigureCategories && <Button type="button" variant="outline" className="h-10" onClick={() => { setCategoryDialogOpen(true); setCategoryError(null); }} data-testid="button-document-category-config"><Settings2 size={14} /> Category configuration</Button>}
+          </div>
+        </div>
+        {categoryQuery.isError && <div className="mt-3"><InlineError onRetry={() => void categoryQuery.refetch()} label="Document categories could not be loaded." testId="state-document-categories-error" /></div>}
+      </CardContent>
+    </Card>
+
+    <Card className="border-border/80" data-testid="card-documents">
+      <CardHeader className="pb-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order repository</p>
+        <CardTitle className="mt-1 text-base">Documents <span className="font-mono text-xs font-normal text-muted-foreground" data-testid="count-documents">{documents.length}</span></CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-5 grid gap-3 sm:grid-cols-[minmax(12rem,1fr)_minmax(9rem,12rem)_minmax(9rem,12rem)_auto]">
+          <div className="relative">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search documents" aria-label="Search documents" className="pl-9" data-testid="input-document-search" />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger aria-label="Filter documents by category" data-testid="select-document-filter"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">All categories</SelectItem>{categories.map((item) => <SelectItem value={item.id} key={item.id}>{item.label}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger aria-label="Sort documents" data-testid="select-document-sort"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest first</SelectItem>
+              <SelectItem value="oldest">Oldest first</SelectItem>
+              <SelectItem value="name-asc">Name A–Z</SelectItem>
+              <SelectItem value="name-desc">Name Z–A</SelectItem>
+              <SelectItem value="size-desc">Largest file</SelectItem>
+              <SelectItem value="size-asc">Smallest file</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center justify-end gap-1 rounded-lg border border-border p-1" role="group" aria-label="Document layout">
+            <Button type="button" variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" aria-label="List layout" aria-pressed={layout === 'list'} onClick={() => setLayout('list')} data-testid="button-view-documents-list"><List size={16} /></Button>
+            <Button type="button" variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" aria-label="Grid layout" aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')} data-testid="button-view-documents-grid"><Grid2X2 size={16} /></Button>
+          </div>
+        </div>
+
+        {query.isLoading ? <div className="space-y-3" data-testid="state-documents-loading">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div>
+          : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Documents could not be loaded." testId="state-documents-error" />
+            : documents.length === 0 ? <ZeroState icon={FileText} title="No documents attached" description="This order has no persisted documents in its repository." testId="state-documents-empty" />
+              : filteredDocuments.length === 0 ? <div className="rounded-xl border border-dashed border-border bg-muted/15 px-5 py-10 text-center" data-testid="state-documents-no-match">
+                <Search className="mx-auto text-muted-foreground/60" size={24} /><p className="mt-3 text-sm font-semibold">No matching documents</p><p className="mt-1 text-xs text-muted-foreground">Try another search or category filter.</p>
+                <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => { setSearch(''); setCategoryFilter('all'); }} data-testid="button-clear-document-filters">Clear filters</Button>
+              </div>
+                : layout === 'list' ? <div className="divide-y divide-border/60" data-testid="list-documents">
+                  {filteredDocuments.map((item) => <div key={item.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between" data-testid={`row-document-${item.id}`}>
+                    <div className="flex min-w-0 items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground"><FileText size={16} /></div><div className="min-w-0"><p className="truncate text-sm font-semibold" data-testid={`text-document-name-${item.id}`}>{item.filename}</p><p className="mt-1 text-[11px] text-muted-foreground">{categoryLabel(item.category)} · {item.contentType} · {formatBytes(item.sizeBytes)}</p><p className="mt-1 text-[10px] text-muted-foreground">Uploaded by {item.uploadedBy} · {dateLabel(item.uploadedAt)}</p></div></div>
+                    {documentActions(item)}
+                  </div>)}
+                </div> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="grid-documents">
+                  {filteredDocuments.map((item) => <article key={item.id} className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border border-border/70 bg-background/40 p-4" data-testid={`row-document-${item.id}`}>
+                    <div className="flex min-w-0 items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground"><FileText size={16} /></div><div className="min-w-0"><p className="break-words text-sm font-semibold" data-testid={`text-document-name-${item.id}`}>{item.filename}</p><p className="mt-1 text-[11px] text-muted-foreground">{categoryLabel(item.category)} · {formatBytes(item.sizeBytes)}</p><p className="mt-1 text-[10px] text-muted-foreground">{item.contentType} · {dateLabel(item.uploadedAt)}</p><p className="mt-1 text-[10px] text-muted-foreground">Uploaded by {item.uploadedBy}</p></div></div>
+                    <div className="flex justify-end border-t border-border/60 pt-3">{documentActions(item)}</div>
+                  </article>)}
+                </div>}
+      </CardContent>
+    </Card>
+
+    {categoryDialogOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-3 sm:items-center" data-testid="dialog-document-categories">
+      <section className="max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="document-category-dialog-title">
+        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Order documents</p><h2 id="document-category-dialog-title" className="mt-1 font-display text-xl font-bold">Category configuration</h2><p className="mt-1 text-xs text-muted-foreground">Categories are saved for the workspace. Categories assigned to documents cannot be deleted.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => setCategoryDialogOpen(false)} data-testid="button-close-document-category-config">Close</Button></div>
+        <form className="mt-5 flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); saveCategory(); }} data-testid="form-document-category">
+          <Input value={categoryName} onChange={(event) => { setCategoryName(event.target.value); setCategoryError(null); }} maxLength={64} placeholder="Category name" aria-label="Category name" data-testid="input-document-category-name" />
+          <div className="flex shrink-0 gap-2"><Button type="submit" disabled={!canSaveCategory} data-testid="button-save-document-category">{createCategory.isPending || updateCategory.isPending ? <Loader2 size={14} className="animate-spin" /> : editingCategoryId ? <Save size={14} /> : <Plus size={14} />}{editingCategoryId ? 'Save changes' : 'Add category'}</Button>{editingCategoryId && <Button type="button" variant="outline" onClick={() => { setEditingCategoryId(null); setCategoryName(''); setCategoryError(null); }} data-testid="button-cancel-edit-document-category">Cancel</Button>}</div>
+        </form>
+        {categoryError && <p className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive" role="alert" data-testid="error-document-category">{categoryError}</p>}
+        <div className="mt-5 divide-y divide-border rounded-xl border border-border" data-testid="list-document-categories">
+          {categoryQuery.isLoading ? <p className="p-4 text-sm text-muted-foreground">Loading categories…</p> : categories.length === 0 ? <p className="p-4 text-sm text-muted-foreground">No categories configured.</p> : categories.map((item) => <div key={item.id} className="flex items-center gap-3 px-3 py-2.5" data-testid={`row-document-category-${item.id}`}>
+            <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{item.label}</p><p className="mt-0.5 text-[10px] text-muted-foreground">Upload access: {readable(item.requiredModule)} edit</p></div>
+            <Button type="button" variant="ghost" size="icon" aria-label={`Edit ${item.label}`} title={`Edit ${item.label}`} onClick={() => editCategory(item)} data-testid={`button-edit-document-category-${item.id}`}><Pencil size={14} /></Button>
+            <Button type="button" variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label={`Delete ${item.label}`} title={`Delete ${item.label}`} disabled={deleteCategory.isPending} onClick={() => removeCategory(item)} data-testid={`button-delete-document-category-${item.id}`}><Trash2 size={14} /></Button>
+          </div>)}
+        </div>
+      </section>
+    </div>}
+  </div>;
 }
 
 function formatBytes(bytes: number) {

@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Link } from 'wouter';
 import {
   ArrowDownLeft,
@@ -22,7 +21,6 @@ import {
 import {
   getGetPaymentOverviewQueryKey,
   useGetPaymentOverview,
-  useSendPaymentReminder,
 } from '@workspace/api-client-react';
 import type { RecentPaymentUpdate, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
@@ -60,37 +58,14 @@ function PaymentSkeleton() {
 }
 
 export default function PaymentsPage({ user }: { user: User }) {
-  const queryClient = useQueryClient();
-  const overview = useGetPaymentOverview();
-  const reminder = useSendPaymentReminder();
-  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const [reminderResult, setReminderResult] = useState<{ orderId: string; clientName: string; balance: number; acceptedAt: string } | null>(null);
-  const [reminderError, setReminderError] = useState<string | null>(null);
+  const overview = useGetPaymentOverview({ query: { queryKey: getGetPaymentOverviewQueryKey(), refetchInterval: 30_000, refetchOnWindowFocus: true } });
 
   const recentPayments = useMemo(
     () => [...(overview.data?.recentPayments ?? [])].sort(
-      (a: RecentPaymentUpdate, b: RecentPaymentUpdate) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime(),
+      (a: RecentPaymentUpdate, b: RecentPaymentUpdate) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     ),
     [overview.data?.recentPayments],
   );
-
-  const sendReminder = (orderRecordId: string) => {
-    if (!overview.data?.reminderAvailable || reminder.isPending) return;
-    setSelectedOrder(orderRecordId);
-    setReminderResult(null);
-    setReminderError(null);
-    reminder.mutate({ id: orderRecordId }, {
-      onSuccess: (result) => {
-        setSelectedOrder(null);
-        setReminderResult(result);
-        void queryClient.invalidateQueries({ queryKey: getGetPaymentOverviewQueryKey() });
-      },
-      onError: (error) => {
-        setSelectedOrder(null);
-        setReminderError(error instanceof Error ? error.message : 'The reminder could not be sent. Please try again.');
-      },
-    });
-  };
 
   return <AppShell user={user} title="Payments" eyebrow="Finance workspace">
     <main className="mx-auto w-full max-w-[1440px] space-y-6 pb-10" data-testid="page-payments">
@@ -166,20 +141,19 @@ export default function PaymentsPage({ user }: { user: User }) {
                 <div className="flex items-center gap-2"><h2 className="font-display text-lg font-bold">Balance follow-up</h2><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground" data-testid="count-reminder-orders">{overview.data.reminderOrders.length}</span></div>
                 <p className="mt-1 text-xs text-muted-foreground">Ready frames, shutters and received glass with an unpaid balance.</p>
               </div>
-              <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${overview.data.reminderAvailable ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`} data-testid="status-reminder-availability">
-                <span className={`h-1.5 w-1.5 rounded-full ${overview.data.reminderAvailable ? 'bg-primary' : 'bg-muted-foreground/60'}`} />
-                {overview.data.reminderAvailable ? 'Reminder ready' : 'Sending unavailable'}
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary" data-testid="status-reminder-availability">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                Manual WhatsApp
               </span>
             </div>
-            {!overview.data.reminderAvailable && <div className="flex gap-2.5 border-b border-accent/30 bg-accent/10 px-5 py-3 text-xs leading-5 text-foreground" data-testid="notice-reminder-unavailable">
+            <div className="flex gap-2.5 border-b border-border bg-muted/30 px-5 py-3 text-xs leading-5 text-muted-foreground" data-testid="notice-reminder-manual">
+              <Send size={15} className="mt-0.5 shrink-0 text-primary" />
+              <p>Open a prefilled WhatsApp draft, review it, then press Send in WhatsApp. This app does not send messages or track delivery.</p>
+            </div>
+            {overview.data.reminderUnavailableReason && <div className="flex gap-2.5 border-b border-accent/30 bg-accent/10 px-5 py-3 text-xs leading-5 text-foreground" data-testid="notice-reminder-unavailable">
               <CircleAlert size={15} className="mt-0.5 shrink-0 text-accent-foreground" />
-              <p><span className="font-bold">Reminders are disabled.</span> {overview.data.reminderUnavailableReason || 'No approved balance-reminder template is configured.'}</p>
+              <p><span className="font-bold">WhatsApp draft unavailable.</span> {overview.data.reminderUnavailableReason}</p>
             </div>}
-            {reminderResult && <div className="flex items-start gap-2.5 border-b border-primary/20 bg-primary/[0.06] px-5 py-3 text-xs text-foreground" role="status" data-testid="status-reminder-success">
-              <Check size={15} className="mt-0.5 shrink-0 text-primary" />
-              <p>Reminder accepted for <strong>{reminderResult.clientName}</strong> ({reminderResult.orderId}) — balance {money(reminderResult.balance)}. Sent {dateTime(reminderResult.acceptedAt)}.</p>
-            </div>}
-            {reminderError && <div className="flex items-start justify-between gap-3 border-b border-destructive/20 bg-destructive/5 px-5 py-3 text-xs" role="alert" data-testid="status-reminder-error"><p className="text-destructive">{reminderError}</p><button type="button" onClick={() => setReminderError(null)} className="font-bold text-muted-foreground" aria-label="Dismiss reminder error" data-testid="button-dismiss-reminder-error">Dismiss</button></div>}
             {overview.data.reminderOrders.length === 0 ? <div className="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center" data-testid="state-no-reminder-orders">
               <span className="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-secondary text-secondary-foreground"><Check size={20} /></span>
               <p className="font-semibold">No balances need follow-up</p>
@@ -199,10 +173,11 @@ export default function PaymentsPage({ user }: { user: User }) {
                     <p className="font-display text-lg font-bold tabular-nums" data-testid={`value-balance-${order.orderRecordId}`}>{money(order.balance)}</p>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Balance due</p>
                   </div>
-                  <Button size="sm" variant="outline" disabled={!overview.data.reminderAvailable || reminder.isPending} onClick={() => sendReminder(order.orderRecordId)} data-testid={`button-send-reminder-${order.orderRecordId}`} title={!overview.data.reminderAvailable ? (overview.data.reminderUnavailableReason || 'No approved reminder template is configured.') : 'Send balance reminder'}>
-                    {selectedOrder === order.orderRecordId && reminder.isPending ? <LoaderCircle size={14} className="mr-1.5 animate-spin" /> : <Send size={14} className="mr-1.5" />}
-                    Send
-                  </Button>
+                  <form method="post" action={`/api/orders/${encodeURIComponent(order.orderRecordId)}/payment-reminder`} target="_blank" rel="noreferrer">
+                    <Button type="submit" size="sm" variant="outline" disabled={!order.canOpenWhatsApp} data-testid={`button-send-reminder-${order.orderRecordId}`} title={!order.canOpenWhatsApp ? 'Add a valid WhatsApp number to this order.' : 'Open a draft for manual sending in WhatsApp'}>
+                      <Send size={14} className="mr-1.5" /> Open WhatsApp
+                    </Button>
+                  </form>
                 </div>
               </article>)}
             </div>}
@@ -220,7 +195,7 @@ export default function PaymentsPage({ user }: { user: User }) {
             </div> : <div className="divide-y divide-border/70">
               {recentPayments.map((payment) => <RecentPaymentRow key={payment.id} payment={payment} />)}
             </div>}
-            {recentPayments.length > 0 && <div className="flex items-center gap-2 border-t border-border bg-muted/25 px-5 py-3 text-[10px] text-muted-foreground"><CalendarClock size={13} /> Sorted by payment date</div>}
+            {recentPayments.length > 0 && <div className="flex items-center gap-2 border-t border-border bg-muted/25 px-5 py-3 text-[10px] text-muted-foreground"><CalendarClock size={13} /> Sorted by entry time · newest first</div>}
           </section>
         </div>
       </> : null}

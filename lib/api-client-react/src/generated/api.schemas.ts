@@ -507,19 +507,28 @@ export interface OrderPaymentVoid {
 export type OrderPaymentList = OrderPayment[];
 
 /**
- * The drawing identifier is retained for existing documents and is displayed as Elevation.
+ * @minLength 1
+ * @maxLength 64
  */
-export type OrderDocumentCategory = typeof OrderDocumentCategory[keyof typeof OrderDocumentCategory];
+export type OrderDocumentCategory = string;
 
+export interface OrderDocumentCategoryConfig {
+  id: string;
+  label: string;
+  requiredModule: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export const OrderDocumentCategory = {
-  quotation: 'quotation',
-  purchase_order: 'purchase_order',
-  confirmation: 'confirmation',
-  drawing: 'drawing',
-  invoice: 'invoice',
-  other: 'other',
-} as const;
+export type OrderDocumentCategoryConfigList = OrderDocumentCategoryConfig[];
+
+export interface OrderDocumentCategoryInput {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     */
+  name: string;
+}
 
 export interface OrderDocument {
   id: string;
@@ -591,6 +600,7 @@ export interface PaymentReminderOrder {
   totalCollected: number;
   balance: number;
   windowCount: number;
+  canOpenWhatsApp: boolean;
 }
 
 export type PaymentReminderOrderList = PaymentReminderOrder[];
@@ -619,15 +629,6 @@ export interface PaymentOverview {
   reminderAvailable: boolean;
   /** @nullable */
   reminderUnavailableReason: string | null;
-}
-
-export interface PaymentReminderResult {
-  accepted: boolean;
-  orderRecordId: string;
-  orderId: string;
-  clientName: string;
-  balance: number;
-  acceptedAt: string;
 }
 
 export interface AdminSummary {

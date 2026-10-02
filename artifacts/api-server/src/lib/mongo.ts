@@ -194,7 +194,15 @@ export interface OrderPaymentDocument {
   reference: string | null; notes: string | null; paidAt: Date; status: PaymentStatus;
   voidReason: string | null; createdBy: string; createdAt: Date; voidedBy?: string | null; voidedAt?: Date | null;
 }
-export type DocumentCategory = "quotation" | "purchase_order" | "confirmation" | "drawing" | "invoice" | "other";
+export type DocumentCategory = string;
+export interface OrderDocumentCategoryDocument {
+  _id: string;
+  label: string;
+  labelNormalized: string;
+  requiredModule: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 export interface OrderDocumentMetadataDocument {
   _id: string; orderRecordId: string; filename: string; category: DocumentCategory;
   contentType: string; sizeBytes: number; gridFsId: string | null; storagePath?: string | null; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
@@ -422,6 +430,7 @@ export function getCounters(db: Db): Collection<CounterDocument> {
 }
 export function getOrderWindows(db: Db) { return db.collection<OrderWindowDocument>("order_windows"); }
 export function getOrderPayments(db: Db) { return db.collection<OrderPaymentDocument>("order_payments"); }
+export function getOrderDocumentCategories(db: Db) { return db.collection<OrderDocumentCategoryDocument>("order_document_categories"); }
 export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }
 export function getOrderActivity(db: Db) { return db.collection<OrderActivityDocument>("order_activity"); }
 export function getWindowProfiles(db: Db) { return db.collection<WindowProfileDocument>("window_profiles"); }

@@ -52,6 +52,9 @@ import type {
   OrderBillingUpdate,
   OrderDocument,
   OrderDocumentCategory,
+  OrderDocumentCategoryConfig,
+  OrderDocumentCategoryConfigList,
+  OrderDocumentCategoryInput,
   OrderDocumentList,
   OrderInput,
   OrderList,
@@ -73,7 +76,6 @@ import type {
   OrderWindowList,
   OrderWindowUpdate,
   PaymentOverview,
-  PaymentReminderResult,
   Quotation,
   QuotationInput,
   QuotationList,
@@ -1341,7 +1343,7 @@ export function useGetPaymentOverview<TData = Awaited<ReturnType<typeof getPayme
 
 
 
-export const getSendPaymentReminderUrl = (id: string,) => {
+export const getOpenPaymentReminderUrl = (id: string,) => {
 
 
 
@@ -1350,11 +1352,12 @@ export const getSendPaymentReminderUrl = (id: string,) => {
 }
 
 /**
- * @summary Send an approved WhatsApp balance reminder for an eligible order
+ * The signed-in user reviews and sends the drafted message manually in WhatsApp. The API does not send or confirm delivery.
+ * @summary Open a manual WhatsApp balance reminder for an eligible order
  */
-export const sendPaymentReminder = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<PaymentReminderResult> => {
+export const openPaymentReminder = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
 
-  return customFetch<PaymentReminderResult>(getSendPaymentReminderUrl(id),
+  return customFetch<unknown>(getOpenPaymentReminderUrl(id),
   {
     ...options,
     method: 'POST'
@@ -1367,13 +1370,13 @@ export const sendPaymentReminder = async (id: string, options?: Parameters<typeo
 
 
 
-export const getSendPaymentReminderMutationKey = () => ['sendPaymentReminder'] as const;
+export const getOpenPaymentReminderMutationKey = () => ['openPaymentReminder'] as const;
 
-export const getSendPaymentReminderMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPaymentReminder>>, TError,SendPaymentReminderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof sendPaymentReminder>>, TError,SendPaymentReminderMutationVariables, TContext> => {
+export const getOpenPaymentReminderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof openPaymentReminder>>, TError,OpenPaymentReminderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof openPaymentReminder>>, TError,OpenPaymentReminderMutationVariables, TContext> => {
 
-const mutationKey = getSendPaymentReminderMutationKey();
+const mutationKey = getOpenPaymentReminderMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1383,10 +1386,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendPaymentReminder>>, SendPaymentReminderMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof openPaymentReminder>>, OpenPaymentReminderMutationVariables> = (props) => {
           const {id} = props ?? {};
 
-          return  sendPaymentReminder(id,requestOptions)
+          return  openPaymentReminder(id,requestOptions)
         }
 
 
@@ -1396,23 +1399,23 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type SendPaymentReminderMutationResult = NonNullable<Awaited<ReturnType<typeof sendPaymentReminder>>>
+    export type OpenPaymentReminderMutationResult = NonNullable<Awaited<ReturnType<typeof openPaymentReminder>>>
 
-    export type SendPaymentReminderMutationError = ErrorType<void>
-    export type SendPaymentReminderMutationVariables = {id: string}
+    export type OpenPaymentReminderMutationError = ErrorType<void>
+    export type OpenPaymentReminderMutationVariables = {id: string}
 
     /**
- * @summary Send an approved WhatsApp balance reminder for an eligible order
+ * @summary Open a manual WhatsApp balance reminder for an eligible order
  */
-export const useSendPaymentReminder = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPaymentReminder>>, TError,SendPaymentReminderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useOpenPaymentReminder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof openPaymentReminder>>, TError,OpenPaymentReminderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof sendPaymentReminder>>,
+        Awaited<ReturnType<typeof openPaymentReminder>>,
         TError,
-        SendPaymentReminderMutationVariables,
+        OpenPaymentReminderMutationVariables,
         TContext
       > => {
-      return useMutation(getSendPaymentReminderMutationOptions(options));
+      return useMutation(getOpenPaymentReminderMutationOptions(options));
     }
 
 export const getGetAdminSummaryUrl = () => {
@@ -6074,6 +6077,334 @@ export function useListOrderDocuments<TData = Awaited<ReturnType<typeof listOrde
 
 
 
+
+export const getListOrderDocumentCategoriesUrl = () => {
+
+
+
+
+  return `/api/order-document-categories`
+}
+
+/**
+ * @summary List configured order document categories
+ */
+export const listOrderDocumentCategories = async ( options?: Parameters<typeof customFetch>[1]): Promise<OrderDocumentCategoryConfigList> => {
+
+  return customFetch<OrderDocumentCategoryConfigList>(getListOrderDocumentCategoriesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderDocumentCategoriesQueryKey = () => {
+    return [
+    `/api/order-document-categories`
+    ] as const;
+    }
+
+
+export const getListOrderDocumentCategoriesQueryOptions = <TData = Awaited<ReturnType<typeof listOrderDocumentCategories>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderDocumentCategories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderDocumentCategoriesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderDocumentCategories>>> = ({ signal }) => listOrderDocumentCategories({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderDocumentCategories>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderDocumentCategoriesQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderDocumentCategories>>>
+export type ListOrderDocumentCategoriesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List configured order document categories
+ */
+
+export function useListOrderDocumentCategories<TData = Awaited<ReturnType<typeof listOrderDocumentCategories>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderDocumentCategories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderDocumentCategoriesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateOrderDocumentCategoryUrl = () => {
+
+
+
+
+  return `/api/order-document-categories`
+}
+
+/**
+ * @summary Add an order document category
+ */
+export const createOrderDocumentCategory = async (orderDocumentCategoryInput: OrderDocumentCategoryInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocumentCategoryConfig> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocumentCategoryConfig>(getCreateOrderDocumentCategoryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderDocumentCategoryInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOrderDocumentCategoryMutationKey = () => ['createOrderDocumentCategory'] as const;
+
+export const getCreateOrderDocumentCategoryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderDocumentCategory>>, TError,CreateOrderDocumentCategoryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOrderDocumentCategory>>, TError,CreateOrderDocumentCategoryMutationVariables, TContext> => {
+
+const mutationKey = getCreateOrderDocumentCategoryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOrderDocumentCategory>>, CreateOrderDocumentCategoryMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createOrderDocumentCategory(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOrderDocumentCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof createOrderDocumentCategory>>>
+    export type CreateOrderDocumentCategoryMutationBody = BodyType<OrderDocumentCategoryInput>
+    export type CreateOrderDocumentCategoryMutationError = ErrorType<void>
+    export type CreateOrderDocumentCategoryMutationVariables = {data: BodyType<OrderDocumentCategoryInput>}
+
+    /**
+ * @summary Add an order document category
+ */
+export const useCreateOrderDocumentCategory = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderDocumentCategory>>, TError,CreateOrderDocumentCategoryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOrderDocumentCategory>>,
+        TError,
+        CreateOrderDocumentCategoryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOrderDocumentCategoryMutationOptions(options));
+    }
+
+export const getUpdateOrderDocumentCategoryUrl = (categoryId: string,) => {
+
+
+
+
+  return `/api/order-document-categories/${categoryId}`
+}
+
+/**
+ * @summary Rename an order document category
+ */
+export const updateOrderDocumentCategory = async (categoryId: string,
+    orderDocumentCategoryInput: OrderDocumentCategoryInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocumentCategoryConfig> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocumentCategoryConfig>(getUpdateOrderDocumentCategoryUrl(categoryId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderDocumentCategoryInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateOrderDocumentCategoryMutationKey = () => ['updateOrderDocumentCategory'] as const;
+
+export const getUpdateOrderDocumentCategoryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrderDocumentCategory>>, TError,UpdateOrderDocumentCategoryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOrderDocumentCategory>>, TError,UpdateOrderDocumentCategoryMutationVariables, TContext> => {
+
+const mutationKey = getUpdateOrderDocumentCategoryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOrderDocumentCategory>>, UpdateOrderDocumentCategoryMutationVariables> = (props) => {
+          const {categoryId,data} = props ?? {};
+
+          return  updateOrderDocumentCategory(categoryId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOrderDocumentCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof updateOrderDocumentCategory>>>
+    export type UpdateOrderDocumentCategoryMutationBody = BodyType<OrderDocumentCategoryInput>
+    export type UpdateOrderDocumentCategoryMutationError = ErrorType<void>
+    export type UpdateOrderDocumentCategoryMutationVariables = {categoryId: string;data: BodyType<OrderDocumentCategoryInput>}
+
+    /**
+ * @summary Rename an order document category
+ */
+export const useUpdateOrderDocumentCategory = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrderDocumentCategory>>, TError,UpdateOrderDocumentCategoryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOrderDocumentCategory>>,
+        TError,
+        UpdateOrderDocumentCategoryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateOrderDocumentCategoryMutationOptions(options));
+    }
+
+export const getDeleteOrderDocumentCategoryUrl = (categoryId: string,) => {
+
+
+
+
+  return `/api/order-document-categories/${categoryId}`
+}
+
+/**
+ * @summary Delete an unused order document category
+ */
+export const deleteOrderDocumentCategory = async (categoryId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteOrderDocumentCategoryUrl(categoryId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteOrderDocumentCategoryMutationKey = () => ['deleteOrderDocumentCategory'] as const;
+
+export const getDeleteOrderDocumentCategoryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOrderDocumentCategory>>, TError,DeleteOrderDocumentCategoryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteOrderDocumentCategory>>, TError,DeleteOrderDocumentCategoryMutationVariables, TContext> => {
+
+const mutationKey = getDeleteOrderDocumentCategoryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteOrderDocumentCategory>>, DeleteOrderDocumentCategoryMutationVariables> = (props) => {
+          const {categoryId} = props ?? {};
+
+          return  deleteOrderDocumentCategory(categoryId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteOrderDocumentCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteOrderDocumentCategory>>>
+
+    export type DeleteOrderDocumentCategoryMutationError = ErrorType<void>
+    export type DeleteOrderDocumentCategoryMutationVariables = {categoryId: string}
+
+    /**
+ * @summary Delete an unused order document category
+ */
+export const useDeleteOrderDocumentCategory = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOrderDocumentCategory>>, TError,DeleteOrderDocumentCategoryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteOrderDocumentCategory>>,
+        TError,
+        DeleteOrderDocumentCategoryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteOrderDocumentCategoryMutationOptions(options));
+    }
 
 export const getArchiveOrderDocumentUrl = (id: string,
     documentId: string,) => {
