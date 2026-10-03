@@ -5,6 +5,8 @@ import {
   ArrowDownToLine,
   ArrowRight,
   BadgeCheck,
+  ChevronDown,
+  ChevronUp,
   CircleAlert,
   Eye,
   FileCheck2,
@@ -79,6 +81,13 @@ const formatBytes = (bytes: number) => {
 };
 
 type DownloadTarget = { orderRecordId: string; document: OrderDocument } | null;
+type RegisterSort = 'updated-desc' | 'updated-asc' | 'order-id' | 'client';
+const registerSortDescriptions: Record<RegisterSort, string> = {
+  'updated-desc': 'recent order update',
+  'updated-asc': 'oldest order update',
+  'order-id': 'order ID',
+  client: 'client name',
+};
 type PreviewTarget =
   | { kind: 'order-document'; orderRecordId: string; document: OrderDocument }
   | { kind: 'quotation-request'; orderRecordId: string; request: PurchaseOrderQuotationRequest };
@@ -121,6 +130,9 @@ export default function ConfirmationPage({ user }: { user: User }) {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [poFilter, setPoFilter] = useState<'all' | 'with' | 'without'>('all');
+  const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+  const [sort, setSort] = useState<RegisterSort>('updated-desc');
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [downloadTarget, setDownloadTarget] = useState<DownloadTarget>(null);
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
   const query = useGetPurchaseOrderRegister({
@@ -272,16 +284,23 @@ export default function ConfirmationPage({ user }: { user: User }) {
   }), [rows]);
   const filteredRows = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
-    return rows.filter((entry) => {
+    const filtered = rows.filter((entry) => {
       const hasPo = entry.purchaseOrderDocuments.length > 0;
       if (poFilter === 'with' && !hasPo) return false;
       if (poFilter === 'without' && hasPo) return false;
+      if (orderStatusFilter !== 'all' && entry.orderStatus !== orderStatusFilter) return false;
       if (!needle) return true;
       const files = [...entry.purchaseOrderDocuments, ...entry.confirmationDocuments].map((item) => item.filename).join(' ');
       const quotationText = entry.quotationRequests.flatMap((request) => [request.id, request.clientName, request.location, request.pdfFilename]).join(' ');
       return `${entry.orderId} ${entry.clientName} ${entry.locationCode} ${entry.locationName} ${files} ${quotationText}`.toLocaleLowerCase().includes(needle);
     });
-  }, [poFilter, rows, search]);
+    return filtered.sort((a, b) => {
+      if (sort === 'updated-asc') return new Date(a.orderUpdatedAt).getTime() - new Date(b.orderUpdatedAt).getTime();
+      if (sort === 'order-id') return a.orderId.localeCompare(b.orderId, undefined, { numeric: true, sensitivity: 'base' });
+      if (sort === 'client') return a.clientName.localeCompare(b.clientName, undefined, { sensitivity: 'base' });
+      return new Date(b.orderUpdatedAt).getTime() - new Date(a.orderUpdatedAt).getTime();
+    });
+  }, [orderStatusFilter, poFilter, rows, search, sort]);
 
   const requestDownload = (orderRecordId: string, file: OrderDocument) => setDownloadTarget({ orderRecordId, document: file });
   const requestPreview = (orderRecordId: string, file: OrderDocument) => setPreviewTarget({ kind: 'order-document', orderRecordId, document: file });
@@ -339,20 +358,40 @@ export default function ConfirmationPage({ user }: { user: User }) {
         <p className="mt-1 text-sm text-muted-foreground">The purchase order register could not be loaded.</p>
         <Button variant="outline" size="sm" className="mt-4" onClick={() => void query.refetch()} data-testid="button-retry-confirmation"><RefreshCw size={13} /> Try again</Button>
       </section> : <>
-        <section className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card/75 p-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Register filters">
-          <div className="relative w-full sm:max-w-md">
+        <section className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card/75 p-3 xl:flex-row xl:items-center xl:justify-between" aria-label="Register filters and sorting">
+          <div className="relative w-full xl:max-w-md">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find order, client, quotation request or filename" className="h-10 border-border/70 bg-background pl-9 pr-9 text-xs" data-testid="input-confirmation-search" aria-label="Search register" />
             {search && <button type="button" onClick={() => setSearch('')} className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Clear search" data-testid="button-clear-confirmation-search"><X size={14} /></button>}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:inline-flex"><Filter size={13} /> Purchase order</span>
-            <div className="flex rounded-lg border border-border/75 bg-background p-1" role="group" aria-label="Filter purchase order status">
-              {([['all', 'All'], ['with', 'With PO'], ['without', 'Missing PO']] as const).map(([value, label]) => <button type="button" key={value} onClick={() => setPoFilter(value)} aria-pressed={poFilter === value}
-                className={`rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${poFilter === value ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                data-testid={`button-filter-${value}`}>{label}</button>)}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="hidden items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:inline-flex"><Filter size={13} /> Purchase order</span>
+              <div className="flex rounded-lg border border-border/75 bg-background p-1" role="group" aria-label="Filter purchase order status">
+                {([['all', 'All'], ['with', 'With PO'], ['without', 'Missing PO']] as const).map(([value, label]) => <button type="button" key={value} onClick={() => setPoFilter(value)} aria-pressed={poFilter === value}
+                  className={`rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${poFilter === value ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  data-testid={`button-filter-${value}`}>{label}</button>)}
+              </div>
             </div>
-            <span className="hidden font-mono text-[10px] text-muted-foreground lg:inline" data-testid="text-filtered-register-count">{filteredRows.length} / {rows.length}</span>
+            <label className="relative">
+              <span className="sr-only">Filter by order stage</span>
+              <select value={orderStatusFilter} onChange={(event) => setOrderStatusFilter(event.target.value)} className="h-10 min-w-[160px] appearance-none rounded-lg border border-border/75 bg-background pl-3 pr-8 text-xs font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="select-filter-confirmation-stage">
+                <option value="all">All order stages</option>
+                {Object.entries(statusNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            </label>
+            <label className="relative">
+              <span className="sr-only">Sort Confirmation / PO records</span>
+              <select value={sort} onChange={(event) => setSort(event.target.value as RegisterSort)} className="h-10 min-w-[170px] appearance-none rounded-lg border border-border/75 bg-background pl-3 pr-8 text-xs font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="select-sort-confirmation-register">
+                <option value="updated-desc">Recently updated</option>
+                <option value="updated-asc">Oldest updated</option>
+                <option value="order-id">Order ID A–Z</option>
+                <option value="client">Client name A–Z</option>
+              </select>
+              <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            </label>
+            <span className="hidden font-mono text-[10px] text-muted-foreground 2xl:inline" data-testid="text-filtered-register-count">{filteredRows.length} / {rows.length}</span>
           </div>
         </section>
 
@@ -365,48 +404,63 @@ export default function ConfirmationPage({ user }: { user: User }) {
           <Search className="mx-auto text-muted-foreground/65" size={23} />
           <h2 className="mt-3 font-display text-base font-bold">No matching orders</h2>
           <p className="mt-1 text-xs text-muted-foreground">Try another search or clear the purchase order filter.</p>
-          <Button variant="ghost" size="sm" className="mt-3" onClick={() => { setSearch(''); setPoFilter('all'); }} data-testid="button-reset-confirmation-filters">Reset filters</Button>
+          <Button variant="ghost" size="sm" className="mt-3" onClick={() => { setSearch(''); setPoFilter('all'); setOrderStatusFilter('all'); }} data-testid="button-reset-confirmation-filters">Reset filters</Button>
         </section> : <section className="overflow-hidden rounded-2xl border border-border/75 bg-card/75 shadow-sm" data-testid="table-confirmation-register">
           <div className="flex items-center justify-between border-b border-border/70 bg-muted/25 px-4 py-3 sm:px-5">
-            <div><p className="text-[10px] font-bold uppercase tracking-[.15em] text-primary">Order paperwork</p><p className="mt-0.5 text-[11px] text-muted-foreground">{filteredRows.length} {filteredRows.length === 1 ? 'record' : 'records'} · sorted by recent order update</p></div>
+            <div><p className="text-[10px] font-bold uppercase tracking-[.15em] text-primary">Order paperwork</p><p className="mt-0.5 text-[11px] text-muted-foreground">{filteredRows.length} {filteredRows.length === 1 ? 'record' : 'records'} · sorted by {registerSortDescriptions[sort]}</p></div>
             <span className="rounded-md border border-border/70 bg-background px-2 py-1 font-mono text-[9px] text-muted-foreground">REGISTER</span>
           </div>
           <div className="divide-y divide-border/65">
-            {filteredRows.map((entry, index) => <article key={entry.orderRecordId} className="confirmation-row p-4 sm:p-5" data-testid={`row-confirmation-${entry.orderRecordId}`}>
-              <div className="grid gap-4 lg:grid-cols-[minmax(205px,.9fr)_minmax(180px,.65fr)_minmax(0,1.35fr)_auto] lg:items-center">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-primary/[.09] font-mono text-[9px] font-bold text-primary">{String(index + 1).padStart(2, '0')}</span>
-                    <Link href={canViewOrder ? `/order-hub/${entry.orderRecordId}` : '#'} onClick={(event) => { if (!canViewOrder) event.preventDefault(); }}
-                      className={`truncate font-mono text-[12px] font-bold tracking-tight ${canViewOrder ? 'text-primary hover:underline' : 'text-foreground'}`}
-                      data-testid={`link-confirmation-order-${entry.orderRecordId}`}>{entry.orderId}</Link>
+            {filteredRows.map((entry, index) => {
+              const expanded = expandedOrderId === entry.orderRecordId;
+              const detailsId = `confirmation-details-${entry.orderRecordId}`;
+              const poCount = entry.purchaseOrderDocuments.length;
+              return <article key={entry.orderRecordId} className="confirmation-row px-4 py-3 sm:px-5" data-testid={`row-confirmation-${entry.orderRecordId}`}>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center lg:grid-cols-[minmax(220px,1.25fr)_minmax(190px,.9fr)_minmax(0,1fr)]">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-primary/[.09] font-mono text-[9px] font-bold text-primary">{String(index + 1).padStart(2, '0')}</span>
+                      <Link href={canViewOrder ? `/order-hub/${entry.orderRecordId}` : '#'} onClick={(event) => { if (!canViewOrder) event.preventDefault(); }}
+                        className={`truncate font-mono text-[12px] font-bold tracking-tight ${canViewOrder ? 'text-primary hover:underline' : 'text-foreground'}`}
+                        data-testid={`link-confirmation-order-${entry.orderRecordId}`}>{entry.orderId}</Link>
+                    </div>
+                    <p className="mt-1 truncate pl-8 text-[11px] font-semibold" data-testid={`text-confirmation-client-${entry.orderRecordId}`}>{entry.clientName}</p>
+                    <p className="mt-0.5 flex items-center gap-1.5 pl-8 text-[10px] text-muted-foreground"><MapPin size={11} /><span className="font-mono font-semibold text-foreground/70">{entry.locationCode}</span><span className="truncate">{entry.locationName}</span></p>
                   </div>
-                  <p className="mt-2 truncate pl-8 text-[12px] font-semibold" data-testid={`text-confirmation-client-${entry.orderRecordId}`}>{entry.clientName}</p>
-                  <p className="mt-1 flex items-center gap-1.5 pl-8 text-[10px] text-muted-foreground"><MapPin size={11} /><span className="font-mono font-semibold text-foreground/70">{entry.locationCode}</span><span className="truncate">{entry.locationName}</span></p>
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:justify-start">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-bold ${statusStyles[entry.orderStatus] || 'bg-muted text-muted-foreground'}`} data-testid={`status-confirmation-order-${entry.orderRecordId}`}>{statusNames[entry.orderStatus] || entry.orderStatus.replaceAll('_', ' ')}</span>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[9px] font-semibold ${poCount > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`} data-testid={`status-confirmation-po-${entry.orderRecordId}`}>
+                      <FileCheck2 size={11} />{poCount > 0 ? `${poCount} PO file${poCount === 1 ? '' : 's'}` : 'Missing PO'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2 lg:col-span-1 lg:justify-end">
+                    <span className="text-[10px] text-muted-foreground">Updated {formatDate(entry.orderUpdatedAt)}</span>
+                    <div className="flex items-center gap-1.5">
+                      {canViewOrder ? <Link href={`/order-hub/${entry.orderRecordId}?tab=documents`} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/75 bg-background px-2.5 text-[10px] font-bold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/[.04] hover:text-primary" data-testid={`link-manage-documents-${entry.orderRecordId}`}>Manage <ArrowRight size={12} /></Link>
+                        : <span className="inline-flex items-center gap-1 text-[9px] text-muted-foreground" title="Order hub access is required"><LockKeyhole size={12} /> No order access</span>}
+                      <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 px-2.5 text-[10px]" onClick={() => setExpandedOrderId(expanded ? null : entry.orderRecordId)} aria-expanded={expanded} aria-controls={detailsId} data-testid={`button-expand-confirmation-${entry.orderRecordId}`}>
+                        {expanded ? <><ChevronUp size={13} /> Collapse</> : <><ChevronDown size={13} /> Expand</>}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 lg:block">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-bold ${statusStyles[entry.orderStatus] || 'bg-muted text-muted-foreground'}`} data-testid={`status-confirmation-order-${entry.orderRecordId}`}>{statusNames[entry.orderStatus] || entry.orderStatus.replaceAll('_', ' ')}</span>
-                  <span className="text-[10px] text-muted-foreground lg:mt-2 lg:block">Updated {formatDate(entry.orderUpdatedAt)}</span>
+                <div id={detailsId} className={`mt-4 border-t border-border/65 pt-4 ${expanded ? '' : 'hidden'}`} aria-hidden={!expanded}>
+                  <DocumentColumn label="Purchase order" documents={entry.purchaseOrderDocuments} orderRecordId={entry.orderRecordId} onDownload={requestDownload} downloadingId={downloadTarget?.document.id} />
+                  <QuotationRequestsPanel
+                    entry={entry}
+                    canEditConfirmation={canEditConfirmation}
+                    uploading={uploadConfirmation.isPending}
+                    replacing={replaceDocument.isPending}
+                    removing={removeDocument.isPending}
+                    onPreviewQuotation={requestQuotationPreview}
+                    onPreviewConfirmation={requestPreview}
+                    onUpload={(event, request) => uploadConfirmationForRequest(event, entry, request)}
+                    onReplace={(event, file) => replaceConfirmationDocument(event, entry.orderRecordId, file)}
+                    onDelete={(file) => deleteConfirmationDocument(entry.orderRecordId, file)}
+                  />
                 </div>
-                <DocumentColumn label="Purchase order" documents={entry.purchaseOrderDocuments} orderRecordId={entry.orderRecordId} onDownload={requestDownload} downloadingId={downloadTarget?.document.id} />
-                <div className="flex justify-end border-t border-border/50 pt-3 lg:border-0 lg:pt-0">
-                  {canViewOrder ? <Link href={`/order-hub/${entry.orderRecordId}?tab=documents`} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/75 bg-background px-2.5 text-[10px] font-bold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/[.04] hover:text-primary" data-testid={`link-manage-documents-${entry.orderRecordId}`}>Manage <ArrowRight size={12} /></Link>
-                    : <span className="inline-flex items-center gap-1 text-[9px] text-muted-foreground" title="Order hub access is required"><LockKeyhole size={12} /> No order access</span>}
-                </div>
-              </div>
-              <QuotationRequestsPanel
-                entry={entry}
-                canEditConfirmation={canEditConfirmation}
-                uploading={uploadConfirmation.isPending}
-                replacing={replaceDocument.isPending}
-                removing={removeDocument.isPending}
-                onPreviewQuotation={requestQuotationPreview}
-                onPreviewConfirmation={requestPreview}
-                onUpload={(event, request) => uploadConfirmationForRequest(event, entry, request)}
-                onReplace={(event, file) => replaceConfirmationDocument(event, entry.orderRecordId, file)}
-                onDelete={(file) => deleteConfirmationDocument(entry.orderRecordId, file)}
-              />
-            </article>)}
+              </article>;
+            })}
           </div>
           {downloadTarget && downloadQuery.isFetching && <div className="flex items-center gap-2 border-t border-primary/15 bg-primary/[.035] px-4 py-2 text-[10px] text-primary" role="status" data-testid="status-document-download"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" /> Preparing {downloadTarget.document.filename}</div>}
           {downloadTarget && downloadQuery.isError && <div className="flex items-center justify-between gap-3 border-t border-destructive/20 bg-destructive/[.04] px-4 py-2 text-[10px] text-destructive" role="alert" data-testid="status-document-download-error"><span>Download could not be prepared.</span><div className="flex gap-3"><button type="button" onClick={() => void downloadQuery.refetch()} className="font-bold underline" data-testid="button-retry-document-download">Try again</button><button type="button" onClick={() => setDownloadTarget(null)} className="font-bold underline">Dismiss</button></div></div>}
