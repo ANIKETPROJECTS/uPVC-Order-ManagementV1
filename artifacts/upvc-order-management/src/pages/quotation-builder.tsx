@@ -885,12 +885,12 @@ function RateApprovalDesk({ user }: { user: User }) {
       </Tabs>
       <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-desk-note"><MapPin size={15} className="mt-0.5 shrink-0 text-primary" /><p>Rate requests receive a temporary RA ID, and the server calculates Average (SqFt / Qty). Linking an order is optional and can be done later.</p></div>
       <Dialog open={Boolean(linkingSubmission)} onOpenChange={(open) => { if (!open) setLinkingSubmission(null); }}>
-        <DialogContent data-testid="dialog-link-quotation-order">
+        <DialogContent className="max-w-none sm:max-h-[90vh] sm:w-[min(90vw,52rem)] sm:max-w-none" data-testid="dialog-link-quotation-order">
           <DialogHeader>
             <DialogTitle>Link quotation request and measurement sheet</DialogTitle>
             <DialogDescription>{linkingSubmission ? `${linkingSubmission.id} · ${linkingSubmission.clientName}` : 'Choose an order for this quotation request.'}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="min-w-0 w-full space-y-4">
             <label className="block space-y-1.5 text-xs font-semibold">Order ID
               <Select value={linkOrderRecordId || 'unassigned'} onValueChange={(value) => { setLinkOrderRecordId(value === 'unassigned' ? '' : value); }}>
                 <SelectTrigger data-testid="select-link-quotation-order"><SelectValue placeholder="Select an order" /></SelectTrigger>

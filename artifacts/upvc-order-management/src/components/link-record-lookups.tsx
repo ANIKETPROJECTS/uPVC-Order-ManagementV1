@@ -34,8 +34,9 @@ export function QuotationRequestLookup({
   const selectedRequestIsListed = Boolean(selectedId && requests.some((item) => item.id === selectedId));
 
   return (
-    <div className="space-y-2" data-testid="lookup-quotation-request">
+    <div className="min-w-0 w-full space-y-2" data-testid="lookup-quotation-request">
       <Input
+        className="min-w-0 w-full"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search by RA ID or client name"
@@ -49,8 +50,10 @@ export function QuotationRequestLookup({
           if (selected) onSelect(selected);
         }}
       >
-        <SelectTrigger aria-label="Select a Rate Approval request" data-testid="select-quotation-request">
-          <SelectValue placeholder={results.isLoading ? 'Loading current requests…' : 'Choose from current Rate Approval requests'} />
+        <SelectTrigger className="min-w-0 overflow-hidden" aria-label="Select a Rate Approval request" data-testid="select-quotation-request">
+          <SelectValue className="min-w-0 flex-1 truncate" placeholder={results.isLoading ? 'Loading current requests…' : 'Choose from current Rate Approval requests'}>
+            {selectedId ? selectedLabel || selectedId : undefined}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {results.isLoading && <SelectItem value="__loading" disabled>Loading current requests…</SelectItem>}
@@ -96,8 +99,9 @@ export function MeasurementSheetLookup({
   const selectedSheetIsListed = Boolean(selectedId && sheets.some((item) => item.id === selectedId));
 
   return (
-    <div className="space-y-2" data-testid="lookup-measurement-sheet">
+    <div className="min-w-0 w-full space-y-2" data-testid="lookup-measurement-sheet">
       <Input
+        className="min-w-0 w-full"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search by sheet ID, client, or location"
@@ -111,8 +115,10 @@ export function MeasurementSheetLookup({
           if (selected) onSelect(selected);
         }}
       >
-        <SelectTrigger aria-label="Select a measurement sheet" data-testid="select-measurement-sheet">
-          <SelectValue placeholder={results.isLoading ? 'Loading current sheets…' : 'Choose from current measurement sheets'} />
+        <SelectTrigger className="min-w-0 overflow-hidden" aria-label="Select a measurement sheet" data-testid="select-measurement-sheet">
+          <SelectValue className="min-w-0 flex-1 truncate" placeholder={results.isLoading ? 'Loading current sheets…' : 'Choose from current measurement sheets'}>
+            {selectedId ? selectedLabel || measurementSheetIdLabel(selectedId) : undefined}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {results.isLoading && <SelectItem value="__loading" disabled>Loading current sheets…</SelectItem>}
