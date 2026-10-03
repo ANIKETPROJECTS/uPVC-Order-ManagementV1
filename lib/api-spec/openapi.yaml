@@ -2539,7 +2539,8 @@ components:
       type: object
       properties:
         installationStatus:
-          $ref: "#/components/schemas/InstallationStatus"
+          type: string
+          enum: [issue, installed]
         installationDate:
           type: string
           format: date

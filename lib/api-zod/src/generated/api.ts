@@ -739,6 +739,103 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
 
 
 /**
+ * @summary List delivered orders and their installation state
+ */
+export const ListInstallationOrdersResponseItem = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "installationStatus": zod.enum(['pending', 'issue', 'installed']),
+  "installationDate": zod.coerce.date().nullable(),
+  "issueReason": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListInstallationOrdersResponse = zod.array(ListInstallationOrdersResponseItem)
+
+
+/**
+ * @summary Record an installation result or issue for a delivered order
+ */
+export const UpdateInstallationOrderParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateInstallationOrderBodyIssueReasonMax = 2000;
+
+
+
+export const UpdateInstallationOrderBody = zod.object({
+  "installationStatus": zod.enum(['issue', 'installed']),
+  "installationDate": zod.coerce.date(),
+  "issueReason": zod.string().max(updateInstallationOrderBodyIssueReasonMax).optional()
+})
+
+export const UpdateInstallationOrderResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "installationStatus": zod.enum(['pending', 'issue', 'installed']),
+  "installationDate": zod.coerce.date().nullable(),
+  "issueReason": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List grievances recorded for an order
+ */
+export const ListOrderGrievancesParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListOrderGrievancesResponseItem = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "description": zod.string(),
+  "reportedAt": zod.coerce.date(),
+  "status": zod.enum(['open']),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListOrderGrievancesResponse = zod.array(ListOrderGrievancesResponseItem)
+
+
+/**
+ * @summary Record a customer grievance after installation
+ */
+export const CreateOrderGrievanceParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const createOrderGrievanceBodyDescriptionMax = 3000;
+
+
+
+export const CreateOrderGrievanceBody = zod.object({
+  "description": zod.string().min(1).max(createOrderGrievanceBodyDescriptionMax),
+  "reportedAt": zod.coerce.date()
+})
+
+export const CreateOrderGrievanceResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "description": zod.string(),
+  "reportedAt": zod.coerce.date(),
+  "status": zod.enum(['open']),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List centrally configured lifecycle message templates
  */
 export const ListOrderMessageTemplatesResponseItem = zod.object({

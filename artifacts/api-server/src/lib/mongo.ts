@@ -43,7 +43,6 @@ export const MODULES = [
   { id: "balance-payment", label: "Balance Payment Messages" },
   { id: "dispatch", label: "Dispatch QR & Gate Pass" },
   { id: "installation", label: "Installation Scheduling" },
-  { id: "grievances", label: "Customer Grievances" },
   { id: "reporting", label: "Central Dashboard & Reporting" },
 ] as const;
 

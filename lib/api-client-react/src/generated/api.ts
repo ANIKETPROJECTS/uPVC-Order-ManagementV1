@@ -34,12 +34,16 @@ import type {
   ClientInput,
   ClientList,
   ClientUpdate,
+  CreateOrderGrievance,
   Dashboard,
   DispatchOrder,
   DispatchOrderList,
   DispatchStatusUpdate,
   GlassTrackingWindowList,
   HealthStatus,
+  InstallationOrder,
+  InstallationOrderList,
+  InstallationOrderUpdate,
   ListClientsParams,
   ListOrderLocationsParams,
   ListOrdersParams,
@@ -61,6 +65,8 @@ import type {
   OrderDocumentCategoryConfigList,
   OrderDocumentCategoryInput,
   OrderDocumentList,
+  OrderGrievance,
+  OrderGrievanceList,
   OrderInput,
   OrderList,
   OrderLocation,
@@ -2525,6 +2531,338 @@ export const useUpdateDispatchOrderStatus = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateDispatchOrderStatusMutationOptions(options));
+    }
+
+export const getListInstallationOrdersUrl = () => {
+
+
+
+
+  return `/api/installation/orders`
+}
+
+/**
+ * @summary List delivered orders and their installation state
+ */
+export const listInstallationOrders = async ( options?: Parameters<typeof customFetch>[1]): Promise<InstallationOrderList> => {
+
+  return customFetch<InstallationOrderList>(getListInstallationOrdersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInstallationOrdersQueryKey = () => {
+    return [
+    `/api/installation/orders`
+    ] as const;
+    }
+
+
+export const getListInstallationOrdersQueryOptions = <TData = Awaited<ReturnType<typeof listInstallationOrders>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstallationOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInstallationOrdersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInstallationOrders>>> = ({ signal }) => listInstallationOrders({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInstallationOrders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInstallationOrdersQueryResult = NonNullable<Awaited<ReturnType<typeof listInstallationOrders>>>
+export type ListInstallationOrdersQueryError = ErrorType<void>
+
+
+/**
+ * @summary List delivered orders and their installation state
+ */
+
+export function useListInstallationOrders<TData = Awaited<ReturnType<typeof listInstallationOrders>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstallationOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInstallationOrdersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateInstallationOrderUrl = (id: string,) => {
+
+
+
+
+  return `/api/installation/orders/${id}`
+}
+
+/**
+ * @summary Record an installation result or issue for a delivered order
+ */
+export const updateInstallationOrder = async (id: string,
+    installationOrderUpdate: InstallationOrderUpdate, options?: Parameters<typeof customFetch>[1]): Promise<InstallationOrder> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InstallationOrder>(getUpdateInstallationOrderUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(installationOrderUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateInstallationOrderMutationKey = () => ['updateInstallationOrder'] as const;
+
+export const getUpdateInstallationOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstallationOrder>>, TError,UpdateInstallationOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInstallationOrder>>, TError,UpdateInstallationOrderMutationVariables, TContext> => {
+
+const mutationKey = getUpdateInstallationOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstallationOrder>>, UpdateInstallationOrderMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateInstallationOrder(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInstallationOrderMutationResult = NonNullable<Awaited<ReturnType<typeof updateInstallationOrder>>>
+    export type UpdateInstallationOrderMutationBody = BodyType<InstallationOrderUpdate>
+    export type UpdateInstallationOrderMutationError = ErrorType<void>
+    export type UpdateInstallationOrderMutationVariables = {id: string;data: BodyType<InstallationOrderUpdate>}
+
+    /**
+ * @summary Record an installation result or issue for a delivered order
+ */
+export const useUpdateInstallationOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstallationOrder>>, TError,UpdateInstallationOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInstallationOrder>>,
+        TError,
+        UpdateInstallationOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateInstallationOrderMutationOptions(options));
+    }
+
+export const getListOrderGrievancesUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/grievances`
+}
+
+/**
+ * @summary List grievances recorded for an order
+ */
+export const listOrderGrievances = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderGrievanceList> => {
+
+  return customFetch<OrderGrievanceList>(getListOrderGrievancesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderGrievancesQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/grievances`
+    ] as const;
+    }
+
+
+export const getListOrderGrievancesQueryOptions = <TData = Awaited<ReturnType<typeof listOrderGrievances>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderGrievances>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderGrievancesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderGrievances>>> = ({ signal }) => listOrderGrievances(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderGrievances>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderGrievancesQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderGrievances>>>
+export type ListOrderGrievancesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List grievances recorded for an order
+ */
+
+export function useListOrderGrievances<TData = Awaited<ReturnType<typeof listOrderGrievances>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderGrievances>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderGrievancesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateOrderGrievanceUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/grievances`
+}
+
+/**
+ * @summary Record a customer grievance after installation
+ */
+export const createOrderGrievance = async (id: string,
+    createOrderGrievanceBody: CreateOrderGrievance, options?: Parameters<typeof customFetch>[1]): Promise<OrderGrievance> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderGrievance>(getCreateOrderGrievanceUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createOrderGrievanceBody)
+  }
+);}
+
+
+
+
+
+export const getCreateOrderGrievanceMutationKey = () => ['createOrderGrievance'] as const;
+
+export const getCreateOrderGrievanceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderGrievance>>, TError,CreateOrderGrievanceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOrderGrievance>>, TError,CreateOrderGrievanceMutationVariables, TContext> => {
+
+const mutationKey = getCreateOrderGrievanceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOrderGrievance>>, CreateOrderGrievanceMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createOrderGrievance(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOrderGrievanceMutationResult = NonNullable<Awaited<ReturnType<typeof createOrderGrievance>>>
+    export type CreateOrderGrievanceMutationBody = BodyType<CreateOrderGrievance>
+    export type CreateOrderGrievanceMutationError = ErrorType<void>
+    export type CreateOrderGrievanceMutationVariables = {id: string;data: BodyType<CreateOrderGrievance>}
+
+    /**
+ * @summary Record a customer grievance after installation
+ */
+export const useCreateOrderGrievance = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderGrievance>>, TError,CreateOrderGrievanceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOrderGrievance>>,
+        TError,
+        CreateOrderGrievanceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOrderGrievanceMutationOptions(options));
     }
 
 export const getListOrderMessageTemplatesUrl = () => {

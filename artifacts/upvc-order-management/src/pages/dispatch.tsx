@@ -8,6 +8,8 @@ import {
   Check,
   CircleAlert,
   Clock3,
+  Grid2X2,
+  List,
   MapPin,
   PackageCheck,
   QrCode,
@@ -20,6 +22,7 @@ import {
 import {
   DispatchStatus,
   getListDispatchOrdersQueryKey,
+  getListInstallationOrdersQueryKey,
   useListDispatchOrders,
   useUpdateDispatchOrderStatus,
 } from '@workspace/api-client-react';
@@ -32,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 
 type StatusValue = (typeof DispatchStatus)[keyof typeof DispatchStatus];
 type SortValue = 'updated-desc' | 'updated-asc' | 'order-id' | 'client';
+type ViewMode = 'list' | 'grid';
 
 const STATUS_OPTIONS: { value: StatusValue; label: string; tone: string; dot: string }[] = [
   { value: DispatchStatus.pending_dispatch, label: 'Pending Dispatch', tone: 'bg-amber-100 text-amber-900 ring-amber-200', dot: 'bg-amber-500' },
@@ -72,7 +76,17 @@ function formatUpdated(value: string) {
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
-function SkeletonRows() {
+function SkeletonRows({ viewMode }: { viewMode: ViewMode }) {
+  if (viewMode === 'grid') {
+    return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading dispatch orders" data-testid="state-dispatch-loading">
+      {[0, 1, 2, 3, 4, 5].map((item) => <div key={item} className="h-56 animate-pulse rounded-xl border border-border/70 bg-card p-4">
+        <div className="flex justify-between"><div className="h-4 w-28 rounded bg-muted" /><div className="h-6 w-24 rounded-full bg-muted/70" /></div>
+        <div className="mt-5 h-3 w-36 rounded bg-muted/70" /><div className="mt-2 h-3 w-24 rounded bg-muted/60" />
+        <div className="mt-6 h-8 w-32 rounded-lg bg-muted/70" /><div className="mt-3 h-3 w-28 rounded bg-muted/60" />
+        <div className="mt-6 flex gap-2"><div className="h-8 w-12 rounded-lg bg-muted/70" /><div className="h-8 w-20 rounded-lg bg-muted/70" /></div>
+      </div>)}
+    </div>;
+  }
   return <div className="space-y-2" aria-label="Loading dispatch orders" data-testid="state-dispatch-loading">
     {[0, 1, 2, 3].map((item) => <div key={item} className={`grid animate-pulse grid-cols-1 gap-3 rounded-xl border border-border/70 bg-card px-3.5 py-3 lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`}>
       <div className="space-y-2"><div className="h-4 w-28 rounded bg-muted" /><div className="h-3 w-36 rounded bg-muted/70" /></div>
@@ -86,6 +100,37 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex w-fit items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${option?.tone || 'bg-muted text-muted-foreground ring-border'}`} data-testid={`status-dispatch-${status}`}>
     <span className={`h-1.5 w-1.5 rounded-full ${option?.dot || 'bg-muted-foreground'}`} />{dispatchLabel(status)}
   </span>;
+}
+
+function DispatchGridCard({ order, canViewOrderHub, canEdit, busy, onShowQr, onUpdate }: {
+  order: DispatchOrder;
+  canViewOrderHub: boolean;
+  canEdit: boolean;
+  busy: boolean;
+  onShowQr: () => void;
+  onUpdate: () => void;
+}) {
+  return <article className="group flex min-h-56 flex-col rounded-xl border border-border/75 bg-background p-4 transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-primary/[.018] hover:shadow-md" data-testid={`card-dispatch-order-${order.id}`}>
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        {canViewOrderHub
+          ? <Link href={`/order-status/${encodeURIComponent(order.id)}`} className="break-all font-mono text-sm font-bold tracking-tight text-primary underline-offset-4 hover:underline" data-testid={`link-order-status-${order.id}`}>{order.orderId}</Link>
+          : <span className="break-all font-mono text-sm font-bold tracking-tight text-foreground" data-testid={`order-id-${order.id}`}>{order.orderId}</span>}
+        <p className="mt-1 truncate text-xs font-semibold text-foreground">{order.clientName}</p>
+      </div>
+      <StatusPill status={order.dispatchStatus} />
+    </div>
+    <div className="mt-4 flex min-w-0 items-center gap-2 text-xs text-muted-foreground"><MapPin size={14} className="shrink-0 text-primary/70" /><span className="truncate">{order.locationName}</span></div>
+    <div className="mt-4 rounded-lg border border-border/60 bg-muted/25 p-3">
+      <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Order lifecycle</p>
+      <span className={`mt-2 inline-flex w-fit rounded-md px-2 py-1 text-[10px] font-semibold ${orderTone(order.orderStatus)}`} data-testid={`status-order-${order.id}`}>{ORDER_STATUS_LABELS[order.orderStatus] || order.orderStatus.replaceAll('_', ' ')}</span>
+    </div>
+    <div className="mt-3 text-[10px] text-muted-foreground"><span className="font-bold uppercase tracking-wider">Updated</span><span className="ml-2" title={formatUpdated(order.updatedAt)}>{formatUpdated(order.updatedAt)}</span></div>
+    <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-border/60 pt-4">
+      <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-[10px]" onClick={onShowQr} aria-label={`Show QR for ${order.orderId}`} data-testid={`button-show-qr-${order.id}`}><QrCode size={13} /><span className="hidden sm:inline">QR</span></Button>
+      <Button type="button" size="sm" className="h-8 px-2 text-[10px]" disabled={!canEdit || busy} onClick={onUpdate} title={canEdit ? 'Change dispatch status' : 'View-only access'} data-testid={`button-change-status-${order.id}`}>{canEdit ? 'Update' : 'View'}<ArrowRight size={12} /></Button>
+    </div>
+  </article>;
 }
 
 function StatusDialog({ order, canEdit, busy, error, onClose, onSave }: {
@@ -152,6 +197,7 @@ export default function DispatchPage({ user }: { user: User }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sort, setSort] = useState<SortValue>('updated-desc');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [activeOrder, setActiveOrder] = useState<DispatchOrder | null>(null);
   const [qrOrder, setQrOrder] = useState<DispatchOrder | null>(null);
   const handledScanRef = useRef<string | null>(null);
@@ -191,6 +237,7 @@ export default function DispatchPage({ user }: { user: User }) {
       onSuccess: (updated) => {
         queryClient.setQueryData<DispatchOrder[]>(getListDispatchOrdersQueryKey(), (current) => current?.map((order) => order.id === updated.id ? updated : order));
         void queryClient.invalidateQueries({ queryKey: getListDispatchOrdersQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getListInstallationOrdersQueryKey() });
         toast({ title: 'Dispatch status updated', description: `${updated.orderId} · ${dispatchLabel(updated.dispatchStatus)}` });
         setActiveOrder(null);
       },
@@ -232,40 +279,51 @@ export default function DispatchPage({ user }: { user: User }) {
             <div><div className="flex items-center gap-2"><span className="h-5 w-1 rounded-full bg-primary" /><h2 className="font-display text-lg font-bold tracking-tight">Dispatch register</h2><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground" data-testid="text-dispatch-count">{filteredOrders.length} / {orders.length}</span></div><p className="ml-3 mt-1 text-xs text-muted-foreground">Search by order, client, or delivery location.</p></div>
             {!canEdit && <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-900"><ShieldCheck size={13} /> View-only access</span>}
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(200px,1fr)_190px_190px_auto]">
-            <label className="relative block">
-              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find an order…" aria-label="Search by order, client, or location" className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-dispatch-search" />
-            </label>
-            <label className="relative">
-              <span className="sr-only">Filter dispatch status</span>
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-8 text-xs font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="select-dispatch-filter">
-                <option value="all">All dispatch statuses</option>{STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-              <ArrowDownUp size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            </label>
-            <label className="relative">
-              <span className="sr-only">Sort dispatch orders</span>
-              <select value={sort} onChange={(event) => setSort(event.target.value as SortValue)} className="h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-8 text-xs font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="select-dispatch-sort">
-                <option value="updated-desc">Recently updated</option><option value="updated-asc">Oldest update</option><option value="order-id">Order ID</option><option value="client">Client name</option>
-              </select>
-              <ArrowDownUp size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            </label>
-            {(search || statusFilter !== 'all') && <Button type="button" variant="ghost" size="sm" className="h-10 text-xs" onClick={clearFilters} data-testid="button-clear-dispatch-filters"><X size={14} /> Clear</Button>}
+          <div className="mt-4 flex flex-col gap-2 lg:flex-row">
+            <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(180px,1fr)_minmax(150px,.75fr)_minmax(150px,.75fr)]">
+              <label className="relative block">
+                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find an order…" aria-label="Search by order, client, or location" className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-dispatch-search" />
+              </label>
+              <label className="relative">
+                <span className="sr-only">Filter dispatch status</span>
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-8 text-xs font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="select-dispatch-filter">
+                  <option value="all">All dispatch statuses</option>{STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+                <ArrowDownUp size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              </label>
+              <label className="relative">
+                <span className="sr-only">Sort dispatch orders</span>
+                <select value={sort} onChange={(event) => setSort(event.target.value as SortValue)} className="h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-8 text-xs font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="select-dispatch-sort">
+                  <option value="updated-desc">Recently updated</option><option value="updated-asc">Oldest update</option><option value="order-id">Order ID</option><option value="client">Client name</option>
+                </select>
+                <ArrowDownUp size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              </label>
+            </div>
+            <div className="flex items-center justify-between gap-2 sm:justify-end">
+              <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-background p-1" role="group" aria-label="Dispatch register view">
+                <Button type="button" variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')} aria-label="List view" aria-pressed={viewMode === 'list'} title="List view" data-testid="button-dispatch-list-view"><List size={15} /></Button>
+                <Button type="button" variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} title="Grid view" data-testid="button-dispatch-grid-view"><Grid2X2 size={15} /></Button>
+              </div>
+              {(search || statusFilter !== 'all') && <Button type="button" variant="ghost" size="sm" className="h-10 text-xs" onClick={clearFilters} data-testid="button-clear-dispatch-filters"><X size={14} /> Clear</Button>}
+            </div>
           </div>
         </div>
 
-        <div className={`mx-2 hidden gap-3 rounded-xl border border-transparent bg-muted/45 px-3.5 py-2.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground sm:mx-3 lg:grid lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`}>
+        {viewMode === 'list' && <div className={`mx-2 hidden gap-3 rounded-xl border border-transparent bg-muted/45 px-3.5 py-2.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground sm:mx-3 lg:grid lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`}>
           <span>Order / client</span><span>Delivery location</span><span>Dispatch status</span><span>Order lifecycle</span><span>Updated</span><span className="text-right">Actions</span>
-        </div>
-        <div className="space-y-2 p-2 sm:p-3">
+        </div>}
+        <div className="p-2 sm:p-3">
           {!canView ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-dispatch-access-denied">
             <div><ShieldCheck size={24} className="mx-auto text-muted-foreground" /><h3 className="mt-3 font-display text-sm font-bold">Dispatch access required</h3><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">Your role does not have permission to view dispatch records. Ask an administrator for dispatch access.</p></div>
-          </div> : ordersQuery.isLoading ? <SkeletonRows /> : ordersQuery.isError ? <div className="grid min-h-64 place-items-center rounded-xl border border-destructive/20 bg-destructive/[0.035] p-6 text-center" data-testid="state-dispatch-error">
+          </div> : ordersQuery.isLoading ? <SkeletonRows viewMode={viewMode} /> : ordersQuery.isError ? <div className="grid min-h-64 place-items-center rounded-xl border border-destructive/20 bg-destructive/[0.035] p-6 text-center" data-testid="state-dispatch-error">
             <div><CircleAlert size={24} className="mx-auto text-destructive" /><h3 className="mt-3 font-display text-sm font-bold">Dispatch records unavailable</h3><p className="mt-1 text-xs text-muted-foreground">The latest handoff records could not be loaded.</p><Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => void ordersQuery.refetch()} data-testid="button-retry-dispatch"><RefreshCw size={13} /> Try again</Button></div>
           </div> : filteredOrders.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-dispatch-empty">
             <div><div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-primary"><PackageCheck size={20} /></div><h3 className="mt-3 font-display text-sm font-bold">{orders.length ? 'No orders match these filters' : 'No dispatch records yet'}</h3><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{orders.length ? 'Try a different search or status filter, or clear your filters.' : 'Orders will appear here with a separate dispatch status so delivery handoffs can be tracked.'}</p>{orders.length > 0 && <Button type="button" size="sm" variant="outline" className="mt-4" onClick={clearFilters} data-testid="button-empty-clear-filters">Clear filters</Button>}</div>
-          </div> : filteredOrders.map((order) => <article key={order.id} className={`group grid gap-3 rounded-xl border border-border/75 bg-background px-3.5 py-3 transition duration-200 hover:border-primary/25 hover:bg-primary/[0.018] hover:shadow-sm lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`} data-testid={`row-dispatch-order-${order.id}`}>
+          </div> : viewMode === 'grid' ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="grid-dispatch-orders">
+            {filteredOrders.map((order) => <DispatchGridCard key={order.id} order={order} canViewOrderHub={canViewOrderHub} canEdit={canEdit} busy={updateStatus.isPending} onShowQr={() => setQrOrder(order)} onUpdate={() => setActiveOrder(order)} />)}
+          </div> : <div className="space-y-2" data-testid="list-dispatch-orders">
+            {filteredOrders.map((order) => <article key={order.id} className={`group grid gap-3 rounded-xl border border-border/75 bg-background px-3.5 py-3 transition duration-200 hover:border-primary/25 hover:bg-primary/[0.018] hover:shadow-sm lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`} data-testid={`row-dispatch-order-${order.id}`}>
             <div className="min-w-0">
               {canViewOrderHub
                 ? <Link href={`/order-status/${encodeURIComponent(order.id)}`} className="w-fit font-mono text-[13px] font-bold tracking-tight text-primary underline-offset-4 hover:underline" data-testid={`link-order-status-${order.id}`}>{order.orderId}</Link>
@@ -286,7 +344,8 @@ export default function DispatchPage({ user }: { user: User }) {
                 <Button type="button" size="sm" className="h-8 px-2 text-[10px]" disabled={!canEdit || updateStatus.isPending} onClick={() => setActiveOrder(order)} title={canEdit ? 'Change dispatch status' : 'View-only access'} data-testid={`button-change-status-${order.id}`}>{canEdit ? 'Update' : 'View'}<ArrowRight size={12} /></Button>
               </div>
             </div>
-          </article>)}
+            </article>)}
+          </div>}
         </div>
         {!ordersQuery.isLoading && !ordersQuery.isError && orders.length > 0 && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 px-4 py-3 text-[10px] text-muted-foreground">
           <span>Updated records are shown first by default.</span><span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-primary" /> {filteredOrders.length} {filteredOrders.length === 1 ? 'record' : 'records'} in view</span>

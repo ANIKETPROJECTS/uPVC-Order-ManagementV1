@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  ShieldCheck,
   Settings2,
   Trash2,
   Upload,
@@ -36,6 +37,7 @@ import {
   getGetOrderQueryKey,
   getListOrderDocumentCategoriesQueryKey,
   getListOrderActivityQueryKey,
+  getListOrderGrievancesQueryKey,
   getListOrderDocumentsQueryKey,
   getListOrderMessageTemplatesQueryKey,
   getListOrderPaymentsQueryKey,
@@ -49,6 +51,7 @@ import {
   useArchiveOrderDocument,
   useArchiveOrderWindow,
   useCreateOrderDocumentCategory,
+  useCreateOrderGrievance,
   useCreateOrderWindow,
   useDeleteOrderDocumentCategory,
   useDownloadOrderDocument,
@@ -56,6 +59,7 @@ import {
   useListOrderActivity,
   useListOrderDocumentCategories,
   useListOrderDocuments,
+  useListOrderGrievances,
   useListOrderMessageTemplates,
   useListOrderPayments,
   useListOrderWindows,
@@ -73,6 +77,7 @@ import type {
   OrderDocument,
   OrderDocumentCategory,
   OrderDocumentCategoryConfig,
+  OrderGrievance,
   OrderPayment,
   OrderWindow,
   User,
@@ -130,6 +135,15 @@ const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-
 const inr = (value: number | null | undefined) => value == null ? 'Not set' : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value);
 const plainInr = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value);
 const readable = (value: string) => value === 'drawing' ? 'Elevation' : value.replaceAll('_', ' ');
+const localDateInput = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+};
+const grievanceFormSchema = z.object({
+  description: z.string().trim().min(1, 'Describe the customer’s grievance.').max(3000, 'Keep the description under 3,000 characters.'),
+  reportedAt: z.string().min(1, 'Choose the date the grievance was reported.'),
+});
+type GrievanceFormValues = z.infer<typeof grievanceFormSchema>;
 
 function hasPermission(user: User, module: string, level: 'view' | 'edit' = 'edit') {
   return user.roleId === 'master-admin' || user.permissions?.[module] === 'edit' || (level === 'view' && user.permissions?.[module] === 'view');
@@ -637,6 +651,87 @@ function ActivityPanel({ orderId }: { orderId: string }) {
   return <Card className="border-border/80" data-testid="card-order-activity"><CardHeader className="pb-3"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Audit trail</p><CardTitle className="mt-1 text-base">User Log</CardTitle><p className="mt-1 text-xs text-muted-foreground">Persisted activity for this order, newest first.</p></CardHeader><CardContent>{query.isLoading ? <div className="space-y-4" data-testid="state-activity-loading">{[1, 2, 3, 4].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="User Log could not be loaded." testId="state-activity-error" /> : activity.length === 0 ? <ZeroState icon={ClipboardCheck} title="No activity recorded" description="The activity endpoint has no entries for this order yet." testId="state-activity-empty" /> : <div className="relative space-y-0">{activity.map((item, index) => <div key={item.id} className="relative flex gap-4 pb-5 last:pb-0" data-testid={`row-activity-${item.id}`}><div className="relative flex w-8 shrink-0 justify-center"><span className="relative z-10 mt-1 grid h-7 w-7 place-items-center rounded-full border border-primary/30 bg-primary/10 text-[10px] font-bold text-primary">{item.actorName.slice(0, 1).toUpperCase()}</span>{index < activity.length - 1 && <span className="absolute top-8 h-full w-px bg-border" />}</div><div className="min-w-0 flex-1 rounded-xl border border-border/60 bg-background/40 p-3"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><p className="text-xs font-semibold" data-testid={`text-activity-summary-${item.id}`}>{item.summary}</p><time className="shrink-0 text-[10px] text-muted-foreground" dateTime={item.createdAt}>{dateLabel(item.createdAt)}</time></div><p className="mt-1 text-[11px] text-muted-foreground">{item.actorName} · <span className="capitalize">{readable(item.action)}</span></p></div></div>)}</div>}</CardContent></Card>;
 }
 
+function GrievancesPanel({ order, user }: { order: Order; user: User }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const canEdit = hasPermission(user, 'order-hub', 'edit');
+  const query = useListOrderGrievances(order.id, { query: { queryKey: getListOrderGrievancesQueryKey(order.id) } });
+  const create = useCreateOrderGrievance();
+  const grievances = query.data || [];
+  const form = useForm<GrievanceFormValues>({
+    resolver: zodResolver(grievanceFormSchema),
+    defaultValues: { description: '', reportedAt: localDateInput() },
+  });
+  const descriptionLength = form.watch('description').length;
+
+  const saveGrievance = (values: GrievanceFormValues) => {
+    if (!canEdit || order.status !== OrderStatus.installed) return;
+    create.mutate({
+      id: order.id,
+      data: { description: values.description.trim(), reportedAt: values.reportedAt },
+    }, {
+      onSuccess: () => {
+        form.reset({ description: '', reportedAt: localDateInput() });
+        toast({ title: 'Grievance recorded', description: 'It is saved in this order’s Grievances tab.' });
+        void queryClient.invalidateQueries({ queryKey: getListOrderGrievancesQueryKey(order.id) });
+        void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(order.id) });
+      },
+      onError: () => toast({ title: 'Grievance could not be saved', description: 'Check the order status and try again.', variant: 'destructive' }),
+    });
+  };
+
+  return <div className="grid gap-5 xl:grid-cols-[minmax(300px,.82fr)_minmax(0,1.18fr)]" data-testid="panel-order-grievances">
+    <Card className="h-fit overflow-hidden border-border/80 shadow-sm" data-testid="card-order-grievance-form">
+      <CardHeader className="border-b border-border/60 bg-muted/20 pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Customer care · order record</p><CardTitle className="mt-1 text-base">Grievances</CardTitle><p className="mt-1 text-xs leading-5 text-muted-foreground">Post-installation concerns stay attached to this order for the team to follow.</p></div>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-primary/15 bg-primary/10 text-primary"><MessageSquareText size={17} /></span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/70 px-3 py-2">
+          <span className="text-[9px] font-bold uppercase tracking-[.13em] text-muted-foreground">Linked order</span>
+          <span className="font-mono text-xs font-bold text-foreground">{order.orderId}</span>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4">
+        {order.status !== OrderStatus.installed
+          ? <div className="flex gap-3 rounded-xl border border-dashed border-border bg-muted/15 p-4 text-xs leading-5 text-muted-foreground" data-testid="state-grievance-installation-required"><Wrench className="mt-0.5 shrink-0 text-primary/75" size={16} /><span>A grievance can be added after this order is marked installed in the Installation module.</span></div>
+          : !canEdit
+            ? <div className="flex gap-3 rounded-xl border border-amber-300/70 bg-amber-50 p-4 text-xs leading-5 text-amber-950" data-testid="state-grievance-read-only"><ShieldCheck className="mt-0.5 shrink-0" size={16} /><span>You can view this grievance record. Order edit access is required to add one.</span></div>
+            : <Form {...form}>
+              <form className="space-y-4" onSubmit={form.handleSubmit(saveGrievance)} data-testid="form-order-grievance">
+                <FormField control={form.control} name="description" render={({ field }) => <FormItem>
+                  <div className="flex items-center justify-between gap-3"><FormLabel>Customer grievance</FormLabel><span className="font-mono text-[10px] text-muted-foreground" aria-live="polite">{descriptionLength.toLocaleString()} / 3,000</span></div>
+                  <FormControl><Textarea {...field} rows={5} maxLength={3000} placeholder="Describe the customer’s concern and the assistance needed…" className="min-h-32 resize-y leading-6" data-testid="textarea-order-grievance" /></FormControl>
+                  <FormMessage />
+                </FormItem>} />
+                <FormField control={form.control} name="reportedAt" render={({ field }) => <FormItem>
+                  <FormLabel>Date reported</FormLabel>
+                  <FormControl><Input type="date" {...field} data-testid="input-grievance-reported-date" /></FormControl>
+                  <FormMessage />
+                </FormItem>} />
+                <Button type="submit" disabled={create.isPending} className="w-full sm:w-auto" data-testid="button-add-order-grievance">{create.isPending ? <><Loader2 size={14} className="animate-spin" /> Saving grievance…</> : <><Plus size={14} /> Add grievance</>}</Button>
+              </form>
+            </Form>}
+      </CardContent>
+    </Card>
+
+    <Card className="overflow-hidden border-border/80 shadow-sm" data-testid="card-order-grievance-history">
+      <CardHeader className="border-b border-border/60 pb-4"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Persistent record</p><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle className="text-base">Grievance history</CardTitle><span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 font-mono text-[10px] font-semibold text-muted-foreground" data-testid="count-order-grievances"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{grievances.length} {grievances.length === 1 ? 'record' : 'records'}</span></div><p className="text-xs text-muted-foreground">Every report remains connected to {order.orderId}.</p></CardHeader>
+      <CardContent>
+        {query.isLoading ? <div className="space-y-3" data-testid="state-grievances-loading">{[1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div>
+          : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Grievances could not be loaded." testId="state-grievances-error" />
+            : grievances.length === 0 ? <ZeroState icon={MessageSquareText} title="No grievances recorded" description="Post-installation complaints added for this order will be kept here." testId="state-grievances-empty" />
+              : <div className="space-y-3">{grievances.map((item: OrderGrievance) => <article key={item.id} className="relative overflow-hidden rounded-xl border border-border/70 bg-background/65 p-4 transition-colors hover:border-primary/25" data-testid={`row-order-grievance-${item.id}`}>
+                <span className="absolute inset-y-0 left-0 w-1 bg-amber-400/80" />
+                <div className="flex flex-wrap items-start justify-between gap-3 pl-2"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-900">{item.status === 'open' ? 'Open' : item.status}</span><span className="text-[10px] text-muted-foreground">Reported {dateLabel(item.reportedAt)}</span></div><span className="text-[10px] text-muted-foreground">Added by <span className="font-semibold text-foreground/80">{item.createdBy}</span></span></div>
+                <p className="mt-3 whitespace-pre-wrap pl-2 text-sm leading-6" data-testid={`text-order-grievance-${item.id}`}>{item.description}</p>
+                <p className="mt-3 border-t border-border/50 pl-2 pt-2 text-[9px] text-muted-foreground">Recorded {dateLabel(item.createdAt)}</p>
+              </article>)}</div>}
+      </CardContent>
+    </Card>
+  </div>;
+}
+
 function InlineError({ onRetry, label, testId }: { onRetry: () => void; label: string; testId: string }) {
   return <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-5 text-center" data-testid={testId}><CircleAlert className="mx-auto text-destructive" size={20} /><p className="mt-2 text-sm font-semibold">{label}</p><Button variant="outline" size="sm" className="mt-3" onClick={onRetry} data-testid={`${testId}-retry`}><RefreshCw size={13} /> Retry</Button></div>;
 }
@@ -667,10 +762,11 @@ export default function OrderDetailPage({ user }: { user: User }) {
     <section className="order-hub-accent relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header"><div className="absolute right-10 top-8 h-28 w-28 rounded-full border border-sidebar-primary/20" /><div className="relative flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="min-w-0"><p className="break-all font-mono text-xs font-bold tracking-[0.13em] text-sidebar-primary" data-testid="text-order-id">{record.orderId}</p><h2 className="mt-3 break-words font-display text-2xl font-bold tracking-[-0.04em] sm:text-3xl md:text-4xl" data-testid="text-order-client">{record.clientName}</h2><p className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70"><span className="font-mono text-sidebar-primary">{record.locationCode}</span> <span className="break-words">{record.locationName}</span> <span className="text-white/40">·</span> <span>created {dateLabel(record.createdAt)}</span></p></div><span className={`inline-flex w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusTone(record.status)}`} data-testid="status-order-detail">{statusLabel(record.status)}</span></div></section>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Windows" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Total area" value={`${summary.sqFt.toFixed(2)} sq ft`} detail="Summed from window records" testId="text-summary-area" /><SummaryStat label="Glass state" value={summary.glass} detail="Aggregate procurement state" testId="text-summary-glass" /><SummaryStat label="Received" value={hasPermission(user, 'payments', 'view') ? plainInr(received) : 'Restricted'} detail="Payments marked received" testId="text-summary-received" /></div>
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6" data-testid="section-order-lifecycle"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-base font-bold">Where this order is now</h2></div><span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span></div><div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">{timeline.map((item, index) => <div key={item.value} className="relative min-w-0" data-testid={`timeline-stage-${item.value}`}>{index < timeline.length - 1 && <div aria-hidden="true" className={`absolute left-7 -right-4 top-3.5 z-0 hidden h-px lg:block ${item.active ? 'bg-primary/35' : 'bg-border'}`} />}<span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.current ? 'border-primary bg-primary text-primary-foreground' : item.active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}>{item.current ? <Check size={13} /> : String(index + 1).padStart(2, '0')}</span><p className={`mt-2 min-h-8 text-[10px] font-bold leading-4 ${item.active ? 'text-primary' : 'text-muted-foreground'}`}>{item.label}</p></div>)}</div></section>
-    <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-4"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
+    <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : new URLSearchParams(window.location.search).get('tab') === 'grievances' ? 'grievances' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-5"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="grievances" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-grievances">Grievances</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
       <TabsContent value="details" className="space-y-5"><OrderQrCard orderId={record.orderId} orderRecordId={record.id} /><div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><OrderRecordCard order={record} user={user} id={id} /><MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} /></div><WindowsPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="billing" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><PaymentsPanel orderId={id} user={user} order={record} /></TabsContent>
       <TabsContent value="documents"><DocumentsPanel orderId={id} user={user} /></TabsContent>
+      <TabsContent value="grievances"><GrievancesPanel order={record} user={user} /></TabsContent>
       <TabsContent value="activity"><ActivityPanel orderId={id} /></TabsContent>
     </Tabs>
   </div></AppShell>;

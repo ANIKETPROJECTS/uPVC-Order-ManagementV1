@@ -1,0 +1,299 @@
+import { randomUUID } from "node:crypto";
+import {
+  CreateOrderGrievanceBody,
+  CreateOrderGrievanceParams,
+  CreateOrderGrievanceResponse,
+  ListInstallationOrdersResponse,
+  ListOrderGrievancesParams,
+  ListOrderGrievancesResponse,
+  UpdateInstallationOrderBody,
+  UpdateInstallationOrderParams,
+  UpdateInstallationOrderResponse,
+} from "@workspace/api-zod";
+import { Router, type Request, type Response } from "express";
+import {
+  getInstallations,
+  getMongoClient,
+  getMongoDb,
+  getOrderActivity,
+  getOrderGrievances,
+  getOrders,
+  getPublicUser,
+  getUsers,
+  type InstallationDocument,
+  type OrderDocument,
+  type OrderGrievanceDocument,
+} from "../lib/mongo";
+
+const router = Router();
+
+type Actor = { id: string; name: string; masterAdmin: boolean };
+
+async function getActor(
+  req: Request,
+  res: Response,
+  module: "installation" | "order-hub",
+  required: "view" | "edit",
+): Promise<Actor | null> {
+  const db = await getMongoDb();
+  const user = req.session.userId
+    ? await getUsers(db).findOne({ _id: req.session.userId, status: "active" })
+    : null;
+  if (!user) {
+    res.status(401).json({ error: "Sign in to continue." });
+    return null;
+  }
+
+  const publicUser = await getPublicUser(user, db);
+  const permission = publicUser.permissions[module] ?? "none";
+  if (
+    publicUser.roleId !== "master-admin" &&
+    permission !== "edit" &&
+    (required === "edit" || permission !== "view")
+  ) {
+    res.status(403).json({ error: `${module === "installation" ? "Installation" : "Order"} ${required} access is required.` });
+    return null;
+  }
+  return { id: user._id, name: user.name, masterAdmin: publicUser.roleId === "master-admin" };
+}
+
+function installationResponse(order: OrderDocument, installation?: InstallationDocument) {
+  return {
+    id: order._id,
+    orderId: order.orderId,
+    clientName: order.clientName,
+    locationName: order.locationName,
+    orderStatus: order.status,
+    dispatchStatus: order.dispatchStatus ?? "pending_dispatch",
+    installationStatus: installation?.installationStatus ?? (order.status === "installed" ? "installed" : "pending"),
+    installationDate: installation?.installationDate
+      ? new Date(`${installation.installationDate}T00:00:00.000Z`)
+      : null,
+    issueReason: installation?.issueReason ?? null,
+    updatedAt: installation?.updatedAt ?? order.updatedAt,
+  };
+}
+
+function grievanceResponse(item: OrderGrievanceDocument) {
+  return {
+    id: item._id,
+    orderRecordId: item.orderRecordId,
+    orderId: item.orderId,
+    description: item.description,
+    reportedAt: new Date(`${item.reportedAt}T00:00:00.000Z`),
+    status: item.status,
+    createdBy: item.createdByName,
+    createdAt: item.createdAt,
+  };
+}
+
+class InstallationConflict extends Error {}
+
+router.get("/installation/orders", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res, "installation", "view");
+  if (!actor) return;
+
+  const db = await getMongoDb();
+  const orders = await getOrders(db)
+    .find({ dispatchStatus: "delivered" })
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .toArray();
+  if (!orders.length) {
+    res.json(ListInstallationOrdersResponse.parse([]));
+    return;
+  }
+
+  const installations = await getInstallations(db)
+    .find({ _id: { $in: orders.map((order) => order._id) } })
+    .toArray();
+  const installationsByOrder = new Map(installations.map((item) => [item.orderRecordId, item]));
+  res.json(ListInstallationOrdersResponse.parse(orders.map((order) =>
+    installationResponse(order, installationsByOrder.get(order._id)),
+  )));
+});
+
+router.patch("/installation/orders/:id", async (req, res): Promise<void> => {
+  const params = UpdateInstallationOrderParams.safeParse(req.params);
+  const body = UpdateInstallationOrderBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: !params.success ? params.error.message : body.success ? "" : body.error.message });
+    return;
+  }
+  const actor = await getActor(req, res, "installation", "edit");
+  if (!actor) return;
+
+  const issueReason = body.data.installationStatus === "issue"
+    ? body.data.issueReason?.trim() ?? ""
+    : "";
+  if (body.data.installationStatus === "issue" && !issueReason) {
+    res.status(400).json({ error: "Add a reason before recording an installation issue." });
+    return;
+  }
+
+  const db = await getMongoDb();
+  const session = (await getMongoClient()).startSession();
+  let updatedOrder: OrderDocument | null = null;
+  let updatedInstallation: InstallationDocument | null = null;
+  const now = new Date();
+  const installationDate = body.data.installationDate.toISOString().slice(0, 10);
+
+  try {
+    await session.withTransaction(async () => {
+      const orders = getOrders(db);
+      const order = await orders.findOne(
+        { _id: params.data.id, dispatchStatus: "delivered" },
+        { session },
+      );
+      if (!order) {
+        const existing = await orders.findOne({ _id: params.data.id }, { session });
+        if (!existing) throw new InstallationConflict("Order not found.");
+        throw new InstallationConflict("Only delivered orders can be updated in Installation.");
+      }
+      if (order.status === "installed" && body.data.installationStatus === "issue") {
+        throw new InstallationConflict("Record a post-installation complaint in the Grievances tab instead.");
+      }
+
+      if (body.data.installationStatus === "installed") {
+        const result = await orders.findOneAndUpdate(
+          { _id: order._id, dispatchStatus: "delivered" },
+          { $set: { status: "installed", updatedAt: now, updatedBy: actor.id } },
+          { returnDocument: "after", session },
+        );
+        if (!result) throw new InstallationConflict("The order changed before installation could be saved.");
+        updatedOrder = result;
+      } else {
+        updatedOrder = order;
+      }
+
+      const result = await getInstallations(db).findOneAndUpdate(
+        { _id: order._id },
+        {
+          $set: {
+            orderRecordId: order._id,
+            installationStatus: body.data.installationStatus,
+            installationDate,
+            issueReason: body.data.installationStatus === "issue" ? issueReason : null,
+            updatedBy: actor.id,
+            updatedAt: now,
+          },
+          $setOnInsert: { createdAt: now },
+        },
+        { returnDocument: "after", upsert: true, session },
+      );
+      if (!result) throw new InstallationConflict("The installation update could not be saved.");
+      updatedInstallation = result;
+
+      await getOrderActivity(db).insertOne({
+        _id: randomUUID(),
+        orderRecordId: order._id,
+        actorId: actor.id,
+        actorName: actor.name,
+        action: body.data.installationStatus === "issue" ? "installation_issue" : "installation",
+        summary: body.data.installationStatus === "issue"
+          ? `Installation issue recorded for ${order.orderId} on ${installationDate}: ${issueReason}`
+          : `${order.orderId} marked installed on ${installationDate}.`,
+        createdAt: now,
+      }, { session });
+    });
+  } catch (error) {
+    if (error instanceof InstallationConflict) {
+      res.status(error.message === "Order not found." ? 404 : 409).json({ error: error.message });
+      return;
+    }
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  if (!updatedOrder || !updatedInstallation) {
+    res.status(409).json({ error: "The installation update could not be saved." });
+    return;
+  }
+  res.json(UpdateInstallationOrderResponse.parse(installationResponse(updatedOrder, updatedInstallation)));
+});
+
+router.get("/orders/:id/grievances", async (req, res): Promise<void> => {
+  const params = ListOrderGrievancesParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const actor = await getActor(req, res, "order-hub", "view");
+  if (!actor) return;
+  const db = await getMongoDb();
+  const order = await getOrders(db).findOne({ _id: params.data.id });
+  if (!order) {
+    res.status(404).json({ error: "Order not found." });
+    return;
+  }
+  const grievances = await getOrderGrievances(db)
+    .find({ orderRecordId: order._id })
+    .sort({ createdAt: -1 })
+    .toArray();
+  res.json(ListOrderGrievancesResponse.parse(grievances.map(grievanceResponse)));
+});
+
+router.post("/orders/:id/grievances", async (req, res): Promise<void> => {
+  const params = CreateOrderGrievanceParams.safeParse(req.params);
+  const body = CreateOrderGrievanceBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: !params.success ? params.error.message : body.success ? "" : body.error.message });
+    return;
+  }
+  const actor = await getActor(req, res, "order-hub", "edit");
+  if (!actor) return;
+  const description = body.data.description.trim();
+  if (!description) {
+    res.status(400).json({ error: "Add details before recording a grievance." });
+    return;
+  }
+
+  const db = await getMongoDb();
+  const session = (await getMongoClient()).startSession();
+  const grievanceId = randomUUID();
+  const now = new Date();
+  const item: OrderGrievanceDocument = {
+    _id: grievanceId,
+    orderRecordId: params.data.id,
+    orderId: "",
+    description,
+    reportedAt: body.data.reportedAt.toISOString().slice(0, 10),
+    status: "open",
+    createdBy: actor.id,
+    createdByName: actor.name,
+    createdAt: now,
+  };
+
+  try {
+    await session.withTransaction(async () => {
+      const order = await getOrders(db).findOne({ _id: params.data.id }, { session });
+      if (!order) throw new InstallationConflict("Order not found.");
+      if (order.status !== "installed") {
+        throw new InstallationConflict("Grievances can only be recorded after the order is installed.");
+      }
+      item.orderId = order.orderId;
+      await getOrderGrievances(db).insertOne(item, { session });
+      await getOrderActivity(db).insertOne({
+        _id: randomUUID(),
+        orderRecordId: order._id,
+        actorId: actor.id,
+        actorName: actor.name,
+        action: "grievance",
+        summary: `Customer grievance recorded for ${order.orderId}: ${item.description}`,
+        createdAt: now,
+      }, { session });
+    });
+  } catch (error) {
+    if (error instanceof InstallationConflict) {
+      res.status(error.message === "Order not found." ? 404 : 409).json({ error: error.message });
+      return;
+    }
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  res.status(201).json(CreateOrderGrievanceResponse.parse(grievanceResponse(item)));
+});
+
+export default router;

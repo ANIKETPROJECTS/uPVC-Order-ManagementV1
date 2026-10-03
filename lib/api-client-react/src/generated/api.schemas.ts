@@ -309,6 +309,76 @@ export interface DispatchStatusUpdate {
 
 export type DispatchOrderList = DispatchOrder[];
 
+export type InstallationStatus = typeof InstallationStatus[keyof typeof InstallationStatus];
+
+
+export const InstallationStatus = {
+  pending: 'pending',
+  issue: 'issue',
+  installed: 'installed',
+} as const;
+
+export interface InstallationOrder {
+  id: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  orderStatus: OrderStatus;
+  dispatchStatus: DispatchStatus;
+  installationStatus: InstallationStatus;
+  /** @nullable */
+  installationDate: string | null;
+  /** @nullable */
+  issueReason: string | null;
+  updatedAt: string;
+}
+
+export type InstallationOrderUpdateInstallationStatus = typeof InstallationOrderUpdateInstallationStatus[keyof typeof InstallationOrderUpdateInstallationStatus];
+
+
+export const InstallationOrderUpdateInstallationStatus = {
+  issue: 'issue',
+  installed: 'installed',
+} as const;
+
+export interface InstallationOrderUpdate {
+  installationStatus: InstallationOrderUpdateInstallationStatus;
+  installationDate: string;
+  /** @maxLength 2000 */
+  issueReason?: string;
+}
+
+export type InstallationOrderList = InstallationOrder[];
+
+export type OrderGrievanceStatus = typeof OrderGrievanceStatus[keyof typeof OrderGrievanceStatus];
+
+
+export const OrderGrievanceStatus = {
+  open: 'open',
+} as const;
+
+export interface OrderGrievance {
+  id: string;
+  orderRecordId: string;
+  orderId: string;
+  description: string;
+  reportedAt: string;
+  status: OrderGrievanceStatus;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface CreateOrderGrievance {
+  /**
+     * @minLength 1
+     * @maxLength 3000
+     */
+  description: string;
+  reportedAt: string;
+}
+
+export type OrderGrievanceList = OrderGrievance[];
+
 export interface Order {
   id: string;
   orderId: string;
