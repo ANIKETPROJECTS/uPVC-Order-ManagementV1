@@ -4,10 +4,14 @@ import { ArrowLeft, Download, Eye, FileSpreadsheet, MapPin, Pencil, Save, Trash2
 import {
   getDownloadMeasurementVersionUrl,
   getListMeasurementRecordsQueryKey,
+  getListQuotationRateSubmissionsQueryKey,
   getPreviewMeasurementVersionUrl,
+  getSearchMeasurementRecordsQueryKey,
+  getSearchQuotationRateSubmissionsQueryKey,
   uploadMeasurementVersion,
   useDeleteMeasurementVersion,
   useListMeasurementRecords,
+  useUpdateMeasurementRecord,
   useUpdateMeasurementVersion,
 } from '@workspace/api-client-react';
 import type { MeasurementVersion, User } from '@workspace/api-client-react';
@@ -15,7 +19,7 @@ import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { measurementSheetIdLabel } from '@/components/link-record-lookups';
+import { measurementSheetIdLabel, QuotationRequestLookup } from '@/components/link-record-lookups';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useParams } from 'wouter';
 
@@ -42,6 +46,7 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
     query: { queryKey: getListMeasurementRecordsQueryKey() },
   });
   const canEdit = user.roleId === 'master-admin' || user.permissions?.measurements === 'edit';
+  const updateRecord = useUpdateMeasurementRecord();
   const updateVersion = useUpdateMeasurementVersion();
   const deleteVersion = useDeleteMeasurementVersion();
   const upload = useMutation({
@@ -52,6 +57,9 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
   });
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [versionNameDraft, setVersionNameDraft] = useState('');
+  const [isEditingQuotation, setIsEditingQuotation] = useState(false);
+  const [selectedQuotationId, setSelectedQuotationId] = useState<string | null>(null);
+  const [selectedQuotationLabel, setSelectedQuotationLabel] = useState('');
   const record = recordsQuery.data?.find((item) => item.id === recordId);
   const versions = record?.versions.slice().sort((a, b) => b.versionNumber - a.versionNumber) || [];
 
@@ -108,6 +116,40 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
       onError: () => toast({ title: 'Could not delete measurement file', description: 'The file remains in the register. Try again.', variant: 'destructive' }),
     });
   };
+  const editQuotationLink = () => {
+    setSelectedQuotationId(record?.quotationRequestId || null);
+    setSelectedQuotationLabel(record?.quotationRequestId || '');
+    setIsEditingQuotation(true);
+  };
+  const saveQuotationLink = (quotationId: string | null) => {
+    updateRecord.mutate({
+      recordId,
+      data: { linkQuotationSubmissionId: quotationId },
+    }, {
+      onSuccess: async () => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() }),
+          queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() }),
+          queryClient.invalidateQueries({ queryKey: getSearchMeasurementRecordsQueryKey() }),
+          queryClient.invalidateQueries({ queryKey: getSearchQuotationRateSubmissionsQueryKey() }),
+        ]);
+        setIsEditingQuotation(false);
+        setSelectedQuotationId(null);
+        setSelectedQuotationLabel('');
+        toast({
+          title: quotationId ? 'Quotation request linked' : 'Quotation request unlinked',
+          description: quotationId
+            ? `${quotationId} is now linked to this measurement sheet.`
+            : 'The request is still saved; only its link to this sheet was removed.',
+        });
+      },
+      onError: () => toast({
+        title: 'Could not update quotation link',
+        description: 'The link was not changed. The request may already be linked to another sheet; refresh and try again.',
+        variant: 'destructive',
+      }),
+    });
+  };
 
   return (
     <AppShell user={user} title="Measurement sheet details" eyebrow="Module 6 · retained register">
@@ -147,9 +189,50 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Client</p><p className="mt-1 text-sm font-semibold">{record.clientName}</p></div>
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Location</p><p className="mt-1 text-sm">{record.location || 'Not specified'}</p></div>
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Assigned order</p><p className="mt-1 text-sm">{record.orderId || 'No order assigned'}</p></div>
-                <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Rate Approval request</p><p className="mt-1 text-sm">{record.quotationRequestId || 'No request linked'}</p></div>
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Created</p><p className="mt-1 text-sm">{dateLabel(record.createdAt)}</p></div>
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Last updated</p><p className="mt-1 text-sm">{dateLabel(record.updatedAt)}</p></div>
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden border-border/80" data-testid="card-measurement-quotation-link">
+              <CardHeader className="border-b border-border/70">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Rate Approval</p>
+                <CardTitle className="mt-1 font-display text-lg">Linked quotation request</CardTitle>
+                <p className="text-xs text-muted-foreground">Link this measurement sheet to one saved quotation request. A request already linked to another sheet cannot be selected.</p>
+              </CardHeader>
+              <CardContent className="p-5">
+                {isEditingQuotation && canEdit ? (
+                  <div className="space-y-4" data-testid="form-measurement-quotation-link">
+                    <QuotationRequestLookup
+                      selectedId={selectedQuotationId}
+                      selectedLabel={selectedQuotationLabel}
+                      currentMeasurementRecordId={record.id}
+                      onSelect={(item) => {
+                        setSelectedQuotationId(item.id);
+                        setSelectedQuotationLabel(`${item.id} · ${item.clientName}`);
+                      }}
+                    />
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {record.quotationRequestId && <Button type="button" variant="outline" disabled={updateRecord.isPending} onClick={() => saveQuotationLink(null)} data-testid="button-unlink-measurement-quotation">Unlink request</Button>}
+                      <Button type="button" variant="outline" disabled={updateRecord.isPending} onClick={() => { setIsEditingQuotation(false); setSelectedQuotationId(null); setSelectedQuotationLabel(''); }} data-testid="button-cancel-measurement-quotation-link">Cancel</Button>
+                      <Button type="button" disabled={updateRecord.isPending || !selectedQuotationId || selectedQuotationId === record.quotationRequestId} onClick={() => selectedQuotationId && saveQuotationLink(selectedQuotationId)} data-testid="button-save-measurement-quotation-link">
+                        {updateRecord.isPending ? 'Saving…' : 'Save link'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Current request</p>
+                      {record.quotationRequestId
+                        ? <code className="mt-1 block font-mono text-sm font-semibold text-primary" data-testid="text-linked-quotation-request">{record.quotationRequestId}</code>
+                        : <p className="mt-1 text-sm text-muted-foreground" data-testid="text-no-linked-quotation-request">No quotation request linked</p>}
+                    </div>
+                    {canEdit && <Button type="button" variant="outline" disabled={updateRecord.isPending} onClick={editQuotationLink} data-testid="button-edit-measurement-quotation-link">
+                      {record.quotationRequestId ? 'Change link' : 'Link request'}
+                    </Button>}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
