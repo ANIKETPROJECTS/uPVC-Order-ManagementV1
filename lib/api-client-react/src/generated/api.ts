@@ -81,6 +81,7 @@ import type {
   OrderWindowList,
   OrderWindowUpdate,
   PaymentOverview,
+  PurchaseOrderRegisterList,
   Quotation,
   QuotationInput,
   QuotationList,
@@ -6734,6 +6735,83 @@ export const useVoidOrderPayment = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getVoidOrderPaymentMutationOptions(options));
     }
+
+export const getGetPurchaseOrderRegisterUrl = () => {
+
+
+
+
+  return `/api/confirmation/purchase-orders`
+}
+
+/**
+ * @summary List orders with attached purchase order and confirmation documents
+ */
+export const getPurchaseOrderRegister = async ( options?: Parameters<typeof customFetch>[1]): Promise<PurchaseOrderRegisterList> => {
+
+  return customFetch<PurchaseOrderRegisterList>(getGetPurchaseOrderRegisterUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPurchaseOrderRegisterQueryKey = () => {
+    return [
+    `/api/confirmation/purchase-orders`
+    ] as const;
+    }
+
+
+export const getGetPurchaseOrderRegisterQueryOptions = <TData = Awaited<ReturnType<typeof getPurchaseOrderRegister>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPurchaseOrderRegister>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPurchaseOrderRegisterQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPurchaseOrderRegister>>> = ({ signal }) => getPurchaseOrderRegister({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPurchaseOrderRegister>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPurchaseOrderRegisterQueryResult = NonNullable<Awaited<ReturnType<typeof getPurchaseOrderRegister>>>
+export type GetPurchaseOrderRegisterQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List orders with attached purchase order and confirmation documents
+ */
+
+export function useGetPurchaseOrderRegister<TData = Awaited<ReturnType<typeof getPurchaseOrderRegister>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPurchaseOrderRegister>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPurchaseOrderRegisterQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListOrderDocumentsUrl = (id: string,) => {
 

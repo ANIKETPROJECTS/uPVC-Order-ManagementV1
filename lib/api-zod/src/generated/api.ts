@@ -2628,6 +2628,48 @@ export const VoidOrderPaymentResponse = zod.object({
 
 
 /**
+ * @summary List orders with attached purchase order and confirmation documents
+ */
+export const getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemCategoryMax = 64;
+
+export const getPurchaseOrderRegisterResponseConfirmationDocumentsItemCategoryMax = 64;
+
+
+
+export const GetPurchaseOrderRegisterResponseItem = zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "orderValue": zod.number().nullable(),
+  "orderUpdatedAt": zod.coerce.date(),
+  "purchaseOrderDocuments": zod.array(zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "filename": zod.string(),
+  "category": zod.string().min(1).max(getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemCategoryMax),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})),
+  "confirmationDocuments": zod.array(zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "filename": zod.string(),
+  "category": zod.string().min(1).max(getPurchaseOrderRegisterResponseConfirmationDocumentsItemCategoryMax),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+}))
+})
+export const GetPurchaseOrderRegisterResponse = zod.array(GetPurchaseOrderRegisterResponseItem)
+
+
+/**
  * @summary List documents attached to an order
  */
 export const ListOrderDocumentsParams = zod.object({

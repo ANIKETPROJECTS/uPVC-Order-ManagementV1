@@ -1742,6 +1742,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrderPayment"
+  /confirmation/purchase-orders:
+    get:
+      operationId: getPurchaseOrderRegister
+      tags: [orders]
+      summary: List orders with attached purchase order and confirmation documents
+      responses:
+        "200":
+          description: Purchase order register entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrderRegisterList"
   /orders/{id}/documents:
     get:
       operationId: listOrderDocuments
@@ -2735,6 +2747,35 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/OrderDocument"
+    PurchaseOrderRegisterEntry:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationCode:
+          type: string
+        locationName:
+          type: string
+        orderStatus:
+          $ref: "#/components/schemas/OrderStatus"
+        orderValue:
+          type: ["number", "null"]
+        orderUpdatedAt:
+          type: string
+          format: date-time
+        purchaseOrderDocuments:
+          $ref: "#/components/schemas/OrderDocumentList"
+        confirmationDocuments:
+          $ref: "#/components/schemas/OrderDocumentList"
+      required: [orderRecordId, orderId, clientName, locationCode, locationName, orderStatus, orderValue, orderUpdatedAt, purchaseOrderDocuments, confirmationDocuments]
+    PurchaseOrderRegisterList:
+      type: array
+      items:
+        $ref: "#/components/schemas/PurchaseOrderRegisterEntry"
     OrderActivity:
       type: object
       properties:

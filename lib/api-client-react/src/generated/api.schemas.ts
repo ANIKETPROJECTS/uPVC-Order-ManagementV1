@@ -588,6 +588,22 @@ export interface OrderDocument {
 
 export type OrderDocumentList = OrderDocument[];
 
+export interface PurchaseOrderRegisterEntry {
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationCode: string;
+  locationName: string;
+  orderStatus: OrderStatus;
+  /** @nullable */
+  orderValue: number | null;
+  orderUpdatedAt: string;
+  purchaseOrderDocuments: OrderDocumentList;
+  confirmationDocuments: OrderDocumentList;
+}
+
+export type PurchaseOrderRegisterList = PurchaseOrderRegisterEntry[];
+
 export interface OrderActivity {
   id: string;
   orderRecordId: string;

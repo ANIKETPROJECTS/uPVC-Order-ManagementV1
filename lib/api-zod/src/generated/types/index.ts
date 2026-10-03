@@ -85,6 +85,8 @@ export * from './paymentReminderOrder';
 export * from './paymentReminderOrderList';
 export * from './permissionLevel';
 export * from './permissionMap';
+export * from './purchaseOrderRegisterEntry';
+export * from './purchaseOrderRegisterList';
 export * from './quotation';
 export * from './quotationInput';
 export * from './quotationItem';
