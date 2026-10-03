@@ -147,6 +147,7 @@ router.get("/measurement-records/lookup", async (req, res): Promise<void> => {
   const clientSearch = rawQuery.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const idSearch = rawQuery.replace(/^MS-/i, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const searchConditions: Record<string, unknown>[] = [{ clientNameLower: { $regex: clientSearch } }];
+  if (rawQuery) searchConditions.push({ location: { $regex: clientSearch, $options: "i" } });
   if (idSearch) searchConditions.push({ _id: { $regex: idSearch, $options: "i" } });
   const db = await getMongoDb();
   const cursor = getMeasurementRecords(db)
