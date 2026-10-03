@@ -2,6 +2,7 @@ import { type FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
+  ChevronDown,
   ClipboardList,
   Download,
   Eye,
@@ -109,6 +110,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
   const [sortBy, setSortBy] = useState<MeasurementSort>('recent');
   const [layout, setLayout] = useState<MeasurementLayout>('list');
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [expandedRecordIds, setExpandedRecordIds] = useState<Set<string>>(() => new Set());
   const records = recordsQuery.data || [];
   const orders = ordersQuery.data || [];
   const invalidateRecords = () => void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
@@ -262,6 +264,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
           return next;
         });
         setEditingRecordId(null);
+        setRecordExpanded(record.id, false);
         toast({ title: 'Measurement record updated', description: value.linkQuotation ? `Sheet ID linked directly to ${value.linkQuotationSubmissionId}.` : record.quotationRequestId ? 'Details saved and the quotation request unlinked.' : 'Client details and order assignment are saved.' });
       },
       onError: () => toast({ title: 'Could not update record', description: 'The record remains unchanged. Try again.', variant: 'destructive' }),
@@ -315,6 +318,14 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
       onError: () => toast({ title: 'Could not delete measurement file', description: 'The file remains in the register. Try again.', variant: 'destructive' }),
     });
   };
+  const setRecordExpanded = (recordId: string, expanded: boolean) => {
+    setExpandedRecordIds((current) => {
+      const next = new Set(current);
+      if (expanded) next.add(recordId);
+      else next.delete(recordId);
+      return next;
+    });
+  };
   const removeRecord = (record: MeasurementRecord) => {
     const sheetId = measurementSheetIdLabel(record.id);
     const fileCount = record.versions.length;
@@ -324,6 +335,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
         invalidateRecords();
         void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
         setEditingRecordId((current) => current === record.id ? null : current);
+        setRecordExpanded(record.id, false);
         setEdits((current) => {
           const next = { ...current };
           delete next[record.id];
@@ -464,9 +476,10 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                       const pendingSheets = versionFiles[record.id] || [];
                       const latestVersion = record.versions[0];
                       const isEditing = editingRecordId === record.id;
+                      const isExpanded = expandedRecordIds.has(record.id);
                       const visibleVersions = record.versions.filter((version) =>
                         fileFilter === 'all' || fileFilter === 'none' || extensionOf(version.filename) === fileFilter);
-                      return <article key={record.id} className={`space-y-4 ${layout === 'grid' ? 'rounded-xl border border-border/70 bg-card p-4' : 'p-4 sm:p-5'}`} data-testid={`row-measurement-record-${record.id}`}>
+                      return <article key={record.id} className={`space-y-3 ${layout === 'grid' ? 'rounded-xl border border-border/70 bg-card p-3' : 'px-3 py-3 sm:px-4'}`} data-testid={`row-measurement-record-${record.id}`}>
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 space-y-1">
                             <p className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">Measurement Sheet ID</p>
@@ -474,6 +487,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                             {record.quotationRequestId && <p className="text-[10px] text-muted-foreground">Rate Approval request <code className="font-mono font-semibold text-foreground" data-testid={`text-measurement-quotation-id-${record.id}`}>{record.quotationRequestId}</code></p>}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
+                            <Button type="button" variant="ghost" size="sm" aria-expanded={isExpanded} aria-controls={`measurement-details-${record.id}`} onClick={() => setRecordExpanded(record.id, !isExpanded)} data-testid={`button-expand-measurement-record-${record.id}`}><ChevronDown size={14} className={isExpanded ? 'rotate-180 transition-transform' : 'transition-transform'} /> {isExpanded ? 'Collapse' : 'Expand'}</Button>
                             {latestVersion ? <a href={getPreviewMeasurementVersionUrl(record.id, latestVersion.id)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted" data-testid={`link-view-measurement-record-${record.id}`}><Eye size={14} /> View</a>
                               : <Button type="button" variant="outline" size="sm" disabled title="Add a sheet file to enable viewing" data-testid={`button-view-measurement-record-${record.id}`}><Eye size={14} /> View</Button>}
                             {canEdit && <Button type="button" variant="outline" size="sm" onClick={() => {
@@ -486,11 +500,13 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                                 });
                               } else {
                                 setEditingRecordId(record.id);
+                                setRecordExpanded(record.id, true);
                               }
                             }} data-testid={`button-edit-measurement-record-${record.id}`}><Pencil size={14} /> {isEditing ? 'Cancel edit' : 'Edit'}</Button>}
                             {canEdit && <Button type="button" variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={deleteRecord.isPending} onClick={() => removeRecord(record)} data-testid={`button-delete-measurement-record-${record.id}`}><Trash2 size={14} /> Delete</Button>}
                           </div>
                         </div>
+                        {isExpanded ? <div id={`measurement-details-${record.id}`} className="space-y-4">
                         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(210px,1fr)_auto] xl:items-end">
                           {isEditing ? <>
                             <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Client name<Input value={edit.clientName} onChange={(event) => setEdit(record, 'clientName', event.target.value)} maxLength={160} data-testid={`input-measurement-client-${record.id}`} /></label>
@@ -574,6 +590,12 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                             </div>
                           </li>)}
                         </ol> : <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground" data-testid={`state-measurement-versions-empty-${record.id}`}>No sheet uploaded yet. Add the first version when it is ready.</div>}
+                        </div> : <div id={`measurement-details-${record.id}`} className={`grid gap-2 border-t border-border/50 pt-3 ${layout === 'grid' ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-4'}`} data-testid={`summary-measurement-record-${record.id}`}>
+                          <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Client</p><p className="truncate text-xs font-semibold">{record.clientName}</p></div>
+                          <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Location</p><p className="truncate text-xs">{record.location || 'No location'}</p></div>
+                          <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Assigned order</p><p className="truncate text-xs">{record.orderId || 'No order assigned'}</p></div>
+                          <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Sheet versions</p><p className="truncate text-xs">{record.versions.length} · Updated {dateLabel(record.updatedAt)}</p></div>
+                        </div>}
                       </article>;
                     })}
                     </div>}
