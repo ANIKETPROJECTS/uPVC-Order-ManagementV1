@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QuotationRateSubmissionRevision } from './quotationRateSubmissionRevision';
 import type { QuotationRateSubmissionStatus } from './quotationRateSubmissionStatus';
 
 export interface QuotationRateSubmission {
@@ -36,6 +37,8 @@ export interface QuotationRateSubmission {
   decidedBy: string | null;
   /** @nullable */
   decidedByName: string | null;
+  pdfNeedsRefresh: boolean;
+  revisionHistory: QuotationRateSubmissionRevision[];
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,10 +1,10 @@
 ---
 name: Measurement register layout
-description: Default compact card behavior and expanded details for the measurement register.
+description: Compact measurement register cards and dedicated record detail navigation.
 ---
 
-Keep measurement records compact in both list and grid layouts by default. Provide a per-record Expand/Collapse control for the full detail and version-history view; opening Edit should expand that record.
+Keep measurement records compact in both list and grid layouts without a per-record Expand/Collapse control. The record-level View action opens a dedicated detail page; only each document's View action opens the file.
 
-**Why:** The project owner explicitly requested a compact register that preserves access to the existing full record view on demand.
+**Why:** The project owner asked to view record details and documents on a dedicated page and to keep document opening exclusive to document-level View actions.
 
-**How to apply:** Keep the permanent sheet ID, client summary, key links, and record actions visible while collapsed; place editing fields, uploads, and retained version controls in the expanded view.
+**How to apply:** Keep the permanent sheet ID, client summary, key links, and record actions visible in register cards. Put the full record metadata and retained document history on the dedicated detail page.

@@ -1015,6 +1015,29 @@ export const QuotationRateSubmissionStatus = {
   rejected: 'rejected',
 } as const;
 
+export interface QuotationRateSubmissionRevision {
+  revisionNumber: number;
+  clientName: string;
+  /** @nullable */
+  location: string | null;
+  windowQty: number;
+  totalSqFt: number;
+  glassType: string;
+  averageSqFtPerQty: number;
+  previousStatus: QuotationRateSubmissionStatus;
+  revisedBy: string;
+  revisedByName: string;
+  revisedAt: string;
+  /** @nullable */
+  pdfFilename: string | null;
+  /** @nullable */
+  decidedBy: string | null;
+  /** @nullable */
+  decidedByName: string | null;
+  /** @nullable */
+  decisionComment: string | null;
+}
+
 export interface QuotationRateSubmission {
   id: string;
   /** @nullable */
@@ -1044,6 +1067,8 @@ export interface QuotationRateSubmission {
   decidedBy: string | null;
   /** @nullable */
   decidedByName: string | null;
+  pdfNeedsRefresh: boolean;
+  revisionHistory: QuotationRateSubmissionRevision[];
   createdAt: string;
   updatedAt: string;
 }

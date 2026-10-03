@@ -26,6 +26,7 @@ import type { RecentPaymentUpdate, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const money = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -134,7 +135,17 @@ export default function PaymentsPage({ user }: { user: User }) {
           </Card>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
+        <Tabs defaultValue="balance" className="space-y-4" data-testid="tabs-payment-sections">
+          <TabsList className="grid h-auto w-full max-w-xl grid-cols-2 rounded-xl bg-secondary/70 p-1">
+            <TabsTrigger value="balance" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-payment-balances">
+              Balance follow-up <span className="rounded-full bg-background/70 px-2 py-0.5 text-[10px]">{overview.data.reminderOrders.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="receipts" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-payment-receipts">
+              Recent receipts <span className="rounded-full bg-background/70 px-2 py-0.5 text-[10px]">{recentPayments.length}</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="balance" className="mt-0" data-testid="section-payment-balances-tab">
           <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid="section-reminder-orders">
             <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -188,6 +199,8 @@ export default function PaymentsPage({ user }: { user: User }) {
             </div>}
           </section>
 
+          </TabsContent>
+          <TabsContent value="receipts" className="mt-0" data-testid="section-payment-receipts-tab">
           <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid="section-recent-payments">
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div><h2 className="font-display text-lg font-bold">Recent receipts</h2><p className="mt-1 text-xs text-muted-foreground">Latest received payments, newest first.</p></div>
@@ -202,7 +215,8 @@ export default function PaymentsPage({ user }: { user: User }) {
             </div>}
             {recentPayments.length > 0 && <div className="flex items-center gap-2 border-t border-border bg-muted/25 px-5 py-3 text-[10px] text-muted-foreground"><CalendarClock size={13} /> Sorted by entry time · newest first</div>}
           </section>
-        </div>
+          </TabsContent>
+        </Tabs>
       </> : null}
     </main>
   </AppShell>;

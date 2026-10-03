@@ -1098,6 +1098,61 @@ paths:
           description: Invalid submission details
         "503":
           description: No active rate approver is available
+  /quotation-rate-submissions/{submissionId}:
+    patch:
+      operationId: updateQuotationRateSubmission
+      tags: [quotations]
+      summary: Revise a saved rate request and return it to PDF submission
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 80
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationRateSubmissionInput"
+      responses:
+        "200":
+          description: Updated request awaiting an updated PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationRateSubmission"
+        "400":
+          description: Invalid request details
+        "403":
+          description: Request editing access required
+        "404":
+          description: Request not found
+        "409":
+          description: Request changed while it was being edited
+    delete:
+      operationId: deleteQuotationRateSubmission
+      tags: [quotations]
+      summary: Delete a saved rate request and its attached PDF
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 80
+      responses:
+        "204":
+          description: Request and attached PDF deleted
+        "403":
+          description: Request deletion access required
+        "404":
+          description: Request not found
+        "409":
+          description: Request changed before deletion
   /quotation-rate-submissions/lookup:
     get:
       operationId: searchQuotationRateSubmissions
@@ -3264,13 +3319,54 @@ components:
           type: ["string", "null"]
         decidedByName:
           type: ["string", "null"]
+        pdfNeedsRefresh:
+          type: boolean
+        revisionHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotationRateSubmissionRevision"
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderRecordId, orderId, measurementRecordId, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, createdAt, updatedAt]
+      required: [id, orderRecordId, orderId, measurementRecordId, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
+    QuotationRateSubmissionRevision:
+      type: object
+      properties:
+        revisionNumber:
+          type: integer
+        clientName:
+          type: string
+        location:
+          type: ["string", "null"]
+        windowQty:
+          type: integer
+        totalSqFt:
+          type: number
+        glassType:
+          type: string
+        averageSqFtPerQty:
+          type: number
+        previousStatus:
+          $ref: "#/components/schemas/QuotationRateSubmissionStatus"
+        revisedBy:
+          type: string
+        revisedByName:
+          type: string
+        revisedAt:
+          type: string
+          format: date-time
+        pdfFilename:
+          type: ["string", "null"]
+        decidedBy:
+          type: ["string", "null"]
+        decidedByName:
+          type: ["string", "null"]
+        decisionComment:
+          type: ["string", "null"]
+      required: [revisionNumber, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, previousStatus, revisedBy, revisedByName, revisedAt, pdfFilename, decidedBy, decidedByName, decisionComment]
     QuotationRateSubmissionList:
       type: array
       items:

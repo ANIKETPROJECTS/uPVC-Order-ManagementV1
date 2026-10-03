@@ -4471,6 +4471,169 @@ export const useCreateQuotationRateSubmission = <TError = ErrorType<void>,
       return useMutation(getCreateQuotationRateSubmissionMutationOptions(options));
     }
 
+export const getUpdateQuotationRateSubmissionUrl = (submissionId: string,) => {
+
+
+
+
+  return `/api/quotation-rate-submissions/${submissionId}`
+}
+
+/**
+ * @summary Revise a saved rate request and return it to PDF submission
+ */
+export const updateQuotationRateSubmission = async (submissionId: string,
+    quotationRateSubmissionInput: QuotationRateSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QuotationRateSubmission>(getUpdateQuotationRateSubmissionUrl(submissionId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationRateSubmissionInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateQuotationRateSubmissionMutationKey = () => ['updateQuotationRateSubmission'] as const;
+
+export const getUpdateQuotationRateSubmissionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQuotationRateSubmission>>, TError,UpdateQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateQuotationRateSubmission>>, TError,UpdateQuotationRateSubmissionMutationVariables, TContext> => {
+
+const mutationKey = getUpdateQuotationRateSubmissionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateQuotationRateSubmission>>, UpdateQuotationRateSubmissionMutationVariables> = (props) => {
+          const {submissionId,data} = props ?? {};
+
+          return  updateQuotationRateSubmission(submissionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateQuotationRateSubmissionMutationResult = NonNullable<Awaited<ReturnType<typeof updateQuotationRateSubmission>>>
+    export type UpdateQuotationRateSubmissionMutationBody = BodyType<QuotationRateSubmissionInput>
+    export type UpdateQuotationRateSubmissionMutationError = ErrorType<void>
+    export type UpdateQuotationRateSubmissionMutationVariables = {submissionId: string;data: BodyType<QuotationRateSubmissionInput>}
+
+    /**
+ * @summary Revise a saved rate request and return it to PDF submission
+ */
+export const useUpdateQuotationRateSubmission = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQuotationRateSubmission>>, TError,UpdateQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateQuotationRateSubmission>>,
+        TError,
+        UpdateQuotationRateSubmissionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateQuotationRateSubmissionMutationOptions(options));
+    }
+
+export const getDeleteQuotationRateSubmissionUrl = (submissionId: string,) => {
+
+
+
+
+  return `/api/quotation-rate-submissions/${submissionId}`
+}
+
+/**
+ * @summary Delete a saved rate request and its attached PDF
+ */
+export const deleteQuotationRateSubmission = async (submissionId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteQuotationRateSubmissionUrl(submissionId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteQuotationRateSubmissionMutationKey = () => ['deleteQuotationRateSubmission'] as const;
+
+export const getDeleteQuotationRateSubmissionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQuotationRateSubmission>>, TError,DeleteQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteQuotationRateSubmission>>, TError,DeleteQuotationRateSubmissionMutationVariables, TContext> => {
+
+const mutationKey = getDeleteQuotationRateSubmissionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteQuotationRateSubmission>>, DeleteQuotationRateSubmissionMutationVariables> = (props) => {
+          const {submissionId} = props ?? {};
+
+          return  deleteQuotationRateSubmission(submissionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteQuotationRateSubmissionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteQuotationRateSubmission>>>
+
+    export type DeleteQuotationRateSubmissionMutationError = ErrorType<void>
+    export type DeleteQuotationRateSubmissionMutationVariables = {submissionId: string}
+
+    /**
+ * @summary Delete a saved rate request and its attached PDF
+ */
+export const useDeleteQuotationRateSubmission = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQuotationRateSubmission>>, TError,DeleteQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteQuotationRateSubmission>>,
+        TError,
+        DeleteQuotationRateSubmissionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteQuotationRateSubmissionMutationOptions(options));
+    }
+
 export const getSearchQuotationRateSubmissionsUrl = (params: SearchQuotationRateSubmissionsParams,) => {
   const normalizedParams = new URLSearchParams();
 

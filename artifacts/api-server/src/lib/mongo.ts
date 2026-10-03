@@ -308,6 +308,23 @@ export type QuotationRateSubmissionStatus =
   | "pending_review"
   | "approved"
   | "rejected";
+export interface QuotationRateSubmissionRevisionDocument {
+  revisionNumber: number;
+  clientName: string;
+  location: string | null;
+  windowQty: number;
+  totalSqFt: number;
+  glassType: string;
+  averageSqFtPerQty: number;
+  previousStatus: QuotationRateSubmissionStatus;
+  revisedBy: string;
+  revisedByName: string;
+  revisedAt: Date;
+  pdfFilename: string | null;
+  decidedBy: string | null;
+  decidedByName: string | null;
+  decisionComment: string | null;
+}
 export interface QuotationRateSubmissionDocument {
   _id: string;
   orderRecordId: string | null;
@@ -331,6 +348,8 @@ export interface QuotationRateSubmissionDocument {
   decisionComment: string | null;
   decidedBy: string | null;
   decidedByName: string | null;
+  pdfNeedsRefresh?: boolean;
+  revisionHistory?: QuotationRateSubmissionRevisionDocument[];
   createdAt: Date;
   updatedAt: Date;
 }

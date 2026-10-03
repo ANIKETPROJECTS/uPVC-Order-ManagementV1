@@ -14,6 +14,7 @@ import RolesPage from '@/pages/roles';
 import UsersPage from '@/pages/users';
 import ChatGroupsPage from '@/pages/chat-groups';
 import CommunicationPage from '@/pages/communication';
+import QuotationRateRequestDetailPage from '@/pages/quotation-rate-request-detail';
 import OrderHubPage from '@/pages/order-hub';
 import OrderDetailPage from '@/pages/order-detail';
 import OrderScannerPage from '@/pages/order-scanner';
@@ -37,6 +38,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/admin/roles" component={() => <RolesPage user={user} />} />
     <Route path="/admin/groups" component={() => <ChatGroupsPage user={user} />} />
     <Route path="/communication" component={() => <CommunicationPage user={user} />} />
+    <Route path="/quotation-builder/requests/:submissionId" component={() => <QuotationRateRequestDetailPage user={user} />} />
     <Route path="/quotation-builder" component={() => <QuotationBuilderPage user={user} />} />
     <Route path="/measurements/:recordId" component={() => <MeasurementRecordDetailPage user={user} />} />
     <Route path="/measurements" component={() => <MeasurementDatabasePage user={user} />} />

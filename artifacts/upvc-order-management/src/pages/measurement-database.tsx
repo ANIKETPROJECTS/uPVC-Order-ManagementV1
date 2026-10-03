@@ -79,7 +79,7 @@ function RecordState({ state, onRetry }: { state: 'loading' | 'error' | 'empty';
 }
 
 export default function MeasurementDatabasePage({ user }: { user: User }) {
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
   const canEdit = user.roleId === 'master-admin' || user.permissions?.measurements === 'edit';
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -475,7 +475,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                             {record.quotationRequestId && <p className="text-[10px] text-muted-foreground">Rate Approval request <code className="font-mono font-semibold text-foreground" data-testid={`text-measurement-quotation-id-${record.id}`}>{record.quotationRequestId}</code></p>}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
-                            {!isEditing && <Button type="button" variant="outline" size="sm" onClick={() => setLocation(`/measurements/${record.id}`)} data-testid={`button-view-measurement-record-${record.id}`}><Eye size={14} /> View</Button>}
+                            {!isEditing && <Button type="button" variant="outline" size="sm" onClick={() => navigate(`/measurements/${record.id}`)} data-testid={`button-view-measurement-record-${record.id}`}><Eye size={14} /> View</Button>}
                             {canEdit && <Button type="button" variant="outline" size="sm" onClick={() => {
                               if (isEditing) {
                                 setEditingRecordId(null);

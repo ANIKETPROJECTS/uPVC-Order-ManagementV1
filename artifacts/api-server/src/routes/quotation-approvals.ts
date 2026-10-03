@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import {
   CreateQuotationRateSubmissionBody,
   CreateQuotationRateSubmissionResponse,
+  DeleteQuotationRateSubmissionParams,
   DecideQuotationRateSubmissionBody,
   DecideQuotationRateSubmissionParams,
   DecideQuotationRateSubmissionResponse,
@@ -14,6 +15,9 @@ import {
   SearchQuotationRateSubmissionsResponse,
   UploadQuotationRateSubmissionPdfParams,
   UploadQuotationRateSubmissionPdfResponse,
+  UpdateQuotationRateSubmissionBody,
+  UpdateQuotationRateSubmissionParams,
+  UpdateQuotationRateSubmissionResponse,
 } from "@workspace/api-zod";
 import { Router, type Request, type RequestHandler } from "express";
 import {
@@ -96,9 +100,31 @@ function response(item: QuotationRateSubmissionDocument) {
     decisionComment: item.decisionComment,
     decidedBy: item.decidedBy,
     decidedByName: item.decidedByName,
+    pdfNeedsRefresh: item.pdfNeedsRefresh ?? false,
+    revisionHistory: (item.revisionHistory ?? []).map((revision) => ({
+      ...revision,
+      revisedAt: revision.revisedAt.toISOString(),
+    })),
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
   };
+}
+
+async function cleanupQuotationRatePdf(
+  db: Awaited<ReturnType<typeof getMongoDb>>,
+  item: QuotationRateSubmissionDocument,
+  req: Request,
+): Promise<void> {
+  if (item.pdfStoragePath) {
+    await removeProjectUpload(item.pdfStoragePath).catch((error: unknown) =>
+      req.log.error({ err: error, submissionId: item._id }, "Failed to remove a quotation PDF from project storage"),
+    );
+  }
+  if (item.pdfGridFsId && ObjectId.isValid(item.pdfGridFsId)) {
+    await getQuotationRatePdfsBucket(db).delete(new ObjectId(item.pdfGridFsId)).catch((error: unknown) =>
+      req.log.error({ err: error, submissionId: item._id }, "Failed to remove a legacy quotation PDF from GridFS"),
+    );
+  }
 }
 
 async function findApprovers(users: UserDocument[]): Promise<UserDocument[]> {
@@ -226,11 +252,113 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     decisionComment: null,
     decidedBy: null,
     decidedByName: null,
+    pdfNeedsRefresh: false,
+    revisionHistory: [],
     createdAt: now,
     updatedAt: now,
   };
   await getQuotationRateSubmissions(db).insertOne(item);
   res.status(201).json(CreateQuotationRateSubmissionResponse.parse(response(item)));
+});
+
+router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Promise<void> => {
+  const parsedParams = UpdateQuotationRateSubmissionParams.safeParse(req.params);
+  const parsedBody = UpdateQuotationRateSubmissionBody.safeParse(req.body);
+  if (!parsedParams.success || !parsedBody.success) {
+    res.status(400).json({
+      error: !parsedParams.success ? parsedParams.error.message : parsedBody.success ? "" : parsedBody.error.message,
+    });
+    return;
+  }
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const submissions = getQuotationRateSubmissions(db);
+  const item = await submissions.findOne({ _id: parsedParams.data.submissionId });
+  if (!item) {
+    res.status(404).json({ error: "Quotation rate submission not found." });
+    return;
+  }
+  if (!actor.masterAdmin && (!canSubmit(actor) || item.submittedBy !== actor.id)) {
+    res.status(403).json({ error: "Only the submitting quotation member or a master admin can edit this request." });
+    return;
+  }
+
+  const now = new Date();
+  const { clientName, location, windowQty, totalSqFt, glassType } = parsedBody.data;
+  const revisionHistory = item.revisionHistory ?? [];
+  const revision = {
+    revisionNumber: revisionHistory.length + 1,
+    clientName: item.clientName,
+    location: item.location,
+    windowQty: item.windowQty,
+    totalSqFt: item.totalSqFt,
+    glassType: item.glassType,
+    averageSqFtPerQty: item.averageSqFtPerQty,
+    previousStatus: item.status,
+    revisedBy: actor.id,
+    revisedByName: actor.name,
+    revisedAt: now,
+    pdfFilename: item.pdfFilename,
+    decidedBy: item.decidedBy,
+    decidedByName: item.decidedByName,
+    decisionComment: item.decisionComment,
+  };
+  const updated = await submissions.findOneAndUpdate(
+    { _id: item._id, updatedAt: item.updatedAt },
+    {
+      $set: {
+        clientName: clientName.trim(),
+        clientNameLower: clientName.trim().toLowerCase(),
+        location: location?.trim() || null,
+        windowQty,
+        totalSqFt,
+        glassType: glassType.trim(),
+        averageSqFtPerQty: Math.round((totalSqFt / windowQty + Number.EPSILON) * 10000) / 10000,
+        status: "awaiting_pdf",
+        pdfNeedsRefresh: Boolean(item.pdfFilename || item.pdfStoragePath || item.pdfGridFsId),
+        decisionComment: null,
+        decidedBy: null,
+        decidedByName: null,
+        updatedAt: now,
+      },
+      $push: { revisionHistory: revision },
+    },
+    { returnDocument: "after" },
+  );
+  if (!updated) {
+    res.status(409).json({ error: "This request changed while you were editing it. Refresh and try again." });
+    return;
+  }
+  res.json(UpdateQuotationRateSubmissionResponse.parse(response(updated)));
+});
+
+router.delete("/quotation-rate-submissions/:submissionId", async (req, res): Promise<void> => {
+  const parsedParams = DeleteQuotationRateSubmissionParams.safeParse(req.params);
+  if (!parsedParams.success) {
+    res.status(400).json({ error: parsedParams.error.message });
+    return;
+  }
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const submissions = getQuotationRateSubmissions(db);
+  const item = await submissions.findOne({ _id: parsedParams.data.submissionId });
+  if (!item) {
+    res.status(404).json({ error: "Quotation rate submission not found." });
+    return;
+  }
+  if (!actor.masterAdmin && (!canSubmit(actor) || item.submittedBy !== actor.id)) {
+    res.status(403).json({ error: "Only the submitting quotation member or a master admin can delete this request." });
+    return;
+  }
+  const deleted = await submissions.deleteOne({ _id: item._id, updatedAt: item.updatedAt });
+  if (!deleted.deletedCount) {
+    res.status(409).json({ error: "This request changed before it could be deleted. Refresh and try again." });
+    return;
+  }
+  await cleanupQuotationRatePdf(db, item, req);
+  res.status(204).send();
 });
 
 router.patch(
@@ -371,8 +499,8 @@ router.post(
       res.status(404).json({ error: "Quotation rate submission not found." });
       return;
     }
-    if (item.submittedBy !== actor.id || !canSubmit(actor)) {
-      res.status(403).json({ error: "Only the submitting quotation member can attach the PDF." });
+    if (!actor.masterAdmin && (item.submittedBy !== actor.id || !canSubmit(actor))) {
+      res.status(403).json({ error: "Only the submitting quotation member or a master admin can attach the PDF." });
       return;
     }
     if (item.status !== "awaiting_pdf") {
@@ -397,7 +525,7 @@ router.post(
       let updated: QuotationRateSubmissionDocument | null;
       try {
         updated = await submissions.findOneAndUpdate(
-          { _id: item._id, status: "awaiting_pdf" },
+          { _id: item._id, status: "awaiting_pdf", updatedAt: item.updatedAt },
           {
             $set: {
               status: "pending_review",
@@ -405,6 +533,7 @@ router.post(
               pdfSizeBytes: body.length,
               pdfGridFsId: null,
               pdfStoragePath: storagePath,
+              pdfNeedsRefresh: false,
               updatedAt: new Date(),
             },
           },
@@ -420,9 +549,10 @@ router.post(
         await removeProjectUpload(storagePath).catch((cleanupError: unknown) =>
           req.log.error({ err: cleanupError }, "Failed to clean up a duplicate project quotation PDF upload"),
         );
-        res.status(409).json({ error: "This submission has already been routed for review." });
+        res.status(409).json({ error: "This submission changed or has already been routed for review." });
         return;
       }
+      await cleanupQuotationRatePdf(db, item, req);
       res.json(UploadQuotationRateSubmissionPdfResponse.parse(response(updated)));
     });
   },

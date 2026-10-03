@@ -6,5 +6,6 @@
 - [Manual WhatsApp reminders](manual-whatsapp-reminders.md) — open a drafted message for an employee to send; never use Meta APIs or WhatsApp credentials.
 - [Measurement sheet labels](measurement-sheet-labels.md) — keep optional user-facing sheet names separate from original filenames, with legacy filename fallback.
 - [Measurement Sheet IDs](measurement-sheet-ids.md) — display the existing UUID with an `MS-` prefix; keep raw UUIDs for direct Rate Approval links.
-- [Measurement register layout](measurement-register-layout.md) — keep list and grid cards compact by default; expand a record for details and version controls.
+- [Measurement register layout](measurement-register-layout.md) — keep register cards compact; open record details separately and reserve file opening for document View actions.
+- [Quotation request lifecycle](quotation-request-lifecycle.md) — edits and deletes are allowed in every status; edits require a fresh approval cycle.
 - [Orval parameter collisions](orval-parameter-collisions.md) — adding query fields can duplicate generated `*Params` exports; separate preview operations avoid the collision.

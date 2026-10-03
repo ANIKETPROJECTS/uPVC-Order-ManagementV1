@@ -1698,6 +1698,24 @@ export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "decisionComment": zod.string().nullable(),
   "decidedBy": zod.string().nullable(),
   "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -1748,9 +1766,116 @@ export const CreateQuotationRateSubmissionResponse = zod.object({
   "decisionComment": zod.string().nullable(),
   "decidedBy": zod.string().nullable(),
   "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Revise a saved rate request and return it to PDF submission
+ */
+export const updateQuotationRateSubmissionPathSubmissionIdMax = 80;
+
+
+
+export const UpdateQuotationRateSubmissionParams = zod.object({
+  "submissionId": zod.coerce.string().min(1).max(updateQuotationRateSubmissionPathSubmissionIdMax)
+})
+
+export const updateQuotationRateSubmissionBodyClientNameMax = 160;
+
+export const updateQuotationRateSubmissionBodyLocationMax = 160;
+
+export const updateQuotationRateSubmissionBodyWindowQtyMax = 100000;
+
+export const updateQuotationRateSubmissionBodyTotalSqFtMin = 0.01;
+export const updateQuotationRateSubmissionBodyTotalSqFtMax = 10000000;
+
+export const updateQuotationRateSubmissionBodyGlassTypeMax = 120;
+
+
+
+export const UpdateQuotationRateSubmissionBody = zod.object({
+  "clientName": zod.string().min(1).max(updateQuotationRateSubmissionBodyClientNameMax),
+  "location": zod.string().max(updateQuotationRateSubmissionBodyLocationMax).nullable(),
+  "windowQty": zod.number().int().min(1).max(updateQuotationRateSubmissionBodyWindowQtyMax),
+  "totalSqFt": zod.number().min(updateQuotationRateSubmissionBodyTotalSqFtMin).max(updateQuotationRateSubmissionBodyTotalSqFtMax),
+  "glassType": zod.string().min(1).max(updateQuotationRateSubmissionBodyGlassTypeMax)
+})
+
+export const UpdateQuotationRateSubmissionResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a saved rate request and its attached PDF
+ */
+export const deleteQuotationRateSubmissionPathSubmissionIdMax = 80;
+
+
+
+export const DeleteQuotationRateSubmissionParams = zod.object({
+  "submissionId": zod.coerce.string().min(1).max(deleteQuotationRateSubmissionPathSubmissionIdMax)
+})
+
+export const DeleteQuotationRateSubmissionResponse = zod.void()
 
 
 /**
@@ -1807,6 +1932,24 @@ export const LinkQuotationRateSubmissionOrderResponse = zod.object({
   "decisionComment": zod.string().nullable(),
   "decidedBy": zod.string().nullable(),
   "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -1844,6 +1987,24 @@ export const UploadQuotationRateSubmissionPdfResponse = zod.object({
   "decisionComment": zod.string().nullable(),
   "decidedBy": zod.string().nullable(),
   "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -1895,6 +2056,24 @@ export const DecideQuotationRateSubmissionResponse = zod.object({
   "decisionComment": zod.string().nullable(),
   "decidedBy": zod.string().nullable(),
   "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })

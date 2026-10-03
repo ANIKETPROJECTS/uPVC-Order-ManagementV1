@@ -92,6 +92,7 @@ export * from './quotationRateSubmissionInput';
 export * from './quotationRateSubmissionList';
 export * from './quotationRateSubmissionLookup';
 export * from './quotationRateSubmissionLookupList';
+export * from './quotationRateSubmissionRevision';
 export * from './quotationRateSubmissionStatus';
 export * from './quotationStatus';
 export * from './quotationTotals';

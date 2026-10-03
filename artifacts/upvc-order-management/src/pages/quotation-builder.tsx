@@ -11,6 +11,7 @@ import {
   CircleAlert,
   Copy,
   Download,
+  Eye,
   FilePlus2,
   FileText,
   LayoutGrid,
@@ -41,6 +42,7 @@ import {
   useCreateQuotation,
   useCreateQuotationRateSubmission,
   useCreateWindowProfile,
+  useDeleteQuotationRateSubmission,
   useDecideQuotationRateSubmission,
   useGetQuotation,
   useListClients,
@@ -53,6 +55,7 @@ import {
   useUpdateQuotation,
   useUpdateWindowProfile,
 } from '@workspace/api-client-react';
+import { useLocation } from 'wouter';
 import type {
   Client,
   Quotation,
@@ -597,6 +600,7 @@ function QuotationPrintDocument({ quote }: { quote: Quotation }) {
 }
 
 function RateApprovalDesk({ user }: { user: User }) {
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const rateDesk = user.roleId === 'master-admin' || user.permissions?.['rate-approval'] === 'edit';
@@ -606,7 +610,9 @@ function RateApprovalDesk({ user }: { user: User }) {
   const create = useCreateQuotationRateSubmission();
   const upload = useUploadQuotationRateSubmissionPdf();
   const decide = useDecideQuotationRateSubmission();
+  const deleteSubmission = useDeleteQuotationRateSubmission();
   const linkOrder = useLinkQuotationRateSubmissionOrder();
+  const [pane, setPane] = useState<'create' | 'requests'>(() => new URLSearchParams(window.location.search).get('pane') === 'requests' ? 'requests' : 'create');
   const [clientName, setClientName] = useState('');
   const [location, setLocation] = useState('');
   const [windowQty, setWindowQty] = useState('');
@@ -669,6 +675,7 @@ function RateApprovalDesk({ user }: { user: User }) {
     }, {
       onSuccess: (submission) => {
         refreshSubmissions();
+        setPane('requests');
         setClientName('');
         setLocation('');
         setWindowQty('');
@@ -723,6 +730,21 @@ function RateApprovalDesk({ user }: { user: User }) {
     user.roleId === 'master-admin'
     || user.permissions?.['rate-approval'] === 'edit'
     || (canSubmit && submission.submittedBy === user.id);
+  const canManageSubmission = (submission: QuotationRateSubmission) =>
+    user.roleId === 'master-admin'
+    || (canSubmit && submission.submittedBy === user.id);
+  const removeSubmission = (submission: QuotationRateSubmission) => {
+    if (!canManageSubmission(submission)) return;
+    if (!window.confirm(`Delete ${submission.id} for ${submission.clientName}? This removes the request, its approval history, and its attached PDF.`)) return;
+    deleteSubmission.mutate({ submissionId: submission.id }, {
+      onSuccess: () => {
+        refreshSubmissions();
+        void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
+        toast({ title: 'Quotation request deleted', description: `${submission.id} and its approval record were removed.` });
+      },
+      onError: () => toast({ title: 'Could not delete the request', description: 'The request was not removed. Refresh and try again.', variant: 'destructive' }),
+    });
+  };
   const statusStyle = (status: string) => status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : status === 'pending_review' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-border bg-muted text-muted-foreground';
   const statusName = (status: string) => status === 'pending_review' ? 'Awaiting Approval' : status === 'awaiting_pdf' ? 'Awaiting PDF' : status === 'approved' ? 'Approved' : 'Rejected';
   const pdfInput = (submission: QuotationRateSubmission) => (
@@ -758,7 +780,12 @@ function RateApprovalDesk({ user }: { user: User }) {
           </CardContent>
         </Card>
       </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(280px,.8fr)_minmax(0,1.5fr)]">
+      <Tabs value={pane} onValueChange={(value) => setPane(value as 'create' | 'requests')} data-testid="tabs-rate-request-sections">
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl bg-secondary/70 p-1">
+          <TabsTrigger value="create" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-create-rate-request"><FilePlus2 size={14} /> Create request</TabsTrigger>
+          <TabsTrigger value="requests" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-saved-rate-requests"><FileText size={14} /> Saved requests ({submissions.length})</TabsTrigger>
+        </TabsList>
+        <TabsContent value="create" className="mt-4" data-testid="section-create-rate-request">
         <Card className="border-border/80" data-testid="card-rate-request-form">
           <CardHeader className="border-b border-border/70 pb-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Rate request</p>
@@ -790,12 +817,17 @@ function RateApprovalDesk({ user }: { user: User }) {
             </form> : <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-submit-read-only">You have view access to this desk. A quotation team member can prepare a rate request.</div>}
           </CardContent>
         </Card>
-
+        </TabsContent>
+        <TabsContent value="requests" className="mt-4" data-testid="section-saved-rate-requests">
         <Card className="border-border/80" data-testid="card-rate-queue">
           <CardHeader className="border-b border-border/70 pb-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Live workflow</p><CardTitle className="mt-1 font-display text-lg">Quotation requests</CardTitle><p className="mt-1 text-xs text-muted-foreground">Temporary IDs, approval history, order links, and Eva PDFs stay together.</p></div>
-              <div className="flex gap-2 text-[10px] font-semibold"><span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">{pending.length} to review</span><span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{awaiting.length} awaiting PDF</span></div>
+              <div className="flex flex-wrap items-center gap-2">
+                {canSubmit && <Button size="sm" variant="outline" onClick={() => setPane('create')} data-testid="button-new-rate-request"><FilePlus2 size={13} /> New request</Button>}
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">{pending.length} to review</span>
+                <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">{awaiting.length} awaiting PDF</span>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -803,7 +835,7 @@ function RateApprovalDesk({ user }: { user: User }) {
               : submissionsQuery.isError ? <div className="p-5" data-testid="state-rate-submissions-error"><StatePanel kind="error" onRetry={() => void submissionsQuery.refetch()} /></div>
                 : submissions.length === 0 ? <div className="grid min-h-52 place-items-center p-7 text-center" data-testid="state-rate-submissions-empty"><div><div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Calculator size={18} /></div><p className="mt-3 text-sm font-bold">No rate requests yet</p><p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">A new submission will appear here with its PDF and decision history.</p></div></div>
                   : <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1120px] border-collapse text-left text-xs" data-testid="table-rate-submissions">
+                     <table className="w-full min-w-[1260px] border-collapse text-left text-xs" data-testid="table-rate-submissions">
                       <thead className="bg-muted/50 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">
                         <tr><th className="px-4 py-3">Request ID</th><th className="px-4 py-3">Client / Order</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Sq.Ft</th><th className="px-3 py-3">Glass Type</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Status</th><th className="px-4 py-3">Action</th></tr>
                       </thead>
@@ -818,7 +850,11 @@ function RateApprovalDesk({ user }: { user: User }) {
                             {submission.orderId && <p className="mt-1 text-[10px] font-semibold text-primary" data-testid={`text-rate-order-id-${submission.id}`}>{submission.orderId}</p>}
                             {submission.measurementRecordId && <p className="mt-1 text-[10px] text-muted-foreground">Measurement Sheet ID <code className="font-mono font-semibold text-foreground" data-testid={`text-rate-measurement-sheet-id-${submission.id}`}>{measurementSheetIdLabel(submission.measurementRecordId)}</code></p>}
                             <p className="mt-1 text-[10px] text-muted-foreground">Submitted by {submission.submittedByName}</p>
-                            {submission.pdfFilename ? <a href={getDownloadQuotationRateSubmissionPdfUrl(submission.id)} download={submission.pdfFilename} className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate text-[10px] font-semibold text-primary hover:underline" data-testid={`link-download-rate-pdf-${submission.id}`}><Download size={12} /> {submission.pdfFilename}</a> : submission.status === 'awaiting_pdf' && canSubmit ? pdfInput(submission) : null}
+                            {submission.pdfFilename && <div className="mt-2">
+                              <a href={getDownloadQuotationRateSubmissionPdfUrl(submission.id)} download={submission.pdfFilename} className="inline-flex max-w-full items-center gap-1.5 truncate text-[10px] font-semibold text-primary hover:underline" data-testid={`link-download-rate-pdf-${submission.id}`}><Download size={12} /> {submission.pdfNeedsRefresh ? `Previous PDF · ${submission.pdfFilename}` : submission.pdfFilename}</a>
+                              {submission.pdfNeedsRefresh && <p className="mt-1 text-[10px] text-amber-700">Updated PDF required before approval</p>}
+                            </div>}
+                            {submission.status === 'awaiting_pdf' && canManageSubmission(submission) ? pdfInput(submission) : null}
                           </td>
                           <td className="px-3 py-3 tabular-nums">{submission.windowQty}</td>
                           <td className="px-3 py-3 tabular-nums">{submission.totalSqFt.toLocaleString('en-IN')}</td>
@@ -831,6 +867,9 @@ function RateApprovalDesk({ user }: { user: User }) {
                           </td>
                           <td className="min-w-[260px] px-4 py-3">
                             <div className="flex flex-wrap items-center gap-1.5">
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/quotation-builder/requests/${submission.id}`)} data-testid={`button-view-rate-request-${submission.id}`}><Eye size={13} /> View</Button>
+                              {canManageSubmission(submission) && <Button size="sm" variant="outline" onClick={() => navigate(`/quotation-builder/requests/${submission.id}?edit=1`)} data-testid={`button-edit-rate-request-${submission.id}`}><Pencil size={13} /> Edit</Button>}
+                              {canManageSubmission(submission) && <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={deleteSubmission.isPending} onClick={() => removeSubmission(submission)} data-testid={`button-delete-rate-request-${submission.id}`}><Trash2 size={13} /> Delete</Button>}
                               {canLinkSubmission(submission) && <Button size="sm" variant="outline" onClick={() => openOrderLink(submission)} data-testid={`button-link-rate-order-${submission.id}`}><Link2 size={13} /> {submission.orderId ? 'Update links' : 'Link to order'}</Button>}
                               {submission.status === 'pending_review' && rateDesk ? <><Button size="sm" onClick={() => makeDecision(submission, 'approved')} disabled={decide.isPending} data-testid={`button-approve-rate-${submission.id}`}><Check size={13} /> Approve</Button><Button size="sm" variant="outline" className="text-destructive" onClick={() => makeDecision(submission, 'rejected')} disabled={decide.isPending} data-testid={`button-reject-rate-${submission.id}`}><X size={13} /> Reject</Button></> : submission.status === 'approved' || submission.status === 'rejected' ? <span className="px-2 text-muted-foreground" data-testid={`text-rate-action-complete-${submission.id}`}>—</span> : null}
                             </div>
@@ -842,7 +881,8 @@ function RateApprovalDesk({ user }: { user: User }) {
                   </div>}
           </CardContent>
         </Card>
-      </div>
+        </TabsContent>
+      </Tabs>
       <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-desk-note"><MapPin size={15} className="mt-0.5 shrink-0 text-primary" /><p>Rate requests receive a temporary RA ID, and the server calculates Average (SqFt / Qty). Linking an order is optional and can be done later.</p></div>
       <Dialog open={Boolean(linkingSubmission)} onOpenChange={(open) => { if (!open) setLinkingSubmission(null); }}>
         <DialogContent data-testid="dialog-link-quotation-order">
@@ -887,7 +927,10 @@ function RateApprovalDesk({ user }: { user: User }) {
 export default function QuotationBuilderPage({ user }: { user: User }) {
   const canEdit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'new' | 'profiles' | 'drafts' | 'rates'>('new');
+  const [activeSection, setActiveSection] = useState<'new' | 'profiles' | 'drafts' | 'rates'>(() => {
+    const initialSection = new URLSearchParams(window.location.search).get('section');
+    return initialSection === 'profiles' || initialSection === 'drafts' || initialSection === 'rates' ? initialSection : 'new';
+  });
   const [search, setSearch] = useState('');
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<WindowProfile | null>(null);
