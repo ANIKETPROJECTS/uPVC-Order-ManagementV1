@@ -13,4 +13,6 @@ export interface QuotationRateSubmissionLookup {
   status: QuotationRateSubmissionStatus;
   /** @nullable */
   orderId: string | null;
+  /** @nullable */
+  measurementRecordId: string | null;
 }

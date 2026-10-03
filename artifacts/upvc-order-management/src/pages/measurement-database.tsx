@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   List,
   MapPin,
+  Pencil,
   Plus,
   RefreshCw,
   Save,
@@ -25,6 +26,7 @@ import {
   getListOrdersQueryKey,
   getListQuotationRateSubmissionsQueryKey,
   useCreateMeasurementRecord,
+  useDeleteMeasurementRecord,
   useDeleteMeasurementVersion,
   useListMeasurementRecords,
   useListOrders,
@@ -40,7 +42,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { QuotationRequestLookup } from '@/components/link-record-lookups';
+import { measurementSheetIdLabel, QuotationRequestLookup } from '@/components/link-record-lookups';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 type MeasurementEdit = {
@@ -67,6 +69,7 @@ type MeasurementLayout = 'list' | 'grid';
 type MeasurementSort = 'recent' | 'oldest' | 'client';
 type MeasurementFileFilter = 'all' | 'none' | 'pdf' | 'xlsx' | 'csv';
 type MeasurementOrderFilter = 'all' | 'assigned' | 'unassigned';
+type MeasurementQuotationFilter = 'all' | 'linked' | 'unlinked';
 
 function RecordState({ state, onRetry }: { state: 'loading' | 'error' | 'empty'; onRetry?: () => void }) {
   if (state === 'loading') return <div className="space-y-3 p-5" data-testid="state-measurements-loading"><div className="h-20 animate-pulse rounded-xl bg-muted" /><div className="h-20 animate-pulse bg-muted/70 rounded-xl" /><div className="h-20 animate-pulse rounded-xl bg-muted/50" /></div>;
@@ -82,6 +85,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
   const ordersQuery = useListOrders({}, { query: { queryKey: getListOrdersQueryKey({}) } });
   const create = useCreateMeasurementRecord();
   const update = useUpdateMeasurementRecord();
+  const deleteRecord = useDeleteMeasurementRecord();
   const updateVersion = useUpdateMeasurementVersion();
   const deleteVersion = useDeleteMeasurementVersion();
   const upload = useMutation({
@@ -101,8 +105,10 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
   const [recordSearch, setRecordSearch] = useState('');
   const [fileFilter, setFileFilter] = useState<MeasurementFileFilter>('all');
   const [orderFilter, setOrderFilter] = useState<MeasurementOrderFilter>('all');
+  const [quotationFilter, setQuotationFilter] = useState<MeasurementQuotationFilter>('all');
   const [sortBy, setSortBy] = useState<MeasurementSort>('recent');
   const [layout, setLayout] = useState<MeasurementLayout>('list');
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const records = recordsQuery.data || [];
   const orders = ordersQuery.data || [];
   const invalidateRecords = () => void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
@@ -110,6 +116,8 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
     const query = recordSearch.trim().toLocaleLowerCase();
     const filtered = records.filter((record) => {
       const searchable = [
+        measurementSheetIdLabel(record.id),
+        record.quotationRequestId || '',
         record.clientName,
         record.location || '',
         record.orderId || '',
@@ -121,6 +129,8 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
         && !record.versions.some((version) => extensionOf(version.filename) === fileFilter)) return false;
       if (orderFilter === 'assigned' && !record.orderRecordId) return false;
       if (orderFilter === 'unassigned' && record.orderRecordId) return false;
+      if (quotationFilter === 'linked' && !record.quotationRequestId) return false;
+      if (quotationFilter === 'unlinked' && record.quotationRequestId) return false;
       return true;
     });
     return filtered.sort((a, b) => {
@@ -128,7 +138,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
       const difference = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
       return sortBy === 'oldest' ? difference : -difference;
     });
-  }, [fileFilter, orderFilter, recordSearch, records, sortBy]);
+  }, [fileFilter, orderFilter, quotationFilter, recordSearch, records, sortBy]);
 
   const validateFile = (file: File | undefined) => {
     if (!file) return false;
@@ -220,9 +230,9 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
     clientName: record.clientName,
     location: record.location || '',
     orderRecordId: record.orderRecordId || '',
-    linkQuotation: false,
-    linkQuotationSubmissionId: null,
-    quotationLabel: '',
+    linkQuotation: Boolean(record.quotationRequestId),
+    linkQuotationSubmissionId: record.quotationRequestId,
+    quotationLabel: record.quotationRequestId || '',
   };
   const saveRecord = (record: MeasurementRecord) => {
     const value = currentEdit(record);
@@ -240,7 +250,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
         clientName: value.clientName.trim(),
         location: value.location.trim() || null,
         orderRecordId: value.orderRecordId || null,
-        linkQuotationSubmissionId: value.linkQuotation ? value.linkQuotationSubmissionId || undefined : undefined,
+        linkQuotationSubmissionId: value.linkQuotation ? value.linkQuotationSubmissionId || undefined : null,
       },
     }, {
       onSuccess: () => {
@@ -251,7 +261,8 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
           delete next[record.id];
           return next;
         });
-        toast({ title: 'Measurement record updated', description: value.linkQuotation ? 'The measurement sheet and quotation are linked to the same order.' : 'Client details and order assignment are saved.' });
+        setEditingRecordId(null);
+        toast({ title: 'Measurement record updated', description: value.linkQuotation ? `Sheet ID linked directly to ${value.linkQuotationSubmissionId}.` : record.quotationRequestId ? 'Details saved and the quotation request unlinked.' : 'Client details and order assignment are saved.' });
       },
       onError: () => toast({ title: 'Could not update record', description: 'The record remains unchanged. Try again.', variant: 'destructive' }),
     });
@@ -259,7 +270,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
   const setEdit = (record: MeasurementRecord, key: keyof MeasurementEdit, value: string | boolean) => {
     setEdits((current) => {
       const next = { ...currentEdit(record), [key]: value } as MeasurementEdit;
-      if (key === 'orderRecordId' && !value) {
+      if (key === 'linkQuotation' && value === false) {
         next.linkQuotation = false;
         next.linkQuotationSubmissionId = null;
         next.quotationLabel = '';
@@ -304,6 +315,30 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
       onError: () => toast({ title: 'Could not delete measurement file', description: 'The file remains in the register. Try again.', variant: 'destructive' }),
     });
   };
+  const removeRecord = (record: MeasurementRecord) => {
+    const sheetId = measurementSheetIdLabel(record.id);
+    const fileCount = record.versions.length;
+    if (!window.confirm(`Delete measurement sheet ${sheetId} for ${record.clientName}? This permanently removes the record and all ${fileCount} retained file${fileCount === 1 ? '' : 's'}. Its quotation request will be unlinked.`)) return;
+    deleteRecord.mutate({ recordId: record.id }, {
+      onSuccess: () => {
+        invalidateRecords();
+        void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
+        setEditingRecordId((current) => current === record.id ? null : current);
+        setEdits((current) => {
+          const next = { ...current };
+          delete next[record.id];
+          return next;
+        });
+        setVersionFiles((current) => {
+          const next = { ...current };
+          delete next[record.id];
+          return next;
+        });
+        toast({ title: 'Measurement record deleted', description: `${sheetId} and its retained files were removed.` });
+      },
+      onError: () => toast({ title: 'Could not delete measurement record', description: 'The record and its files remain unchanged. Try again.', variant: 'destructive' }),
+    });
+  };
   const orderOption = (order: Order) => `${order.orderId} · ${order.clientName} · ${order.locationName}`;
   const assignNewRecordOrder = (value: string) => {
     setOrderRecordId(value);
@@ -330,8 +365,8 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
           <div className="relative z-10 max-w-3xl">
             <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-sidebar-primary"><span>Traceable fabrication records</span><span className="h-1 w-1 rounded-full bg-accent" /><span>PDF · XLSX · CSV</span></p>
             <h2 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-[-0.05em] md:text-4xl">Every measurement sheet, kept with its history.</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">File multiple sheets by client and site, optionally name each one, then connect an order when it is known. New uploads add versions; they never overwrite the record.</p>
-            <div className="mt-5 flex flex-wrap gap-2"><span className="rounded-lg bg-white/10 px-3 py-2 text-xs"><strong className="font-display text-base">{records.length}</strong><span className="ml-2 text-white/65">client records</span></span><span className="rounded-lg bg-white/10 px-3 py-2 text-xs"><strong className="font-display text-base">{records.reduce((count, record) => count + record.versions.length, 0)}</strong><span className="ml-2 text-white/65">retained versions</span></span></div>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">Every record receives a permanent Measurement Sheet ID. Link it directly to an RA request ID, search or filter the register, and keep every uploaded version for traceability.</p>
+            <div className="mt-5 flex flex-wrap gap-2"><span className="rounded-lg bg-white/10 px-3 py-2 text-xs"><strong className="font-display text-base">{records.length}</strong><span className="ml-2 text-white/65">measurement records</span></span><span className="rounded-lg bg-white/10 px-3 py-2 text-xs"><strong className="font-display text-base">{records.reduce((count, record) => count + record.versions.length, 0)}</strong><span className="ml-2 text-white/65">retained versions</span></span></div>
           </div>
           <div className="quotation-hero-mark" aria-hidden="true"><span /><span /><span /><span /></div>
         </section>
@@ -363,7 +398,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
         <Card className="overflow-hidden border-border/80" data-testid="card-measurement-register">
           <CardHeader className="border-b border-border/70">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Register</p><CardTitle className="mt-1 font-display text-lg">Client measurement sheets</CardTitle><p className="mt-1 text-xs text-muted-foreground">Current order links and complete retained version history.</p></div>
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Register</p><CardTitle className="mt-1 font-display text-lg">Client measurement sheets</CardTitle><p className="mt-1 text-xs text-muted-foreground">One record per list or grid card, with a permanent sheet ID, Rate Approval link, and retained versions.</p></div>
               <span className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground"><ClipboardList size={13} /> {records.length} records</span>
             </div>
             {ordersQuery.isError && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" data-testid="state-measurement-orders-error"><span>Order list unavailable. Existing records remain visible; order choices may be incomplete.</span><Button size="sm" variant="outline" onClick={() => void ordersQuery.refetch()} data-testid="button-retry-measurement-orders"><RefreshCw size={13} /> Retry orders</Button></div>}
@@ -373,7 +408,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
               : recordsQuery.isError ? <RecordState state="error" onRetry={() => void recordsQuery.refetch()} />
                 : records.length === 0 ? <RecordState state="empty" />
                   : <div>
-                    <div className="grid gap-3 border-b border-border/70 bg-muted/10 p-4 xl:grid-cols-[minmax(230px,1fr)_150px_160px_170px_auto]">
+                    <div className="grid gap-3 border-b border-border/70 bg-muted/10 p-4 xl:grid-cols-[minmax(230px,1fr)_150px_160px_160px_170px_auto]">
                       <label className="relative min-w-0">
                         <span className="sr-only">Search measurement records and files</span>
                         <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -395,6 +430,14 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                           <SelectItem value="all">All order links</SelectItem>
                           <SelectItem value="assigned">Order assigned</SelectItem>
                           <SelectItem value="unassigned">No order assigned</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={quotationFilter} onValueChange={(value) => setQuotationFilter(value as MeasurementQuotationFilter)}>
+                        <SelectTrigger aria-label="Filter by quotation request link" data-testid="select-measurement-quotation-filter"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All quotation links</SelectItem>
+                          <SelectItem value="linked">RA request linked</SelectItem>
+                          <SelectItem value="unlinked">No RA request</SelectItem>
                         </SelectContent>
                       </Select>
                       <Select value={sortBy} onValueChange={(value) => setSortBy(value as MeasurementSort)}>
@@ -419,16 +462,48 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                     {visibleRecords.map((record) => {
                       const edit = currentEdit(record);
                       const pendingSheets = versionFiles[record.id] || [];
+                      const latestVersion = record.versions[0];
+                      const isEditing = editingRecordId === record.id;
                       const visibleVersions = record.versions.filter((version) =>
                         fileFilter === 'all' || fileFilter === 'none' || extensionOf(version.filename) === fileFilter);
                       return <article key={record.id} className={`space-y-4 ${layout === 'grid' ? 'rounded-xl border border-border/70 bg-card p-4' : 'p-4 sm:p-5'}`} data-testid={`row-measurement-record-${record.id}`}>
-                        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(210px,1fr)_auto] xl:items-end">
-                          <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Client name<Input value={edit.clientName} readOnly={!canEdit} onChange={(event) => setEdit(record, 'clientName', event.target.value)} maxLength={160} data-testid={`input-measurement-client-${record.id}`} /></label>
-                          <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Location<Input value={edit.location} readOnly={!canEdit} onChange={(event) => setEdit(record, 'location', event.target.value)} maxLength={160} placeholder="No location" data-testid={`input-measurement-location-${record.id}`} /></label>
-                          <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Assigned order{canEdit ? <OrderSelect value={edit.orderRecordId} onChange={(value) => setEdit(record, 'orderRecordId', value)} testId={`select-measurement-record-order-${record.id}`} /> : <Input readOnly value={record.orderId || 'No order assigned'} data-testid={`text-measurement-order-${record.id}`} />}</label>
-                          {canEdit && <Button variant="outline" size="sm" onClick={() => saveRecord(record)} disabled={update.isPending} data-testid={`button-save-measurement-record-${record.id}`}><Save size={14} /> Save details</Button>}
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 space-y-1">
+                            <p className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">Measurement Sheet ID</p>
+                            <code className="block break-all font-mono text-xs font-semibold text-primary" title={record.id} data-testid={`text-measurement-sheet-id-${record.id}`}>{measurementSheetIdLabel(record.id)}</code>
+                            {record.quotationRequestId && <p className="text-[10px] text-muted-foreground">Rate Approval request <code className="font-mono font-semibold text-foreground" data-testid={`text-measurement-quotation-id-${record.id}`}>{record.quotationRequestId}</code></p>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {latestVersion ? <a href={getPreviewMeasurementVersionUrl(record.id, latestVersion.id)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted" data-testid={`link-view-measurement-record-${record.id}`}><Eye size={14} /> View</a>
+                              : <Button type="button" variant="outline" size="sm" disabled title="Add a sheet file to enable viewing" data-testid={`button-view-measurement-record-${record.id}`}><Eye size={14} /> View</Button>}
+                            {canEdit && <Button type="button" variant="outline" size="sm" onClick={() => {
+                              if (isEditing) {
+                                setEditingRecordId(null);
+                                setEdits((current) => {
+                                  const next = { ...current };
+                                  delete next[record.id];
+                                  return next;
+                                });
+                              } else {
+                                setEditingRecordId(record.id);
+                              }
+                            }} data-testid={`button-edit-measurement-record-${record.id}`}><Pencil size={14} /> {isEditing ? 'Cancel edit' : 'Edit'}</Button>}
+                            {canEdit && <Button type="button" variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={deleteRecord.isPending} onClick={() => removeRecord(record)} data-testid={`button-delete-measurement-record-${record.id}`}><Trash2 size={14} /> Delete</Button>}
+                          </div>
                         </div>
-                        {canEdit && edit.orderRecordId && <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3" data-testid={`link-quotation-from-measurement-${record.id}`}>
+                        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(210px,1fr)_auto] xl:items-end">
+                          {isEditing ? <>
+                            <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Client name<Input value={edit.clientName} onChange={(event) => setEdit(record, 'clientName', event.target.value)} maxLength={160} data-testid={`input-measurement-client-${record.id}`} /></label>
+                            <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Location<Input value={edit.location} onChange={(event) => setEdit(record, 'location', event.target.value)} maxLength={160} placeholder="No location" data-testid={`input-measurement-location-${record.id}`} /></label>
+                            <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Assigned order<OrderSelect value={edit.orderRecordId} onChange={(value) => setEdit(record, 'orderRecordId', value)} testId={`select-measurement-record-order-${record.id}`} /></label>
+                            <Button type="button" variant="outline" size="sm" onClick={() => saveRecord(record)} disabled={update.isPending} data-testid={`button-save-measurement-record-${record.id}`}><Save size={14} /> Save</Button>
+                          </> : <>
+                            <div><p className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">Client name</p><p className="mt-1 text-sm font-semibold">{record.clientName}</p></div>
+                            <div><p className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">Location</p><p className="mt-1 text-sm">{record.location || 'No location'}</p></div>
+                            <div><p className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">Assigned order</p><p className="mt-1 text-sm">{record.orderId || 'No order assigned'}</p></div>
+                          </>}
+                        </div>
+                        {canEdit && isEditing && <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3" data-testid={`link-quotation-from-measurement-${record.id}`}>
                           <label className="flex items-center gap-2 text-xs font-semibold">
                             <input
                               type="checkbox"
@@ -437,11 +512,12 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                               className="h-4 w-4 accent-primary"
                               data-testid={`checkbox-link-quotation-${record.id}`}
                             />
-                            Do you also want to link the Quotation?
+                            Link directly to a Rate Approval request ID
                           </label>
                           {edit.linkQuotation && <QuotationRequestLookup
                             selectedId={edit.linkQuotationSubmissionId}
                             selectedLabel={edit.quotationLabel}
+                            currentMeasurementRecordId={record.id}
                             onSelect={(item) => setEdits((current) => ({
                               ...current,
                               [record.id]: {

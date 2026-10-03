@@ -13,4 +13,6 @@ export interface MeasurementRecordLookup {
   location: string | null;
   /** @nullable */
   orderId: string | null;
+  /** @nullable */
+  quotationRequestId: string | null;
 }

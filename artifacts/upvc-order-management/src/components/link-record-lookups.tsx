@@ -11,13 +11,17 @@ import type {
 } from '@workspace/api-client-react';
 import { Input } from '@/components/ui/input';
 
+export const measurementSheetIdLabel = (id: string) => `MS-${id.toUpperCase()}`;
+
 export function QuotationRequestLookup({
   selectedId,
   selectedLabel,
+  currentMeasurementRecordId,
   onSelect,
 }: {
   selectedId: string | null;
   selectedLabel: string;
+  currentMeasurementRecordId: string;
   onSelect: (item: QuotationRateSubmissionLookup) => void;
 }) {
   const [query, setQuery] = useState('');
@@ -47,12 +51,13 @@ export function QuotationRequestLookup({
                     type="button"
                     role="option"
                     aria-selected={selectedId === item.id}
+                    disabled={Boolean(item.measurementRecordId && item.measurementRecordId !== currentMeasurementRecordId)}
                     onClick={() => onSelect(item)}
-                    className="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-xs hover:bg-secondary"
+                    className="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-xs hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
                     data-testid={`option-quotation-request-${item.id}`}
                   >
                     <span><strong>{item.id}</strong><span className="ml-2 text-muted-foreground">{item.clientName}</span></span>
-                    <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{item.status.replaceAll('_', ' ')}</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">{item.measurementRecordId ? `Linked to ${measurementSheetIdLabel(item.measurementRecordId)}` : item.status.replaceAll('_', ' ')}</span>
                   </button>
                 ))}
         </div>
@@ -64,10 +69,12 @@ export function QuotationRequestLookup({
 export function MeasurementSheetLookup({
   selectedId,
   selectedLabel,
+  currentQuotationRequestId,
   onSelect,
 }: {
   selectedId: string | null;
   selectedLabel: string;
+  currentQuotationRequestId: string;
   onSelect: (item: MeasurementRecordLookup) => void;
 }) {
   const [query, setQuery] = useState('');
@@ -97,12 +104,13 @@ export function MeasurementSheetLookup({
                     type="button"
                     role="option"
                     aria-selected={selectedId === item.id}
+                    disabled={Boolean(item.quotationRequestId && item.quotationRequestId !== currentQuotationRequestId)}
                     onClick={() => onSelect(item)}
-                    className="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-xs hover:bg-secondary"
+                    className="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-xs hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
                     data-testid={`option-measurement-sheet-${item.id}`}
                   >
-                    <span><strong>{item.clientName}</strong>{item.location && <span className="ml-2 text-muted-foreground">{item.location}</span>}</span>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">{item.orderId || 'No order'}</span>
+                    <span className="min-w-0"><strong>{measurementSheetIdLabel(item.id)}</strong><span className="ml-2">{item.clientName}</span>{item.location && <span className="ml-2 text-muted-foreground">{item.location}</span>}</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">{item.quotationRequestId ? `Linked to ${item.quotationRequestId}` : item.orderId || 'No order'}</span>
                   </button>
                 ))}
         </div>

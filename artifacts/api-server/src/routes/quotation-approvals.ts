@@ -39,6 +39,8 @@ const router = Router();
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 class LinkConflict extends Error {}
+const isDuplicateKeyError = (error: unknown) =>
+  Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000);
 
 type Actor = {
   id: string;
@@ -78,6 +80,7 @@ function response(item: QuotationRateSubmissionDocument) {
     id: item._id,
     orderRecordId: item.orderRecordId ?? null,
     orderId: item.orderId ?? null,
+    measurementRecordId: item.measurementRecordId ?? null,
     clientName: item.clientName,
     location: item.location,
     windowQty: item.windowQty,
@@ -150,6 +153,7 @@ router.get("/quotation-rate-submissions/lookup", async (req, res): Promise<void>
     clientName: item.clientName,
     status: item.status,
     orderId: item.orderId ?? null,
+    measurementRecordId: item.measurementRecordId ?? null,
   }))));
 });
 
@@ -193,6 +197,7 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     _id: `RA-${counter.value}`,
     orderRecordId: null,
     orderId: null,
+    measurementRecordId: null,
     clientName: clientName.trim(),
     clientNameLower: clientName.trim().toLowerCase(),
     location: location?.trim() || null,
@@ -253,6 +258,16 @@ router.patch(
       res.status(404).json({ error: "The selected measurement sheet could not be found." });
       return;
     }
+    if (measurement) {
+      const otherLinkedRequest = await submissions.findOne({
+        _id: { $ne: item._id },
+        measurementRecordId: measurement._id,
+      });
+      if (otherLinkedRequest) {
+        res.status(409).json({ error: "This measurement sheet is already linked to another quotation request." });
+        return;
+      }
+    }
 
     const session = (await getMongoClient()).startSession();
     let updated: QuotationRateSubmissionDocument | null = null;
@@ -261,16 +276,33 @@ router.patch(
         const quoteResult = await submissions.findOneAndUpdate(
           {
             _id: item._id,
-            $or: [
-              { orderRecordId: null },
-              { orderRecordId: order._id },
-              { orderRecordId: { $exists: false } },
+            $and: [
+              {
+                $or: [
+                  { orderRecordId: null },
+                  { orderRecordId: order._id },
+                  { orderRecordId: { $exists: false } },
+                ],
+              },
+              {
+                $or: [
+                  { measurementRecordId: item.measurementRecordId ?? null },
+                  { measurementRecordId: { $exists: false } },
+                ],
+              },
             ],
           },
-          { $set: { orderRecordId: order._id, orderId: order.orderId, updatedAt: new Date() } },
+          {
+            $set: {
+              orderRecordId: order._id,
+              orderId: order.orderId,
+              measurementRecordId: measurement?._id ?? null,
+              updatedAt: new Date(),
+            },
+          },
           { returnDocument: "after", session },
         );
-        if (!quoteResult) throw new LinkConflict("This quotation is already linked to another order.");
+        if (!quoteResult) throw new LinkConflict("This quotation's links changed. Refresh and try again.");
         if (measurement) {
           const measurementResult = await getMeasurementRecords(db).updateOne(
             {
@@ -291,8 +323,12 @@ router.patch(
         updated = quoteResult;
       });
     } catch (error) {
-      if (error instanceof LinkConflict) {
-        res.status(409).json({ error: error.message });
+      if (error instanceof LinkConflict || isDuplicateKeyError(error)) {
+        res.status(409).json({
+          error: error instanceof LinkConflict
+            ? error.message
+            : "This measurement sheet is already linked to another quotation request.",
+        });
         return;
       }
       throw error;

@@ -19,5 +19,9 @@ export interface MeasurementRecordUpdate {
   location?: string | null;
   /** @nullable */
   orderRecordId?: string | null;
-  linkQuotationSubmissionId?: string;
+  /**
+     * Set to a rate approval request ID to link it to this measurement record, or null to unlink it.
+     * @nullable
+     */
+  linkQuotationSubmissionId?: string | null;
 }

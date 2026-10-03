@@ -1286,7 +1286,7 @@ paths:
     patch:
       operationId: updateMeasurementRecord
       tags: [orders]
-      summary: Update measurement record details or assign it to an order
+      summary: Update measurement record details and its quotation request link
       parameters:
         - name: recordId
           in: path
@@ -1308,6 +1308,21 @@ paths:
                 $ref: "#/components/schemas/MeasurementRecord"
         "404":
           description: Measurement record or order not found
+    delete:
+      operationId: deleteMeasurementRecord
+      tags: [orders]
+      summary: Delete a measurement record and all retained sheet versions
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Measurement record and its sheet versions deleted
+        "404":
+          description: Measurement record not found
   /measurement-records/{recordId}/versions/{filename}:
     post:
       operationId: uploadMeasurementVersion
@@ -3215,6 +3230,8 @@ components:
           type: ["string", "null"]
         orderId:
           type: ["string", "null"]
+        measurementRecordId:
+          type: ["string", "null"]
         clientName:
           type: string
         location:
@@ -3253,7 +3270,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderRecordId, orderId, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, createdAt, updatedAt]
+      required: [id, orderRecordId, orderId, measurementRecordId, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, createdAt, updatedAt]
     QuotationRateSubmissionList:
       type: array
       items:
@@ -3269,7 +3286,9 @@ components:
           $ref: "#/components/schemas/QuotationRateSubmissionStatus"
         orderId:
           type: ["string", "null"]
-      required: [id, clientName, status, orderId]
+        measurementRecordId:
+          type: ["string", "null"]
+      required: [id, clientName, status, orderId, measurementRecordId]
     QuotationRateSubmissionLookupList:
       type: array
       items:
@@ -3352,6 +3371,8 @@ components:
           type: ["string", "null"]
         orderId:
           type: ["string", "null"]
+        quotationRequestId:
+          type: ["string", "null"]
         versions:
           type: array
           items:
@@ -3364,7 +3385,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, clientName, location, orderRecordId, orderId, versions, createdBy, createdAt, updatedAt]
+      required: [id, clientName, location, orderRecordId, orderId, quotationRequestId, versions, createdBy, createdAt, updatedAt]
     MeasurementRecordList:
       type: array
       items:
@@ -3380,7 +3401,9 @@ components:
           type: ["string", "null"]
         orderId:
           type: ["string", "null"]
-      required: [id, clientName, location, orderId]
+        quotationRequestId:
+          type: ["string", "null"]
+      required: [id, clientName, location, orderId, quotationRequestId]
     MeasurementRecordLookupList:
       type: array
       items:
@@ -3411,7 +3434,8 @@ components:
         orderRecordId:
           type: ["string", "null"]
         linkQuotationSubmissionId:
-          type: string
+          type: ["string", "null"]
+          description: Set to a rate approval request ID to link it to this measurement record, or null to unlink it.
     MeasurementVersionUpdate:
       type: object
       properties:

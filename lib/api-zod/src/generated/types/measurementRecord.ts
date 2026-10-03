@@ -16,6 +16,8 @@ export interface MeasurementRecord {
   orderRecordId: string | null;
   /** @nullable */
   orderId: string | null;
+  /** @nullable */
+  quotationRequestId: string | null;
   versions: MeasurementVersion[];
   createdBy: string;
   createdAt: Date;

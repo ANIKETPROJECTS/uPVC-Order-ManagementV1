@@ -5159,7 +5159,7 @@ export const getUpdateMeasurementRecordUrl = (recordId: string,) => {
 }
 
 /**
- * @summary Update measurement record details or assign it to an order
+ * @summary Update measurement record details and its quotation request link
  */
 export const updateMeasurementRecord = async (recordId: string,
     measurementRecordUpdate: MeasurementRecordUpdate, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementRecord> => {
@@ -5226,7 +5226,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateMeasurementRecordMutationVariables = {recordId: string;data: BodyType<MeasurementRecordUpdate>}
 
     /**
- * @summary Update measurement record details or assign it to an order
+ * @summary Update measurement record details and its quotation request link
  */
 export const useUpdateMeasurementRecord = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementRecord>>, TError,UpdateMeasurementRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -5237,6 +5237,80 @@ export const useUpdateMeasurementRecord = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateMeasurementRecordMutationOptions(options));
+    }
+
+export const getDeleteMeasurementRecordUrl = (recordId: string,) => {
+
+
+
+
+  return `/api/measurement-records/${recordId}`
+}
+
+/**
+ * @summary Delete a measurement record and all retained sheet versions
+ */
+export const deleteMeasurementRecord = async (recordId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteMeasurementRecordUrl(recordId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteMeasurementRecordMutationKey = () => ['deleteMeasurementRecord'] as const;
+
+export const getDeleteMeasurementRecordMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementRecord>>, TError,DeleteMeasurementRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementRecord>>, TError,DeleteMeasurementRecordMutationVariables, TContext> => {
+
+const mutationKey = getDeleteMeasurementRecordMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMeasurementRecord>>, DeleteMeasurementRecordMutationVariables> = (props) => {
+          const {recordId} = props ?? {};
+
+          return  deleteMeasurementRecord(recordId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMeasurementRecordMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMeasurementRecord>>>
+
+    export type DeleteMeasurementRecordMutationError = ErrorType<void>
+    export type DeleteMeasurementRecordMutationVariables = {recordId: string}
+
+    /**
+ * @summary Delete a measurement record and all retained sheet versions
+ */
+export const useDeleteMeasurementRecord = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementRecord>>, TError,DeleteMeasurementRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMeasurementRecord>>,
+        TError,
+        DeleteMeasurementRecordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteMeasurementRecordMutationOptions(options));
     }
 
 export const getUploadMeasurementVersionUrl = (recordId: string,

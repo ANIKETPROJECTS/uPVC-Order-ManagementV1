@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import {
   CreateMeasurementRecordBody,
   CreateMeasurementRecordResponse,
+  DeleteMeasurementRecordParams,
   DeleteMeasurementVersionParams,
   DownloadMeasurementVersionParams,
   ListMeasurementRecordsResponse,
@@ -43,6 +44,8 @@ import {
 const router = Router();
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 class LinkConflict extends Error {}
+const isDuplicateKeyError = (error: unknown) =>
+  Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000);
 const sheetTypes: Record<string, string> = {
   pdf: "application/pdf",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -105,9 +108,10 @@ function versionResponse(version: MeasurementVersionDocument) {
 
 async function recordResponse(record: MeasurementRecordDocument) {
   const db = await getMongoDb();
-  const [versions, order] = await Promise.all([
+  const [versions, order, quotation] = await Promise.all([
     getMeasurementVersions(db).find({ recordId: record._id }).sort({ versionNumber: -1 }).toArray(),
     record.orderRecordId ? getOrders(db).findOne({ _id: record.orderRecordId }) : Promise.resolve(null),
+    getQuotationRateSubmissions(db).findOne({ measurementRecordId: record._id }, { projection: { _id: 1 } }),
   ]);
   return {
     id: record._id,
@@ -115,6 +119,7 @@ async function recordResponse(record: MeasurementRecordDocument) {
     location: record.location,
     orderRecordId: record.orderRecordId,
     orderId: order?.orderId ?? null,
+    quotationRequestId: quotation?._id ?? null,
     versions: versions.map(versionResponse),
     createdBy: record.createdBy,
     createdAt: record.createdAt.toISOString(),
@@ -138,18 +143,29 @@ router.get("/measurement-records/lookup", async (req, res): Promise<void> => {
   }
   const actor = await actorContext(req, res, false, true);
   if (!actor) return;
-  const escaped = query.data.query.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const records = await getMeasurementRecords(await getMongoDb())
-    .find({ $or: [{ _id: { $regex: escaped, $options: "i" } }, { clientNameLower: { $regex: escaped } }] })
+  const rawQuery = query.data.query.trim();
+  const clientSearch = rawQuery.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const idSearch = rawQuery.replace(/^MS-/i, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const searchConditions: Record<string, unknown>[] = [{ clientNameLower: { $regex: clientSearch } }];
+  if (idSearch) searchConditions.push({ _id: { $regex: idSearch, $options: "i" } });
+  const db = await getMongoDb();
+  const records = await getMeasurementRecords(db)
+    .find({ $or: searchConditions })
     .sort({ updatedAt: -1 })
     .limit(20)
     .toArray();
-  const db = await getMongoDb();
+  const quotationLinks = records.length
+    ? await getQuotationRateSubmissions(db)
+        .find({ measurementRecordId: { $in: records.map((record) => record._id) } }, { projection: { _id: 1, measurementRecordId: 1 } })
+        .toArray()
+    : [];
+  const quotationIdByRecord = new Map(quotationLinks.map((item) => [item.measurementRecordId!, item._id]));
   const response = await Promise.all(records.map(async (record) => ({
     id: record._id,
     clientName: record.clientName,
     location: record.location,
     orderId: record.orderRecordId ? (await getOrders(db).findOne({ _id: record.orderRecordId }))?.orderId ?? null : null,
+    quotationRequestId: quotationIdByRecord.get(record._id) ?? null,
   })));
   res.json(SearchMeasurementRecordsResponse.parse(response));
 });
@@ -204,6 +220,14 @@ router.patch("/measurement-records/:recordId", async (req, res): Promise<void> =
     res.status(404).json({ error: "Measurement record not found." });
     return;
   }
+  const linkQuotationFieldProvided = Object.hasOwn(parsedBody.data, "linkQuotationSubmissionId");
+  const hasRecordChanges = parsedBody.data.clientName !== undefined
+    || parsedBody.data.location !== undefined
+    || parsedBody.data.orderRecordId !== undefined;
+  if (!hasRecordChanges && !linkQuotationFieldProvided) {
+    res.status(400).json({ error: "Provide at least one field to update." });
+    return;
+  }
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (parsedBody.data.clientName !== undefined) {
     const clientName = parsedBody.data.clientName.trim();
@@ -222,40 +246,54 @@ router.patch("/measurement-records/:recordId", async (req, res): Promise<void> =
     }
     updates.orderRecordId = parsedBody.data.orderRecordId;
   }
-  if (parsedBody.data.linkQuotationSubmissionId) {
-    if (!parsedBody.data.orderRecordId || !selectedOrder) {
-      res.status(400).json({ error: "Select an order before linking a quotation." });
-      return;
-    }
-  }
-  if (Object.keys(updates).length === 1) {
-    res.status(400).json({ error: "Provide at least one field to update." });
+
+  const quotationCollection = getQuotationRateSubmissions(db);
+  const requestedQuotationId = parsedBody.data.linkQuotationSubmissionId ?? null;
+  const requestedQuotation = linkQuotationFieldProvided && requestedQuotationId
+    ? await quotationCollection.findOne({ _id: requestedQuotationId })
+    : null;
+  if (linkQuotationFieldProvided && requestedQuotationId && !requestedQuotation) {
+    res.status(404).json({ error: "The selected quotation request could not be found." });
     return;
   }
-  if (parsedBody.data.linkQuotationSubmissionId && selectedOrder) {
-    const quotation = await getQuotationRateSubmissions(db).findOne({ _id: parsedBody.data.linkQuotationSubmissionId });
-    if (!quotation) {
-      res.status(404).json({ error: "The selected quotation request could not be found." });
-      return;
-    }
+
+  if (linkQuotationFieldProvided) {
     const session = (await getMongoClient()).startSession();
     try {
       await session.withTransaction(async () => {
-        const linkedQuotation = await getQuotationRateSubmissions(db).updateOne(
-          {
-            _id: quotation._id,
-            $or: [
-              { orderRecordId: null },
-              { orderRecordId: selectedOrder._id },
-              { orderRecordId: { $exists: false } },
-            ],
-          },
-          { $set: { orderRecordId: selectedOrder._id, orderId: selectedOrder.orderId, updatedAt: new Date() } },
-          { session },
+        const existingQuotation = await quotationCollection.findOne(
+          { measurementRecordId: old._id },
+          { session, projection: { _id: 1 } },
         );
-        if (!linkedQuotation.matchedCount) {
-          throw new LinkConflict("This quotation is already linked to another order.");
+        if (existingQuotation && existingQuotation._id !== requestedQuotationId) {
+          const cleared = await quotationCollection.updateOne(
+            { _id: existingQuotation._id, measurementRecordId: old._id },
+            { $set: { measurementRecordId: null, updatedAt: new Date() } },
+            { session },
+          );
+          if (!cleared.matchedCount) {
+            throw new LinkConflict("The existing quotation link changed. Refresh and try again.");
+          }
         }
+
+        if (requestedQuotation) {
+          const linkedQuotation = await quotationCollection.updateOne(
+            {
+              _id: requestedQuotation._id,
+              $or: [
+                { measurementRecordId: null },
+                { measurementRecordId: old._id },
+                { measurementRecordId: { $exists: false } },
+              ],
+            },
+            { $set: { measurementRecordId: old._id, updatedAt: new Date() } },
+            { session },
+          );
+          if (!linkedQuotation.matchedCount) {
+            throw new LinkConflict("This quotation request is already linked to another measurement sheet.");
+          }
+        }
+
         const updatedRecord = await collection.updateOne(
           { _id: old._id, orderRecordId: old.orderRecordId ?? null },
           { $set: updates },
@@ -266,8 +304,10 @@ router.patch("/measurement-records/:recordId", async (req, res): Promise<void> =
         }
       });
     } catch (error) {
-      if (error instanceof LinkConflict) {
-        res.status(409).json({ error: error.message });
+      if (error instanceof LinkConflict || isDuplicateKeyError(error)) {
+        res.status(409).json({
+          error: error instanceof LinkConflict ? error.message : "This sheet is already linked to another quotation request.",
+        });
         return;
       }
       throw error;
@@ -279,6 +319,62 @@ router.patch("/measurement-records/:recordId", async (req, res): Promise<void> =
   }
   const updated = await collection.findOne({ _id: old._id });
   res.json(UpdateMeasurementRecordResponse.parse(await recordResponse(updated!)));
+});
+
+router.delete("/measurement-records/:recordId", async (req, res): Promise<void> => {
+  const parsedParams = DeleteMeasurementRecordParams.safeParse(req.params);
+  if (!parsedParams.success) {
+    res.status(400).json({ error: parsedParams.error.message });
+    return;
+  }
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const collection = getMeasurementRecords(db);
+  const record = await collection.findOne({ _id: parsedParams.data.recordId });
+  if (!record) {
+    res.status(404).json({ error: "Measurement record not found." });
+    return;
+  }
+  const versions = await getMeasurementVersions(db).find({ recordId: record._id }).toArray();
+  const session = (await getMongoClient()).startSession();
+  try {
+    await session.withTransaction(async () => {
+      await getQuotationRateSubmissions(db).updateMany(
+        { measurementRecordId: record._id },
+        { $set: { measurementRecordId: null, updatedAt: new Date() } },
+        { session },
+      );
+      await getMeasurementVersions(db).deleteMany({ recordId: record._id }, { session });
+      const deleted = await collection.deleteOne({ _id: record._id }, { session });
+      if (!deleted.deletedCount) {
+        throw new LinkConflict("The measurement record changed while it was being deleted.");
+      }
+    });
+  } catch (error) {
+    if (error instanceof LinkConflict) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  const bucket = getMeasurementSheetsBucket(db);
+  for (const version of versions) {
+    try {
+      if (version.storagePath) {
+        await removeProjectUpload(version.storagePath);
+      } else if (version.gridFsId && ObjectId.isValid(version.gridFsId)) {
+        const gridFsId = new ObjectId(version.gridFsId);
+        if (await bucket.find({ _id: gridFsId }).next()) await bucket.delete(gridFsId);
+      }
+    } catch (error) {
+      req.log.warn({ err: error, recordId: record._id, versionId: version._id }, "Failed to remove stored bytes for a deleted measurement record");
+    }
+  }
+  res.status(204).send();
 });
 
 router.patch("/measurement-records/:recordId/versions/:versionId", async (req, res): Promise<void> => {

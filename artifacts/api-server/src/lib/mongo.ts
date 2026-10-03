@@ -312,6 +312,7 @@ export interface QuotationRateSubmissionDocument {
   _id: string;
   orderRecordId: string | null;
   orderId: string | null;
+  measurementRecordId?: string | null;
   clientName: string;
   clientNameLower: string;
   location: string | null;
@@ -829,6 +830,7 @@ export async function initializeMongo(): Promise<void> {
   const orderActivity = getOrderActivity(db);
   const windowProfiles = getWindowProfiles(db);
   const quotations = getQuotations(db);
+  const quotationRateSubmissions = getQuotationRateSubmissions(db);
 
   await Promise.all([
     users.createIndex({ usernameLower: 1 }, { unique: true, name: "username_unique" }),
@@ -878,6 +880,14 @@ export async function initializeMongo(): Promise<void> {
     quotations.createIndex({ quoteNo: 1 }, { unique: true, name: "quotation_number_unique" }),
     quotations.createIndex({ updatedAt: -1 }, { name: "quotations_by_updated_at" }),
     quotations.createIndex({ clientId: 1, updatedAt: -1 }, { name: "quotations_by_client" }),
+    quotationRateSubmissions.createIndex(
+      { measurementRecordId: 1 },
+      {
+        unique: true,
+        name: "rate_request_measurement_sheet_unique",
+        partialFilterExpression: { measurementRecordId: { $type: "string" } },
+      },
+    ),
   ]);
 
   const now = new Date();

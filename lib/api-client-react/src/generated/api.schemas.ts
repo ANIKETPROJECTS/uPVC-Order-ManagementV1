@@ -1021,6 +1021,8 @@ export interface QuotationRateSubmission {
   orderRecordId: string | null;
   /** @nullable */
   orderId: string | null;
+  /** @nullable */
+  measurementRecordId: string | null;
   clientName: string;
   /** @nullable */
   location: string | null;
@@ -1054,6 +1056,8 @@ export interface QuotationRateSubmissionLookup {
   status: QuotationRateSubmissionStatus;
   /** @nullable */
   orderId: string | null;
+  /** @nullable */
+  measurementRecordId: string | null;
 }
 
 export type QuotationRateSubmissionLookupList = QuotationRateSubmissionLookup[];
@@ -1131,6 +1135,8 @@ export interface MeasurementRecord {
   orderRecordId: string | null;
   /** @nullable */
   orderId: string | null;
+  /** @nullable */
+  quotationRequestId: string | null;
   versions: MeasurementVersion[];
   createdBy: string;
   createdAt: string;
@@ -1146,6 +1152,8 @@ export interface MeasurementRecordLookup {
   location: string | null;
   /** @nullable */
   orderId: string | null;
+  /** @nullable */
+  quotationRequestId: string | null;
 }
 
 export type MeasurementRecordLookupList = MeasurementRecordLookup[];
@@ -1178,7 +1186,11 @@ export interface MeasurementRecordUpdate {
   location?: string | null;
   /** @nullable */
   orderRecordId?: string | null;
-  linkQuotationSubmissionId?: string;
+  /**
+     * Set to a rate approval request ID to link it to this measurement record, or null to unlink it.
+     * @nullable
+     */
+  linkQuotationSubmissionId?: string | null;
 }
 
 export interface MeasurementVersionUpdate {

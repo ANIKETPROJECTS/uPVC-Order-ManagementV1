@@ -1682,6 +1682,7 @@ export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -1731,6 +1732,7 @@ export const CreateQuotationRateSubmissionResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -1766,7 +1768,8 @@ export const SearchQuotationRateSubmissionsResponseItem = zod.object({
   "id": zod.string(),
   "clientName": zod.string(),
   "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
-  "orderId": zod.string().nullable()
+  "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable()
 })
 export const SearchQuotationRateSubmissionsResponse = zod.array(SearchQuotationRateSubmissionsResponseItem)
 
@@ -1787,6 +1790,7 @@ export const LinkQuotationRateSubmissionOrderResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -1823,6 +1827,7 @@ export const UploadQuotationRateSubmissionPdfResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -1873,6 +1878,7 @@ export const DecideQuotationRateSubmissionResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -1906,6 +1912,7 @@ export const ListMeasurementRecordsResponseItem = zod.object({
   "location": zod.string().nullable(),
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
+  "quotationRequestId": zod.string().nullable(),
   "versions": zod.array(zod.object({
   "id": zod.string(),
   "versionNumber": zod.number().int(),
@@ -1949,6 +1956,7 @@ export const CreateMeasurementRecordResponse = zod.object({
   "location": zod.string().nullable(),
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
+  "quotationRequestId": zod.string().nullable(),
   "versions": zod.array(zod.object({
   "id": zod.string(),
   "versionNumber": zod.number().int(),
@@ -1981,13 +1989,14 @@ export const SearchMeasurementRecordsResponseItem = zod.object({
   "id": zod.string(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
-  "orderId": zod.string().nullable()
+  "orderId": zod.string().nullable(),
+  "quotationRequestId": zod.string().nullable()
 })
 export const SearchMeasurementRecordsResponse = zod.array(SearchMeasurementRecordsResponseItem)
 
 
 /**
- * @summary Update measurement record details or assign it to an order
+ * @summary Update measurement record details and its quotation request link
  */
 export const UpdateMeasurementRecordParams = zod.object({
   "recordId": zod.coerce.string()
@@ -2003,7 +2012,7 @@ export const UpdateMeasurementRecordBody = zod.object({
   "clientName": zod.string().min(1).max(updateMeasurementRecordBodyClientNameMax).optional(),
   "location": zod.string().max(updateMeasurementRecordBodyLocationMax).nullish(),
   "orderRecordId": zod.string().nullish(),
-  "linkQuotationSubmissionId": zod.string().optional()
+  "linkQuotationSubmissionId": zod.string().nullish().describe('Set to a rate approval request ID to link it to this measurement record, or null to unlink it.')
 })
 
 export const updateMeasurementRecordResponseVersionsItemNameMax = 160;
@@ -2016,6 +2025,7 @@ export const UpdateMeasurementRecordResponse = zod.object({
   "location": zod.string().nullable(),
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
+  "quotationRequestId": zod.string().nullable(),
   "versions": zod.array(zod.object({
   "id": zod.string(),
   "versionNumber": zod.number().int(),
@@ -2031,6 +2041,16 @@ export const UpdateMeasurementRecordResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Delete a measurement record and all retained sheet versions
+ */
+export const DeleteMeasurementRecordParams = zod.object({
+  "recordId": zod.coerce.string()
+})
+
+export const DeleteMeasurementRecordResponse = zod.void()
 
 
 /**

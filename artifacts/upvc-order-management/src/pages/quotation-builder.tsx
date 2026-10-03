@@ -75,7 +75,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WindowProfileImageInput } from '@/components/window-profile-image-input';
-import { MeasurementSheetLookup } from '@/components/link-record-lookups';
+import { measurementSheetIdLabel, MeasurementSheetLookup } from '@/components/link-record-lookups';
 import { useToast } from '@/hooks/use-toast';
 
 const drawingTypes = ['casement', 'sliding', 'mixed', 'louvre'] as const;
@@ -693,9 +693,9 @@ function RateApprovalDesk({ user }: { user: User }) {
   const openOrderLink = (submission: QuotationRateSubmission) => {
     setLinkingSubmission(submission);
     setLinkOrderRecordId(submission.orderRecordId || '');
-    setLinkMeasurementSheet(false);
-    setLinkMeasurementId(null);
-    setLinkMeasurementLabel('');
+    setLinkMeasurementSheet(Boolean(submission.measurementRecordId));
+    setLinkMeasurementId(submission.measurementRecordId || null);
+    setLinkMeasurementLabel(submission.measurementRecordId ? measurementSheetIdLabel(submission.measurementRecordId) : '');
   };
   const saveOrderLink = () => {
     if (!linkingSubmission || !linkOrderRecordId) {
@@ -714,7 +714,7 @@ function RateApprovalDesk({ user }: { user: User }) {
         void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
         setLinkingSubmission(null);
-        toast({ title: 'Quotation linked to order', description: linkMeasurementSheet ? 'The measurement sheet is linked to the same order.' : 'The quotation request is now linked.' });
+        toast({ title: 'Quotation request links saved', description: linkMeasurementSheet ? `${measurementSheetIdLabel(linkMeasurementId || '')} is linked directly to ${linkingSubmission.id}.` : linkingSubmission.measurementRecordId ? 'The order link is saved and the measurement sheet link is removed.' : 'The order link is saved.' });
       },
       onError: () => toast({ title: 'Could not link the quotation', description: 'The order links were not changed. Refresh and try again.', variant: 'destructive' }),
     });
@@ -816,6 +816,7 @@ function RateApprovalDesk({ user }: { user: User }) {
                           <td className="max-w-[220px] px-4 py-3">
                             <p className="truncate font-semibold">{submission.clientName}</p>
                             {submission.orderId && <p className="mt-1 text-[10px] font-semibold text-primary" data-testid={`text-rate-order-id-${submission.id}`}>{submission.orderId}</p>}
+                            {submission.measurementRecordId && <p className="mt-1 text-[10px] text-muted-foreground">Measurement Sheet ID <code className="font-mono font-semibold text-foreground" data-testid={`text-rate-measurement-sheet-id-${submission.id}`}>{measurementSheetIdLabel(submission.measurementRecordId)}</code></p>}
                             <p className="mt-1 text-[10px] text-muted-foreground">Submitted by {submission.submittedByName}</p>
                             {submission.pdfFilename ? <a href={getDownloadQuotationRateSubmissionPdfUrl(submission.id)} download={submission.pdfFilename} className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate text-[10px] font-semibold text-primary hover:underline" data-testid={`link-download-rate-pdf-${submission.id}`}><Download size={12} /> {submission.pdfFilename}</a> : submission.status === 'awaiting_pdf' && canSubmit ? pdfInput(submission) : null}
                           </td>
@@ -846,12 +847,12 @@ function RateApprovalDesk({ user }: { user: User }) {
       <Dialog open={Boolean(linkingSubmission)} onOpenChange={(open) => { if (!open) setLinkingSubmission(null); }}>
         <DialogContent data-testid="dialog-link-quotation-order">
           <DialogHeader>
-            <DialogTitle>Link quotation to an order</DialogTitle>
+            <DialogTitle>Link quotation request and measurement sheet</DialogTitle>
             <DialogDescription>{linkingSubmission ? `${linkingSubmission.id} · ${linkingSubmission.clientName}` : 'Choose an order for this quotation request.'}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <label className="block space-y-1.5 text-xs font-semibold">Order ID
-              <Select value={linkOrderRecordId || 'unassigned'} onValueChange={(value) => { setLinkOrderRecordId(value === 'unassigned' ? '' : value); setLinkMeasurementId(null); setLinkMeasurementLabel(''); }}>
+              <Select value={linkOrderRecordId || 'unassigned'} onValueChange={(value) => { setLinkOrderRecordId(value === 'unassigned' ? '' : value); }}>
                 <SelectTrigger data-testid="select-link-quotation-order"><SelectValue placeholder="Select an order" /></SelectTrigger>
                 <SelectContent>
                   {ordersQuery.isLoading ? <SelectItem value="loading" disabled>Loading orders…</SelectItem>
@@ -863,12 +864,13 @@ function RateApprovalDesk({ user }: { user: User }) {
             {linkOrderRecordId && <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
               <label className="flex items-center gap-2 text-xs font-semibold">
                 <input type="checkbox" checked={linkMeasurementSheet} onChange={(event) => { setLinkMeasurementSheet(event.target.checked); if (!event.target.checked) { setLinkMeasurementId(null); setLinkMeasurementLabel(''); } }} className="h-4 w-4 accent-primary" data-testid="checkbox-link-measurement-from-quotation" />
-                Do you also want to link the Measurement Sheet?
+                Link a measurement sheet ID to this request
               </label>
               {linkMeasurementSheet && <MeasurementSheetLookup
                 selectedId={linkMeasurementId}
                 selectedLabel={linkMeasurementLabel}
-                onSelect={(item) => { setLinkMeasurementId(item.id); setLinkMeasurementLabel(`${item.clientName}${item.location ? ` · ${item.location}` : ''}`); }}
+                currentQuotationRequestId={linkingSubmission?.id || ''}
+                onSelect={(item) => { setLinkMeasurementId(item.id); setLinkMeasurementLabel(`${measurementSheetIdLabel(item.id)} · ${item.clientName}`); }}
               />}
             </div>}
           </div>
