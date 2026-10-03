@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, LockKeyhole, UserRound } from 'lucide-react';
 import { getGetAuthSessionQueryKey, useLogin } from '@workspace/api-client-react';
-import loginBackground from '@/assets/login-window-background.jpg';
+import loginBackground from '@/assets/login-window-background.png';
 
 export default function LoginPage() {
   const queryClient = useQueryClient();
