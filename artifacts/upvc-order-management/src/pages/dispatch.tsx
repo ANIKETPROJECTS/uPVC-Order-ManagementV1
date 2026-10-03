@@ -39,6 +39,8 @@ const STATUS_OPTIONS: { value: StatusValue; label: string; tone: string; dot: st
   { value: DispatchStatus.delivered, label: 'Delivered', tone: 'bg-emerald-100 text-emerald-900 ring-emerald-200', dot: 'bg-emerald-600' },
 ];
 
+const DISPATCH_REGISTER_COLUMNS = 'lg:grid-cols-[minmax(130px,1.25fr)_minmax(85px,.85fr)_minmax(130px,1.05fr)_minmax(95px,.9fr)_minmax(132px,1.1fr)_minmax(130px,1fr)]';
+
 const ORDER_STATUS_LABELS: Record<string, string> = {
   quotation_stage: 'Quotation stage',
   confirmed: 'Confirmed',
@@ -72,9 +74,9 @@ function formatUpdated(value: string) {
 
 function SkeletonRows() {
   return <div className="space-y-2" aria-label="Loading dispatch orders" data-testid="state-dispatch-loading">
-    {[0, 1, 2, 3].map((item) => <div key={item} className="grid animate-pulse grid-cols-1 gap-4 rounded-xl border border-border/70 bg-card p-4 md:grid-cols-[1.15fr_1fr_.9fr_1fr_auto] md:items-center">
+    {[0, 1, 2, 3].map((item) => <div key={item} className={`grid animate-pulse grid-cols-1 gap-3 rounded-xl border border-border/70 bg-card px-3.5 py-3 lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`}>
       <div className="space-y-2"><div className="h-4 w-28 rounded bg-muted" /><div className="h-3 w-36 rounded bg-muted/70" /></div>
-      <div className="h-4 w-32 rounded bg-muted/70" /><div className="h-6 w-24 rounded-full bg-muted/70" /><div className="h-4 w-28 rounded bg-muted/60" /><div className="h-8 w-24 rounded-lg bg-muted/70" />
+      <div className="h-4 w-24 rounded bg-muted/70" /><div className="h-6 w-24 rounded-full bg-muted/70" /><div className="h-4 w-24 rounded bg-muted/60" /><div className="h-3 w-28 rounded bg-muted/60" /><div className="flex gap-1.5"><div className="h-8 w-11 rounded-lg bg-muted/70" /><div className="h-8 w-16 rounded-lg bg-muted/70" /></div>
     </div>)}
   </div>;
 }
@@ -253,8 +255,8 @@ export default function DispatchPage({ user }: { user: User }) {
           </div>
         </div>
 
-        <div className="hidden grid-cols-[1.15fr_1fr_.9fr_1fr_auto] gap-4 bg-muted/45 px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground md:grid">
-          <span>Order / client</span><span>Delivery location</span><span>Dispatch status</span><span>Order lifecycle</span><span className="text-right">Actions</span>
+        <div className={`mx-2 hidden gap-3 rounded-xl border border-transparent bg-muted/45 px-3.5 py-2.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground sm:mx-3 lg:grid lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`}>
+          <span>Order / client</span><span>Delivery location</span><span>Dispatch status</span><span>Order lifecycle</span><span>Updated</span><span className="text-right">Actions</span>
         </div>
         <div className="space-y-2 p-2 sm:p-3">
           {!canView ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-dispatch-access-denied">
@@ -263,7 +265,7 @@ export default function DispatchPage({ user }: { user: User }) {
             <div><CircleAlert size={24} className="mx-auto text-destructive" /><h3 className="mt-3 font-display text-sm font-bold">Dispatch records unavailable</h3><p className="mt-1 text-xs text-muted-foreground">The latest handoff records could not be loaded.</p><Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => void ordersQuery.refetch()} data-testid="button-retry-dispatch"><RefreshCw size={13} /> Try again</Button></div>
           </div> : filteredOrders.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-dispatch-empty">
             <div><div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-primary"><PackageCheck size={20} /></div><h3 className="mt-3 font-display text-sm font-bold">{orders.length ? 'No orders match these filters' : 'No dispatch records yet'}</h3><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{orders.length ? 'Try a different search or status filter, or clear your filters.' : 'Orders will appear here with a separate dispatch status so delivery handoffs can be tracked.'}</p>{orders.length > 0 && <Button type="button" size="sm" variant="outline" className="mt-4" onClick={clearFilters} data-testid="button-empty-clear-filters">Clear filters</Button>}</div>
-          </div> : filteredOrders.map((order) => <article key={order.id} className="group grid gap-3 rounded-xl border border-border/75 bg-background px-3.5 py-3 transition duration-200 hover:border-primary/25 hover:bg-primary/[0.018] hover:shadow-sm md:grid-cols-[1.15fr_1fr_.9fr_1fr_auto] md:items-center md:gap-4 md:px-4" data-testid={`row-dispatch-order-${order.id}`}>
+          </div> : filteredOrders.map((order) => <article key={order.id} className={`group grid gap-3 rounded-xl border border-border/75 bg-background px-3.5 py-3 transition duration-200 hover:border-primary/25 hover:bg-primary/[0.018] hover:shadow-sm lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`} data-testid={`row-dispatch-order-${order.id}`}>
             <div className="min-w-0">
               {canViewOrderHub
                 ? <Link href={`/order-status/${encodeURIComponent(order.id)}`} className="w-fit font-mono text-[13px] font-bold tracking-tight text-primary underline-offset-4 hover:underline" data-testid={`link-order-status-${order.id}`}>{order.orderId}</Link>
@@ -271,13 +273,17 @@ export default function DispatchPage({ user }: { user: User }) {
               <p className="mt-1 truncate text-xs font-semibold text-foreground">{order.clientName}</p>
             </div>
             <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground"><MapPin size={14} className="shrink-0 text-primary/70" /><span className="truncate">{order.locationName}</span></div>
-            <div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground md:hidden">Dispatch</span><StatusPill status={order.dispatchStatus} /></div>
-            <div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground md:hidden">Order stage</span><span className={`inline-flex w-fit rounded-md px-2 py-1 text-[10px] font-semibold ${orderTone(order.orderStatus)}`} data-testid={`status-order-${order.id}`}>{ORDER_STATUS_LABELS[order.orderStatus] || order.orderStatus.replaceAll('_', ' ')}</span></div>
-            <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-2 md:justify-end md:border-0 md:pt-0">
-              <span className="text-[10px] text-muted-foreground" title={formatUpdated(order.updatedAt)}>{formatUpdated(order.updatedAt)}</span>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground lg:hidden">Dispatch</span><StatusPill status={order.dispatchStatus} /></div>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground lg:hidden">Order stage</span><span className={`inline-flex w-fit rounded-md px-2 py-1 text-[10px] font-semibold ${orderTone(order.orderStatus)}`} data-testid={`status-order-${order.id}`}>{ORDER_STATUS_LABELS[order.orderStatus] || order.orderStatus.replaceAll('_', ' ')}</span></div>
+            <div className="flex items-center justify-between gap-3 text-[10px] text-muted-foreground lg:block">
+              <span className="text-[9px] font-bold uppercase tracking-wider lg:hidden">Updated</span>
+              <span className="whitespace-nowrap" title={formatUpdated(order.updatedAt)}>{formatUpdated(order.updatedAt)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-2 lg:justify-end lg:border-0 lg:pt-0">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground lg:hidden">Actions</span>
               <div className="flex shrink-0 items-center gap-1.5">
-                <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-[10px]" onClick={() => setQrOrder(order)} aria-label={`Show QR for ${order.orderId}`} data-testid={`button-show-qr-${order.id}`}><QrCode size={13} /><span className="hidden sm:inline">QR</span></Button>
-                <Button type="button" size="sm" className="h-8 px-2.5 text-[10px]" disabled={!canEdit || updateStatus.isPending} onClick={() => setActiveOrder(order)} title={canEdit ? 'Change dispatch status' : 'View-only access'} data-testid={`button-change-status-${order.id}`}>{canEdit ? 'Update' : 'View'}<ArrowRight size={12} /></Button>
+                <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-[10px]" onClick={() => setQrOrder(order)} aria-label={`Show QR for ${order.orderId}`} data-testid={`button-show-qr-${order.id}`}><QrCode size={13} /><span className="hidden sm:inline">QR</span></Button>
+                <Button type="button" size="sm" className="h-8 px-2 text-[10px]" disabled={!canEdit || updateStatus.isPending} onClick={() => setActiveOrder(order)} title={canEdit ? 'Change dispatch status' : 'View-only access'} data-testid={`button-change-status-${order.id}`}>{canEdit ? 'Update' : 'View'}<ArrowRight size={12} /></Button>
               </div>
             </div>
           </article>)}
