@@ -2,7 +2,6 @@ import { type FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
-  ChevronDown,
   ClipboardList,
   Download,
   Eye,
@@ -44,6 +43,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { measurementSheetIdLabel, QuotationRequestLookup } from '@/components/link-record-lookups';
+import { useLocation } from 'wouter';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 type MeasurementEdit = {
@@ -79,6 +79,7 @@ function RecordState({ state, onRetry }: { state: 'loading' | 'error' | 'empty';
 }
 
 export default function MeasurementDatabasePage({ user }: { user: User }) {
+  const [, setLocation] = useLocation();
   const canEdit = user.roleId === 'master-admin' || user.permissions?.measurements === 'edit';
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -110,7 +111,6 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
   const [sortBy, setSortBy] = useState<MeasurementSort>('recent');
   const [layout, setLayout] = useState<MeasurementLayout>('list');
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const [expandedRecordIds, setExpandedRecordIds] = useState<Set<string>>(() => new Set());
   const records = recordsQuery.data || [];
   const orders = ordersQuery.data || [];
   const invalidateRecords = () => void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
@@ -264,7 +264,6 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
           return next;
         });
         setEditingRecordId(null);
-        setRecordExpanded(record.id, false);
         toast({ title: 'Measurement record updated', description: value.linkQuotation ? `Sheet ID linked directly to ${value.linkQuotationSubmissionId}.` : record.quotationRequestId ? 'Details saved and the quotation request unlinked.' : 'Client details and order assignment are saved.' });
       },
       onError: () => toast({ title: 'Could not update record', description: 'The record remains unchanged. Try again.', variant: 'destructive' }),
@@ -318,14 +317,6 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
       onError: () => toast({ title: 'Could not delete measurement file', description: 'The file remains in the register. Try again.', variant: 'destructive' }),
     });
   };
-  const setRecordExpanded = (recordId: string, expanded: boolean) => {
-    setExpandedRecordIds((current) => {
-      const next = new Set(current);
-      if (expanded) next.add(recordId);
-      else next.delete(recordId);
-      return next;
-    });
-  };
   const removeRecord = (record: MeasurementRecord) => {
     const sheetId = measurementSheetIdLabel(record.id);
     const fileCount = record.versions.length;
@@ -335,7 +326,6 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
         invalidateRecords();
         void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
         setEditingRecordId((current) => current === record.id ? null : current);
-        setRecordExpanded(record.id, false);
         setEdits((current) => {
           const next = { ...current };
           delete next[record.id];
@@ -474,9 +464,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                     {visibleRecords.map((record) => {
                       const edit = currentEdit(record);
                       const pendingSheets = versionFiles[record.id] || [];
-                      const latestVersion = record.versions[0];
                       const isEditing = editingRecordId === record.id;
-                      const isExpanded = expandedRecordIds.has(record.id);
                       const visibleVersions = record.versions.filter((version) =>
                         fileFilter === 'all' || fileFilter === 'none' || extensionOf(version.filename) === fileFilter);
                       return <article key={record.id} className={`space-y-3 ${layout === 'grid' ? 'rounded-xl border border-border/70 bg-card p-3' : 'px-3 py-3 sm:px-4'}`} data-testid={`row-measurement-record-${record.id}`}>
@@ -487,9 +475,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                             {record.quotationRequestId && <p className="text-[10px] text-muted-foreground">Rate Approval request <code className="font-mono font-semibold text-foreground" data-testid={`text-measurement-quotation-id-${record.id}`}>{record.quotationRequestId}</code></p>}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <Button type="button" variant="ghost" size="sm" aria-expanded={isExpanded} aria-controls={`measurement-details-${record.id}`} onClick={() => setRecordExpanded(record.id, !isExpanded)} data-testid={`button-expand-measurement-record-${record.id}`}><ChevronDown size={14} className={isExpanded ? 'rotate-180 transition-transform' : 'transition-transform'} /> {isExpanded ? 'Collapse' : 'Expand'}</Button>
-                            {latestVersion ? <a href={getPreviewMeasurementVersionUrl(record.id, latestVersion.id)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted" data-testid={`link-view-measurement-record-${record.id}`}><Eye size={14} /> View</a>
-                              : <Button type="button" variant="outline" size="sm" disabled title="Add a sheet file to enable viewing" data-testid={`button-view-measurement-record-${record.id}`}><Eye size={14} /> View</Button>}
+                            {!isEditing && <Button type="button" variant="outline" size="sm" onClick={() => setLocation(`/measurements/${record.id}`)} data-testid={`button-view-measurement-record-${record.id}`}><Eye size={14} /> View</Button>}
                             {canEdit && <Button type="button" variant="outline" size="sm" onClick={() => {
                               if (isEditing) {
                                 setEditingRecordId(null);
@@ -500,13 +486,12 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                                 });
                               } else {
                                 setEditingRecordId(record.id);
-                                setRecordExpanded(record.id, true);
                               }
                             }} data-testid={`button-edit-measurement-record-${record.id}`}><Pencil size={14} /> {isEditing ? 'Cancel edit' : 'Edit'}</Button>}
                             {canEdit && <Button type="button" variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={deleteRecord.isPending} onClick={() => removeRecord(record)} data-testid={`button-delete-measurement-record-${record.id}`}><Trash2 size={14} /> Delete</Button>}
                           </div>
                         </div>
-                        {isExpanded ? <div id={`measurement-details-${record.id}`} className="space-y-4">
+                          {isEditing ? <div id={`measurement-details-${record.id}`} className="space-y-4">
                         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(210px,1fr)_auto] xl:items-end">
                           {isEditing ? <>
                             <label className="space-y-1.5 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Client name<Input value={edit.clientName} onChange={(event) => setEdit(record, 'clientName', event.target.value)} maxLength={160} data-testid={`input-measurement-client-${record.id}`} /></label>

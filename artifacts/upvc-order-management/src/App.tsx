@@ -20,6 +20,7 @@ import OrderScannerPage from '@/pages/order-scanner';
 import OrderStatusPage from '@/pages/order-status';
 import QuotationBuilderPage from '@/pages/quotation-builder';
 import MeasurementDatabasePage from '@/pages/measurement-database';
+import MeasurementRecordDetailPage from '@/pages/measurement-record-detail';
 import PaymentsPage from '@/pages/payments';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000 } } });
@@ -37,6 +38,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/admin/groups" component={() => <ChatGroupsPage user={user} />} />
     <Route path="/communication" component={() => <CommunicationPage user={user} />} />
     <Route path="/quotation-builder" component={() => <QuotationBuilderPage user={user} />} />
+    <Route path="/measurements/:recordId" component={() => <MeasurementRecordDetailPage user={user} />} />
     <Route path="/measurements" component={() => <MeasurementDatabasePage user={user} />} />
     <Route path="/payments" component={() => <PaymentsPage user={user} />} />
     <Route component={NotFound} />
