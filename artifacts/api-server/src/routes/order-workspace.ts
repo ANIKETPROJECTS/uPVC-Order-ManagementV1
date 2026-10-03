@@ -148,13 +148,13 @@ router.get("/payments/overview", async (req, res): Promise<void> => {
     rows.push(window);
     windowsByOrder.set(window.orderRecordId, rows);
   }
-  const reminderOrders = outstandingOrders.flatMap((order) => {
+  const reminderOrders = outstandingOrders.map((order) => {
     const windows = windowsByOrder.get(order._id) ?? [];
     const collected = collectedByOrder.get(order._id) ?? 0;
     const balance = order.orderValue! - collected;
-    if (windows.length === 0 || windows.some((window) => window.frameStatus !== "ready"
-      || window.shutterStatus !== "ready" || window.glassStatus !== "received")) return [];
-    return [{
+    const productionReady = windows.length > 0 && windows.every((window) => window.frameStatus === "ready"
+      && window.shutterStatus === "ready" && window.glassStatus === "received");
+    return {
       orderRecordId: order._id,
       orderId: order.orderId,
       clientName: order.clientName,
@@ -163,8 +163,9 @@ router.get("/payments/overview", async (req, res): Promise<void> => {
       totalCollected: collected,
       balance,
       windowCount: windows.length,
-      canOpenWhatsApp: Boolean(toWhatsAppNumber(order.clientPhone)),
-    }];
+      productionReady,
+      canOpenWhatsApp: productionReady && Boolean(toWhatsAppNumber(order.clientPhone)),
+    };
   }).sort((a, b) => b.balance - a.balance);
 
   const recentOrderIds = new Set(recentPayments.map((payment) => payment.orderRecordId));
@@ -188,6 +189,16 @@ router.get("/payments/overview", async (req, res): Promise<void> => {
     }];
   });
   const reminderAvailable = reminderOrders.some((order) => order.canOpenWhatsApp);
+  const reminderUnavailableReason = reminderOrders.length > 0 && !reminderAvailable
+    ? [
+      reminderOrders.some((order) => !order.productionReady)
+        ? "Add at least one active window, then make every frame and shutter ready and receive all glass."
+        : null,
+      reminderOrders.some((order) => order.productionReady && !order.canOpenWhatsApp)
+        ? "A valid client WhatsApp number is required to open a reminder draft."
+        : null,
+    ].filter((reason): reason is string => reason !== null).join(" ")
+    : null;
   res.json(GetPaymentOverviewResponse.parse({
     totalCollected,
     totalOutstanding,
@@ -195,9 +206,7 @@ router.get("/payments/overview", async (req, res): Promise<void> => {
     reminderOrders,
     recentPayments: recentUpdates,
     reminderAvailable,
-    reminderUnavailableReason: reminderOrders.length > 0 && !reminderAvailable
-      ? "A valid client WhatsApp number is required to open a reminder draft."
-      : null,
+    reminderUnavailableReason,
   }));
 });
 

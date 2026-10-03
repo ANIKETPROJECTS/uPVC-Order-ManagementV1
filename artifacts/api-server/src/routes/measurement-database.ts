@@ -3,13 +3,18 @@ import { ObjectId } from "mongodb";
 import {
   CreateMeasurementRecordBody,
   CreateMeasurementRecordResponse,
+  DeleteMeasurementVersionParams,
   DownloadMeasurementVersionParams,
   ListMeasurementRecordsResponse,
+  PreviewMeasurementVersionParams,
   SearchMeasurementRecordsQueryParams,
   SearchMeasurementRecordsResponse,
   UpdateMeasurementRecordBody,
   UpdateMeasurementRecordParams,
   UpdateMeasurementRecordResponse,
+  UpdateMeasurementVersionBody,
+  UpdateMeasurementVersionParams,
+  UpdateMeasurementVersionResponse,
   UploadMeasurementVersionParams,
   UploadMeasurementVersionHeader,
   UploadMeasurementVersionResponse,
@@ -276,6 +281,82 @@ router.patch("/measurement-records/:recordId", async (req, res): Promise<void> =
   res.json(UpdateMeasurementRecordResponse.parse(await recordResponse(updated!)));
 });
 
+router.patch("/measurement-records/:recordId/versions/:versionId", async (req, res): Promise<void> => {
+  const parsedParams = UpdateMeasurementVersionParams.safeParse(req.params);
+  const parsedBody = UpdateMeasurementVersionBody.safeParse(req.body);
+  if (!parsedParams.success || !parsedBody.success) {
+    res.status(400).json({
+      error: !parsedParams.success ? parsedParams.error.message : parsedBody.success ? "" : parsedBody.error.message,
+    });
+    return;
+  }
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const record = await getMeasurementRecords(db).findOne({ _id: parsedParams.data.recordId });
+  if (!record) {
+    res.status(404).json({ error: "Measurement record not found." });
+    return;
+  }
+  const name = parsedBody.data.name?.trim() || null;
+  const result = await getMeasurementVersions(db).updateOne(
+    { _id: parsedParams.data.versionId, recordId: record._id },
+    { $set: { name } },
+  );
+  if (!result.matchedCount) {
+    res.status(404).json({ error: "Measurement sheet version not found." });
+    return;
+  }
+  await getMeasurementRecords(db).updateOne({ _id: record._id }, { $set: { updatedAt: new Date() } });
+  const updated = await getMeasurementVersions(db).findOne({
+    _id: parsedParams.data.versionId,
+    recordId: record._id,
+  });
+  if (!updated) {
+    res.status(404).json({ error: "Measurement sheet version not found." });
+    return;
+  }
+  res.json(UpdateMeasurementVersionResponse.parse(versionResponse(updated)));
+});
+
+router.delete("/measurement-records/:recordId/versions/:versionId", async (req, res): Promise<void> => {
+  const parsed = DeleteMeasurementVersionParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const record = await getMeasurementRecords(db).findOne({ _id: parsed.data.recordId });
+  if (!record) {
+    res.status(404).json({ error: "Measurement record not found." });
+    return;
+  }
+  const versions = getMeasurementVersions(db);
+  const version = await versions.findOne({ _id: parsed.data.versionId, recordId: record._id });
+  if (!version) {
+    res.status(404).json({ error: "Measurement sheet version not found." });
+    return;
+  }
+
+  if (version.storagePath) {
+    await removeProjectUpload(version.storagePath);
+  } else if (version.gridFsId && ObjectId.isValid(version.gridFsId)) {
+    const gridFsId = new ObjectId(version.gridFsId);
+    const bucket = getMeasurementSheetsBucket(db);
+    if (await bucket.find({ _id: gridFsId }).next()) await bucket.delete(gridFsId);
+  }
+
+  const deleted = await versions.deleteOne({ _id: version._id, recordId: record._id });
+  if (!deleted.deletedCount) {
+    res.status(404).json({ error: "Measurement sheet version not found." });
+    return;
+  }
+  await getMeasurementRecords(db).updateOne({ _id: record._id }, { $set: { updatedAt: new Date() } });
+  res.status(204).send();
+});
+
 router.post("/measurement-records/:recordId/versions/:filename", async (req, res, next): Promise<void> => {
   const parsed = UploadMeasurementVersionParams.safeParse(req.params);
   if (!parsed.success) {
@@ -385,59 +466,63 @@ router.post("/measurement-records/:recordId/versions/:filename", async (req, res
   });
 });
 
-router.get(
-  "/measurement-records/:recordId/versions/:versionId/content",
-  async (req, res, next): Promise<void> => {
-    const parsed = DownloadMeasurementVersionParams.safeParse(req.params);
-    if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.message });
-      return;
-    }
-    const actor = await actorContext(req, res);
-    if (!actor) return;
-    const db = await getMongoDb();
-    const version = await getMeasurementVersions(db).findOne({
-      _id: parsed.data.versionId,
-      recordId: parsed.data.recordId,
-    });
-    if (!version) {
-      res.status(404).json({ error: "Measurement sheet version not found." });
-      return;
-    }
-    if (version.storagePath) {
-      const filePath = resolveProjectUploadPath(version.storagePath);
-      if (!filePath) {
-        res.status(404).json({ error: "Measurement sheet content not found." });
-        return;
-      }
-      const safeFilename = version.filename.replace(/[\x00-\x1f\x7f"]/g, "_");
-      res.setHeader("Content-Type", version.contentType);
-      res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.sendFile(filePath, { dotfiles: "deny" }, (error) => {
-        if (error && !res.headersSent) res.status(404).json({ error: "Measurement sheet content not found." });
-        else if (error) req.log.error({ err: error, storagePath: version.storagePath }, "Failed to serve a measurement sheet upload");
-      });
-      return;
-    }
-    if (!version.gridFsId || !ObjectId.isValid(version.gridFsId)) {
-      res.status(404).json({ error: "Measurement sheet version not found." });
-      return;
-    }
-    const gridId = new ObjectId(version.gridFsId);
-    const bucket = getMeasurementSheetsBucket(db);
-    if (!(await bucket.find({ _id: gridId }).next())) {
+const measurementVersionContentHandler = (inline: boolean): RequestHandler => async (req, res, next) => {
+  const paramsSchema = inline ? PreviewMeasurementVersionParams : DownloadMeasurementVersionParams;
+  const parsed = paramsSchema.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const actor = await actorContext(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const version = await getMeasurementVersions(db).findOne({
+    _id: parsed.data.versionId,
+    recordId: parsed.data.recordId,
+  });
+  if (!version) {
+    res.status(404).json({ error: "Measurement sheet version not found." });
+    return;
+  }
+  const safeFilename = version.filename.replace(/[\x00-\x1f\x7f"]/g, "_");
+  const disposition = inline ? "inline" : "attachment";
+  res.setHeader("Content-Type", version.contentType);
+  res.setHeader("Content-Disposition", `${disposition}; filename="${safeFilename}"`);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  if (version.storagePath) {
+    const filePath = resolveProjectUploadPath(version.storagePath);
+    if (!filePath) {
       res.status(404).json({ error: "Measurement sheet content not found." });
       return;
     }
-    const safeFilename = version.filename.replace(/[\x00-\x1f\x7f"]/g, "_");
-    res.setHeader("Content-Type", version.contentType);
-    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    const stream = bucket.openDownloadStream(gridId);
-    stream.on("error", next);
-    stream.pipe(res);
-  },
+    res.sendFile(filePath, { dotfiles: "deny" }, (error) => {
+      if (error && !res.headersSent) res.status(404).json({ error: "Measurement sheet content not found." });
+      else if (error) req.log.error({ err: error, storagePath: version.storagePath }, "Failed to serve a measurement sheet upload");
+    });
+    return;
+  }
+  if (!version.gridFsId || !ObjectId.isValid(version.gridFsId)) {
+    res.status(404).json({ error: "Measurement sheet version not found." });
+    return;
+  }
+  const gridId = new ObjectId(version.gridFsId);
+  const bucket = getMeasurementSheetsBucket(db);
+  if (!(await bucket.find({ _id: gridId }).next())) {
+    res.status(404).json({ error: "Measurement sheet content not found." });
+    return;
+  }
+  const stream = bucket.openDownloadStream(gridId);
+  stream.on("error", next);
+  stream.pipe(res);
+};
+
+router.get(
+  "/measurement-records/:recordId/versions/:versionId/content",
+  measurementVersionContentHandler(false),
+);
+router.get(
+  "/measurement-records/:recordId/versions/:versionId/preview",
+  measurementVersionContentHandler(true),
 );
 
 function readRawFile(

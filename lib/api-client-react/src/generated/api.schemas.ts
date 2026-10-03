@@ -600,6 +600,7 @@ export interface PaymentReminderOrder {
   totalCollected: number;
   balance: number;
   windowCount: number;
+  productionReady: boolean;
   canOpenWhatsApp: boolean;
 }
 
@@ -1178,6 +1179,15 @@ export interface MeasurementRecordUpdate {
   /** @nullable */
   orderRecordId?: string | null;
   linkQuotationSubmissionId?: string;
+}
+
+export interface MeasurementVersionUpdate {
+  /**
+     * Blank or null removes the custom label and falls back to the original filename.
+     * @maxLength 160
+     * @nullable
+     */
+  name: string | null;
 }
 
 export type ListUsersParams = {

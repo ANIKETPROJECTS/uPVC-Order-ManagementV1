@@ -5,3 +5,4 @@
 - [Scoped workspace themes](workspace-theme-scope.md) — theme choice affects the sidebar and selected hero panels; workspace content remains light.
 - [Manual WhatsApp reminders](manual-whatsapp-reminders.md) — open a drafted message for an employee to send; never use Meta APIs or WhatsApp credentials.
 - [Measurement sheet labels](measurement-sheet-labels.md) — keep optional user-facing sheet names separate from original filenames, with legacy filename fallback.
+- [Orval parameter collisions](orval-parameter-collisions.md) — adding query fields can duplicate generated `*Params` exports; separate preview operations avoid the collision.

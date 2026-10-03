@@ -1351,6 +1351,57 @@ paths:
           description: Invalid measurement sheet
         "404":
           description: Measurement record not found
+  /measurement-records/{recordId}/versions/{versionId}:
+    patch:
+      operationId: updateMeasurementVersion
+      tags: [orders]
+      summary: Rename a retained measurement sheet version
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeasurementVersionUpdate"
+      responses:
+        "200":
+          description: Updated measurement version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementVersion"
+        "404":
+          description: Measurement version not found
+    delete:
+      operationId: deleteMeasurementVersion
+      tags: [orders]
+      summary: Delete a retained measurement sheet version and its stored file
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Measurement version deleted
+        "404":
+          description: Measurement version not found
   /measurement-records/{recordId}/versions/{versionId}/content:
     get:
       operationId: downloadMeasurementVersion
@@ -1370,6 +1421,32 @@ paths:
       responses:
         "200":
           description: Measurement sheet file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Version not found
+  /measurement-records/{recordId}/versions/{versionId}/preview:
+    get:
+      operationId: previewMeasurementVersion
+      tags: [orders]
+      summary: Preview a retained measurement sheet version in the browser
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Inline measurement sheet preview
           content:
             application/octet-stream:
               schema:
@@ -3335,4 +3412,12 @@ components:
           type: ["string", "null"]
         linkQuotationSubmissionId:
           type: string
+    MeasurementVersionUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+          maxLength: 160
+          description: Blank or null removes the custom label and falls back to the original filename.
+      required: [name]
 

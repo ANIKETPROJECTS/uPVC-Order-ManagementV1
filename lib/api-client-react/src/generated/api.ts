@@ -47,6 +47,7 @@ import type {
   MeasurementRecordLookupList,
   MeasurementRecordUpdate,
   MeasurementVersion,
+  MeasurementVersionUpdate,
   Order,
   OrderActivityList,
   OrderBillingUpdate,
@@ -5329,6 +5330,173 @@ export const useUploadMeasurementVersion = <TError = ErrorType<void>,
       return useMutation(getUploadMeasurementVersionMutationOptions(options));
     }
 
+export const getUpdateMeasurementVersionUrl = (recordId: string,
+    versionId: string,) => {
+
+
+
+
+  return `/api/measurement-records/${recordId}/versions/${versionId}`
+}
+
+/**
+ * @summary Rename a retained measurement sheet version
+ */
+export const updateMeasurementVersion = async (recordId: string,
+    versionId: string,
+    measurementVersionUpdate: MeasurementVersionUpdate, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementVersion> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MeasurementVersion>(getUpdateMeasurementVersionUrl(recordId,versionId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(measurementVersionUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateMeasurementVersionMutationKey = () => ['updateMeasurementVersion'] as const;
+
+export const getUpdateMeasurementVersionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementVersion>>, TError,UpdateMeasurementVersionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementVersion>>, TError,UpdateMeasurementVersionMutationVariables, TContext> => {
+
+const mutationKey = getUpdateMeasurementVersionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMeasurementVersion>>, UpdateMeasurementVersionMutationVariables> = (props) => {
+          const {recordId,versionId,data} = props ?? {};
+
+          return  updateMeasurementVersion(recordId,versionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMeasurementVersionMutationResult = NonNullable<Awaited<ReturnType<typeof updateMeasurementVersion>>>
+    export type UpdateMeasurementVersionMutationBody = BodyType<MeasurementVersionUpdate>
+    export type UpdateMeasurementVersionMutationError = ErrorType<void>
+    export type UpdateMeasurementVersionMutationVariables = {recordId: string;versionId: string;data: BodyType<MeasurementVersionUpdate>}
+
+    /**
+ * @summary Rename a retained measurement sheet version
+ */
+export const useUpdateMeasurementVersion = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementVersion>>, TError,UpdateMeasurementVersionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMeasurementVersion>>,
+        TError,
+        UpdateMeasurementVersionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateMeasurementVersionMutationOptions(options));
+    }
+
+export const getDeleteMeasurementVersionUrl = (recordId: string,
+    versionId: string,) => {
+
+
+
+
+  return `/api/measurement-records/${recordId}/versions/${versionId}`
+}
+
+/**
+ * @summary Delete a retained measurement sheet version and its stored file
+ */
+export const deleteMeasurementVersion = async (recordId: string,
+    versionId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteMeasurementVersionUrl(recordId,versionId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteMeasurementVersionMutationKey = () => ['deleteMeasurementVersion'] as const;
+
+export const getDeleteMeasurementVersionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementVersion>>, TError,DeleteMeasurementVersionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementVersion>>, TError,DeleteMeasurementVersionMutationVariables, TContext> => {
+
+const mutationKey = getDeleteMeasurementVersionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMeasurementVersion>>, DeleteMeasurementVersionMutationVariables> = (props) => {
+          const {recordId,versionId} = props ?? {};
+
+          return  deleteMeasurementVersion(recordId,versionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMeasurementVersionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMeasurementVersion>>>
+
+    export type DeleteMeasurementVersionMutationError = ErrorType<void>
+    export type DeleteMeasurementVersionMutationVariables = {recordId: string;versionId: string}
+
+    /**
+ * @summary Delete a retained measurement sheet version and its stored file
+ */
+export const useDeleteMeasurementVersion = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementVersion>>, TError,DeleteMeasurementVersionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMeasurementVersion>>,
+        TError,
+        DeleteMeasurementVersionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteMeasurementVersionMutationOptions(options));
+    }
+
 export const getDownloadMeasurementVersionUrl = (recordId: string,
     versionId: string,) => {
 
@@ -5399,6 +5567,88 @@ export function useDownloadMeasurementVersion<TData = Awaited<ReturnType<typeof 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getDownloadMeasurementVersionQueryOptions(recordId,versionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewMeasurementVersionUrl = (recordId: string,
+    versionId: string,) => {
+
+
+
+
+  return `/api/measurement-records/${recordId}/versions/${versionId}/preview`
+}
+
+/**
+ * @summary Preview a retained measurement sheet version in the browser
+ */
+export const previewMeasurementVersion = async (recordId: string,
+    versionId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getPreviewMeasurementVersionUrl(recordId,versionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreviewMeasurementVersionQueryKey = (recordId: string,
+    versionId: string,) => {
+    return [
+    `/api/measurement-records/${recordId}/versions/${versionId}/preview`
+    ] as const;
+    }
+
+
+export const getPreviewMeasurementVersionQueryOptions = <TData = Awaited<ReturnType<typeof previewMeasurementVersion>>, TError = ErrorType<void>>(recordId: string,
+    versionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewMeasurementVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPreviewMeasurementVersionQueryKey(recordId,versionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof previewMeasurementVersion>>> = ({ signal }) => previewMeasurementVersion(recordId,versionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: recordId !== null && recordId !== undefined && versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof previewMeasurementVersion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type PreviewMeasurementVersionQueryResult = NonNullable<Awaited<ReturnType<typeof previewMeasurementVersion>>>
+export type PreviewMeasurementVersionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Preview a retained measurement sheet version in the browser
+ */
+
+export function usePreviewMeasurementVersion<TData = Awaited<ReturnType<typeof previewMeasurementVersion>>, TError = ErrorType<void>>(
+ recordId: string,
+    versionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewMeasurementVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getPreviewMeasurementVersionQueryOptions(recordId,versionId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

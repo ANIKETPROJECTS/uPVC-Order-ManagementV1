@@ -314,6 +314,7 @@ export const GetPaymentOverviewResponse = zod.object({
   "totalCollected": zod.number(),
   "balance": zod.number(),
   "windowCount": zod.number().int(),
+  "productionReady": zod.boolean(),
   "canOpenWhatsApp": zod.boolean()
 })),
   "recentPayments": zod.array(zod.object({
@@ -2070,6 +2071,50 @@ export const UploadMeasurementVersionResponse = zod.object({
 
 
 /**
+ * @summary Rename a retained measurement sheet version
+ */
+export const UpdateMeasurementVersionParams = zod.object({
+  "recordId": zod.coerce.string(),
+  "versionId": zod.coerce.string()
+})
+
+export const updateMeasurementVersionBodyNameMax = 160;
+
+
+
+export const UpdateMeasurementVersionBody = zod.object({
+  "name": zod.string().max(updateMeasurementVersionBodyNameMax).nullable().describe('Blank or null removes the custom label and falls back to the original filename.')
+})
+
+export const updateMeasurementVersionResponseNameMax = 160;
+
+
+
+export const UpdateMeasurementVersionResponse = zod.object({
+  "id": zod.string(),
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedByName": zod.string(),
+  "name": zod.string().max(updateMeasurementVersionResponseNameMax).nullable(),
+  "uploadedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a retained measurement sheet version and its stored file
+ */
+export const DeleteMeasurementVersionParams = zod.object({
+  "recordId": zod.coerce.string(),
+  "versionId": zod.coerce.string()
+})
+
+export const DeleteMeasurementVersionResponse = zod.void()
+
+
+/**
  * @summary Download a retained measurement sheet version
  */
 export const DownloadMeasurementVersionParams = zod.object({
@@ -2078,6 +2123,17 @@ export const DownloadMeasurementVersionParams = zod.object({
 })
 
 export const DownloadMeasurementVersionResponse = zod.unknown()
+
+
+/**
+ * @summary Preview a retained measurement sheet version in the browser
+ */
+export const PreviewMeasurementVersionParams = zod.object({
+  "recordId": zod.coerce.string(),
+  "versionId": zod.coerce.string()
+})
+
+export const PreviewMeasurementVersionResponse = zod.unknown()
 
 
 /**

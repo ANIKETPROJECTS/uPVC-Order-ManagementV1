@@ -128,7 +128,7 @@ export default function PaymentsPage({ user }: { user: User }) {
               </div>
               <div>
                 <p className="font-display text-3xl font-bold tracking-tight sm:text-[34px]" data-testid="value-orders-with-balance">{overview.data.ordersWithBalance}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Production-ready orders eligible for follow-up</p>
+                <p className="mt-1 text-xs text-muted-foreground">Orders with a remaining balance</p>
               </div>
             </CardContent>
           </Card>
@@ -139,7 +139,7 @@ export default function PaymentsPage({ user }: { user: User }) {
             <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2"><h2 className="font-display text-lg font-bold">Balance follow-up</h2><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground" data-testid="count-reminder-orders">{overview.data.reminderOrders.length}</span></div>
-                <p className="mt-1 text-xs text-muted-foreground">Ready frames, shutters and received glass with an unpaid balance.</p>
+                <p className="mt-1 text-xs text-muted-foreground">All orders with a balance appear here; reminder drafts unlock when production is ready.</p>
               </div>
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary" data-testid="status-reminder-availability">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary" />
@@ -152,21 +152,26 @@ export default function PaymentsPage({ user }: { user: User }) {
             </div>
             {overview.data.reminderUnavailableReason && <div className="flex gap-2.5 border-b border-accent/30 bg-accent/10 px-5 py-3 text-xs leading-5 text-foreground" data-testid="notice-reminder-unavailable">
               <CircleAlert size={15} className="mt-0.5 shrink-0 text-accent-foreground" />
-              <p><span className="font-bold">WhatsApp draft unavailable.</span> {overview.data.reminderUnavailableReason}</p>
+              <p><span className="font-bold">Reminder drafts unavailable.</span> {overview.data.reminderUnavailableReason}</p>
             </div>}
             {overview.data.reminderOrders.length === 0 ? <div className="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center" data-testid="state-no-reminder-orders">
               <span className="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-secondary text-secondary-foreground"><Check size={20} /></span>
               <p className="font-semibold">No balances need follow-up</p>
-              <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Orders appear here once every window is ready and a balance remains.</p>
+              <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Orders with outstanding balances will appear here.</p>
             </div> : <div className="divide-y divide-border/70">
               {overview.data.reminderOrders.map((order) => <article key={order.orderRecordId} className="grid gap-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" data-testid={`row-reminder-order-${order.orderRecordId}`}>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <Link href={`/order-hub/${order.orderRecordId}`} className="font-mono text-xs font-bold text-primary hover:underline" data-testid={`link-reminder-order-${order.orderRecordId}`}>{order.orderId}<ArrowRight size={12} className="ml-1 inline" /></Link>
-                    <span className="text-[10px] text-muted-foreground">{order.windowCount} windows</span>
+                    <span className="text-[10px] text-muted-foreground">{order.windowCount === 0 ? 'No active windows' : `${order.windowCount} windows`}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${order.productionReady ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`} data-testid={`status-production-ready-${order.orderRecordId}`}>
+                      {order.productionReady ? 'Production ready' : 'In production'}
+                    </span>
                   </div>
                   <p className="mt-1 truncate text-sm font-semibold" data-testid={`text-reminder-client-${order.orderRecordId}`}>{order.clientName}</p>
                   <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={12} />{order.locationName} <span className="mx-1 text-border">/</span> Order {money(order.orderValue)} · Paid {money(order.totalCollected)}</p>
+                  {!order.productionReady && <p className="mt-1 text-[10px] text-muted-foreground">Add at least one window, then complete frame, shutter and glass readiness to enable a draft.</p>}
+                  {order.productionReady && !order.canOpenWhatsApp && <p className="mt-1 text-[10px] text-muted-foreground">Add a valid WhatsApp number to enable the draft.</p>}
                 </div>
                 <div className="flex items-center justify-between gap-4 sm:justify-end">
                   <div className="sm:text-right">
@@ -174,7 +179,7 @@ export default function PaymentsPage({ user }: { user: User }) {
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Balance due</p>
                   </div>
                   <form method="post" action={`/api/orders/${encodeURIComponent(order.orderRecordId)}/payment-reminder`} target="_blank" rel="noreferrer">
-                    <Button type="submit" size="sm" variant="outline" disabled={!order.canOpenWhatsApp} data-testid={`button-send-reminder-${order.orderRecordId}`} title={!order.canOpenWhatsApp ? 'Add a valid WhatsApp number to this order.' : 'Open a draft for manual sending in WhatsApp'}>
+                    <Button type="submit" size="sm" variant="outline" disabled={!order.canOpenWhatsApp} data-testid={`button-send-reminder-${order.orderRecordId}`} title={!order.canOpenWhatsApp ? !order.productionReady ? 'Every active window must be ready and glass received before opening a reminder.' : 'Add a valid WhatsApp number to this order.' : 'Open a draft for manual sending in WhatsApp'}>
                       <Send size={14} className="mr-1.5" /> Open WhatsApp
                     </Button>
                   </form>

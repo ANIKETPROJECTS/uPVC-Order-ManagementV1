@@ -40,6 +40,7 @@ export * from './measurementRecordLookup';
 export * from './measurementRecordLookupList';
 export * from './measurementRecordUpdate';
 export * from './measurementVersion';
+export * from './measurementVersionUpdate';
 export * from './order';
 export * from './orderActivity';
 export * from './orderActivityList';
