@@ -775,6 +775,18 @@
   .group:focus-within .hover-reveal-actions { opacity: 1; }
 }
 
+.confirmation-register {
+  background:
+    radial-gradient(ellipse at 84% 0%, hsl(var(--primary) / .09), transparent 34%),
+    linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
+}
+.confirmation-row { transition: background-color 160ms ease, transform 160ms ease; }
+.confirmation-row:hover { background-color: hsl(var(--primary) / .035); }
+.confirmation-file:hover { transform: translateY(-1px); }
+.confirmation-file { transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease; }
+.confirmation-kicker { letter-spacing: .18em; }
+.confirmation-ledger { background-image: linear-gradient(90deg, hsl(var(--primary) / .06) 1px, transparent 1px); background-size: 44px 100%; }
+
 @media (max-width: 767px) {
   .app-grid { background-size: 26px 26px; }
   input, select, textarea { max-width: 100%; }

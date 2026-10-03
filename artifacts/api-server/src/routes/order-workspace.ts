@@ -8,6 +8,7 @@ import {
   DeleteOrderDocumentCategoryParams,
   GetGlassTrackingResponse,
   GetPaymentOverviewResponse,
+  GetPurchaseOrderRegisterResponse,
   ListOrderDocumentCategoriesResponse,
   ListOrderActivityParams, ListOrderActivityResponse, ListOrderDocumentsParams, ListOrderDocumentsResponse,
   ListOrderPaymentsParams, ListOrderPaymentsResponse, ListOrderWindowsParams, ListOrderWindowsResponse,
@@ -106,6 +107,54 @@ router.get("/glass-tracking", async (req, res): Promise<void> => {
     }];
   }).sort((a, b) => a.orderId.localeCompare(b.orderId) || a.windowNo.localeCompare(b.windowNo));
   res.json(GetGlassTrackingResponse.parse(trackingRows));
+});
+
+router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {
+  if (!(await context(req, res, "confirmation"))) return;
+
+  const db = await getMongoDb();
+  const [orders, documents] = await Promise.all([
+    getOrders(db).find({}).sort({ updatedAt: -1, sequenceNo: -1 }).toArray(),
+    getOrderDocumentMetadata(db)
+      .find({
+        category: { $in: ["purchase_order", "confirmation"] },
+        archivedAt: { $exists: false },
+      })
+      .sort({ uploadedAt: -1 })
+      .toArray(),
+  ]);
+  const documentsByOrder = new Map<
+    string,
+    { purchaseOrders: typeof documents; confirmations: typeof documents }
+  >();
+
+  for (const document of documents) {
+    let group = documentsByOrder.get(document.orderRecordId);
+    if (!group) {
+      group = { purchaseOrders: [], confirmations: [] };
+      documentsByOrder.set(document.orderRecordId, group);
+    }
+    if (document.category === "purchase_order") group.purchaseOrders.push(document);
+    if (document.category === "confirmation") group.confirmations.push(document);
+  }
+
+  const register = orders.map((order) => {
+    const group = documentsByOrder.get(order._id);
+    return {
+      orderRecordId: order._id,
+      orderId: order.orderId,
+      clientName: order.clientName,
+      locationCode: order.locationCode,
+      locationName: order.locationName,
+      orderStatus: order.status,
+      orderValue: order.orderValue ?? null,
+      orderUpdatedAt: order.updatedAt.toISOString(),
+      purchaseOrderDocuments: (group?.purchaseOrders ?? []).map(docResponse),
+      confirmationDocuments: (group?.confirmations ?? []).map(docResponse),
+    };
+  });
+
+  res.json(GetPurchaseOrderRegisterResponse.parse(register));
 });
 
 router.get("/orders/:id/windows", async (req, res): Promise<void> => {

@@ -25,6 +25,7 @@ import MeasurementDatabasePage from '@/pages/measurement-database';
 import MeasurementRecordDetailPage from '@/pages/measurement-record-detail';
 import PaymentsPage from '@/pages/payments';
 import GlassTrackingPage from '@/pages/glass-tracking';
+import ConfirmationPage from '@/pages/confirmation';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000 } } });
 
@@ -47,6 +48,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/measurements" component={() => <MeasurementDatabasePage user={user} />} />
     <Route path="/payments" component={() => <PaymentsPage user={user} />} />
     <Route path="/glass-procurement" component={() => <GlassTrackingPage user={user} />} />
+    <Route path="/confirmation" component={() => <ConfirmationPage user={user} />} />
     <Route component={NotFound} />
   </Switch>;
 }
