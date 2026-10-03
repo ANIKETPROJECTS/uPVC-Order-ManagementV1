@@ -16,7 +16,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'measurements', label: 'Measurement Database (Version Control)', short: 'Measurements', built: true },
   { key: 'qr-assembly', label: 'QR Code Generation & Assembly Tracking', short: 'QR assembly' },
   { key: 'window-readiness', label: 'Window-wise Readiness Tracking', short: 'Window readiness' },
-  { key: 'glass-procurement', label: 'Glass Procurement & Delivery Tracking', short: 'Glass procurement' },
+  { key: 'glass-procurement', label: 'Glass Tracking', short: 'Glass tracking', built: true },
   { key: 'payments', label: 'Order Value & Payment Tracking', short: 'Payments', built: true },
   { key: 'balance-payment', label: 'Balance Payment Automated Message Generator', short: 'Balance payment' },
   { key: 'dispatch', label: 'Dispatch Status & QR Tracking', short: 'Dispatch', built: true },

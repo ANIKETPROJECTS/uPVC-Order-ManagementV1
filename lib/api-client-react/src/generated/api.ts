@@ -38,6 +38,7 @@ import type {
   DispatchOrder,
   DispatchOrderList,
   DispatchStatusUpdate,
+  GlassTrackingWindowList,
   HealthStatus,
   ListClientsParams,
   ListOrderLocationsParams,
@@ -6055,6 +6056,83 @@ export function usePreviewMeasurementVersion<TData = Awaited<ReturnType<typeof p
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getPreviewMeasurementVersionQueryOptions(recordId,versionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetGlassTrackingUrl = () => {
+
+
+
+
+  return `/api/glass-tracking`
+}
+
+/**
+ * @summary List active order windows with their glass tracking details
+ */
+export const getGlassTracking = async ( options?: Parameters<typeof customFetch>[1]): Promise<GlassTrackingWindowList> => {
+
+  return customFetch<GlassTrackingWindowList>(getGetGlassTrackingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGlassTrackingQueryKey = () => {
+    return [
+    `/api/glass-tracking`
+    ] as const;
+    }
+
+
+export const getGetGlassTrackingQueryOptions = <TData = Awaited<ReturnType<typeof getGlassTracking>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGlassTracking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGlassTrackingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGlassTracking>>> = ({ signal }) => getGlassTracking({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGlassTracking>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGlassTrackingQueryResult = NonNullable<Awaited<ReturnType<typeof getGlassTracking>>>
+export type GetGlassTrackingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active order windows with their glass tracking details
+ */
+
+export function useGetGlassTracking<TData = Awaited<ReturnType<typeof getGlassTracking>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGlassTracking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGlassTrackingQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

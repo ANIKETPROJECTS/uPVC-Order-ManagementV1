@@ -30,6 +30,8 @@ export * from './dispatchOrder';
 export * from './dispatchOrderList';
 export * from './dispatchStatus';
 export * from './dispatchStatusUpdate';
+export * from './glassTrackingWindow';
+export * from './glassTrackingWindowList';
 export * from './healthStatus';
 export * from './listClientsParams';
 export * from './listOrderLocationsParams';

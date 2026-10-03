@@ -1572,6 +1572,18 @@ paths:
                 format: binary
         "404":
           description: Version not found
+  /glass-tracking:
+    get:
+      operationId: getGlassTracking
+      tags: [orders]
+      summary: List active order windows with their glass tracking details
+      responses:
+        "200":
+          description: Glass tracking entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlassTrackingWindowList"
   /orders/{id}/windows:
     get:
       operationId: listOrderWindows
@@ -2546,6 +2558,43 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/OrderWindow"
+    GlassTrackingWindow:
+      type: object
+      properties:
+        windowId:
+          type: string
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        orderStatus:
+          $ref: "#/components/schemas/OrderStatus"
+        clientName:
+          type: string
+        locationCode:
+          type: string
+        locationName:
+          type: string
+        windowNo:
+          type: string
+        windowType:
+          type: string
+        widthMm:
+          type: number
+        heightMm:
+          type: number
+        sqFt:
+          type: number
+        glassStatus:
+          $ref: "#/components/schemas/OrderGlassStatus"
+        updatedAt:
+          type: string
+          format: date-time
+      required: [windowId, orderRecordId, orderId, orderStatus, clientName, locationCode, locationName, windowNo, windowType, widthMm, heightMm, sqFt, glassStatus, updatedAt]
+    GlassTrackingWindowList:
+      type: array
+      items:
+        $ref: "#/components/schemas/GlassTrackingWindow"
     OrderPaymentMethod:
       type: string
       enum: [cash, bank_transfer, upi, cheque, other]

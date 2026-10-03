@@ -469,6 +469,25 @@ export interface OrderWindowUpdate {
 
 export type OrderWindowList = OrderWindow[];
 
+export interface GlassTrackingWindow {
+  windowId: string;
+  orderRecordId: string;
+  orderId: string;
+  orderStatus: OrderStatus;
+  clientName: string;
+  locationCode: string;
+  locationName: string;
+  windowNo: string;
+  windowType: string;
+  widthMm: number;
+  heightMm: number;
+  sqFt: number;
+  glassStatus: OrderGlassStatus;
+  updatedAt: string;
+}
+
+export type GlassTrackingWindowList = GlassTrackingWindow[];
+
 export type OrderPaymentMethod = typeof OrderPaymentMethod[keyof typeof OrderPaymentMethod];
 
 

@@ -2378,6 +2378,28 @@ export const PreviewMeasurementVersionResponse = zod.unknown()
 
 
 /**
+ * @summary List active order windows with their glass tracking details
+ */
+export const GetGlassTrackingResponseItem = zod.object({
+  "windowId": zod.string(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "clientName": zod.string(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "windowNo": zod.string(),
+  "windowType": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFt": zod.number(),
+  "glassStatus": zod.enum(['pending', 'partial', 'received']),
+  "updatedAt": zod.coerce.date()
+})
+export const GetGlassTrackingResponse = zod.array(GetGlassTrackingResponseItem)
+
+
+/**
  * @summary List window records for an order
  */
 export const ListOrderWindowsParams = zod.object({

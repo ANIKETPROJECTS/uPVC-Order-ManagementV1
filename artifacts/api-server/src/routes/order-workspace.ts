@@ -6,6 +6,7 @@ import {
   CreateOrderDocumentCategoryBody, CreateOrderDocumentCategoryResponse,
   CreateOrderWindowBody, CreateOrderWindowParams, CreateOrderWindowResponse, DownloadOrderDocumentParams,
   DeleteOrderDocumentCategoryParams,
+  GetGlassTrackingResponse,
   GetPaymentOverviewResponse,
   ListOrderDocumentCategoriesResponse,
   ListOrderActivityParams, ListOrderActivityResponse, ListOrderDocumentsParams, ListOrderDocumentsResponse,
@@ -75,6 +76,37 @@ const toWhatsAppNumber = (value: string | null | undefined) => {
   return normalized.length >= 8 && normalized.length <= 15 ? normalized : null;
 };
 const formatReminderAmount = (value: number) => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(value);
+
+router.get("/glass-tracking", async (req, res): Promise<void> => {
+  if (!(await context(req, res, "glass-procurement"))) return;
+  const db = await getMongoDb();
+  const [orders, windows] = await Promise.all([
+    getOrders(db).find({}).toArray(),
+    getOrderWindows(db).find({ archivedAt: { $exists: false } }).toArray(),
+  ]);
+  const ordersById = new Map(orders.map((order) => [order._id, order]));
+  const trackingRows = windows.flatMap((window) => {
+    const order = ordersById.get(window.orderRecordId);
+    if (!order) return [];
+    return [{
+      windowId: window._id,
+      orderRecordId: order._id,
+      orderId: order.orderId,
+      orderStatus: order.status,
+      clientName: order.clientName,
+      locationCode: order.locationCode,
+      locationName: order.locationName,
+      windowNo: window.windowNo,
+      windowType: window.windowType,
+      widthMm: window.widthMm,
+      heightMm: window.heightMm,
+      sqFt: window.sqFt,
+      glassStatus: window.glassStatus,
+      updatedAt: window.updatedAt.toISOString(),
+    }];
+  }).sort((a, b) => a.orderId.localeCompare(b.orderId) || a.windowNo.localeCompare(b.windowNo));
+  res.json(GetGlassTrackingResponse.parse(trackingRows));
+});
 
 router.get("/orders/:id/windows", async (req, res): Promise<void> => {
   const p = ListOrderWindowsParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
