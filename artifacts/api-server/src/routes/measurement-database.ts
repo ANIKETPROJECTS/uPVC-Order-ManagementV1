@@ -149,24 +149,31 @@ router.get("/measurement-records/lookup", async (req, res): Promise<void> => {
   const searchConditions: Record<string, unknown>[] = [{ clientNameLower: { $regex: clientSearch } }];
   if (idSearch) searchConditions.push({ _id: { $regex: idSearch, $options: "i" } });
   const db = await getMongoDb();
-  const records = await getMeasurementRecords(db)
-    .find({ $or: searchConditions })
-    .sort({ updatedAt: -1 })
-    .limit(20)
-    .toArray();
+  const cursor = getMeasurementRecords(db)
+    .find(rawQuery ? { $or: searchConditions } : {}, {
+      projection: { _id: 1, clientName: 1, location: 1, orderRecordId: 1, updatedAt: 1 },
+    })
+    .sort({ updatedAt: -1 });
+  if (rawQuery) cursor.limit(20);
+  const records = await cursor.toArray();
   const quotationLinks = records.length
     ? await getQuotationRateSubmissions(db)
         .find({ measurementRecordId: { $in: records.map((record) => record._id) } }, { projection: { _id: 1, measurementRecordId: 1 } })
         .toArray()
     : [];
   const quotationIdByRecord = new Map(quotationLinks.map((item) => [item.measurementRecordId!, item._id]));
-  const response = await Promise.all(records.map(async (record) => ({
+  const linkedOrderRecords = records.flatMap((record) => record.orderRecordId ? [record.orderRecordId] : []);
+  const linkedOrders = linkedOrderRecords.length
+    ? await getOrders(db).find({ _id: { $in: linkedOrderRecords } }, { projection: { _id: 1, orderId: 1 } }).toArray()
+    : [];
+  const orderIdByRecord = new Map(linkedOrders.map((item) => [item._id, item.orderId]));
+  const response = records.map((record) => ({
     id: record._id,
     clientName: record.clientName,
     location: record.location,
-    orderId: record.orderRecordId ? (await getOrders(db).findOne({ _id: record.orderRecordId }))?.orderId ?? null : null,
+    orderId: record.orderRecordId ? orderIdByRecord.get(record.orderRecordId) ?? null : null,
     quotationRequestId: quotationIdByRecord.get(record._id) ?? null,
-  })));
+  }));
   res.json(SearchMeasurementRecordsResponse.parse(response));
 });
 

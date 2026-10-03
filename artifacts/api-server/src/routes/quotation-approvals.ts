@@ -142,12 +142,23 @@ router.get("/quotation-rate-submissions/lookup", async (req, res): Promise<void>
     res.status(403).json({ error: "Measurement editing or rate approval access is required." });
     return;
   }
-  const escaped = query.data.query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const items = await getQuotationRateSubmissions(await getMongoDb())
-    .find({ _id: { $regex: `^${escaped}`, $options: "i" } })
-    .sort({ createdAt: -1 })
-    .limit(20)
-    .toArray();
+  const queryText = query.data.query.trim();
+  const escaped = queryText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const filter = queryText
+    ? {
+        $or: [
+          { _id: { $regex: `^${escaped}`, $options: "i" } },
+          { clientNameLower: { $regex: escaped, $options: "i" } },
+        ],
+      }
+    : {};
+  const cursor = getQuotationRateSubmissions(await getMongoDb())
+    .find(filter, {
+      projection: { _id: 1, clientName: 1, clientNameLower: 1, status: 1, orderId: 1, measurementRecordId: 1, createdAt: 1 },
+    })
+    .sort({ createdAt: -1 });
+  if (queryText) cursor.limit(20);
+  const items = await cursor.toArray();
   res.json(SearchQuotationRateSubmissionsResponse.parse(items.map((item) => ({
     id: item._id,
     clientName: item.clientName,

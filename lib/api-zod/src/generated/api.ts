@@ -1754,14 +1754,15 @@ export const CreateQuotationRateSubmissionResponse = zod.object({
 
 
 /**
- * @summary Search rate submission IDs for order linking
+ * @summary List and search rate requests for measurement-sheet linking
  */
+export const searchQuotationRateSubmissionsQueryQueryMin = 0;
 export const searchQuotationRateSubmissionsQueryQueryMax = 80;
 
 
 
 export const SearchQuotationRateSubmissionsQueryParams = zod.object({
-  "query": zod.coerce.string().min(1).max(searchQuotationRateSubmissionsQueryQueryMax)
+  "query": zod.coerce.string().min(searchQuotationRateSubmissionsQueryQueryMin).max(searchQuotationRateSubmissionsQueryQueryMax)
 })
 
 export const SearchQuotationRateSubmissionsResponseItem = zod.object({
@@ -1975,14 +1976,15 @@ export const CreateMeasurementRecordResponse = zod.object({
 
 
 /**
- * @summary Search measurement sheets for quotation linking
+ * @summary List and search measurement sheets for quotation linking
  */
+export const searchMeasurementRecordsQueryQueryMin = 0;
 export const searchMeasurementRecordsQueryQueryMax = 160;
 
 
 
 export const SearchMeasurementRecordsQueryParams = zod.object({
-  "query": zod.coerce.string().min(1).max(searchMeasurementRecordsQueryQueryMax)
+  "query": zod.coerce.string().min(searchMeasurementRecordsQueryQueryMin).max(searchMeasurementRecordsQueryQueryMax)
 })
 
 export const SearchMeasurementRecordsResponseItem = zod.object({

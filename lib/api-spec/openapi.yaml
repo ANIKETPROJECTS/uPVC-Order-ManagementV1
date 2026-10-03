@@ -1102,14 +1102,14 @@ paths:
     get:
       operationId: searchQuotationRateSubmissions
       tags: [quotations]
-      summary: Search rate submission IDs for order linking
+      summary: List and search rate requests for measurement-sheet linking
       parameters:
         - name: query
           in: query
           required: true
           schema:
             type: string
-            minLength: 1
+            minLength: 0
             maxLength: 80
       responses:
         "200":
@@ -1266,14 +1266,14 @@ paths:
     get:
       operationId: searchMeasurementRecords
       tags: [orders]
-      summary: Search measurement sheets for quotation linking
+      summary: List and search measurement sheets for quotation linking
       parameters:
         - name: query
           in: query
           required: true
           schema:
             type: string
-            minLength: 1
+            minLength: 0
             maxLength: 160
       responses:
         "200":

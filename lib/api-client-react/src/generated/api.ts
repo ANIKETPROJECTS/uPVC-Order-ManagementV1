@@ -4487,7 +4487,7 @@ export const getSearchQuotationRateSubmissionsUrl = (params: SearchQuotationRate
 }
 
 /**
- * @summary Search rate submission IDs for order linking
+ * @summary List and search rate requests for measurement-sheet linking
  */
 export const searchQuotationRateSubmissions = async (params: SearchQuotationRateSubmissionsParams, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmissionLookupList> => {
 
@@ -4534,7 +4534,7 @@ export type SearchQuotationRateSubmissionsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Search rate submission IDs for order linking
+ * @summary List and search rate requests for measurement-sheet linking
  */
 
 export function useSearchQuotationRateSubmissions<TData = Awaited<ReturnType<typeof searchQuotationRateSubmissions>>, TError = ErrorType<unknown>>(
@@ -5082,7 +5082,7 @@ export const getSearchMeasurementRecordsUrl = (params: SearchMeasurementRecordsP
 }
 
 /**
- * @summary Search measurement sheets for quotation linking
+ * @summary List and search measurement sheets for quotation linking
  */
 export const searchMeasurementRecords = async (params: SearchMeasurementRecordsParams, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementRecordLookupList> => {
 
@@ -5129,7 +5129,7 @@ export type SearchMeasurementRecordsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Search measurement sheets for quotation linking
+ * @summary List and search measurement sheets for quotation linking
  */
 
 export function useSearchMeasurementRecords<TData = Awaited<ReturnType<typeof searchMeasurementRecords>>, TError = ErrorType<unknown>>(

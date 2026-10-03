@@ -8,7 +8,7 @@
 
 export type SearchMeasurementRecordsParams = {
 /**
- * @minLength 1
+ * @minLength 0
  * @maxLength 160
  */
 query: string;

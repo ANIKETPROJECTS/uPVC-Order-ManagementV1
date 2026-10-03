@@ -8,7 +8,7 @@
 
 export type SearchQuotationRateSubmissionsParams = {
 /**
- * @minLength 1
+ * @minLength 0
  * @maxLength 80
  */
 query: string;
