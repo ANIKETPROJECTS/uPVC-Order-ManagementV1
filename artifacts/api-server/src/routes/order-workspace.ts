@@ -17,11 +17,12 @@ import {
   ReplaceOrderDocumentParams, ReplaceOrderDocumentResponse,
   UpdateOrderDocumentCategoryBody, UpdateOrderDocumentCategoryParams, UpdateOrderDocumentCategoryResponse,
   UpdateOrderWindowParams, UpdateOrderWindowResponse, VoidOrderPaymentBody, VoidOrderPaymentParams, VoidOrderPaymentResponse,
-  UploadOrderDocumentParams, UploadOrderDocumentResponse,
+  UploadOrderDocumentParams, UploadOrderDocumentResponse, UploadQuotationConfirmationDocumentParams,
+  UploadQuotationConfirmationDocumentResponse,
 } from "@workspace/api-zod";
 import {
   getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPayments,
-  getOrders, getOrderWindows, getPublicUser, getUsers, type DocumentCategory, type OrderWindowDocument,
+  getOrders, getOrderWindows, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderWindowDocument,
 } from "../lib/mongo";
 import {
   ensureDefaultOrderDocumentCategories,
@@ -68,7 +69,7 @@ async function event(orderRecordId: string, actor: UserContext, action: string, 
 }
 const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
 const paymentResponse = (p: any) => ({ ...p, id: p._id, paidAt: p.paidAt.toISOString(), createdAt: p.createdAt.toISOString() });
-const docResponse = (d: any) => ({ id: d._id, orderRecordId: d.orderRecordId, filename: d.filename, category: d.category, contentType: d.contentType, sizeBytes: d.sizeBytes, uploadedBy: d.uploadedBy, uploadedAt: d.uploadedAt.toISOString() });
+const docResponse = (d: any) => ({ id: d._id, orderRecordId: d.orderRecordId, quotationRequestId: d.quotationRequestId ?? null, filename: d.filename, category: d.category, contentType: d.contentType, sizeBytes: d.sizeBytes, uploadedBy: d.uploadedBy, uploadedAt: d.uploadedAt.toISOString() });
 const activityResponse = (a: any) => ({ ...a, id: a._id, createdAt: a.createdAt.toISOString() });
 const gridFsOptions = (contentType: string, orderRecordId: string, category: string) => ({ contentType, metadata: { orderRecordId, category } });
 const toWhatsAppNumber = (value: string | null | undefined) => {
@@ -123,6 +124,17 @@ router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {
       .sort({ uploadedAt: -1 })
       .toArray(),
   ]);
+  const linkedQuotationRequests = await getQuotationRateSubmissions(db)
+    .find({ orderRecordId: { $in: orders.map((order) => order._id) } })
+    .sort({ updatedAt: -1 })
+    .toArray();
+  const quotationRequestsByOrder = new Map<string, typeof linkedQuotationRequests>();
+  for (const request of linkedQuotationRequests) {
+    if (!request.orderRecordId) continue;
+    const group = quotationRequestsByOrder.get(request.orderRecordId) ?? [];
+    group.push(request);
+    quotationRequestsByOrder.set(request.orderRecordId, group);
+  }
   const documentsByOrder = new Map<
     string,
     { purchaseOrders: typeof documents; confirmations: typeof documents }
@@ -149,6 +161,15 @@ router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {
       orderStatus: order.status,
       orderValue: order.orderValue ?? null,
       orderUpdatedAt: order.updatedAt.toISOString(),
+      quotationRequests: (quotationRequestsByOrder.get(order._id) ?? []).map((request) => ({
+        id: request._id,
+        clientName: request.clientName,
+        location: request.location,
+        status: request.status,
+        pdfFilename: request.pdfFilename && (request.pdfStoragePath || request.pdfGridFsId) ? request.pdfFilename : null,
+        pdfSizeBytes: request.pdfFilename && (request.pdfStoragePath || request.pdfGridFsId) ? request.pdfSizeBytes : null,
+        updatedAt: request.updatedAt.toISOString(),
+      })),
       purchaseOrderDocuments: (group?.purchaseOrders ?? []).map(docResponse),
       confirmationDocuments: (group?.confirmations ?? []).map(docResponse),
     };
@@ -441,7 +462,7 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
       return;
     }
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
-    const meta = { _id: randomUUID(), orderRecordId: p.data.id, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: null, storagePath, uploadedBy: actor.id, uploadedAt: new Date() };
+    const meta = { _id: randomUUID(), orderRecordId: p.data.id, quotationRequestId: null, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: null, storagePath, uploadedBy: actor.id, uploadedAt: new Date() };
     try {
       await getOrderDocumentMetadata(db).insertOne(meta);
     } catch (error) {
@@ -450,6 +471,59 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
     }
     await event(p.data.id, actor, "document.uploaded", `Uploaded ${meta.filename}.`);
     res.status(201).json(UploadOrderDocumentResponse.parse(docResponse(meta)));
+  });
+});
+router.post("/orders/:id/quotation-requests/:quotationRequestId/confirmation-documents/:filename", async (req, res, next): Promise<void> => {
+  const p = UploadQuotationConfirmationDocumentParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const db = await getMongoDb();
+  await ensureDefaultOrderDocumentCategories(db);
+  const category = await getOrderDocumentCategories(db).findOne({ _id: "confirmation" });
+  if (!category) {
+    res.status(409).json({ error: "The confirmation document category is unavailable." });
+    return;
+  }
+  const actor = await context(req, res, category.requiredModule, true);
+  if (!actor || !(await orderExists(p.data.id, res))) return;
+  const quotationRequest = await getQuotationRateSubmissions(db).findOne({
+    _id: p.data.quotationRequestId,
+    orderRecordId: p.data.id,
+  });
+  if (!quotationRequest) {
+    res.status(404).json({ error: "The quotation request is not linked to this order." });
+    return;
+  }
+  expressRaw(req, res, next, async () => {
+    const body = req.body as Buffer;
+    const declaredType = String(req.headers["content-type"] ?? "").split(";")[0];
+    const ext = p.data.filename.toLowerCase().split(".").pop() ?? "";
+    const type = mimeByExt[ext]?.[0];
+    if (!body?.length || !type || (declaredType !== "application/octet-stream" && declaredType !== type)) {
+      res.status(400).json({ error: "Unsupported document. Allowed files are PDF, PNG, JPEG, WebP, DOCX and XLSX up to 10 MiB." });
+      return;
+    }
+    const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
+    const meta = {
+      _id: randomUUID(),
+      orderRecordId: p.data.id,
+      quotationRequestId: p.data.quotationRequestId,
+      filename: p.data.filename,
+      category: "confirmation",
+      contentType: type,
+      sizeBytes: body.length,
+      gridFsId: null,
+      storagePath,
+      uploadedBy: actor.id,
+      uploadedAt: new Date(),
+    };
+    try {
+      await getOrderDocumentMetadata(db).insertOne(meta);
+    } catch (error) {
+      await removeProjectUpload(storagePath).catch((cleanupError: unknown) => req.log.error({ err: cleanupError }, "Failed to clean up an orphaned project upload"));
+      throw error;
+    }
+    await event(p.data.id, actor, "document.uploaded", `Uploaded ${meta.filename} for quotation request ${meta.quotationRequestId}.`);
+    res.status(201).json(UploadQuotationConfirmationDocumentResponse.parse(docResponse(meta)));
   });
 });
 router.delete("/orders/:id/documents/:documentId", async (req, res): Promise<void> => {

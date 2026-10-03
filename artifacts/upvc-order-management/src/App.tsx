@@ -19,6 +19,7 @@ import OrderHubPage from '@/pages/order-hub';
 import OrderDetailPage from '@/pages/order-detail';
 import OrderScannerPage from '@/pages/order-scanner';
 import DispatchPage from '@/pages/dispatch';
+import InstallationPage from '@/pages/installation';
 import OrderStatusPage from '@/pages/order-status';
 import QuotationBuilderPage from '@/pages/quotation-builder';
 import MeasurementDatabasePage from '@/pages/measurement-database';
@@ -34,6 +35,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
   return <Switch>
     <Route path="/" component={() => <DashboardPage user={user} />} />
     <Route path="/dispatch" component={() => <DispatchPage user={user} />} />
+    <Route path="/installation" component={() => <InstallationPage user={user} />} />
     <Route path="/order-scanner" component={() => <OrderScannerPage user={user} />} />
     <Route path="/order-status/:id" component={() => <OrderStatusPage user={user} />} />
     <Route path="/order-hub/:id" component={() => <OrderDetailPage user={user} />} />

@@ -2645,9 +2645,19 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "orderValue": zod.number().nullable(),
   "orderUpdatedAt": zod.coerce.date(),
+  "quotationRequests": zod.array(zod.object({
+  "id": zod.string(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "updatedAt": zod.coerce.date()
+})),
   "purchaseOrderDocuments": zod.array(zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
+  "quotationRequestId": zod.string().nullable(),
   "filename": zod.string(),
   "category": zod.string().min(1).max(getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemCategoryMax),
   "contentType": zod.string(),
@@ -2658,6 +2668,7 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "confirmationDocuments": zod.array(zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
+  "quotationRequestId": zod.string().nullable(),
   "filename": zod.string(),
   "category": zod.string().min(1).max(getPurchaseOrderRegisterResponseConfirmationDocumentsItemCategoryMax),
   "contentType": zod.string(),
@@ -2683,6 +2694,7 @@ export const listOrderDocumentsResponseCategoryMax = 64;
 export const ListOrderDocumentsResponseItem = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
+  "quotationRequestId": zod.string().nullable(),
   "filename": zod.string(),
   "category": zod.string().min(1).max(listOrderDocumentsResponseCategoryMax),
   "contentType": zod.string(),
@@ -2793,8 +2805,41 @@ export const uploadOrderDocumentResponseCategoryMax = 64;
 export const UploadOrderDocumentResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
+  "quotationRequestId": zod.string().nullable(),
   "filename": zod.string(),
   "category": zod.string().min(1).max(uploadOrderDocumentResponseCategoryMax),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Upload a confirmation document linked to a quotation request on this order
+ */
+export const uploadQuotationConfirmationDocumentPathQuotationRequestIdMax = 80;
+
+export const uploadQuotationConfirmationDocumentPathFilenameMax = 180;
+
+
+
+export const UploadQuotationConfirmationDocumentParams = zod.object({
+  "id": zod.coerce.string(),
+  "quotationRequestId": zod.coerce.string().min(1).max(uploadQuotationConfirmationDocumentPathQuotationRequestIdMax),
+  "filename": zod.coerce.string().min(1).max(uploadQuotationConfirmationDocumentPathFilenameMax)
+})
+
+export const uploadQuotationConfirmationDocumentResponseCategoryMax = 64;
+
+
+
+export const UploadQuotationConfirmationDocumentResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "quotationRequestId": zod.string().nullable(),
+  "filename": zod.string(),
+  "category": zod.string().min(1).max(uploadQuotationConfirmationDocumentResponseCategoryMax),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
@@ -2833,6 +2878,7 @@ export const replaceOrderDocumentResponseCategoryMax = 64;
 export const ReplaceOrderDocumentResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
+  "quotationRequestId": zod.string().nullable(),
   "filename": zod.string(),
   "category": zod.string().min(1).max(replaceOrderDocumentResponseCategoryMax),
   "contentType": zod.string(),

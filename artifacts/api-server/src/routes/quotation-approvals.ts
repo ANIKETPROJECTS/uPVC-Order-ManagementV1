@@ -572,7 +572,10 @@ router.get("/quotation-rate-submissions/:submissionId/pdf", async (req, res, nex
     res.status(404).json({ error: "Quotation PDF not found." });
     return;
   }
-  if (item.submittedBy !== actor.id && !item.approverIds.includes(actor.id)) {
+  const canViewLinkedOrderQuotation = Boolean(item.orderRecordId)
+    && (actor.masterAdmin || ["view", "edit"].includes(actor.permissions["order-hub"] ?? "none"))
+    && (actor.masterAdmin || ["view", "edit"].includes(actor.permissions.confirmation ?? "none"));
+  if (item.submittedBy !== actor.id && !item.approverIds.includes(actor.id) && !canViewLinkedOrderQuotation) {
     res.status(403).json({ error: "You do not have access to this quotation PDF." });
     return;
   }

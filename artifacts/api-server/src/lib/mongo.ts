@@ -43,6 +43,7 @@ export const MODULES = [
   { id: "balance-payment", label: "Balance Payment Messages" },
   { id: "dispatch", label: "Dispatch QR & Gate Pass" },
   { id: "installation", label: "Installation Scheduling" },
+  { id: "grievances", label: "Customer Grievances" },
   { id: "reporting", label: "Central Dashboard & Reporting" },
 ] as const;
 
@@ -207,11 +208,33 @@ export interface OrderDocumentCategoryDocument {
   updatedAt: Date;
 }
 export interface OrderDocumentMetadataDocument {
-  _id: string; orderRecordId: string; filename: string; category: DocumentCategory;
+  _id: string; orderRecordId: string; quotationRequestId?: string | null; filename: string; category: DocumentCategory;
   contentType: string; sizeBytes: number; gridFsId: string | null; storagePath?: string | null; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
 }
 export interface OrderActivityDocument {
   _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
+}
+export type InstallationStatus = "pending" | "issue" | "installed";
+export interface InstallationDocument {
+  _id: string;
+  orderRecordId: string;
+  installationStatus: InstallationStatus;
+  installationDate: string | null;
+  issueReason: string | null;
+  updatedBy: string;
+  updatedAt: Date;
+  createdAt: Date;
+}
+export interface OrderGrievanceDocument {
+  _id: string;
+  orderRecordId: string;
+  orderId: string;
+  description: string;
+  reportedAt: string;
+  status: "open";
+  createdBy: string;
+  createdByName: string;
+  createdAt: Date;
 }
 
 export type WindowProfileDrawingType = "casement" | "sliding" | "mixed" | "louvre";
@@ -457,6 +480,8 @@ export function getOrderPayments(db: Db) { return db.collection<OrderPaymentDocu
 export function getOrderDocumentCategories(db: Db) { return db.collection<OrderDocumentCategoryDocument>("order_document_categories"); }
 export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }
 export function getOrderActivity(db: Db) { return db.collection<OrderActivityDocument>("order_activity"); }
+export function getInstallations(db: Db) { return db.collection<InstallationDocument>("installations"); }
+export function getOrderGrievances(db: Db) { return db.collection<OrderGrievanceDocument>("order_grievances"); }
 export function getWindowProfiles(db: Db) { return db.collection<WindowProfileDocument>("window_profiles"); }
 export function getQuotations(db: Db) { return db.collection<QuotationDocument>("quotations"); }
 export function getOrderDocumentsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "order_documents" }); }

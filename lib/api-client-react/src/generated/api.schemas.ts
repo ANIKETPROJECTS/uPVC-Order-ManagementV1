@@ -578,6 +578,8 @@ export interface OrderDocumentCategoryInput {
 export interface OrderDocument {
   id: string;
   orderRecordId: string;
+  /** @nullable */
+  quotationRequestId: string | null;
   filename: string;
   category: OrderDocumentCategory;
   contentType: string;
@@ -587,6 +589,29 @@ export interface OrderDocument {
 }
 
 export type OrderDocumentList = OrderDocument[];
+
+export type QuotationRateSubmissionStatus = typeof QuotationRateSubmissionStatus[keyof typeof QuotationRateSubmissionStatus];
+
+
+export const QuotationRateSubmissionStatus = {
+  awaiting_pdf: 'awaiting_pdf',
+  pending_review: 'pending_review',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface PurchaseOrderQuotationRequest {
+  id: string;
+  clientName: string;
+  /** @nullable */
+  location: string | null;
+  status: QuotationRateSubmissionStatus;
+  /** @nullable */
+  pdfFilename: string | null;
+  /** @nullable */
+  pdfSizeBytes: number | null;
+  updatedAt: string;
+}
 
 export interface PurchaseOrderRegisterEntry {
   orderRecordId: string;
@@ -598,6 +623,7 @@ export interface PurchaseOrderRegisterEntry {
   /** @nullable */
   orderValue: number | null;
   orderUpdatedAt: string;
+  quotationRequests: PurchaseOrderQuotationRequest[];
   purchaseOrderDocuments: OrderDocumentList;
   confirmationDocuments: OrderDocumentList;
 }
@@ -1066,16 +1092,6 @@ export interface QuotationInput {
 }
 
 export type QuotationList = Quotation[];
-
-export type QuotationRateSubmissionStatus = typeof QuotationRateSubmissionStatus[keyof typeof QuotationRateSubmissionStatus];
-
-
-export const QuotationRateSubmissionStatus = {
-  awaiting_pdf: 'awaiting_pdf',
-  pending_review: 'pending_review',
-  approved: 'approved',
-  rejected: 'rejected',
-} as const;
 
 export interface QuotationRateSubmissionRevision {
   revisionNumber: number;

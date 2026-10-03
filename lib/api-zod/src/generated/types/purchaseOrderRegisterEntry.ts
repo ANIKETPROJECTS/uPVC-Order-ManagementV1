@@ -7,6 +7,7 @@
  */
 import type { OrderDocumentList } from './orderDocumentList';
 import type { OrderStatus } from './orderStatus';
+import type { PurchaseOrderQuotationRequest } from './purchaseOrderQuotationRequest';
 
 export interface PurchaseOrderRegisterEntry {
   orderRecordId: string;
@@ -18,6 +19,7 @@ export interface PurchaseOrderRegisterEntry {
   /** @nullable */
   orderValue: number | null;
   orderUpdatedAt: Date;
+  quotationRequests: PurchaseOrderQuotationRequest[];
   purchaseOrderDocuments: OrderDocumentList;
   confirmationDocuments: OrderDocumentList;
 }

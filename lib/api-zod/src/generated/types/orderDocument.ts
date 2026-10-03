@@ -10,6 +10,8 @@ import type { OrderDocumentCategory } from './orderDocumentCategory';
 export interface OrderDocument {
   id: string;
   orderRecordId: string;
+  /** @nullable */
+  quotationRequestId: string | null;
   filename: string;
   category: OrderDocumentCategory;
   contentType: string;

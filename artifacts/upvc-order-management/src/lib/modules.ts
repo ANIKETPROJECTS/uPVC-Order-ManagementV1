@@ -20,7 +20,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'payments', label: 'Order Value & Payment Tracking', short: 'Payments', built: true },
   { key: 'balance-payment', label: 'Balance Payment Automated Message Generator', short: 'Balance payment' },
   { key: 'dispatch', label: 'Dispatch Status & QR Tracking', short: 'Dispatch', built: true },
-  { key: 'installation', label: 'Installation Scheduling', short: 'Installation' },
+  { key: 'installation', label: 'Installation Scheduling', short: 'Installation', built: true },
   { key: 'reporting', label: 'Central Dashboard & Reporting', short: 'Reports' },
 ];
 
