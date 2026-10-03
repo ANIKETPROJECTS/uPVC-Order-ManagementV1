@@ -699,6 +699,45 @@ export const UpdateOrderResponse = zod.object({
 
 
 /**
+ * @summary List orders for dispatch tracking
+ */
+export const ListDispatchOrdersResponseItem = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListDispatchOrdersResponse = zod.array(ListDispatchOrdersResponseItem)
+
+
+/**
+ * @summary Update an order's dispatch status
+ */
+export const UpdateDispatchOrderStatusParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateDispatchOrderStatusBody = zod.object({
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered'])
+})
+
+export const UpdateDispatchOrderStatusResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List centrally configured lifecycle message templates
  */
 export const ListOrderMessageTemplatesResponseItem = zod.object({

@@ -27,12 +27,17 @@ const iconMap: Record<string, SidebarIconName> = {
 };
 
 const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : `/${key}`;
-const isModuleActive = (key: string, location: string) =>
-  key === 'user-access'
+const isModuleActive = (key: string, location: string) => {
+  const isDispatchScanner = location.startsWith('/order-scanner')
+    && new URLSearchParams(window.location.search).get('flow') === 'dispatch';
+  return key === 'user-access'
     ? location.startsWith('/admin/users') || location.startsWith('/admin/roles') || location.startsWith('/admin/groups')
     : key === 'order-hub'
-      ? location.startsWith('/order-hub') || location.startsWith('/order-scanner') || location.startsWith('/order-status')
+      ? location.startsWith('/order-hub') || (!isDispatchScanner && (location.startsWith('/order-scanner') || location.startsWith('/order-status')))
+      : key === 'dispatch'
+        ? location.startsWith('/dispatch') || isDispatchScanner
     : location.startsWith(pathForModule(key));
+};
 
 const navigationGroups: { id: string; label: string; icon: SidebarIconName; moduleKeys: string[] }[] = [
   { id: 'management', label: 'Admin & reports', icon: 'user-access', moduleKeys: ['user-access', 'reporting'] },

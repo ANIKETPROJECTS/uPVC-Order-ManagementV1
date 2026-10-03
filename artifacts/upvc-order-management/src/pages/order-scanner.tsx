@@ -8,7 +8,7 @@ import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getOrderRecordIdFromQr } from '@/lib/order-qr';
+import { getDispatchRecordIdFromQr, getOrderRecordIdFromQr } from '@/lib/order-qr';
 
 type ScannerError = {
   kind: 'camera' | 'qr';
@@ -21,8 +21,11 @@ export default function OrderScannerPage({ user }: { user: User }) {
   const controlsRef = useRef<IScannerControls | null>(null);
   const handledResultRef = useRef(false);
   const lastInvalidQrRef = useRef('');
-  const permission = user.permissions?.['order-hub'];
-  const canView = user.roleId === 'master-admin' || permission === 'view' || permission === 'edit';
+  const orderPermission = user.permissions?.['order-hub'];
+  const dispatchPermission = user.permissions?.dispatch;
+  const canViewOrders = user.roleId === 'master-admin' || orderPermission === 'view' || orderPermission === 'edit';
+  const canViewDispatch = user.roleId === 'master-admin' || dispatchPermission === 'view' || dispatchPermission === 'edit';
+  const canView = canViewOrders || canViewDispatch;
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<ScannerError | null>(null);
   const needsHttps =
@@ -65,6 +68,24 @@ export default function OrderScannerPage({ user }: { user: User }) {
       const reader = new BrowserQRCodeReader();
       const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result, _decodeError, activeControls) => {
         if (!result || handledResultRef.current) return;
+        const dispatchRecordId = getDispatchRecordIdFromQr(result.getText());
+        if (dispatchRecordId) {
+          if (!canViewDispatch) {
+            setError({
+              kind: 'qr',
+              message: 'Dispatch view access is required to open this dispatch QR.',
+            });
+            return;
+          }
+          handledResultRef.current = true;
+          activeControls.stop();
+          controlsRef.current = null;
+          setScanning(false);
+          setError(null);
+          setLocation(`/dispatch?scanOrderId=${encodeURIComponent(dispatchRecordId)}`);
+          return;
+        }
+
         const recordId = getOrderRecordIdFromQr(result.getText());
         if (!recordId) {
           if (lastInvalidQrRef.current !== result.getText()) {
@@ -72,9 +93,16 @@ export default function OrderScannerPage({ user }: { user: User }) {
             setError({
               kind: 'qr',
               message:
-                'This code is not an order status QR. The camera is still on; scan an order QR to continue.',
+                'This code is not an order or dispatch QR. The camera is still on; scan a supported code to continue.',
             });
           }
+          return;
+        }
+        if (!canViewOrders) {
+          setError({
+            kind: 'qr',
+            message: 'Order view access is required to open this order QR.',
+          });
           return;
         }
 
@@ -102,8 +130,8 @@ export default function OrderScannerPage({ user }: { user: User }) {
       <AppShell user={user} title="QR scanner" eyebrow="Order access">
         <Alert variant="destructive" className="mx-auto mt-12 max-w-lg">
           <CircleAlert size={18} />
-          <AlertTitle>Order access required</AlertTitle>
-          <AlertDescription>Your role does not have permission to scan order codes.</AlertDescription>
+          <AlertTitle>Order or dispatch access required</AlertTitle>
+          <AlertDescription>Your role does not have permission to scan order or dispatch codes.</AlertDescription>
         </Alert>
       </AppShell>
     );
@@ -116,10 +144,10 @@ export default function OrderScannerPage({ user }: { user: User }) {
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order lookup</p>
-                <CardTitle className="mt-1">Scan an order QR code</CardTitle>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order lookup</p>
+              <CardTitle className="mt-1">Scan an order or dispatch QR</CardTitle>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Point your camera at an order QR to open its status page. You must sign in and have order view access; changing a status requires edit access.
+                  Point your camera at an order QR to open its status page, or a dispatch QR to open the dispatch status action. Your role permissions control which records you can update.
                 </p>
               </div>
               <ScanLine size={22} className="shrink-0 text-primary" aria-hidden="true" />

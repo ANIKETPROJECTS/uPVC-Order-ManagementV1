@@ -283,6 +283,32 @@ export const OrderStatus = {
   installed: 'installed',
 } as const;
 
+export type DispatchStatus = typeof DispatchStatus[keyof typeof DispatchStatus];
+
+
+export const DispatchStatus = {
+  pending_dispatch: 'pending_dispatch',
+  dispatched: 'dispatched',
+  delivered: 'delivered',
+} as const;
+
+export interface DispatchOrder {
+  id: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  orderStatus: OrderStatus;
+  dispatchStatus: DispatchStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DispatchStatusUpdate {
+  dispatchStatus: DispatchStatus;
+}
+
+export type DispatchOrderList = DispatchOrder[];
+
 export interface Order {
   id: string;
   orderId: string;

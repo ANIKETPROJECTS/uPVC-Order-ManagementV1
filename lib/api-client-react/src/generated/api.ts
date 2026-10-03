@@ -35,6 +35,9 @@ import type {
   ClientList,
   ClientUpdate,
   Dashboard,
+  DispatchOrder,
+  DispatchOrderList,
+  DispatchStatusUpdate,
   HealthStatus,
   ListClientsParams,
   ListOrderLocationsParams,
@@ -2354,6 +2357,172 @@ export const useUpdateOrder = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateOrderMutationOptions(options));
+    }
+
+export const getListDispatchOrdersUrl = () => {
+
+
+
+
+  return `/api/dispatch/orders`
+}
+
+/**
+ * @summary List orders for dispatch tracking
+ */
+export const listDispatchOrders = async ( options?: Parameters<typeof customFetch>[1]): Promise<DispatchOrderList> => {
+
+  return customFetch<DispatchOrderList>(getListDispatchOrdersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDispatchOrdersQueryKey = () => {
+    return [
+    `/api/dispatch/orders`
+    ] as const;
+    }
+
+
+export const getListDispatchOrdersQueryOptions = <TData = Awaited<ReturnType<typeof listDispatchOrders>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDispatchOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDispatchOrdersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDispatchOrders>>> = ({ signal }) => listDispatchOrders({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDispatchOrders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDispatchOrdersQueryResult = NonNullable<Awaited<ReturnType<typeof listDispatchOrders>>>
+export type ListDispatchOrdersQueryError = ErrorType<void>
+
+
+/**
+ * @summary List orders for dispatch tracking
+ */
+
+export function useListDispatchOrders<TData = Awaited<ReturnType<typeof listDispatchOrders>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDispatchOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDispatchOrdersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateDispatchOrderStatusUrl = (id: string,) => {
+
+
+
+
+  return `/api/dispatch/orders/${id}/status`
+}
+
+/**
+ * @summary Update an order's dispatch status
+ */
+export const updateDispatchOrderStatus = async (id: string,
+    dispatchStatusUpdate: DispatchStatusUpdate, options?: Parameters<typeof customFetch>[1]): Promise<DispatchOrder> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<DispatchOrder>(getUpdateDispatchOrderStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(dispatchStatusUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateDispatchOrderStatusMutationKey = () => ['updateDispatchOrderStatus'] as const;
+
+export const getUpdateDispatchOrderStatusMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDispatchOrderStatus>>, TError,UpdateDispatchOrderStatusMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDispatchOrderStatus>>, TError,UpdateDispatchOrderStatusMutationVariables, TContext> => {
+
+const mutationKey = getUpdateDispatchOrderStatusMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDispatchOrderStatus>>, UpdateDispatchOrderStatusMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDispatchOrderStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDispatchOrderStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateDispatchOrderStatus>>>
+    export type UpdateDispatchOrderStatusMutationBody = BodyType<DispatchStatusUpdate>
+    export type UpdateDispatchOrderStatusMutationError = ErrorType<void>
+    export type UpdateDispatchOrderStatusMutationVariables = {id: string;data: BodyType<DispatchStatusUpdate>}
+
+    /**
+ * @summary Update an order's dispatch status
+ */
+export const useUpdateDispatchOrderStatus = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDispatchOrderStatus>>, TError,UpdateDispatchOrderStatusMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDispatchOrderStatus>>,
+        TError,
+        UpdateDispatchOrderStatusMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateDispatchOrderStatusMutationOptions(options));
     }
 
 export const getListOrderMessageTemplatesUrl = () => {

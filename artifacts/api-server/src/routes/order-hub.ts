@@ -582,6 +582,7 @@ router.post(
       locationCode: normalizedLocationCode,
       locationName: location.name,
       status: "quotation_stage",
+      dispatchStatus: "pending_dispatch",
       notes: parsed.data.notes?.trim() || null,
       orderValue: null,
       createdBy: actorId,

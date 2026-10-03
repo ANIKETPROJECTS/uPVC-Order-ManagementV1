@@ -134,6 +134,8 @@ export type OrderStatus =
   | "dispatched"
   | "installed";
 
+export type DispatchStatus = "pending_dispatch" | "dispatched" | "delivered";
+
 export interface ClientDocument {
   _id: string;
   name: string;
@@ -171,6 +173,7 @@ export interface OrderDocument {
   locationCode: string;
   locationName: string;
   status: OrderStatus;
+  dispatchStatus?: DispatchStatus;
   notes: string | null;
   orderValue?: number | null;
   createdBy: string;

@@ -19,7 +19,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'glass-procurement', label: 'Glass Procurement & Delivery Tracking', short: 'Glass procurement' },
   { key: 'payments', label: 'Order Value & Payment Tracking', short: 'Payments', built: true },
   { key: 'balance-payment', label: 'Balance Payment Automated Message Generator', short: 'Balance payment' },
-  { key: 'dispatch', label: 'Dispatch QR Scan & WhatsApp Payment Alert Gate', short: 'Dispatch' },
+  { key: 'dispatch', label: 'Dispatch Status & QR Tracking', short: 'Dispatch', built: true },
   { key: 'installation', label: 'Installation Scheduling', short: 'Installation' },
   { key: 'reporting', label: 'Central Dashboard & Reporting', short: 'Reports' },
 ];
