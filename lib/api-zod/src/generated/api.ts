@@ -308,6 +308,7 @@ export const GetPaymentOverviewResponse = zod.object({
   "reminderOrders": zod.array(zod.object({
   "orderRecordId": zod.string(),
   "orderId": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "clientName": zod.string(),
   "locationName": zod.string(),
   "orderValue": zod.number(),

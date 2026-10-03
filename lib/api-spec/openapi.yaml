@@ -2776,6 +2776,8 @@ components:
           type: string
         orderId:
           type: string
+        orderStatus:
+          $ref: "#/components/schemas/OrderStatus"
         clientName:
           type: string
         locationName:
@@ -2792,7 +2794,7 @@ components:
           type: boolean
         canOpenWhatsApp:
           type: boolean
-      required: [orderRecordId, orderId, clientName, locationName, orderValue, totalCollected, balance, windowCount, productionReady, canOpenWhatsApp]
+      required: [orderRecordId, orderId, orderStatus, clientName, locationName, orderValue, totalCollected, balance, windowCount, productionReady, canOpenWhatsApp]
     PaymentReminderOrderList:
       type: array
       items:

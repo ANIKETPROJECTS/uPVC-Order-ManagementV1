@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'wouter';
 import { ArrowLeft, CircleAlert, LockKeyhole, Save } from 'lucide-react';
 import {
+  getGetPaymentOverviewQueryKey,
   getGetOrderQueryKey,
   getListOrdersQueryKey,
   OrderStatus,
@@ -58,6 +59,7 @@ export default function OrderStatusPage({ user }: { user: User }) {
         onSuccess: (updated) => {
           queryClient.setQueryData(getGetOrderQueryKey(id), updated);
           void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+          void queryClient.invalidateQueries({ queryKey: getGetPaymentOverviewQueryKey() });
           toast({
             title: 'Order status updated',
             description: `${updated.orderId} is now ${statusLabel(updated.status)}.`,

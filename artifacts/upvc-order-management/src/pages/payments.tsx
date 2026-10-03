@@ -34,6 +34,15 @@ const money = (amount: number) => new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 }).format(amount);
 
+const lifecycleStatusLabel = (status: string) => ({
+  quotation_stage: 'Quotation stage',
+  confirmed: 'Confirmed',
+  in_production: 'In production',
+  ready: 'Ready',
+  dispatched: 'Dispatched',
+  installed: 'Installed',
+}[status] ?? status.replaceAll('_', ' '));
+
 const dateTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -175,8 +184,11 @@ export default function PaymentsPage({ user }: { user: User }) {
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <Link href={`/order-hub/${order.orderRecordId}`} className="font-mono text-xs font-bold text-primary hover:underline" data-testid={`link-reminder-order-${order.orderRecordId}`}>{order.orderId}<ArrowRight size={12} className="ml-1 inline" /></Link>
                     <span className="text-[10px] text-muted-foreground">{order.windowCount === 0 ? 'No active windows' : `${order.windowCount} windows`}</span>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary" data-testid={`status-order-lifecycle-${order.orderRecordId}`}>
+                      Lifecycle: {lifecycleStatusLabel(order.orderStatus)}
+                    </span>
                     <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${order.productionReady ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`} data-testid={`status-production-ready-${order.orderRecordId}`}>
-                      {order.productionReady ? 'Production ready' : 'In production'}
+                      Window readiness: {order.productionReady ? 'Complete' : 'Incomplete'}
                     </span>
                   </div>
                   <p className="mt-1 truncate text-sm font-semibold" data-testid={`text-reminder-client-${order.orderRecordId}`}>{order.clientName}</p>

@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { OrderStatus } from './orderStatus';
 
 export interface PaymentReminderOrder {
   orderRecordId: string;
   orderId: string;
+  orderStatus: OrderStatus;
   clientName: string;
   locationName: string;
   orderValue: number;

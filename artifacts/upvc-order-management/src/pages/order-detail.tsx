@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import {
   getDownloadOrderDocumentQueryKey,
+  getGetPaymentOverviewQueryKey,
   getGetOrderQueryKey,
   getListOrderDocumentCategoriesQueryKey,
   getListOrderActivityQueryKey,
@@ -195,6 +196,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
     onSuccess: (updated) => {
       queryClient.setQueryData(getGetOrderQueryKey(id), updated);
       void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getGetPaymentOverviewQueryKey() });
       void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(id) });
       setEditing(false);
       toast({ title: 'Order record updated', description: `${updated.orderId} is now ${statusLabel(updated.status)}.` });

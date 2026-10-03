@@ -620,6 +620,7 @@ export interface Dashboard {
 export interface PaymentReminderOrder {
   orderRecordId: string;
   orderId: string;
+  orderStatus: OrderStatus;
   clientName: string;
   locationName: string;
   orderValue: number;

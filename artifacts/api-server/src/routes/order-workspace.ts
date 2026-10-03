@@ -157,6 +157,7 @@ router.get("/payments/overview", async (req, res): Promise<void> => {
     return {
       orderRecordId: order._id,
       orderId: order.orderId,
+      orderStatus: order.status,
       clientName: order.clientName,
       locationName: order.locationName,
       orderValue: order.orderValue!,
