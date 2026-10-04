@@ -1,0 +1,55 @@
+In the Payments section, the red "Flagged" badge on order cards is not clickable. Fix this and complete the flag and payment progress features. Do not break existing functionality, and keep the current UI style. Do not change the WhatsApp button logic or the window readiness checks.
+
+PART 1: Make the Flagged badge clickable
+1. Clicking the "Flagged" badge on an order card opens a "Flag Details" panel (modal on desktop, bottom sheet on mobile).
+2. The badge must look and behave like a button: pointer cursor, hover state, keyboard focusable (Enter and Space open it), and an aria-label such as "View flag details".
+3. The badge text shows the flag type, for example "Flagged: Bounced" or "Flagged: Refusal to Pay".
+4. Clicking the badge must NOT trigger the card's own click or navigation (stop event propagation).
+
+PART 2: Flag Details panel
+Show these fields for the active flag:
+- Flag type, status (Active or Resolved), remarks
+- Date flagged, flagged by
+- If Bounced: bounce reason, bounced amount, bank charges
+- If Refusal to Pay: number of follow-ups, last follow-up date, follow-up notes
+- Action history (who, when, what), newest first
+
+Buttons inside the panel:
+- Edit flag
+- Mark as Resolved (asks for resolution date and notes, then the badge turns grey "Resolved" or disappears from active flags)
+- Remove flag (asks for confirmation first)
+- Add follow-up (for Refusal to Pay: increases the follow-up count, updates the last follow-up date, appends a note)
+Every action must be saved to the history log.
+
+PART 3: Flag an order (for orders with no flag yet)
+- On each order card and on the order detail page, add a small "Flag" button.
+- It opens a form with: Flag type dropdown, Remarks, Date flagged (today, editable), Flagged by (logged-in user, read-only), plus the conditional fields from Part 2.
+- Show only the fields for the selected type. Validate required fields and show clear error messages.
+- After saving, the card updates immediately without a page refresh.
+
+PART 4: Flagged Payments tab
+- A "Flagged Payments" tab inside Payments lists all flagged orders with: order number, client, flag type, status, amount, date flagged.
+- Search by client name or order number. Filters for flag type, status (Active, Resolved, All) and date range.
+- Summary at the top: total flagged count and total flagged amount (active flags only).
+- Clicking a row opens the same Flag Details panel from Part 1.
+
+PART 5: Payment progress bar
+- Compact bar on each order card, with the percentage (already built, keep it).
+- Full version on the order detail page showing Order Value, Paid, Balance and Percentage with a bar.
+- Colors: red under 30%, amber 30 to 99%, green 100%. Overpayment caps the bar at 100% but shows the real percentage. Order value of 0 shows 0% with no error.
+- Use Indian currency format (₹1,00,000).
+
+PART 6: Bounced receipts and refunds
+- Allow marking an individual receipt as Bounced (date and reason). A bounced receipt does not count as Paid.
+- Allow recording a Refund against an order (amount, date, notes). Refunds are subtracted from Paid.
+- A receipt can only be in one state (received, void or bounced), so it is never deducted twice.
+- When a receipt is marked bounced, offer (optional) to create a Bounced Payment flag pre-filled with the receipt amount.
+- Paid, Balance and Percentage must come from one shared calculation, so Payments cards, order detail, reminders and the Flagged tab always match.
+- Existing data must show the same Paid values as before.
+
+After building, do the following:
+1. Make sure at least 3 sample flags exist (one Bounced, one Refusal to Pay, one Resolved).
+2. Run a typecheck and test the running app.
+3. Give me a short summary listing each part (1 to 6) as Done or Not done, and what I should click to test it.
+
+Show a short plan first, then build.
