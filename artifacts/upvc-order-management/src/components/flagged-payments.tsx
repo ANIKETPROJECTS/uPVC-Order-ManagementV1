@@ -58,8 +58,6 @@ export function FlaggedPaymentsSection({
   const [dateTo, setDateTo] = useState('');
   const [selectedFlag, setSelectedFlag] = useState<PaymentFlag | null>(null);
 
-  const activeFlags = useMemo(() => flags.filter((flag) => flag.status === 'active'), [flags]);
-  const totalFlaggedAmount = useMemo(() => activeFlags.reduce((sum, flag) => sum + flag.flaggedAmount, 0), [activeFlags]);
   const clients = useMemo(() => [...new Set(flags.map((flag) => flag.clientName).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [flags]);
   const filteredFlags = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
@@ -67,9 +65,9 @@ export function FlaggedPaymentsSection({
       if (typeFilter !== 'all' && flag.flagType !== typeFilter) return false;
       if (statusFilter !== 'all' && flag.status !== statusFilter) return false;
       if (clientFilter !== 'all' && flag.clientName !== clientFilter) return false;
-       const flaggedDate = flag.flaggedAt.slice(0, 10);
-       if (dateFrom && flaggedDate < dateFrom) return false;
-       if (dateTo && flaggedDate > dateTo) return false;
+      const flaggedDate = flag.flaggedAt.slice(0, 10);
+      if (dateFrom && flaggedDate < dateFrom) return false;
+      if (dateTo && flaggedDate > dateTo) return false;
       if (!term) return true;
       return [
         flag.orderId,
@@ -82,12 +80,16 @@ export function FlaggedPaymentsSection({
       ].some((value) => value.toLocaleLowerCase().includes(term));
     });
   }, [clientFilter, dateFrom, dateTo, flags, search, statusFilter, typeFilter]);
+  const totalFlaggedAmount = useMemo(
+    () => filteredFlags.reduce((sum, flag) => sum + (flag.status === 'active' ? flag.flaggedAmount : 0), 0),
+    [filteredFlags],
+  );
 
   return <div className="space-y-4" data-testid="section-flagged-payments">
     <section className="grid gap-3 sm:grid-cols-2" data-testid="summary-flagged-payments">
       <Card className="border-rose-200/80 bg-rose-50/60">
         <CardContent className="flex min-h-24 items-center justify-between p-4">
-          <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-rose-700">Total flags</p><p className="mt-1 font-display text-2xl font-bold text-rose-900" data-testid="value-total-payment-flags">{flags.length}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-rose-700">Total flags</p><p className="mt-1 font-display text-2xl font-bold text-rose-900" data-testid="value-total-payment-flags">{filteredFlags.length}</p></div>
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-rose-100 text-rose-700"><Flag size={18} /></span>
         </CardContent>
       </Card>

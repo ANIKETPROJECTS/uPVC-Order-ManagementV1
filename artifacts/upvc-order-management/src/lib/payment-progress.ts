@@ -2,7 +2,7 @@ export function calculatePaymentProgress(orderValue: number | null | undefined, 
   const balance = orderValue == null ? null : orderValue - paid;
   const percentage = orderValue == null || orderValue === 0
     ? 0
-    : Math.round((paid / orderValue) * 1000) / 10;
+    : (paid / orderValue) * 100;
   return { paid, balance, percentage };
 }
 

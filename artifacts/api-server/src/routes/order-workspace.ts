@@ -100,7 +100,7 @@ const paymentProgress = (orderValue: number | null | undefined, receipts: number
     orderValue: orderValue ?? null,
     paid,
     balance: orderValue == null ? null : orderValue - paid,
-    percentage: orderValue == null || orderValue === 0 ? 0 : Math.round((paid / orderValue) * 1000) / 10,
+    percentage: orderValue == null || orderValue === 0 ? 0 : (paid / orderValue) * 100,
   };
 };
 async function getPaymentProgressMap(db: Awaited<ReturnType<typeof getMongoDb>>, ordersById: Map<string, OrderDocument>) {
