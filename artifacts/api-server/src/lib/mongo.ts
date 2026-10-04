@@ -191,11 +191,16 @@ export interface OrderWindowDocument {
   createdBy: string; createdAt: Date; updatedBy: string; updatedAt: Date; archivedAt?: Date | null;
 }
 export type PaymentMethod = "cash" | "bank_transfer" | "upi" | "cheque" | "other";
-export type PaymentStatus = "received" | "void";
+export type PaymentStatus = "received" | "void" | "bounced";
 export interface OrderPaymentDocument {
   _id: string; orderRecordId: string; amount: number; method: PaymentMethod;
   reference: string | null; notes: string | null; paidAt: Date; status: PaymentStatus;
   voidReason: string | null; createdBy: string; createdAt: Date; voidedBy?: string | null; voidedAt?: Date | null;
+  bouncedAt?: Date | null; bounceReason?: string | null; bouncedBy?: string | null;
+}
+export interface OrderRefundDocument {
+  _id: string; orderRecordId: string; amount: number; refundDate: Date;
+  notes: string | null; createdBy: string; createdAt: Date;
 }
 export type PaymentFlagType = "bounced_payment" | "refusal_to_pay";
 export type PaymentFlagStatus = "active" | "resolved" | "removed";
@@ -514,6 +519,7 @@ export function getCounters(db: Db): Collection<CounterDocument> {
 }
 export function getOrderWindows(db: Db) { return db.collection<OrderWindowDocument>("order_windows"); }
 export function getOrderPayments(db: Db) { return db.collection<OrderPaymentDocument>("order_payments"); }
+export function getOrderRefunds(db: Db) { return db.collection<OrderRefundDocument>("order_refunds"); }
 export function getOrderPaymentFlags(db: Db) { return db.collection<OrderPaymentFlagDocument>("order_payment_flags"); }
 export function getOrderDocumentCategories(db: Db) { return db.collection<OrderDocumentCategoryDocument>("order_document_categories"); }
 export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }

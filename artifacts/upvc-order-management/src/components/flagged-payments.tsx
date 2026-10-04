@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { PaymentFlagBadge } from '@/components/payment-flag-badge';
+import { PaymentProgressBar } from '@/components/payment-progress-bar';
 
 const money = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -221,7 +222,12 @@ function FlaggedPaymentRow({ flag, canEdit, onResolve, onRemove }: { flag: Payme
           <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground">{statusLabel}</span>
           <Link href={`/order-hub/${flag.orderRecordId}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-flag-order-${flag.id}`}>{flag.orderId}<ArrowRight size={11} className="ml-1 inline" /></Link>
         </div>
-        <div><p className="text-sm font-semibold">{flag.clientName} <span className="font-normal text-muted-foreground">· {flag.locationName}</span></p><p className="mt-1 text-xs leading-5 text-muted-foreground">{flag.remarks}</p></div>
+        <div><p className="text-sm font-semibold">{flag.clientName} <span className="font-normal text-muted-foreground">· {flag.locationName}</span></p><p className="mt-1 text-xs leading-5 text-muted-foreground">{flag.remarks}</p>
+          <div className="mt-2 max-w-sm space-y-1.5">
+            <p className="text-[10px] text-muted-foreground">Paid {money(flag.paymentProgress?.paid ?? 0)} <span aria-hidden="true">·</span> Balance {flag.paymentProgress?.balance == null ? 'Unknown' : money(flag.paymentProgress.balance)}</p>
+            <PaymentProgressBar percentage={flag.paymentProgress?.percentage ?? 0} compact testId={`progress-payment-flag-${flag.id}`} />
+          </div>
+        </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
           <span>Flagged {dateLabel(flag.flaggedAt)} by {flag.flaggedBy}</span>
           {flag.flagType === 'bounced_payment'

@@ -11,4 +11,4 @@
 - [Quotation-linked confirmations](quotation-linked-confirmations.md) — associate new confirmations with the linked request; keep historical order-only files unassigned.
 - [Orval parameter collisions](orval-parameter-collisions.md) — adding query fields can duplicate generated `*Params` exports; separate preview operations avoid the collision.
 - [Installation and grievances](installation-grievances.md) — delivered orders enter Installation; post-install grievances stay in each order’s own tab.
-- [Flagged payment audits](payment-flag-audits.md) — payment flags stay separate from receipt totals; preserve amount snapshots and append-only action history.
+- [Flagged payment audits](payment-flag-audits.md) — keep flags ledger-independent; Paid equals received receipts minus refunds, excluding void and bounced receipts.

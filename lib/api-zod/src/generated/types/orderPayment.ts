@@ -21,6 +21,12 @@ export interface OrderPayment {
   status: OrderPaymentStatus;
   /** @nullable */
   voidReason: string | null;
+  /** @nullable */
+  bouncedAt: Date | null;
+  /** @nullable */
+  bounceReason: string | null;
+  /** @nullable */
+  bouncedBy: string | null;
   createdBy: string;
   createdAt: Date;
 }

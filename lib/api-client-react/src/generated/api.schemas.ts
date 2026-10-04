@@ -575,6 +575,7 @@ export type OrderPaymentStatus = typeof OrderPaymentStatus[keyof typeof OrderPay
 export const OrderPaymentStatus = {
   received: 'received',
   void: 'void',
+  bounced: 'bounced',
 } as const;
 
 export interface OrderPayment {
@@ -590,6 +591,12 @@ export interface OrderPayment {
   status: OrderPaymentStatus;
   /** @nullable */
   voidReason: string | null;
+  /** @nullable */
+  bouncedAt: string | null;
+  /** @nullable */
+  bounceReason: string | null;
+  /** @nullable */
+  bouncedBy: string | null;
   createdBy: string;
   createdAt: string;
 }
@@ -619,7 +626,49 @@ export interface OrderPaymentVoid {
   voidReason: string;
 }
 
+export interface OrderPaymentBounce {
+  bouncedAt: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  bounceReason: string;
+}
+
 export type OrderPaymentList = OrderPayment[];
+
+export interface OrderRefund {
+  id: string;
+  orderRecordId: string;
+  amount: number;
+  refundDate: string;
+  /** @nullable */
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface OrderRefundInput {
+  /** @exclusiveMinimum 0 */
+  amount: number;
+  refundDate: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  notes?: string | null;
+}
+
+export type OrderRefundList = OrderRefund[];
+
+export interface PaymentProgress {
+  /** @nullable */
+  orderValue: number | null;
+  paid: number;
+  /** @nullable */
+  balance: number | null;
+  percentage: number;
+}
 
 export type PaymentFlagType = typeof PaymentFlagType[keyof typeof PaymentFlagType];
 
@@ -662,6 +711,7 @@ export interface PaymentFlag {
   orderId: string;
   clientName: string;
   locationName: string;
+  paymentProgress: PaymentProgress;
   flagType: PaymentFlagType;
   remarks: string;
   flaggedAmount: number;
@@ -862,6 +912,7 @@ export interface PaymentReminderOrder {
   orderValue: number;
   totalCollected: number;
   balance: number;
+  percentage: number;
   windowCount: number;
   productionReady: boolean;
   canOpenWhatsApp: boolean;

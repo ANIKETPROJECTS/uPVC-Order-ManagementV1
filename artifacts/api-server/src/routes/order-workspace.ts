@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { Router as ExpressRouter, type RequestHandler } from "express";
 import {
   ArchiveOrderDocumentParams, ArchiveOrderWindowParams,
+  BounceOrderPaymentBody, BounceOrderPaymentParams, BounceOrderPaymentResponse,
   CreateOrderDocumentCategoryBody, CreateOrderDocumentCategoryResponse,
   CreateOrderPaymentFlagBody, CreateOrderPaymentFlagParams, CreateOrderPaymentFlagResponse,
   CreateOrderWindowBody, CreateOrderWindowParams, CreateOrderWindowResponse, DownloadOrderDocumentParams,
@@ -13,9 +14,11 @@ import {
   ListOrderDocumentCategoriesResponse,
   ListOrderActivityParams, ListOrderActivityResponse, ListOrderDocumentsParams, ListOrderDocumentsResponse,
   ListOrderPaymentFlagsParams, ListOrderPaymentFlagsResponse, ListOrderPaymentsParams, ListOrderPaymentsResponse, ListOrderWindowsParams, ListOrderWindowsResponse,
+  ListOrderRefundsParams, ListOrderRefundsResponse,
   ListPaymentFlagsResponse, RemovePaymentFlagParams, RemovePaymentFlagResponse,
   OpenPaymentReminderParams,
   RecordOrderPaymentBody, RecordOrderPaymentParams, RecordOrderPaymentResponse, UpdateOrderWindowBody,
+  RecordOrderRefundBody, RecordOrderRefundParams, RecordOrderRefundResponse,
   ResolvePaymentFlagBody, ResolvePaymentFlagParams, ResolvePaymentFlagResponse,
   ReplaceOrderDocumentParams, ReplaceOrderDocumentResponse,
   UpdateOrderDocumentCategoryBody, UpdateOrderDocumentCategoryParams, UpdateOrderDocumentCategoryResponse,
@@ -25,8 +28,8 @@ import {
 } from "@workspace/api-zod";
 import {
   getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPaymentFlags, getOrderPayments,
-  getOrders, getOrderWindows, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderWindowDocument,
-  type OrderPaymentFlagDocument, type PaymentFlagActionDocument,
+  getOrderRefunds, getOrders, getOrderWindows, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderDocument, type OrderWindowDocument,
+  type OrderPaymentFlagDocument, type PaymentFlagActionDocument, type OrderRefundDocument,
 } from "../lib/mongo";
 import {
   ensureDefaultOrderDocumentCategories,
@@ -72,13 +75,60 @@ async function event(orderRecordId: string, actor: UserContext, action: string, 
   await getOrderActivity(await getMongoDb()).insertOne({ _id: randomUUID(), orderRecordId, actorId: actor.id, actorName: actor.name, action, summary, createdAt: new Date() });
 }
 const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
-const paymentResponse = (p: any) => ({ ...p, id: p._id, paidAt: p.paidAt.toISOString(), createdAt: p.createdAt.toISOString() });
-const paymentFlagResponse = (flag: OrderPaymentFlagDocument) => ({
+const paymentResponse = (p: any) => ({
+  ...p,
+  id: p._id,
+  paidAt: p.paidAt.toISOString(),
+  bouncedAt: p.bouncedAt?.toISOString().slice(0, 10) ?? null,
+  bounceReason: p.bounceReason ?? null,
+  bouncedBy: p.bouncedBy ?? null,
+  createdAt: p.createdAt.toISOString(),
+});
+const refundResponse = (refund: OrderRefundDocument) => ({
+  id: refund._id,
+  orderRecordId: refund.orderRecordId,
+  amount: refund.amount,
+  refundDate: refund.refundDate.toISOString().slice(0, 10),
+  notes: refund.notes,
+  createdBy: refund.createdBy,
+  createdAt: refund.createdAt.toISOString(),
+});
+const paymentProgress = (orderValue: number | null | undefined, receipts: number, refunds: number) => {
+  const paid = receipts - refunds;
+  return {
+    orderValue: orderValue ?? null,
+    paid,
+    balance: orderValue == null ? null : orderValue - paid,
+    percentage: orderValue == null || orderValue === 0 ? 0 : Math.round((paid / orderValue) * 1000) / 10,
+  };
+};
+async function getPaymentProgressMap(db: Awaited<ReturnType<typeof getMongoDb>>, ordersById: Map<string, OrderDocument>) {
+  const ids = [...ordersById.keys()];
+  if (ids.length === 0) return new Map();
+  const [paymentTotals, refundTotals] = await Promise.all([
+    getOrderPayments(db).aggregate<{ _id: string; total: number }>([
+      { $match: { orderRecordId: { $in: ids }, status: "received" } },
+      { $group: { _id: "$orderRecordId", total: { $sum: "$amount" } } },
+    ]).toArray(),
+    getOrderRefunds(db).aggregate<{ _id: string; total: number }>([
+      { $match: { orderRecordId: { $in: ids } } },
+      { $group: { _id: "$orderRecordId", total: { $sum: "$amount" } } },
+    ]).toArray(),
+  ]);
+  const paidReceiptsByOrder = new Map(paymentTotals.map((row) => [row._id, Number(row.total) || 0]));
+  const refundsByOrder = new Map(refundTotals.map((row) => [row._id, Number(row.total) || 0]));
+  return new Map(ids.map((id) => [
+    id,
+    paymentProgress(ordersById.get(id)?.orderValue, paidReceiptsByOrder.get(id) ?? 0, refundsByOrder.get(id) ?? 0),
+  ]));
+}
+const paymentFlagResponse = (flag: OrderPaymentFlagDocument, progress: ReturnType<typeof paymentProgress>) => ({
   id: flag._id,
   orderRecordId: flag.orderRecordId,
   orderId: flag.orderId,
   clientName: flag.clientName,
   locationName: flag.locationName,
+  paymentProgress: progress,
   flagType: flag.flagType,
   remarks: flag.remarks,
   flaggedAmount: flag.flaggedAmount,
@@ -254,25 +304,145 @@ router.delete("/orders/:id/windows/:windowId", async (req, res): Promise<void> =
   await getOrderWindows(db).updateOne({ _id: w._id }, { $set: { archivedAt: new Date(), updatedAt: new Date(), updatedBy: actor.id } }); await event(p.data.id, actor, "window.archived", `Archived window ${w.windowNo}.`); res.status(204).send();
 });
 
-router.get("/orders/:id/payments", async (req, res): Promise<void> => { const p = ListOrderPaymentsParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } const actor = await context(req, res, "payments"); if (!actor || !(await orderExists(p.data.id, res))) return; const rows = await getOrderPayments(await getMongoDb()).find({ orderRecordId: p.data.id }).sort({ createdAt: -1 }).toArray(); res.json(ListOrderPaymentsResponse.parse(rows.map(paymentResponse))); });
-router.post("/orders/:id/payments", async (req, res): Promise<void> => { const p = RecordOrderPaymentParams.safeParse(req.params), b = RecordOrderPaymentBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; } const actor = await context(req, res, "payments", true); const order = actor ? await orderExists(p.data.id, res) : null; if (!actor || !order) return; const db = await getMongoDb(); const total = await getOrderPayments(db).aggregate([{ $match: { orderRecordId: p.data.id, status: "received" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).toArray(); if (order.orderValue != null && Number(total[0]?.total ?? 0) + b.data.amount > order.orderValue) { res.status(400).json({ error: "Payment exceeds the remaining order balance." }); return; } const paidAt = new Date(b.data.paidAt); if (Number.isNaN(paidAt.getTime())) { res.status(400).json({ error: "Invalid payment date." }); return; } const payment = { _id: randomUUID(), orderRecordId: p.data.id, amount: b.data.amount, method: b.data.method, reference: b.data.reference ?? null, notes: b.data.notes ?? null, paidAt, status: "received" as const, voidReason: null, createdBy: actor.id, createdAt: new Date() }; await getOrderPayments(db).insertOne(payment); await event(p.data.id, actor, "payment.recorded", `Recorded payment of ${payment.amount}.`); res.status(201).json(RecordOrderPaymentResponse.parse(paymentResponse(payment))); });
-router.patch("/orders/:id/payments/:paymentId", async (req, res): Promise<void> => { const p = VoidOrderPaymentParams.safeParse(req.params), b = VoidOrderPaymentBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; } const actor = await context(req, res, "payments", true); if (!actor || !(await orderExists(p.data.id, res))) return; const db = await getMongoDb(); const old = await getOrderPayments(db).findOne({ _id: p.data.paymentId, orderRecordId: p.data.id }); if (!old) { res.status(404).json({ error: "Payment not found." }); return; } if (old.status === "void") { res.status(400).json({ error: "Payment is already void." }); return; } await getOrderPayments(db).updateOne({ _id: old._id }, { $set: { status: "void", voidReason: b.data.voidReason, voidedBy: actor.id, voidedAt: new Date() } }); const updated = await getOrderPayments(db).findOne({ _id: old._id }); await event(p.data.id, actor, "payment.voided", `Voided payment of ${old.amount}.`); res.json(VoidOrderPaymentResponse.parse(paymentResponse(updated))); });
+router.get("/orders/:id/payments", async (req, res): Promise<void> => {
+  const p = ListOrderPaymentsParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "payments");
+  if (!actor || !(await orderExists(p.data.id, res))) return;
+  const rows = await getOrderPayments(await getMongoDb()).find({ orderRecordId: p.data.id }).sort({ createdAt: -1 }).toArray();
+  res.json(ListOrderPaymentsResponse.parse(rows.map(paymentResponse)));
+});
+router.post("/orders/:id/payments", async (req, res): Promise<void> => {
+  const p = RecordOrderPaymentParams.safeParse(req.params);
+  const b = RecordOrderPaymentBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
+  const db = await getMongoDb();
+  const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
+  if (order.orderValue != null && progress.paid + b.data.amount > order.orderValue) {
+    res.status(400).json({ error: "Payment exceeds the remaining order balance." });
+    return;
+  }
+  const paidAt = new Date(b.data.paidAt);
+  if (Number.isNaN(paidAt.getTime())) { res.status(400).json({ error: "Invalid payment date." }); return; }
+  const payment = {
+    _id: randomUUID(), orderRecordId: p.data.id, amount: b.data.amount, method: b.data.method,
+    reference: b.data.reference ?? null, notes: b.data.notes ?? null, paidAt, status: "received" as const,
+    voidReason: null, bouncedAt: null, bounceReason: null, bouncedBy: null, createdBy: actor.id, createdAt: new Date(),
+  };
+  await getOrderPayments(db).insertOne(payment);
+  await event(p.data.id, actor, "payment.recorded", `Recorded payment of ${payment.amount}.`);
+  res.status(201).json(RecordOrderPaymentResponse.parse(paymentResponse(payment)));
+});
+router.patch("/orders/:id/payments/:paymentId", async (req, res): Promise<void> => {
+  const p = VoidOrderPaymentParams.safeParse(req.params);
+  const b = VoidOrderPaymentBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
+  const db = await getMongoDb();
+  const old = await getOrderPayments(db).findOne({ _id: p.data.paymentId, orderRecordId: p.data.id });
+  if (!old) { res.status(404).json({ error: "Payment not found." }); return; }
+  if (old.status !== "received") { res.status(400).json({ error: "Only a received payment can be voided." }); return; }
+  const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
+  if (progress.paid - old.amount < 0) { res.status(409).json({ error: "This receipt cannot be voided because recorded refunds would exceed the remaining received receipts." }); return; }
+  const update = await getOrderPayments(db).updateOne(
+    { _id: old._id, status: "received" },
+    { $set: { status: "void", voidReason: b.data.voidReason, voidedBy: actor.id, voidedAt: new Date() } },
+  );
+  if (update.modifiedCount === 0) { res.status(409).json({ error: "This payment has already changed status." }); return; }
+  const updated = await getOrderPayments(db).findOne({ _id: old._id });
+  await event(p.data.id, actor, "payment.voided", `Voided payment of ${old.amount}.`);
+  res.json(VoidOrderPaymentResponse.parse(paymentResponse(updated)));
+});
+router.post("/orders/:id/payments/:paymentId/bounce", async (req, res): Promise<void> => {
+  const p = BounceOrderPaymentParams.safeParse(req.params);
+  const b = BounceOrderPaymentBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
+  const bouncedAt = parseDateOnly(b.data.bouncedAt);
+  if (!bouncedAt) { res.status(400).json({ error: "Enter a valid bounce date." }); return; }
+  const db = await getMongoDb();
+  const old = await getOrderPayments(db).findOne({ _id: p.data.paymentId, orderRecordId: p.data.id });
+  if (!old) { res.status(404).json({ error: "Payment not found." }); return; }
+  if (old.status !== "received") { res.status(400).json({ error: "Only a received payment can be marked bounced." }); return; }
+  const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
+  if (progress.paid - old.amount < 0) { res.status(409).json({ error: "This receipt cannot be bounced because recorded refunds would exceed the remaining received receipts." }); return; }
+  const update = await getOrderPayments(db).updateOne(
+    { _id: old._id, status: "received" },
+    { $set: { status: "bounced", bouncedAt, bounceReason: b.data.bounceReason.trim(), bouncedBy: actor.id } },
+  );
+  if (update.modifiedCount === 0) { res.status(409).json({ error: "This payment has already changed status." }); return; }
+  const updated = await getOrderPayments(db).findOne({ _id: old._id });
+  await event(p.data.id, actor, "payment.bounced", `Marked payment of ${old.amount} as bounced: ${b.data.bounceReason.trim()}.`);
+  res.json(BounceOrderPaymentResponse.parse(paymentResponse(updated)));
+});
+router.get("/orders/:id/refunds", async (req, res): Promise<void> => {
+  const p = ListOrderRefundsParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "payments");
+  if (!actor || !(await orderExists(p.data.id, res))) return;
+  const rows = await getOrderRefunds(await getMongoDb()).find({ orderRecordId: p.data.id }).sort({ refundDate: -1, createdAt: -1 }).toArray();
+  res.json(ListOrderRefundsResponse.parse(rows.map(refundResponse)));
+});
+router.post("/orders/:id/refunds", async (req, res): Promise<void> => {
+  const p = RecordOrderRefundParams.safeParse(req.params);
+  const b = RecordOrderRefundBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
+  const refundDate = parseDateOnly(b.data.refundDate);
+  if (!refundDate) { res.status(400).json({ error: "Enter a valid refund date." }); return; }
+  const db = await getMongoDb();
+  const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
+  if (b.data.amount > Math.max(0, progress.paid)) {
+    res.status(400).json({ error: "Refund exceeds the amount currently paid on this order." });
+    return;
+  }
+  const refund: OrderRefundDocument = {
+    _id: randomUUID(), orderRecordId: order._id, amount: b.data.amount, refundDate,
+    notes: b.data.notes?.trim() || null, createdBy: actor.id, createdAt: new Date(),
+  };
+  await getOrderRefunds(db).insertOne(refund);
+  await event(order._id, actor, "payment.refunded", `Recorded a refund of ${refund.amount}.`);
+  res.status(201).json(RecordOrderRefundResponse.parse(refundResponse(refund)));
+});
 
 router.get("/payments/flags", async (req, res): Promise<void> => {
   if (!(await context(req, res, "payments"))) return;
-  const flags = await getOrderPaymentFlags(await getMongoDb()).find({}).sort({ flaggedAt: -1, createdAt: -1 }).toArray();
-  res.json(ListPaymentFlagsResponse.parse(flags.map(paymentFlagResponse)));
+  const db = await getMongoDb();
+  const flags = await getOrderPaymentFlags(db).find({}).sort({ flaggedAt: -1, createdAt: -1 }).toArray();
+  const orderIds = [...new Set(flags.map((flag) => flag.orderRecordId))];
+  const orders = await getOrders(db).find({ _id: { $in: orderIds } }).toArray();
+  const progressByOrder = await getPaymentProgressMap(db, new Map(orders.map((order) => [order._id, order])));
+  res.json(ListPaymentFlagsResponse.parse(flags.map((flag) =>
+    paymentFlagResponse(flag, progressByOrder.get(flag.orderRecordId) ?? paymentProgress(null, 0, 0)),
+  )));
 });
 
 router.get("/orders/:id/payment-flags", async (req, res): Promise<void> => {
   const p = ListOrderPaymentFlagsParams.safeParse(req.params);
   if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
-  if (!(await context(req, res, "payments")) || !(await orderExists(p.data.id, res))) return;
-  const flags = await getOrderPaymentFlags(await getMongoDb())
+  if (!(await context(req, res, "payments"))) return;
+  const order = await orderExists(p.data.id, res);
+  if (!order) return;
+  const db = await getMongoDb();
+  const flags = await getOrderPaymentFlags(db)
     .find({ orderRecordId: p.data.id })
     .sort({ flaggedAt: -1, createdAt: -1 })
     .toArray();
-  res.json(ListOrderPaymentFlagsResponse.parse(flags.map(paymentFlagResponse)));
+  const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
+  res.json(ListOrderPaymentFlagsResponse.parse(flags.map((flag) => paymentFlagResponse(flag, progress))));
 });
 
 router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
@@ -286,6 +456,7 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
   if (!b.data.remarks.trim()) { res.status(400).json({ error: "Add remarks describing the payment issue." }); return; }
   const flaggedAt = parseDateOnly(b.data.flaggedAt);
   if (!flaggedAt) { res.status(400).json({ error: "Enter a valid flag date." }); return; }
+  const db = await getMongoDb();
 
   let flaggedAmount: number;
   let bounceReason: string | null = null;
@@ -318,11 +489,8 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
       res.status(409).json({ error: "Set the order value before flagging a refusal to pay." });
       return;
     }
-    const paid = await getOrderPayments(await getMongoDb()).aggregate<{ total: number }>([
-      { $match: { orderRecordId: order._id, status: "received" } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]).toArray();
-    flaggedAmount = Math.max(0, order.orderValue - Number(paid[0]?.total ?? 0));
+    const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
+    flaggedAmount = Math.max(0, progress.balance ?? 0);
     if (flaggedAmount <= 0) {
       res.status(409).json({ error: "This order has no pending amount to flag." });
       return;
@@ -331,7 +499,6 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
     followUpNotes = b.data.followUpNotes.trim();
   }
 
-  const db = await getMongoDb();
   const now = new Date();
   const id = randomUUID();
   const historyEntry: PaymentFlagActionDocument = {
@@ -371,7 +538,8 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
   };
   await getOrderPaymentFlags(db).insertOne(flag);
   await event(order._id, actor, "payment.flag_created", `${historyEntry.summary} ${flag.remarks}`);
-  res.status(201).json(CreateOrderPaymentFlagResponse.parse(paymentFlagResponse(flag)));
+  const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
+  res.status(201).json(CreateOrderPaymentFlagResponse.parse(paymentFlagResponse(flag, progress)));
 });
 
 router.patch("/payment-flags/:id/resolve", async (req, res): Promise<void> => {
@@ -384,7 +552,8 @@ router.patch("/payment-flags/:id/resolve", async (req, res): Promise<void> => {
   if (!b.data.resolutionNotes.trim()) { res.status(400).json({ error: "Add notes describing how the issue was resolved." }); return; }
   const resolutionDate = parseDateOnly(b.data.resolutionDate);
   if (!resolutionDate) { res.status(400).json({ error: "Enter a valid resolution date." }); return; }
-  const flags = getOrderPaymentFlags(await getMongoDb());
+  const db = await getMongoDb();
+  const flags = getOrderPaymentFlags(db);
   const old = await flags.findOne({ _id: p.data.id });
   if (!old) { res.status(404).json({ error: "Payment flag not found." }); return; }
   if (old.status !== "active") { res.status(409).json({ error: "Only active payment flags can be resolved." }); return; }
@@ -404,7 +573,11 @@ router.patch("/payment-flags/:id/resolve", async (req, res): Promise<void> => {
   if (result.modifiedCount === 0) { res.status(409).json({ error: "Payment flag changed before it could be resolved. Refresh and try again." }); return; }
   const updated = await flags.findOne({ _id: old._id });
   await event(old.orderRecordId, actor, "payment.flag_resolved", `Resolved payment flag for ${old.orderId}. ${action.summary}`);
-  res.json(ResolvePaymentFlagResponse.parse(paymentFlagResponse(updated!)));
+  const order = await getOrders(db).findOne({ _id: old.orderRecordId });
+  const progress = order
+    ? (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!
+    : paymentProgress(null, 0, 0);
+  res.json(ResolvePaymentFlagResponse.parse(paymentFlagResponse(updated!, progress)));
 });
 
 router.delete("/payment-flags/:id", async (req, res): Promise<void> => {
@@ -412,7 +585,8 @@ router.delete("/payment-flags/:id", async (req, res): Promise<void> => {
   if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
   const actor = await context(req, res, "payments", true);
   if (!actor) return;
-  const flags = getOrderPaymentFlags(await getMongoDb());
+  const db = await getMongoDb();
+  const flags = getOrderPaymentFlags(db);
   const old = await flags.findOne({ _id: p.data.id });
   if (!old) { res.status(404).json({ error: "Payment flag not found." }); return; }
   if (old.status === "removed") { res.status(409).json({ error: "Payment flag is already removed." }); return; }
@@ -432,30 +606,30 @@ router.delete("/payment-flags/:id", async (req, res): Promise<void> => {
   if (result.modifiedCount === 0) { res.status(409).json({ error: "Payment flag changed before it could be removed. Refresh and try again." }); return; }
   const updated = await flags.findOne({ _id: old._id });
   await event(old.orderRecordId, actor, "payment.flag_removed", `Removed payment flag for ${old.orderId}.`);
-  res.json(RemovePaymentFlagResponse.parse(paymentFlagResponse(updated!)));
+  const order = await getOrders(db).findOne({ _id: old.orderRecordId });
+  const progress = order
+    ? (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!
+    : paymentProgress(null, 0, 0);
+  res.json(RemovePaymentFlagResponse.parse(paymentFlagResponse(updated!, progress)));
 });
 
 router.get("/payments/overview", async (req, res): Promise<void> => {
   const actor = await context(req, res, "payments");
   if (!actor) return;
   const db = await getMongoDb();
-  const [orders, paymentTotals, recentPayments] = await Promise.all([
+  const [orders, recentPayments] = await Promise.all([
     getOrders(db).find({}).toArray(),
-    getOrderPayments(db).aggregate<{ _id: string; total: number }>([
-      { $match: { status: "received" } },
-      { $group: { _id: "$orderRecordId", total: { $sum: "$amount" } } },
-    ]).toArray(),
     getOrderPayments(db).find({ status: "received" }).sort({ createdAt: -1, _id: -1 }).limit(12).toArray(),
   ]);
   const orderById = new Map(orders.map((order) => [order._id, order]));
-  const collectedByOrder = new Map(paymentTotals.map((row) => [row._id, Number(row.total) || 0]));
-  const totalCollected = paymentTotals.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
+  const progressByOrder = await getPaymentProgressMap(db, orderById);
+  const totalCollected = [...progressByOrder.values()].reduce((sum, progress) => sum + progress.paid, 0);
   const totalOutstanding = orders.reduce((sum, order) => {
-    if (order.orderValue == null) return sum;
-    return sum + Math.max(0, order.orderValue - (collectedByOrder.get(order._id) ?? 0));
+    const balance = progressByOrder.get(order._id)?.balance;
+    return sum + Math.max(0, balance ?? 0);
   }, 0);
   const outstandingOrders = orders.filter((order) => order.orderValue != null
-    && order.orderValue - (collectedByOrder.get(order._id) ?? 0) > 0);
+    && (progressByOrder.get(order._id)?.balance ?? 0) > 0);
   const activeWindows = await getOrderWindows(db).find({
     orderRecordId: { $in: outstandingOrders.map((order) => order._id) },
     archivedAt: { $exists: false },
@@ -468,8 +642,8 @@ router.get("/payments/overview", async (req, res): Promise<void> => {
   }
   const reminderOrders = outstandingOrders.map((order) => {
     const windows = windowsByOrder.get(order._id) ?? [];
-    const collected = collectedByOrder.get(order._id) ?? 0;
-    const balance = order.orderValue! - collected;
+    const progress = progressByOrder.get(order._id)!;
+    const balance = progress.balance!;
     const productionReady = windows.length > 0 && windows.every((window) => window.frameStatus === "ready"
       && window.shutterStatus === "ready" && window.glassStatus === "received");
     return {
@@ -479,8 +653,9 @@ router.get("/payments/overview", async (req, res): Promise<void> => {
       clientName: order.clientName,
       locationName: order.locationName,
       orderValue: order.orderValue!,
-      totalCollected: collected,
+      totalCollected: progress.paid,
       balance,
+      percentage: progress.percentage,
       windowCount: windows.length,
       productionReady,
       canOpenWhatsApp: productionReady && Boolean(toWhatsAppNumber(order.clientPhone)),
@@ -549,11 +724,8 @@ router.post("/orders/:id/payment-reminder", async (req, res): Promise<void> => {
     res.status(409).json({ error: "Set the order value before opening a balance reminder." });
     return;
   }
-  const paymentTotal = await getOrderPayments(db).aggregate<{ total: number }>([
-    { $match: { orderRecordId: order._id, status: "received" } },
-    { $group: { _id: null, total: { $sum: "$amount" } } },
-  ]).toArray();
-  const balance = order.orderValue - Number(paymentTotal[0]?.total ?? 0);
+  const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
+  const balance = progress.balance!;
   if (balance <= 0) {
     res.status(409).json({ error: "This order no longer has an outstanding balance." });
     return;

@@ -8,6 +8,7 @@
 import type { PaymentFlagAction } from './paymentFlagAction';
 import type { PaymentFlagStatus } from './paymentFlagStatus';
 import type { PaymentFlagType } from './paymentFlagType';
+import type { PaymentProgress } from './paymentProgress';
 
 export interface PaymentFlag {
   id: string;
@@ -15,6 +16,7 @@ export interface PaymentFlag {
   orderId: string;
   clientName: string;
   locationName: string;
+  paymentProgress: PaymentProgress;
   flagType: PaymentFlagType;
   remarks: string;
   flaggedAmount: number;

@@ -77,9 +77,13 @@ import type {
   OrderMessageTemplateList,
   OrderMessageTemplateUpdate,
   OrderPayment,
+  OrderPaymentBounce,
   OrderPaymentInput,
   OrderPaymentList,
   OrderPaymentVoid,
+  OrderRefund,
+  OrderRefundInput,
+  OrderRefundList,
   OrderStatus,
   OrderUpdate,
   OrderWindow,
@@ -7482,6 +7486,263 @@ export const useVoidOrderPayment = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getVoidOrderPaymentMutationOptions(options));
+    }
+
+export const getBounceOrderPaymentUrl = (id: string,
+    paymentId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/payments/${paymentId}/bounce`
+}
+
+/**
+ * @summary Mark a received payment as bounced
+ */
+export const bounceOrderPayment = async (id: string,
+    paymentId: string,
+    orderPaymentBounce: OrderPaymentBounce, options?: Parameters<typeof customFetch>[1]): Promise<OrderPayment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderPayment>(getBounceOrderPaymentUrl(id,paymentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderPaymentBounce)
+  }
+);}
+
+
+
+
+
+export const getBounceOrderPaymentMutationKey = () => ['bounceOrderPayment'] as const;
+
+export const getBounceOrderPaymentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bounceOrderPayment>>, TError,BounceOrderPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bounceOrderPayment>>, TError,BounceOrderPaymentMutationVariables, TContext> => {
+
+const mutationKey = getBounceOrderPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bounceOrderPayment>>, BounceOrderPaymentMutationVariables> = (props) => {
+          const {id,paymentId,data} = props ?? {};
+
+          return  bounceOrderPayment(id,paymentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BounceOrderPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof bounceOrderPayment>>>
+    export type BounceOrderPaymentMutationBody = BodyType<OrderPaymentBounce>
+    export type BounceOrderPaymentMutationError = ErrorType<unknown>
+    export type BounceOrderPaymentMutationVariables = {id: string;paymentId: string;data: BodyType<OrderPaymentBounce>}
+
+    /**
+ * @summary Mark a received payment as bounced
+ */
+export const useBounceOrderPayment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bounceOrderPayment>>, TError,BounceOrderPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bounceOrderPayment>>,
+        TError,
+        BounceOrderPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBounceOrderPaymentMutationOptions(options));
+    }
+
+export const getListOrderRefundsUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/refunds`
+}
+
+/**
+ * @summary List refunds for an order
+ */
+export const listOrderRefunds = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderRefundList> => {
+
+  return customFetch<OrderRefundList>(getListOrderRefundsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderRefundsQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/refunds`
+    ] as const;
+    }
+
+
+export const getListOrderRefundsQueryOptions = <TData = Awaited<ReturnType<typeof listOrderRefunds>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderRefunds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderRefundsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderRefunds>>> = ({ signal }) => listOrderRefunds(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderRefunds>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderRefundsQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderRefunds>>>
+export type ListOrderRefundsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List refunds for an order
+ */
+
+export function useListOrderRefunds<TData = Awaited<ReturnType<typeof listOrderRefunds>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderRefunds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderRefundsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRecordOrderRefundUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/refunds`
+}
+
+/**
+ * @summary Record a refund against an order
+ */
+export const recordOrderRefund = async (id: string,
+    orderRefundInput: OrderRefundInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderRefund> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderRefund>(getRecordOrderRefundUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderRefundInput)
+  }
+);}
+
+
+
+
+
+export const getRecordOrderRefundMutationKey = () => ['recordOrderRefund'] as const;
+
+export const getRecordOrderRefundMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordOrderRefund>>, TError,RecordOrderRefundMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordOrderRefund>>, TError,RecordOrderRefundMutationVariables, TContext> => {
+
+const mutationKey = getRecordOrderRefundMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordOrderRefund>>, RecordOrderRefundMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  recordOrderRefund(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordOrderRefundMutationResult = NonNullable<Awaited<ReturnType<typeof recordOrderRefund>>>
+    export type RecordOrderRefundMutationBody = BodyType<OrderRefundInput>
+    export type RecordOrderRefundMutationError = ErrorType<unknown>
+    export type RecordOrderRefundMutationVariables = {id: string;data: BodyType<OrderRefundInput>}
+
+    /**
+ * @summary Record a refund against an order
+ */
+export const useRecordOrderRefund = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordOrderRefund>>, TError,RecordOrderRefundMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordOrderRefund>>,
+        TError,
+        RecordOrderRefundMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRecordOrderRefundMutationOptions(options));
     }
 
 export const getGetPurchaseOrderRegisterUrl = () => {

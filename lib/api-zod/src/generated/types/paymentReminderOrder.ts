@@ -16,6 +16,7 @@ export interface PaymentReminderOrder {
   orderValue: number;
   totalCollected: number;
   balance: number;
+  percentage: number;
   windowCount: number;
   productionReady: boolean;
   canOpenWhatsApp: boolean;

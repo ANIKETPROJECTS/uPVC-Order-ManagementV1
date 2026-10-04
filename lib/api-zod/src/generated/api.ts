@@ -314,6 +314,7 @@ export const GetPaymentOverviewResponse = zod.object({
   "orderValue": zod.number(),
   "totalCollected": zod.number(),
   "balance": zod.number(),
+  "percentage": zod.number(),
   "windowCount": zod.number().int(),
   "productionReady": zod.boolean(),
   "canOpenWhatsApp": zod.boolean()
@@ -344,6 +345,12 @@ export const ListPaymentFlagsResponseItem = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "paymentProgress": zod.object({
+  "orderValue": zod.number().nullable(),
+  "paid": zod.number(),
+  "balance": zod.number().nullable(),
+  "percentage": zod.number()
+}),
   "flagType": zod.enum(['bounced_payment', 'refusal_to_pay']),
   "remarks": zod.string(),
   "flaggedAmount": zod.number(),
@@ -388,6 +395,12 @@ export const ListOrderPaymentFlagsResponseItem = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "paymentProgress": zod.object({
+  "orderValue": zod.number().nullable(),
+  "paid": zod.number(),
+  "balance": zod.number().nullable(),
+  "percentage": zod.number()
+}),
   "flagType": zod.enum(['bounced_payment', 'refusal_to_pay']),
   "remarks": zod.string(),
   "flaggedAmount": zod.number(),
@@ -457,6 +470,12 @@ export const CreateOrderPaymentFlagResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "paymentProgress": zod.object({
+  "orderValue": zod.number().nullable(),
+  "paid": zod.number(),
+  "balance": zod.number().nullable(),
+  "percentage": zod.number()
+}),
   "flagType": zod.enum(['bounced_payment', 'refusal_to_pay']),
   "remarks": zod.string(),
   "flaggedAmount": zod.number(),
@@ -509,6 +528,12 @@ export const ResolvePaymentFlagResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "paymentProgress": zod.object({
+  "orderValue": zod.number().nullable(),
+  "paid": zod.number(),
+  "balance": zod.number().nullable(),
+  "percentage": zod.number()
+}),
   "flagType": zod.enum(['bounced_payment', 'refusal_to_pay']),
   "remarks": zod.string(),
   "flaggedAmount": zod.number(),
@@ -552,6 +577,12 @@ export const RemovePaymentFlagResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "paymentProgress": zod.object({
+  "orderValue": zod.number().nullable(),
+  "paid": zod.number(),
+  "balance": zod.number().nullable(),
+  "percentage": zod.number()
+}),
   "flagType": zod.enum(['bounced_payment', 'refusal_to_pay']),
   "remarks": zod.string(),
   "flaggedAmount": zod.number(),
@@ -2893,8 +2924,11 @@ export const ListOrderPaymentsResponseItem = zod.object({
   "reference": zod.string().nullable(),
   "notes": zod.string().nullable(),
   "paidAt": zod.coerce.date(),
-  "status": zod.enum(['received', 'void']),
+  "status": zod.enum(['received', 'void', 'bounced']),
   "voidReason": zod.string().nullable(),
+  "bouncedAt": zod.coerce.date().nullable(),
+  "bounceReason": zod.string().nullable(),
+  "bouncedBy": zod.string().nullable(),
   "createdBy": zod.string(),
   "createdAt": zod.coerce.date()
 })
@@ -2932,8 +2966,11 @@ export const RecordOrderPaymentResponse = zod.object({
   "reference": zod.string().nullable(),
   "notes": zod.string().nullable(),
   "paidAt": zod.coerce.date(),
-  "status": zod.enum(['received', 'void']),
+  "status": zod.enum(['received', 'void', 'bounced']),
   "voidReason": zod.string().nullable(),
+  "bouncedAt": zod.coerce.date().nullable(),
+  "bounceReason": zod.string().nullable(),
+  "bouncedBy": zod.string().nullable(),
   "createdBy": zod.string(),
   "createdAt": zod.coerce.date()
 })
@@ -2964,8 +3001,96 @@ export const VoidOrderPaymentResponse = zod.object({
   "reference": zod.string().nullable(),
   "notes": zod.string().nullable(),
   "paidAt": zod.coerce.date(),
-  "status": zod.enum(['received', 'void']),
+  "status": zod.enum(['received', 'void', 'bounced']),
   "voidReason": zod.string().nullable(),
+  "bouncedAt": zod.coerce.date().nullable(),
+  "bounceReason": zod.string().nullable(),
+  "bouncedBy": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Mark a received payment as bounced
+ */
+export const BounceOrderPaymentParams = zod.object({
+  "id": zod.coerce.string(),
+  "paymentId": zod.coerce.string()
+})
+
+export const bounceOrderPaymentBodyBounceReasonMin = 3;
+export const bounceOrderPaymentBodyBounceReasonMax = 500;
+
+
+
+export const BounceOrderPaymentBody = zod.object({
+  "bouncedAt": zod.coerce.date(),
+  "bounceReason": zod.string().min(bounceOrderPaymentBodyBounceReasonMin).max(bounceOrderPaymentBodyBounceReasonMax)
+})
+
+export const BounceOrderPaymentResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "amount": zod.number(),
+  "method": zod.enum(['cash', 'bank_transfer', 'upi', 'cheque', 'other']),
+  "reference": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "paidAt": zod.coerce.date(),
+  "status": zod.enum(['received', 'void', 'bounced']),
+  "voidReason": zod.string().nullable(),
+  "bouncedAt": zod.coerce.date().nullable(),
+  "bounceReason": zod.string().nullable(),
+  "bouncedBy": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List refunds for an order
+ */
+export const ListOrderRefundsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListOrderRefundsResponseItem = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "amount": zod.number(),
+  "refundDate": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListOrderRefundsResponse = zod.array(ListOrderRefundsResponseItem)
+
+
+/**
+ * @summary Record a refund against an order
+ */
+export const RecordOrderRefundParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const recordOrderRefundBodyAmountExclusiveMin = 0;
+
+export const recordOrderRefundBodyNotesMax = 500;
+
+
+
+export const RecordOrderRefundBody = zod.object({
+  "amount": zod.number().gt(recordOrderRefundBodyAmountExclusiveMin),
+  "refundDate": zod.coerce.date(),
+  "notes": zod.string().max(recordOrderRefundBodyNotesMax).nullish()
+})
+
+export const RecordOrderRefundResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "amount": zod.number(),
+  "refundDate": zod.coerce.date(),
+  "notes": zod.string().nullable(),
   "createdBy": zod.string(),
   "createdAt": zod.coerce.date()
 })

@@ -1944,6 +1944,76 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrderPayment"
+  /orders/{id}/payments/{paymentId}/bounce:
+    post:
+      operationId: bounceOrderPayment
+      tags: [orders]
+      summary: Mark a received payment as bounced
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderPaymentBounce"
+      responses:
+        "200":
+          description: Bounced payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderPayment"
+  /orders/{id}/refunds:
+    get:
+      operationId: listOrderRefunds
+      tags: [orders]
+      summary: List refunds for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order refunds
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderRefundList"
+    post:
+      operationId: recordOrderRefund
+      tags: [orders]
+      summary: Record a refund against an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderRefundInput"
+      responses:
+        "201":
+          description: Recorded refund
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderRefund"
   /confirmation/purchase-orders:
     get:
       operationId: getPurchaseOrderRegister
@@ -2939,7 +3009,7 @@ components:
       enum: [cash, bank_transfer, upi, cheque, other]
     OrderPaymentStatus:
       type: string
-      enum: [received, void]
+      enum: [received, void, bounced]
     OrderPayment:
       type: object
       properties:
@@ -2962,6 +3032,13 @@ components:
           $ref: "#/components/schemas/OrderPaymentStatus"
         voidReason:
           type: ["string", "null"]
+        bouncedAt:
+          type: ["string", "null"]
+          format: date
+        bounceReason:
+          type: ["string", "null"]
+        bouncedBy:
+          type: ["string", "null"]
         createdBy:
           type: string
         createdAt:
@@ -2977,6 +3054,9 @@ components:
         - paidAt
         - status
         - voidReason
+        - bouncedAt
+        - bounceReason
+        - bouncedBy
         - createdBy
         - createdAt
     OrderPaymentInput:
@@ -3005,10 +3085,70 @@ components:
           minLength: 3
           maxLength: 500
       required: [voidReason]
+    OrderPaymentBounce:
+      type: object
+      properties:
+        bouncedAt:
+          type: string
+          format: date
+        bounceReason:
+          type: string
+          minLength: 3
+          maxLength: 500
+      required: [bouncedAt, bounceReason]
     OrderPaymentList:
       type: array
       items:
         $ref: "#/components/schemas/OrderPayment"
+    OrderRefund:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        amount:
+          type: number
+        refundDate:
+          type: string
+          format: date
+        notes:
+          type: ["string", "null"]
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, orderRecordId, amount, refundDate, notes, createdBy, createdAt]
+    OrderRefundInput:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: 0
+        refundDate:
+          type: string
+          format: date
+        notes:
+          type: ["string", "null"]
+          maxLength: 500
+      required: [amount, refundDate]
+    OrderRefundList:
+      type: array
+      items:
+        $ref: "#/components/schemas/OrderRefund"
+    PaymentProgress:
+      type: object
+      properties:
+        orderValue:
+          type: ["number", "null"]
+        paid:
+          type: number
+        balance:
+          type: ["number", "null"]
+        percentage:
+          type: number
+      required: [orderValue, paid, balance, percentage]
     PaymentFlagType:
       type: string
       enum: [bounced_payment, refusal_to_pay]
@@ -3046,6 +3186,8 @@ components:
           type: string
         locationName:
           type: string
+        paymentProgress:
+          $ref: "#/components/schemas/PaymentProgress"
         flagType:
           $ref: "#/components/schemas/PaymentFlagType"
         remarks:
@@ -3100,6 +3242,7 @@ components:
         - orderId
         - clientName
         - locationName
+        - paymentProgress
         - flagType
         - remarks
         - flaggedAmount
@@ -3388,13 +3531,15 @@ components:
           type: number
         balance:
           type: number
+        percentage:
+          type: number
         windowCount:
           type: integer
         productionReady:
           type: boolean
         canOpenWhatsApp:
           type: boolean
-      required: [orderRecordId, orderId, orderStatus, clientName, locationName, orderValue, totalCollected, balance, windowCount, productionReady, canOpenWhatsApp]
+      required: [orderRecordId, orderId, orderStatus, clientName, locationName, orderValue, totalCollected, balance, percentage, windowCount, productionReady, canOpenWhatsApp]
     PaymentReminderOrderList:
       type: array
       items:

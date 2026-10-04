@@ -31,6 +31,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FlaggedPaymentsSection } from '@/components/flagged-payments';
 import { PaymentFlagBadge } from '@/components/payment-flag-badge';
+import { PaymentProgressBar } from '@/components/payment-progress-bar';
 
 const money = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -122,12 +123,12 @@ export default function PaymentsPage({ user }: { user: User }) {
             <CardContent className="relative flex min-h-[148px] flex-col justify-between p-5 sm:p-6">
               <div className="absolute -right-4 -top-5 opacity-[0.12]"><Wallet size={112} strokeWidth={1} /></div>
               <div className="relative flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-foreground/75">Total collected</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-foreground/75">Net paid</span>
                 <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-foreground/15"><ArrowDownLeft size={18} /></span>
               </div>
               <div className="relative">
                 <p className="font-display text-3xl font-bold tracking-tight sm:text-[34px]" data-testid="value-total-collected">{money(overview.data.totalCollected)}</p>
-                <p className="mt-1 text-xs text-primary-foreground/70">Received across all tracked orders</p>
+                <p className="mt-1 text-xs text-primary-foreground/70">Received receipts less refunds</p>
               </div>
             </CardContent>
           </Card>
@@ -210,6 +211,7 @@ export default function PaymentsPage({ user }: { user: User }) {
                   </div>
                   <p className="mt-1 truncate text-sm font-semibold" data-testid={`text-reminder-client-${order.orderRecordId}`}>{order.clientName}</p>
                   <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={12} />{order.locationName} <span className="mx-1 text-border">/</span> Order {money(order.orderValue)} · Paid {money(order.totalCollected)}</p>
+                  <PaymentProgressBar percentage={order.percentage} compact testId={`progress-reminder-order-${order.orderRecordId}`} />
                   {!order.productionReady && <p className="mt-1 text-[10px] text-muted-foreground">Add at least one window, then complete frame, shutter and glass readiness to enable a draft.</p>}
                   {order.productionReady && !order.canOpenWhatsApp && <p className="mt-1 text-[10px] text-muted-foreground">Add a valid WhatsApp number to enable the draft.</p>}
                 </div>

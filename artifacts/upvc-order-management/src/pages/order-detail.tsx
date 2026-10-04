@@ -24,6 +24,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   ShieldCheck,
@@ -43,6 +44,8 @@ import {
   getListOrderMessageTemplatesQueryKey,
   getListOrderPaymentFlagsQueryKey,
   getListOrderPaymentsQueryKey,
+  getListOrderRefundsQueryKey,
+  getListPaymentFlagsQueryKey,
   getListOrderWindowsQueryKey,
   getListOrdersQueryKey,
   OrderGlassStatus,
@@ -52,9 +55,11 @@ import {
   OrderWindowReadiness,
   useArchiveOrderDocument,
   useArchiveOrderWindow,
+  useBounceOrderPayment,
   useCreateOrderDocumentCategory,
   useCreateOrderGrievance,
   useCreateOrderWindow,
+  useCreateOrderPaymentFlag,
   useDeleteOrderDocumentCategory,
   useDownloadOrderDocument,
   useGetOrder,
@@ -65,8 +70,10 @@ import {
   useListOrderMessageTemplates,
   useListOrderPaymentFlags,
   useListOrderPayments,
+  useListOrderRefunds,
   useListOrderWindows,
   useRecordOrderPayment,
+  useRecordOrderRefund,
   useReplaceOrderDocument,
   useUpdateOrder,
   useUpdateOrderBilling,
@@ -99,6 +106,8 @@ import { useToast } from '@/hooks/use-toast';
 import { DocumentPreviewDialog } from '@/components/document-preview';
 import { PaymentFlagBadge } from '@/components/payment-flag-badge';
 import { PaymentFlagDialog } from '@/components/payment-flag-dialog';
+import { PaymentProgressBar } from '@/components/payment-progress-bar';
+import { calculatePaymentProgress } from '@/lib/payment-progress';
 
 type Status = (typeof OrderStatus)[keyof typeof OrderStatus];
 type Readiness = (typeof OrderWindowReadiness)[keyof typeof OrderWindowReadiness];
@@ -362,7 +371,7 @@ function BillingPanel({ order, user, id }: { order: Order; user: User; id: strin
   const [editing, setEditing] = useState(false);
   const form = useForm<{ orderValue: string }>({ defaultValues: { orderValue: order.orderValue == null ? '' : String(order.orderValue) } });
   useEffect(() => { if (!editing) form.reset({ orderValue: order.orderValue == null ? '' : String(order.orderValue) }); }, [editing, form, order.orderValue]);
-  const save = (values: { orderValue: string }) => update.mutate({ id, data: { orderValue: values.orderValue.trim() === '' ? null : Number(values.orderValue) } }, { onSuccess: (updated) => { queryClient.setQueryData(getGetOrderQueryKey(id), updated); void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(id) }); setEditing(false); toast({ title: 'Order value updated' }); }, onError: () => toast({ title: 'Order value could not be updated', variant: 'destructive' as const }) });
+  const save = (values: { orderValue: string }) => update.mutate({ id, data: { orderValue: values.orderValue.trim() === '' ? null : Number(values.orderValue) } }, { onSuccess: (updated) => { queryClient.setQueryData(getGetOrderQueryKey(id), updated); void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(id) }); void queryClient.invalidateQueries({ queryKey: getGetPaymentOverviewQueryKey() }); void queryClient.invalidateQueries({ queryKey: getListPaymentFlagsQueryKey() }); void queryClient.invalidateQueries({ queryKey: getListOrderPaymentFlagsQueryKey(id) }); setEditing(false); toast({ title: 'Order value updated' }); }, onError: () => toast({ title: 'Order value could not be updated', variant: 'destructive' as const }) });
   return <Card className="border-border/80" data-testid="card-billing-value"><CardHeader className="flex-row items-start justify-between pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Commercial record</p><CardTitle className="mt-1 text-base">Order value</CardTitle><p className="mt-1 text-xs text-muted-foreground">The agreed value used for balance calculation.</p></div>{canEdit && <Button size="sm" variant="outline" onClick={() => setEditing((value) => !value)} data-testid="button-edit-order-value"><Pencil size={13} /> {editing ? 'Cancel' : 'Edit value'}</Button>}</CardHeader><CardContent>{editing && canEdit ? <Form {...form}><form onSubmit={form.handleSubmit(save)} className="flex flex-wrap items-end gap-3" data-testid="form-order-billing"><FormField control={form.control} name="orderValue" render={({ field }) => <FormItem className="min-w-[220px] flex-1"><FormLabel>Order value (INR)</FormLabel><FormControl><Input {...field} type="number" min="0" step="0.01" placeholder="Leave blank if not agreed" data-testid="input-order-value" /></FormControl><FormMessage /></FormItem>} /><Button type="submit" disabled={update.isPending} data-testid="button-save-order-value">{update.isPending ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} Save</Button></form></Form> : <div className="flex items-end justify-between gap-4"><div><p className="font-display text-3xl font-bold tracking-[-0.04em]" data-testid="text-order-value">{inr(order.orderValue)}</p><p className="mt-1 text-xs text-muted-foreground">{order.orderValue == null ? 'Balance remains unknown until an order value is set.' : 'Persisted on the central order record.'}</p></div><IndianRupee className="mb-1 text-primary/70" size={28} /></div>}</CardContent></Card>;
 }
 
@@ -372,20 +381,178 @@ function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; 
   const canView = hasPermission(user, 'payments', 'view');
   const canEdit = hasPermission(user, 'payments');
   const query = useListOrderPayments(orderId, { query: { enabled: canView, queryKey: getListOrderPaymentsQueryKey(orderId) } });
+  const refundsQuery = useListOrderRefunds(orderId, { query: { enabled: canView, queryKey: getListOrderRefundsQueryKey(orderId) } });
   const voidPayment = useVoidOrderPayment();
+  const bouncePayment = useBounceOrderPayment();
+  const createFlag = useCreateOrderPaymentFlag();
+  const recordRefund = useRecordOrderRefund();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundDate, setRefundDate] = useState(localDateInput);
+  const [refundNotes, setRefundNotes] = useState('');
+  const [bounceTarget, setBounceTarget] = useState<OrderPayment | null>(null);
+  const [bounceDate, setBounceDate] = useState(localDateInput);
+  const [bounceReason, setBounceReason] = useState('');
+  const [createBounceFlag, setCreateBounceFlag] = useState(false);
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const payments = query.data || [];
-  const received = payments.filter((payment) => payment.status === OrderPaymentStatus.received).reduce((sum, payment) => sum + payment.amount, 0);
-  const balance = order.orderValue == null ? null : order.orderValue - received;
+  const refunds = refundsQuery.data || [];
+  const receiptsTotal = payments.filter((payment) => payment.status === OrderPaymentStatus.received).reduce((sum, payment) => sum + payment.amount, 0);
+  const refundTotal = refunds.reduce((sum, refund) => sum + refund.amount, 0);
+  const progress = calculatePaymentProgress(order.orderValue, receiptsTotal - refundTotal);
+  const refreshLedger = () => {
+    void queryClient.invalidateQueries({ queryKey: getListOrderPaymentsQueryKey(orderId) });
+    void queryClient.invalidateQueries({ queryKey: getListOrderRefundsQueryKey(orderId) });
+    void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
+    void queryClient.invalidateQueries({ queryKey: getGetPaymentOverviewQueryKey() });
+    void queryClient.invalidateQueries({ queryKey: getListOrderPaymentFlagsQueryKey(orderId) });
+    void queryClient.invalidateQueries({ queryKey: getListPaymentFlagsQueryKey() });
+  };
   const voidPaymentRecord = (payment: OrderPayment) => {
     const reason = window.prompt('Reason for voiding this payment');
     if (!reason || reason.trim().length < 3) return;
     setVoidingId(payment.id);
-    voidPayment.mutate({ id: orderId, paymentId: payment.id, data: { voidReason: reason.trim() } }, { onSuccess: () => { setVoidingId(null); toast({ title: 'Payment voided' }); void queryClient.invalidateQueries({ queryKey: getListOrderPaymentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => { setVoidingId(null); toast({ title: 'Payment could not be voided', variant: 'destructive' as const }); } });
+    voidPayment.mutate({ id: orderId, paymentId: payment.id, data: { voidReason: reason.trim() } }, {
+      onSuccess: () => { setVoidingId(null); toast({ title: 'Payment voided' }); refreshLedger(); },
+      onError: () => { setVoidingId(null); toast({ title: 'Payment could not be voided', variant: 'destructive' as const }); },
+    });
+  };
+  const submitBounce = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const target = bounceTarget;
+    if (!target || bounceReason.trim().length < 3) return;
+    bouncePayment.mutate({ id: orderId, paymentId: target.id, data: { bouncedAt: bounceDate, bounceReason: bounceReason.trim() } }, {
+      onSuccess: () => {
+        refreshLedger();
+        setBounceTarget(null);
+        toast({ title: 'Receipt marked as bounced' });
+        if (createBounceFlag) {
+          createFlag.mutate({
+            id: orderId,
+            data: {
+              flagType: 'bounced_payment',
+              remarks: `Receipt of ${plainInr(target.amount)} bounced from the bank.`,
+              flaggedAt: bounceDate,
+              bounceReason: bounceReason.trim(),
+              bouncedAmount: target.amount,
+            },
+          }, {
+            onSuccess: () => {
+              void queryClient.invalidateQueries({ queryKey: getListPaymentFlagsQueryKey() });
+              void queryClient.invalidateQueries({ queryKey: getListOrderPaymentFlagsQueryKey(orderId) });
+              void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
+              toast({ title: 'Bounced-payment flag added' });
+            },
+            onError: () => toast({ title: 'Receipt bounced; the payment flag could not be created', description: 'You can add it separately from Payment flags.', variant: 'destructive' as const }),
+          });
+        }
+      },
+      onError: () => toast({ title: 'Receipt could not be marked as bounced', variant: 'destructive' as const }),
+    });
+  };
+  const submitRefund = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const amount = Number(refundAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > Math.max(0, progress.paid)) return;
+    recordRefund.mutate({ id: orderId, data: { amount, refundDate, notes: refundNotes.trim() || null } }, {
+      onSuccess: () => {
+        refreshLedger();
+        setRefundDialogOpen(false);
+        setRefundAmount('');
+        setRefundNotes('');
+        toast({ title: 'Refund recorded' });
+      },
+      onError: () => toast({ title: 'Refund could not be recorded', variant: 'destructive' as const }),
+    });
   };
   if (!canView) return <ZeroState icon={IndianRupee} title="Payment access is restricted" description="You need payments view access to see this order's financial records." testId="state-payments-restricted" />;
-  return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-3"><SummaryStat label="Order value" value={inr(order.orderValue)} detail={order.orderValue == null ? 'Unknown' : 'Agreed value'} testId="text-billing-order-value" /><SummaryStat label="Received" value={plainInr(received)} detail="Status: received only" testId="text-payments-received" /><SummaryStat label="Balance" value={balance == null ? 'Unknown' : plainInr(balance)} detail={balance == null ? 'Set order value to calculate' : balance < 0 ? 'Received exceeds order value' : 'Order value less received'} testId="text-payment-balance" /></div><Card className="border-border/80" data-testid="card-payments"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Payment register</p><CardTitle className="mt-1 text-base">Receipts and voids</CardTitle><p className="mt-1 text-xs text-muted-foreground">Voids retain the original record and audit trail.</p></div>{canEdit && <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="button-record-payment"><Plus size={14} /> Record payment</Button>}</CardHeader><CardContent>{query.isLoading ? <div className="space-y-3" data-testid="state-payments-loading">{[1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Payment records could not be loaded." testId="state-payments-error" /> : payments.length === 0 ? <ZeroState icon={IndianRupee} title="No payment records" description={canEdit ? 'Record the first receipt when funds arrive.' : 'No payments have been persisted for this order.'} testId="state-payments-empty" /> : <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Paid at</th><th className="px-3 py-3">Amount</th><th className="px-3 py-3">Method</th><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Action</th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/50 last:border-0" data-testid={`row-payment-${payment.id}`}><td className="px-3 py-3"><p>{dateLabel(payment.paidAt)}</p><p className="mt-1 text-[10px] text-muted-foreground">by {payment.createdBy}</p></td><td className="px-3 py-3 font-semibold" data-testid={`text-payment-amount-${payment.id}`}>{plainInr(payment.amount)}</td><td className="px-3 py-3 capitalize">{readable(payment.method)}</td><td className="px-3 py-3 text-muted-foreground">{payment.reference || '—'}</td><td className="px-3 py-3"><span className={`rounded-md px-2 py-1 text-[10px] font-bold ${payment.status === OrderPaymentStatus.received ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{payment.status === OrderPaymentStatus.received ? 'Received' : 'Void'}</span>{payment.voidReason && <p className="mt-1 max-w-[160px] truncate text-[10px] text-muted-foreground" title={payment.voidReason}>{payment.voidReason}</p>}</td><td className="px-3 py-3 text-right">{canEdit && payment.status === OrderPaymentStatus.received && <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={voidingId === payment.id} onClick={() => voidPaymentRecord(payment)} data-testid={`button-void-payment-${payment.id}`}>{voidingId === payment.id ? <Loader2 className="animate-spin" size={13} /> : <Archive size={13} />} Void</Button>}</td></tr>)}</tbody></table></div>}</CardContent></Card><PaymentDialog orderId={orderId} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderPaymentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></div>;
+  return <div className="space-y-5">
+    <div className="grid gap-3 sm:grid-cols-3">
+      <SummaryStat label="Order value" value={inr(order.orderValue)} detail={order.orderValue == null ? 'Unknown' : 'Agreed value'} testId="text-billing-order-value" />
+      <SummaryStat label="Paid" value={plainInr(progress.paid)} detail="Received receipts less refunds" testId="text-payments-received" />
+      <SummaryStat label="Balance" value={progress.balance == null ? 'Unknown' : plainInr(progress.balance)} detail={progress.balance == null ? 'Set order value to calculate' : progress.balance < 0 ? 'Paid exceeds order value' : 'Order value less paid'} testId="text-payment-balance" />
+    </div>
+    <Card className="border-border/80" data-testid="card-payments">
+      <CardHeader className="flex-row items-start justify-between gap-3 pb-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Payment register</p>
+          <CardTitle className="mt-1 text-base">Receipts, bounces and refunds</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">Only received receipts count toward Paid; refunds reduce it. Voids and bounces remain in the audit trail.</p>
+        </div>
+        {canEdit && <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" disabled={progress.paid <= 0} onClick={() => { setRefundAmount(''); setRefundDate(localDateInput()); setRefundNotes(''); setRefundDialogOpen(true); }} data-testid="button-record-refund"><RotateCcw size={14} /> Record refund</Button>
+          <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="button-record-payment"><Plus size={14} /> Record payment</Button>
+        </div>}
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <section className="rounded-xl border border-border/70 bg-muted/15 p-4" data-testid="section-payment-progress">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Payment progress</p><p className="mt-1 text-sm font-semibold">{plainInr(progress.paid)} paid <span className="font-normal text-muted-foreground">of {order.orderValue == null ? 'order value not set' : plainInr(order.orderValue)}</span></p></div>
+            <p className="text-xs text-muted-foreground">{progress.balance == null ? 'Balance unavailable' : `Balance ${plainInr(progress.balance)}`}</p>
+          </div>
+          <PaymentProgressBar percentage={progress.percentage} testId="progress-order-payment" />
+        </section>
+        {query.isLoading ? <div className="space-y-3" data-testid="state-payments-loading">{[1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div>
+          : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Payment records could not be loaded." testId="state-payments-error" />
+            : payments.length === 0 ? <ZeroState icon={IndianRupee} title="No payment records" description={canEdit ? 'Record the first receipt when funds arrive.' : 'No payments have been persisted for this order.'} testId="state-payments-empty" />
+              : <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-xs">
+                <thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Paid at</th><th className="px-3 py-3">Amount</th><th className="px-3 py-3">Method</th><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th></tr></thead>
+                <tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/50 last:border-0" data-testid={`row-payment-${payment.id}`}>
+                  <td className="px-3 py-3"><p>{dateLabel(payment.paidAt)}</p><p className="mt-1 text-[10px] text-muted-foreground">by {payment.createdBy}</p></td>
+                  <td className="px-3 py-3 font-semibold" data-testid={`text-payment-amount-${payment.id}`}>{plainInr(payment.amount)}</td>
+                  <td className="px-3 py-3 capitalize">{readable(payment.method)}</td>
+                  <td className="px-3 py-3 text-muted-foreground">{payment.reference || '—'}</td>
+                  <td className="px-3 py-3">
+                    <span className={`rounded-md px-2 py-1 text-[10px] font-bold ${payment.status === OrderPaymentStatus.received ? 'bg-emerald-100 text-emerald-800' : payment.status === 'bounced' ? 'bg-rose-100 text-rose-800' : 'bg-muted text-muted-foreground'}`}>{payment.status === OrderPaymentStatus.received ? 'Received' : payment.status === 'bounced' ? 'Bounced' : 'Void'}</span>
+                    {payment.voidReason && <p className="mt-1 max-w-[160px] truncate text-[10px] text-muted-foreground" title={payment.voidReason}>{payment.voidReason}</p>}
+                    {payment.bounceReason && <p className="mt-1 max-w-[200px] text-[10px] text-rose-700" title={payment.bounceReason}>{payment.bounceReason} · {payment.bouncedAt ? dateLabel(payment.bouncedAt) : 'date unavailable'}</p>}
+                  </td>
+                  <td className="px-3 py-3 text-right">
+                    {canEdit && payment.status === OrderPaymentStatus.received && <div className="inline-flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="text-rose-700 hover:text-rose-800" onClick={() => { setBounceTarget(payment); setBounceDate(localDateInput()); setBounceReason(''); setCreateBounceFlag(false); }} data-testid={`button-bounce-payment-${payment.id}`}><RotateCcw size={13} /> Bounce</Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={voidingId === payment.id} onClick={() => voidPaymentRecord(payment)} data-testid={`button-void-payment-${payment.id}`}>{voidingId === payment.id ? <Loader2 className="animate-spin" size={13} /> : <Archive size={13} />} Void</Button>
+                    </div>}
+                  </td>
+                </tr>)}</tbody>
+              </table></div>}
+      </CardContent>
+    </Card>
+    <Card className="border-border/80" data-testid="card-order-refunds">
+      <CardHeader className="pb-3"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Refund ledger</p><CardTitle className="mt-1 text-base">Refunds</CardTitle></CardHeader>
+      <CardContent>
+        {refundsQuery.isLoading ? <div className="h-12 animate-pulse rounded-xl bg-muted/55" data-testid="state-refunds-loading" />
+          : refundsQuery.isError ? <InlineError onRetry={() => void refundsQuery.refetch()} label="Refund records could not be loaded." testId="state-refunds-error" />
+            : refunds.length === 0 ? <p className="text-xs text-muted-foreground" data-testid="state-refunds-empty">No refunds recorded for this order.</p>
+              : <div className="divide-y divide-border/60" data-testid="list-order-refunds">{refunds.map((refund) => <div key={refund.id} className="flex flex-wrap items-start justify-between gap-2 py-3 first:pt-0 last:pb-0" data-testid={`row-order-refund-${refund.id}`}>
+                <div><p className="text-xs font-semibold">{plainInr(refund.amount)} <span className="font-normal text-muted-foreground">· {dateLabel(refund.refundDate)}</span></p>{refund.notes && <p className="mt-1 max-w-xl text-[11px] text-muted-foreground">{refund.notes}</p>}<p className="mt-1 text-[10px] text-muted-foreground">Recorded by {refund.createdBy}</p></div>
+              </div>)}</div>}
+      </CardContent>
+    </Card>
+    <PaymentDialog orderId={orderId} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={refreshLedger} />
+    {bounceTarget && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="bounce-payment-title" data-testid="dialog-bounce-payment">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-background p-5 shadow-xl sm:p-6">
+        <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-rose-700">Receipt status</p><h2 id="bounce-payment-title" className="mt-1 font-display text-xl font-bold">Mark receipt bounced</h2><p className="mt-1 text-xs text-muted-foreground">{plainInr(bounceTarget.amount)} · {dateLabel(bounceTarget.paidAt)}</p></div><Button type="button" size="sm" variant="ghost" onClick={() => setBounceTarget(null)}>Close</Button></div>
+        <form onSubmit={submitBounce} className="mt-5 space-y-4">
+          <label className="block"><span className="mb-1.5 block text-xs font-semibold">Bounce date</span><Input type="date" required value={bounceDate} onChange={(event) => setBounceDate(event.target.value)} data-testid="input-payment-bounce-date" /></label>
+          <label className="block"><span className="mb-1.5 block text-xs font-semibold">Reason</span><Textarea required minLength={3} maxLength={500} rows={3} value={bounceReason} onChange={(event) => setBounceReason(event.target.value)} placeholder="Enter the bank’s reason" data-testid="textarea-payment-bounce-reason" /></label>
+          <label className="flex items-start gap-2 rounded-lg border border-border/70 p-3 text-xs leading-5"><input type="checkbox" className="mt-1 accent-primary" checked={createBounceFlag} onChange={(event) => setCreateBounceFlag(event.target.checked)} data-testid="checkbox-create-bounce-flag" /><span><span className="font-semibold">Also create a Bounced Payment flag</span><span className="block text-muted-foreground">Adds an issue-tracking flag with the receipt amount, date and reason. It does not change the ledger.</span></span></label>
+          <div className="flex justify-end gap-2 border-t border-border/70 pt-4"><Button type="button" variant="outline" onClick={() => setBounceTarget(null)}>Cancel</Button><Button type="submit" disabled={bouncePayment.isPending || createFlag.isPending} data-testid="button-confirm-bounce-payment">{bouncePayment.isPending ? <Loader2 className="animate-spin" size={14} /> : <RotateCcw size={14} />} Mark bounced</Button></div>
+        </form>
+      </div>
+    </div>}
+    {refundDialogOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="refund-payment-title" data-testid="dialog-record-refund">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-background p-5 shadow-xl sm:p-6">
+        <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Refund ledger</p><h2 id="refund-payment-title" className="mt-1 font-display text-xl font-bold">Record refund</h2><p className="mt-1 text-xs text-muted-foreground">Up to {plainInr(Math.max(0, progress.paid))} can be refunded.</p></div><Button type="button" size="sm" variant="ghost" onClick={() => setRefundDialogOpen(false)}>Close</Button></div>
+        <form onSubmit={submitRefund} className="mt-5 space-y-4">
+          <label className="block"><span className="mb-1.5 block text-xs font-semibold">Refund amount (INR)</span><Input required type="number" min="0.01" max={Math.max(0, progress.paid)} step="0.01" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} data-testid="input-refund-amount" /></label>
+          <label className="block"><span className="mb-1.5 block text-xs font-semibold">Refund date</span><Input required type="date" value={refundDate} onChange={(event) => setRefundDate(event.target.value)} data-testid="input-refund-date" /></label>
+          <label className="block"><span className="mb-1.5 block text-xs font-semibold">Notes <span className="font-normal text-muted-foreground">(optional)</span></span><Textarea maxLength={500} rows={3} value={refundNotes} onChange={(event) => setRefundNotes(event.target.value)} placeholder="Add a note for the audit trail" data-testid="textarea-refund-notes" /></label>
+          <div className="flex justify-end gap-2 border-t border-border/70 pt-4"><Button type="button" variant="outline" onClick={() => setRefundDialogOpen(false)}>Cancel</Button><Button type="submit" disabled={recordRefund.isPending || !refundAmount || Number(refundAmount) <= 0 || Number(refundAmount) > Math.max(0, progress.paid)} data-testid="button-save-refund">{recordRefund.isPending ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} Save refund</Button></div>
+        </form>
+      </div>
+    </div>}
+  </div>;
 }
 
 function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
@@ -799,10 +966,12 @@ export default function OrderDetailPage({ user }: { user: User }) {
   const record = order.data;
   const windows = useListOrderWindows(id, { query: { queryKey: getListOrderWindowsQueryKey(id) } });
   const payments = useListOrderPayments(id, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderPaymentsQueryKey(id) } });
+  const orderRefunds = useListOrderRefunds(id, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderRefundsQueryKey(id) } });
   const canReadOrder = hasPermission(user, 'order-hub', 'view');
   const windowRows = windows.data || [];
   const paymentRows = payments.data || [];
-  const received = paymentRows.filter((payment) => payment.status === OrderPaymentStatus.received).reduce((sum, payment) => sum + payment.amount, 0);
+  const refundTotal = (orderRefunds.data || []).reduce((sum, refund) => sum + refund.amount, 0);
+  const received = paymentRows.filter((payment) => payment.status === OrderPaymentStatus.received).reduce((sum, payment) => sum + payment.amount, 0) - refundTotal;
   const summary = useMemo(() => ({ count: windowRows.length, sqFt: windowRows.reduce((sum, item) => sum + item.sqFt, 0), ready: windowRows.filter((item) => item.frameStatus === OrderWindowReadiness.ready && item.shutterStatus === OrderWindowReadiness.ready && item.glassStatus === OrderGlassStatus.received).length, glass: windowRows.length === 0 ? 'No windows' : windowRows.every((item) => item.glassStatus === OrderGlassStatus.received) ? 'Received' : windowRows.some((item) => item.glassStatus === OrderGlassStatus.partial) ? 'Partial' : 'Pending' }), [windowRows]);
   if (order.isLoading) return <AppShell user={user} title="Order detail" eyebrow="Central order register"><DetailLoading /></AppShell>;
   if (order.isError || !record) return <AppShell user={user} title="Order detail" eyebrow="Central order register"><DetailError onRetry={() => void order.refetch()} /></AppShell>;
@@ -811,7 +980,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
   return <AppShell user={user} title={record.orderId} eyebrow="Module 2 · order record"><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-order-hub"><ArrowLeft size={15} /> Back to order hub</Link><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full bg-primary" /> <span>Last updated {dateLabel(record.updatedAt)}</span></div></div>
     <section className="order-hub-accent relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header"><div className="absolute right-10 top-8 h-28 w-28 rounded-full border border-sidebar-primary/20" /><div className="relative flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="min-w-0"><p className="break-all font-mono text-xs font-bold tracking-[0.13em] text-sidebar-primary" data-testid="text-order-id">{record.orderId}</p><h2 className="mt-3 break-words font-display text-2xl font-bold tracking-[-0.04em] sm:text-3xl md:text-4xl" data-testid="text-order-client">{record.clientName}</h2><p className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70"><span className="font-mono text-sidebar-primary">{record.locationCode}</span> <span className="break-words">{record.locationName}</span> <span className="text-white/40">·</span> <span>created {dateLabel(record.createdAt)}</span></p></div><span className={`inline-flex w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusTone(record.status)}`} data-testid="status-order-detail">{statusLabel(record.status)}</span></div></section>
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Windows" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Total area" value={`${summary.sqFt.toFixed(2)} sq ft`} detail="Summed from window records" testId="text-summary-area" /><SummaryStat label="Glass state" value={summary.glass} detail="Aggregate procurement state" testId="text-summary-glass" /><SummaryStat label="Received" value={hasPermission(user, 'payments', 'view') ? plainInr(received) : 'Restricted'} detail="Payments marked received" testId="text-summary-received" /></div>
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Windows" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Total area" value={`${summary.sqFt.toFixed(2)} sq ft`} detail="Summed from window records" testId="text-summary-area" /><SummaryStat label="Glass state" value={summary.glass} detail="Aggregate procurement state" testId="text-summary-glass" /><SummaryStat label="Paid" value={hasPermission(user, 'payments', 'view') ? plainInr(received) : 'Restricted'} detail="Received receipts less refunds" testId="text-summary-received" /></div>
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6" data-testid="section-order-lifecycle"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-base font-bold">Where this order is now</h2></div><span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span></div><div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">{timeline.map((item, index) => <div key={item.value} className="relative min-w-0" data-testid={`timeline-stage-${item.value}`}>{index < timeline.length - 1 && <div aria-hidden="true" className={`absolute left-7 -right-4 top-3.5 z-0 hidden h-px lg:block ${item.active ? 'bg-primary/35' : 'bg-border'}`} />}<span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.current ? 'border-primary bg-primary text-primary-foreground' : item.active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}>{item.current ? <Check size={13} /> : String(index + 1).padStart(2, '0')}</span><p className={`mt-2 min-h-8 text-[10px] font-bold leading-4 ${item.active ? 'text-primary' : 'text-muted-foreground'}`}>{item.label}</p></div>)}</div></section>
     <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : new URLSearchParams(window.location.search).get('tab') === 'grievances' ? 'grievances' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-5"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="grievances" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-grievances">Grievances</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
       <TabsContent value="details" className="space-y-5"><OrderQrCard orderId={record.orderId} orderRecordId={record.id} /><div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><OrderRecordCard order={record} user={user} id={id} /><MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} /></div><WindowsPanel orderId={id} user={user} /></TabsContent>

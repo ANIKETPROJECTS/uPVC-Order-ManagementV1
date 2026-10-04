@@ -12,4 +12,5 @@ export type OrderPaymentStatus = typeof OrderPaymentStatus[keyof typeof OrderPay
 export const OrderPaymentStatus = {
   received: 'received',
   void: 'void',
+  bounced: 'bounced',
 } as const;
