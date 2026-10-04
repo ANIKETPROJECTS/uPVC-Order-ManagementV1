@@ -960,6 +960,8 @@ export async function initializeMongo(): Promise<void> {
     orderPayments.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "payments_by_order" }),
     paymentFlags.createIndex({ orderRecordId: 1, flaggedAt: -1 }, { name: "payment_flags_by_order_date" }),
     paymentFlags.createIndex({ status: 1, flaggedAt: -1 }, { name: "payment_flags_by_status_date" }),
+    paymentFlags.createIndex({ createdAt: -1, _id: 1 }, { name: "payment_flags_by_created_date" }),
+    paymentFlags.createIndex({ orderRecordId: 1, createdAt: -1, _id: 1 }, { name: "payment_flags_by_order_created_date" }),
     orderDocumentMetadata.createIndex({ orderRecordId: 1, uploadedAt: -1 }, { name: "documents_by_order" }),
     orderActivity.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "activity_by_order" }),
     windowProfiles.createIndex(
@@ -1283,7 +1285,7 @@ export async function initializeMongo(): Promise<void> {
         key: "bounced-active",
         orderIndex: 0,
         flagType: "bounced_payment",
-        remarks: "Sample record: cheque returned by the bank.",
+        remarks: "",
         flaggedAmount: 28500,
         daysAgo: 1,
         bounceReason: "Insufficient funds",
@@ -1300,7 +1302,7 @@ export async function initializeMongo(): Promise<void> {
         key: "refusal-active",
         orderIndex: 1,
         flagType: "refusal_to_pay",
-        remarks: "Sample record: client disputes the pending amount.",
+        remarks: "",
         flaggedAmount: 42000,
         daysAgo: 2,
         bounceReason: null,
@@ -1308,7 +1310,7 @@ export async function initializeMongo(): Promise<void> {
         bankCharges: null,
         followUpCount: 3,
         lastFollowUpDaysAgo: 1,
-        followUpNotes: "Called twice and sent one written reminder; client declined to pay.",
+        followUpNotes: null,
         status: "active",
         resolutionDaysAgo: null,
         resolutionNotes: null,
@@ -1317,7 +1319,7 @@ export async function initializeMongo(): Promise<void> {
         key: "bounced-resolved",
         orderIndex: 2,
         flagType: "bounced_payment",
-        remarks: "Sample record: returned transfer was replaced by a new payment.",
+        remarks: "",
         flaggedAmount: 16750,
         daysAgo: 8,
         bounceReason: "Transfer returned by receiving bank",
@@ -1328,13 +1330,13 @@ export async function initializeMongo(): Promise<void> {
         followUpNotes: null,
         status: "resolved",
         resolutionDaysAgo: 4,
-        resolutionNotes: "Replacement payment received and matched to the order.",
+        resolutionNotes: null,
       },
       {
         key: "refusal-active-second",
         orderIndex: 3,
         flagType: "refusal_to_pay",
-        remarks: "Sample record: payment remains outstanding after follow-ups.",
+        remarks: "",
         flaggedAmount: 31500,
         daysAgo: 5,
         bounceReason: null,
@@ -1342,7 +1344,7 @@ export async function initializeMongo(): Promise<void> {
         bankCharges: null,
         followUpCount: 4,
         lastFollowUpDaysAgo: 2,
-        followUpNotes: "Three calls and one site visit; client requested more time, then declined.",
+        followUpNotes: null,
         status: "active",
         resolutionDaysAgo: null,
         resolutionNotes: null,
@@ -1357,21 +1359,21 @@ export async function initializeMongo(): Promise<void> {
         id: `${id}-created`,
         action: "created",
         actorId: "sample-data",
-        actorName: "Sample data",
+        actorName: "System",
         occurredAt: flaggedAt,
-        summary: "Sample flagged payment created for testing.",
+        summary: "",
       }];
       const resolutionDate = sample.resolutionDaysAgo == null
         ? null
         : new Date(now.getTime() - sample.resolutionDaysAgo * 24 * 60 * 60 * 1000);
-      if (resolutionDate && sample.resolutionNotes) {
+      if (resolutionDate) {
         actions.push({
           id: `${id}-resolved`,
           action: "resolved",
           actorId: "sample-data",
-          actorName: "Sample data",
+          actorName: "System",
           occurredAt: resolutionDate,
-          summary: sample.resolutionNotes,
+          summary: sample.resolutionNotes ?? "",
         });
       }
       await paymentFlags.updateOne(
@@ -1388,7 +1390,7 @@ export async function initializeMongo(): Promise<void> {
             flaggedAmount: sample.flaggedAmount,
             flaggedAt,
             flaggedById: "sample-data",
-            flaggedBy: "Sample data",
+            flaggedBy: "System",
             bounceReason: sample.bounceReason,
             bouncedAmount: sample.bouncedAmount,
             bankCharges: sample.bankCharges,

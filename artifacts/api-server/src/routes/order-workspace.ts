@@ -123,7 +123,17 @@ async function getPaymentProgressMap(db: Awaited<ReturnType<typeof getMongoDb>>,
     paymentProgress(ordersById.get(id)?.orderValue, paidReceiptsByOrder.get(id) ?? 0, refundsByOrder.get(id) ?? 0),
   ]));
 }
-const paymentFlagResponse = (flag: OrderPaymentFlagDocument, progress: ReturnType<typeof paymentProgress>) => ({
+const isSamplePaymentFlag = (flag: OrderPaymentFlagDocument) =>
+  flag._id.startsWith("sample-payment-flag-") ||
+  flag.flaggedById === "sample-data" ||
+  flag.flaggedBy.trim().toLowerCase() === "sample data";
+const safeFlagActorName = (actorId: string, actorName: string, isSample: boolean) =>
+  isSample || actorId === "sample-data" || actorName.trim().toLowerCase() === "sample data"
+    ? "System"
+    : actorName.trim() || "System";
+const paymentFlagResponse = (flag: OrderPaymentFlagDocument, progress: ReturnType<typeof paymentProgress>) => {
+  const isSample = isSamplePaymentFlag(flag);
+  return ({
   id: flag._id,
   orderRecordId: flag.orderRecordId,
   orderId: flag.orderId,
@@ -131,26 +141,32 @@ const paymentFlagResponse = (flag: OrderPaymentFlagDocument, progress: ReturnTyp
   locationName: flag.locationName,
   paymentProgress: progress,
   flagType: flag.flagType,
-  remarks: flag.remarks,
+  remarks: isSample ? "" : flag.remarks,
   flaggedAmount: flag.flaggedAmount,
-  flaggedAt: flag.flaggedAt.toISOString().slice(0, 10),
+  flaggedAt: flag.createdAt.toISOString(),
   flaggedById: flag.flaggedById,
-  flaggedBy: flag.flaggedBy,
+  flaggedBy: safeFlagActorName(flag.flaggedById, flag.flaggedBy, isSample),
   bounceReason: flag.bounceReason,
   bouncedAmount: flag.bouncedAmount,
   bankCharges: flag.bankCharges,
   followUpCount: flag.followUpCount,
   lastFollowUpDate: flag.lastFollowUpDate?.toISOString().slice(0, 10) ?? null,
-  followUpNotes: flag.followUpNotes,
+  followUpNotes: isSample ? null : flag.followUpNotes,
   status: flag.status,
   resolutionDate: flag.resolutionDate?.toISOString().slice(0, 10) ?? null,
-  resolutionNotes: flag.resolutionNotes,
+  resolutionNotes: isSample ? null : flag.resolutionNotes,
   removedAt: flag.removedAt?.toISOString() ?? null,
   removedBy: flag.removedBy,
-  actions: flag.actions.map((action) => ({ ...action, occurredAt: action.occurredAt.toISOString() })),
+  actions: flag.actions.map((action) => ({
+    ...action,
+    actorName: safeFlagActorName(action.actorId, action.actorName, isSample),
+    occurredAt: (action.action === "created" ? flag.createdAt : action.occurredAt).toISOString(),
+    summary: isSample || action.action === "created" ? "" : action.summary,
+  })),
   createdAt: flag.createdAt.toISOString(),
   updatedAt: flag.updatedAt.toISOString(),
-});
+  });
+};
 const parseDateOnly = (value: string | Date): Date | null => {
   const dateText = value instanceof Date
     ? Number.isNaN(value.getTime()) ? "" : value.toISOString().slice(0, 10)
@@ -422,7 +438,7 @@ router.post("/orders/:id/refunds", async (req, res): Promise<void> => {
 router.get("/payments/flags", async (req, res): Promise<void> => {
   if (!(await context(req, res, "payments"))) return;
   const db = await getMongoDb();
-  const flags = await getOrderPaymentFlags(db).find({}).sort({ flaggedAt: -1, createdAt: -1 }).toArray();
+  const flags = await getOrderPaymentFlags(db).find({}).sort({ createdAt: -1, _id: 1 }).toArray();
   const orderIds = [...new Set(flags.map((flag) => flag.orderRecordId))];
   const orders = await getOrders(db).find({ _id: { $in: orderIds } }).toArray();
   const progressByOrder = await getPaymentProgressMap(db, new Map(orders.map((order) => [order._id, order])));
@@ -440,7 +456,7 @@ router.get("/orders/:id/payment-flags", async (req, res): Promise<void> => {
   const db = await getMongoDb();
   const flags = await getOrderPaymentFlags(db)
     .find({ orderRecordId: p.data.id })
-    .sort({ flaggedAt: -1, createdAt: -1 })
+    .sort({ createdAt: -1, _id: 1 })
     .toArray();
   const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
   res.json(ListOrderPaymentFlagsResponse.parse(flags.map((flag) => paymentFlagResponse(flag, progress))));
@@ -455,8 +471,6 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
   const order = actor ? await orderExists(p.data.id, res) : null;
   if (!actor || !order) return;
   if (!b.data.remarks.trim()) { res.status(400).json({ error: "Add remarks describing the payment issue." }); return; }
-  const flaggedAt = parseDateOnly(b.data.flaggedAt);
-  if (!flaggedAt) { res.status(400).json({ error: "Enter a valid flag date." }); return; }
   const db = await getMongoDb();
 
   let flaggedAmount: number;
@@ -501,6 +515,7 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
   }
 
   const now = new Date();
+  const flaggedAt = now;
   const id = randomUUID();
   const historyEntry: PaymentFlagActionDocument = {
     id: randomUUID(),
@@ -508,7 +523,7 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
     actorId: actor.id,
     actorName: actor.name,
     occurredAt: now,
-    summary: `Created ${b.data.flagType === "bounced_payment" ? "bounced payment" : "refusal to pay"} flag.`,
+    summary: "",
   };
   const flag: OrderPaymentFlagDocument = {
     _id: id,
@@ -538,7 +553,12 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
     updatedAt: now,
   };
   await getOrderPaymentFlags(db).insertOne(flag);
-  await event(order._id, actor, "payment.flag_created", `${historyEntry.summary} ${flag.remarks}`);
+  await event(
+    order._id,
+    actor,
+    "payment.flag_created",
+    `${b.data.flagType === "bounced_payment" ? "Bounced payment" : "Refusal to pay"} flag created.`,
+  );
   const progress = (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!;
   res.status(201).json(CreateOrderPaymentFlagResponse.parse(paymentFlagResponse(flag, progress)));
 });

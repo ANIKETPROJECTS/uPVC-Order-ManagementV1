@@ -108,6 +108,7 @@ import { PaymentFlagBadge } from '@/components/payment-flag-badge';
 import { PaymentFlagDialog } from '@/components/payment-flag-dialog';
 import { PaymentFlagDetails } from '@/components/payment-flag-details';
 import { PaymentProgressBar } from '@/components/payment-progress-bar';
+import { formatInr, formatIstDate, formatIstDateTime } from '@/lib/formatters';
 import { calculatePaymentProgress } from '@/lib/payment-progress';
 
 type Status = (typeof OrderStatus)[keyof typeof OrderStatus];
@@ -148,8 +149,8 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 const statusLabel = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.label || status.replaceAll('_', ' ');
 const statusTone = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.tone || 'bg-muted text-muted-foreground';
 const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
-const inr = (value: number | null | undefined) => value == null ? 'Not set' : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value);
-const plainInr = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value);
+const inr = (value: number | null | undefined) => formatInr(value, 'Not set');
+const plainInr = (value: number) => formatInr(value);
 const readable = (value: string) => value === 'drawing' ? 'Elevation' : value.replaceAll('_', ' ');
 const localDateInput = () => {
   const today = new Date();
@@ -324,10 +325,6 @@ function OrderPaymentFlagsPanel({ orderId, user }: { orderId: string; user: User
   const [selectedFlag, setSelectedFlag] = useState<PaymentFlag | null>(null);
   const flags = query.data ?? [];
   const activeCount = flags.filter((flag) => flag.status === 'active').length;
-  const formatFlagDate = (value: string) => {
-    const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
-    return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: value.length > 10 ? '2-digit' : undefined, minute: value.length > 10 ? '2-digit' : undefined }).format(date);
-  };
   if (!hasPermission(user, 'payments', 'view')) return null;
   return <Card className="border-border/80" data-testid="card-order-payment-flags">
     <CardHeader className="flex-row items-start justify-between gap-3 pb-3">
@@ -336,7 +333,7 @@ function OrderPaymentFlagsPanel({ orderId, user }: { orderId: string; user: User
         <div className="mt-1 flex flex-wrap items-center gap-2"><CardTitle className="text-base">Payment flags</CardTitle>{activeCount > 0 && <PaymentFlagBadge count={activeCount} />}</div>
         <p className="mt-1 text-xs text-muted-foreground">Bounced payments and client refusals are tracked separately from received receipts.</p>
       </div>
-      {hasPermission(user, 'payments') && activeCount === 0 && <PaymentFlagDialog orderId={orderId} flaggedBy={user.name} />}
+      {hasPermission(user, 'payments') && activeCount === 0 && <PaymentFlagDialog orderId={orderId} flaggedBy={user.name} onOpening={() => setSelectedFlag(null)} />}
     </CardHeader>
     <CardContent>
       {query.isLoading ? <div className="space-y-2" data-testid="state-order-payment-flags-loading"><div className="h-16 animate-pulse rounded-xl bg-muted/55" /><div className="h-16 animate-pulse rounded-xl bg-muted/55" /></div>
@@ -351,18 +348,18 @@ function OrderPaymentFlagsPanel({ orderId, user }: { orderId: string; user: User
                 </div>
                 <span className="font-display text-sm font-bold tabular-nums">{plainInr(flag.flaggedAmount)}</span>
               </div>
-              <p className="mt-2 text-xs leading-5">{flag.remarks}</p>
-              <p className="mt-1 text-[10px] text-muted-foreground">Flagged {formatFlagDate(flag.flaggedAt)} by {flag.flaggedBy}</p>
+               {flag.remarks && <p className="mt-2 text-xs leading-5">{flag.remarks}</p>}
+               <p className="mt-1 text-[10px] text-muted-foreground">Flagged {formatIstDateTime(flag.flaggedAt)} by {flag.flaggedBy}</p>
               {flag.flagType === 'bounced_payment'
-                ? <p className="mt-2 text-[11px] text-muted-foreground">{flag.bounceReason} · Bounced {flag.bouncedAmount == null ? '—' : plainInr(flag.bouncedAmount)} · Bank charges {flag.bankCharges == null ? '—' : plainInr(flag.bankCharges)}</p>
-                : <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{flag.followUpCount} follow-ups · last on {flag.lastFollowUpDate ? formatFlagDate(flag.lastFollowUpDate) : '—'}{flag.followUpNotes ? ` · ${flag.followUpNotes}` : ''}</p>}
-              {flag.resolutionDate && <p className="mt-2 rounded-lg bg-primary/5 px-3 py-2 text-[11px] leading-5"><span className="font-semibold">Resolved {formatFlagDate(flag.resolutionDate)}: </span>{flag.resolutionNotes}</p>}
-              {flag.removedAt && <p className="mt-2 text-[10px] text-muted-foreground">Removed {formatFlagDate(flag.removedAt)} by {flag.removedBy || 'Former user'}; history retained.</p>}
+                 ? <p className="mt-2 text-[11px] text-muted-foreground">{flag.bounceReason} · Bounced {flag.bouncedAmount == null ? '—' : plainInr(flag.bouncedAmount)} · Bank charges {flag.bankCharges == null ? '—' : plainInr(flag.bankCharges)}</p>
+                 : <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{flag.followUpCount} follow-ups · last on {flag.lastFollowUpDate ? formatIstDate(flag.lastFollowUpDate) : '—'}{flag.followUpNotes ? ` · ${flag.followUpNotes}` : ''}</p>}
+               {flag.resolutionDate && <p className="mt-2 rounded-lg bg-primary/5 px-3 py-2 text-[11px] leading-5"><span className="font-semibold">Resolved {formatIstDate(flag.resolutionDate)}</span>{flag.resolutionNotes && <>: {flag.resolutionNotes}</>}</p>}
+               {flag.removedAt && <p className="mt-2 text-[10px] text-muted-foreground">Removed {formatIstDateTime(flag.removedAt)} by {flag.removedBy || 'Former user'}; history retained.</p>}
               <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => setSelectedFlag(flag)} data-testid={`button-open-order-flag-details-${flag.id}`}>View flag details</Button>
               <details className="mt-2 text-[11px]">
                 <summary className="w-fit cursor-pointer font-semibold text-primary">Action history ({flag.actions.length})</summary>
                 <ol className="mt-2 space-y-2 border-l border-border pl-3">
-                  {[...flag.actions].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).map((action) => <li key={action.id} className="text-muted-foreground"><span className="font-semibold text-foreground">{action.action === 'created' ? 'Flag created' : action.action === 'edited' ? 'Flag edited' : action.action === 'follow_up_added' ? 'Follow-up added' : action.action === 'resolved' ? 'Flag resolved' : 'Flag removed'}</span><span> · {action.actorName} · {formatFlagDate(action.occurredAt)}</span><p className="mt-0.5 leading-4">{action.summary}</p></li>)}
+                  {[...flag.actions].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).map((action) => <li key={action.id} className="text-muted-foreground"><span className="font-semibold text-foreground">{action.action === 'created' ? 'Flag created' : action.action === 'edited' ? 'Flag edited' : action.action === 'follow_up_added' ? 'Follow-up added' : action.action === 'resolved' ? 'Flag resolved' : 'Flag removed'}</span><span> · {action.actorName} · {formatIstDateTime(action.occurredAt)}</span>{action.summary && <p className="mt-0.5 leading-4">{action.summary}</p>}</li>)}
                 </ol>
               </details>
             </article>)}</div>}
@@ -441,7 +438,6 @@ function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; 
             data: {
               flagType: 'bounced_payment',
               remarks: `Receipt of ${plainInr(target.amount)} bounced from the bank.`,
-              flaggedAt: bounceDate,
               bounceReason: bounceReason.trim(),
               bouncedAmount: target.amount,
             },

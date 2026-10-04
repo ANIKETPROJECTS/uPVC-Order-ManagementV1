@@ -35,12 +35,7 @@ import { PaymentFlagBadge } from '@/components/payment-flag-badge';
 import { PaymentProgressBar } from '@/components/payment-progress-bar';
 import { PaymentFlagDetails } from '@/components/payment-flag-details';
 import { PaymentFlagDialog } from '@/components/payment-flag-dialog';
-
-const money = (amount: number) => new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-}).format(amount);
+import { formatInr, formatIstDateTime } from '@/lib/formatters';
 
 const lifecycleStatusLabel = (status: string) => ({
   quotation_stage: 'Quotation stage',
@@ -52,15 +47,7 @@ const lifecycleStatusLabel = (status: string) => ({
 }[status] ?? status.replaceAll('_', ' '));
 
 const dateTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return formatIstDateTime(value);
 };
 
 const methodLabel = (method: string) => method.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -138,7 +125,7 @@ export default function PaymentsPage({ user }: { user: User }) {
                 <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-foreground/15"><ArrowDownLeft size={18} /></span>
               </div>
               <div className="relative">
-                <p className="font-display text-3xl font-bold tracking-tight sm:text-[34px]" data-testid="value-total-collected">{money(overview.data.totalCollected)}</p>
+                <p className="font-display text-3xl font-bold tracking-tight sm:text-[34px]" data-testid="value-total-collected">{formatInr(overview.data.totalCollected)}</p>
                 <p className="mt-1 text-xs text-primary-foreground/70">Received receipts less refunds</p>
               </div>
             </CardContent>
@@ -150,7 +137,7 @@ export default function PaymentsPage({ user }: { user: User }) {
                 <span className="grid h-9 w-9 place-items-center rounded-lg bg-accent/20 text-accent-foreground"><BadgeIndianRupee size={18} /></span>
               </div>
               <div>
-                <p className="font-display text-3xl font-bold tracking-tight sm:text-[34px]" data-testid="value-total-outstanding">{money(overview.data.totalOutstanding)}</p>
+                <p className="font-display text-3xl font-bold tracking-tight sm:text-[34px]" data-testid="value-total-outstanding">{formatInr(overview.data.totalOutstanding)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Remaining client balances</p>
               </div>
             </CardContent>
@@ -221,17 +208,17 @@ export default function PaymentsPage({ user }: { user: User }) {
                     </span>
                   </div>
                   <p className="mt-1 truncate text-sm font-semibold" data-testid={`text-reminder-client-${order.orderRecordId}`}>{order.clientName}</p>
-                  <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={12} />{order.locationName} <span className="mx-1 text-border">/</span> Order {money(order.orderValue)} · Paid {money(order.totalCollected)}</p>
+                  <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={12} />{order.locationName} <span className="mx-1 text-border">/</span> Order {formatInr(order.orderValue)} · Paid {formatInr(order.totalCollected)}</p>
                   <PaymentProgressBar percentage={order.percentage} compact testId={`progress-reminder-order-${order.orderRecordId}`} />
                   {!order.productionReady && <p className="mt-1 text-[10px] text-muted-foreground">Add at least one window, then complete frame, shutter and glass readiness to enable a draft.</p>}
                   {order.productionReady && !order.canOpenWhatsApp && <p className="mt-1 text-[10px] text-muted-foreground">Add a valid WhatsApp number to enable the draft.</p>}
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
                   <div className="sm:text-right">
-                    <p className="font-display text-lg font-bold tabular-nums" data-testid={`value-balance-${order.orderRecordId}`}>{money(order.balance)}</p>
+                    <p className="font-display text-lg font-bold tabular-nums" data-testid={`value-balance-${order.orderRecordId}`}>{formatInr(order.balance)}</p>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Balance due</p>
                   </div>
-                  {(activeFlagCounts.get(order.orderRecordId) ?? 0) === 0 && <PaymentFlagDialog orderId={order.orderRecordId} flaggedBy={user.name} />}
+                  {(activeFlagCounts.get(order.orderRecordId) ?? 0) === 0 && <PaymentFlagDialog orderId={order.orderRecordId} flaggedBy={user.name} onOpening={() => setSelectedFlag(null)} />}
                   <form method="post" action={`/api/orders/${encodeURIComponent(order.orderRecordId)}/payment-reminder`} target="_blank" rel="noreferrer">
                     <Button type="submit" size="sm" variant="outline" disabled={!order.canOpenWhatsApp} data-testid={`button-send-reminder-${order.orderRecordId}`} title={!order.canOpenWhatsApp ? !order.productionReady ? 'Every active window must be ready and glass received before opening a reminder.' : 'Add a valid WhatsApp number to this order.' : 'Open a draft for manual sending in WhatsApp'}>
                       <Send size={14} className="mr-1.5" /> Open WhatsApp
@@ -302,6 +289,6 @@ function RecentPaymentRow({ payment, flagCount, activeFlag, onViewFlag }: { paym
         <p className="mt-1.5 text-[10px] text-muted-foreground" data-testid={`text-payment-date-${payment.id}`}>{dateTime(payment.paidAt)} <span className="mx-1">·</span> Recorded by {payment.recordedBy}</p>
       </div>
     </div>
-    <p className="shrink-0 pt-0.5 font-display text-sm font-bold tabular-nums" data-testid={`value-payment-amount-${payment.id}`}>{money(payment.amount)}</p>
+    <p className="shrink-0 pt-0.5 font-display text-sm font-bold tabular-nums" data-testid={`value-payment-amount-${payment.id}`}>{formatInr(payment.amount)}</p>
   </article>;
 }

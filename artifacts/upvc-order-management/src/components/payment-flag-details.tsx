@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { PaymentFlagBadge } from '@/components/payment-flag-badge';
+import { formatInr, formatIstDate, formatIstDateTime } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 
 const today = () => {
@@ -26,16 +27,6 @@ const today = () => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 const flagTypeLabel = (flag: PaymentFlag) => flag.flagType === 'bounced_payment' ? 'Bounced Payment' : 'Refusal to Pay';
-const dateLabel = (value: string) => {
-  const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    ...(value.length > 10 ? { hour: '2-digit', minute: '2-digit' } : {}),
-  }).format(date);
-};
-const money = (amount: number | null | undefined) => amount == null ? '—' : new Intl.NumberFormat('en-IN', {
-  style: 'currency', currency: 'INR', maximumFractionDigits: 2,
-}).format(amount);
 const actionLabel = (action: string) => ({
   created: 'Flag created',
   edited: 'Flag edited',
@@ -137,10 +128,10 @@ export function PaymentFlagDetails({ flag, canEdit, onClose, onFlagUpdated }: { 
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/25 p-4">
           <div className="flex items-center gap-2"><PaymentFlagBadge status={flag.status} /><span className="text-xs font-semibold">{flag.status === 'active' ? 'Active tracking' : flag.status === 'resolved' ? 'Resolved' : 'Removed'}</span></div>
-          <div className="text-right"><p className="font-display text-lg font-bold tabular-nums" data-testid={`value-flag-detail-amount-${flag.id}`}>{money(flag.flaggedAmount)}</p><p className="text-[10px] text-muted-foreground">Flagged amount snapshot</p></div>
+          <div className="text-right"><p className="font-display text-lg font-bold tabular-nums" data-testid={`value-flag-detail-amount-${flag.id}`}>{formatInr(flag.flaggedAmount)}</p><p className="text-[10px] text-muted-foreground">Flagged amount snapshot</p></div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <DetailFact label="Flagged" value={dateLabel(flag.flaggedAt)} testId={`text-flag-date-${flag.id}`} />
+          <DetailFact label="Flagged" value={formatIstDateTime(flag.flaggedAt)} testId={`text-flag-date-${flag.id}`} />
           <DetailFact label="Flagged by" value={flag.flaggedBy} testId={`text-flagged-by-${flag.id}`} />
         </div>
         {editing ? <form onSubmit={saveEdit} className="space-y-4 rounded-xl border border-border p-4" data-testid="form-edit-payment-flag">
@@ -156,18 +147,18 @@ export function PaymentFlagDetails({ flag, canEdit, onClose, onFlagUpdated }: { 
           </div>}
           <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditing(false)} data-testid="button-cancel-edit-payment-flag">Cancel</Button><Button type="submit" disabled={update.isPending} data-testid="button-save-edit-payment-flag">{update.isPending ? <LoaderCircle className="animate-spin" size={14} /> : <Check size={14} />} Save changes</Button></div>
         </form> : <section className="space-y-3" data-testid={`flag-details-fields-${flag.id}`}>
-          <div className="rounded-xl border border-border/70 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Remarks</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6" data-testid={`text-flag-remarks-${flag.id}`}>{flag.remarks}</p></div>
+          {flag.remarks && <div className="rounded-xl border border-border/70 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Remarks</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6" data-testid={`text-flag-remarks-${flag.id}`}>{flag.remarks}</p></div>}
           {flag.flagType === 'bounced_payment' ? <div className="grid gap-3 sm:grid-cols-3">
             <DetailFact label="Bounce reason" value={flag.bounceReason || 'Not recorded'} testId={`text-bounce-reason-${flag.id}`} />
-            <DetailFact label="Bounced amount" value={money(flag.bouncedAmount)} testId={`text-bounced-amount-${flag.id}`} />
-            <DetailFact label="Bank charges" value={money(flag.bankCharges)} testId={`text-bank-charges-${flag.id}`} />
+            <DetailFact label="Bounced amount" value={formatInr(flag.bouncedAmount)} testId={`text-bounced-amount-${flag.id}`} />
+            <DetailFact label="Bank charges" value={formatInr(flag.bankCharges)} testId={`text-bank-charges-${flag.id}`} />
           </div> : <div className="grid gap-3 sm:grid-cols-3">
             <DetailFact label="Follow-ups" value={String(flag.followUpCount ?? 0)} testId={`text-follow-up-count-${flag.id}`} />
-            <DetailFact label="Last follow-up" value={flag.lastFollowUpDate ? dateLabel(flag.lastFollowUpDate) : 'Not recorded'} testId={`text-last-follow-up-${flag.id}`} />
+            <DetailFact label="Last follow-up" value={flag.lastFollowUpDate ? formatIstDate(flag.lastFollowUpDate) : 'Not recorded'} testId={`text-last-follow-up-${flag.id}`} />
             <DetailFact label="Follow-up notes" value={flag.followUpNotes || 'No notes recorded'} testId={`text-follow-up-notes-${flag.id}`} />
           </div>}
-          {flag.resolutionDate && <div className="rounded-xl bg-primary/5 p-4" data-testid={`text-flag-resolution-${flag.id}`}><p className="text-[10px] font-bold uppercase tracking-wider text-primary">Resolution · {dateLabel(flag.resolutionDate)}</p><p className="mt-2 text-sm leading-5">{flag.resolutionNotes || 'No resolution note recorded.'}</p></div>}
-          {flag.removedAt && <p className="text-xs text-muted-foreground" data-testid={`text-flag-removed-${flag.id}`}>Removed {dateLabel(flag.removedAt)} by {flag.removedBy || 'Former user'}.</p>}
+          {flag.resolutionDate && <div className="rounded-xl bg-primary/5 p-4" data-testid={`text-flag-resolution-${flag.id}`}><p className="text-[10px] font-bold uppercase tracking-wider text-primary">Resolution · {formatIstDate(flag.resolutionDate)}</p>{flag.resolutionNotes && <p className="mt-2 text-sm leading-5">{flag.resolutionNotes}</p>}</div>}
+          {flag.removedAt && <p className="text-xs text-muted-foreground" data-testid={`text-flag-removed-${flag.id}`}>Removed {formatIstDateTime(flag.removedAt)} by {flag.removedBy || 'Former user'}.</p>}
         </section>}
 
         {showFollowUp && flag.status === 'active' && <form onSubmit={saveFollowUp} className="space-y-3 rounded-xl border border-primary/20 bg-primary/[0.035] p-4" data-testid="form-payment-flag-follow-up">
@@ -184,7 +175,7 @@ export function PaymentFlagDetails({ flag, canEdit, onClose, onFlagUpdated }: { 
         </form>}
         <section className="rounded-xl border border-border/70 p-4" data-testid={`section-flag-action-history-${flag.id}`}>
           <div className="flex items-center gap-2"><CalendarClock size={15} className="text-primary" /><h3 className="text-sm font-semibold">Action history</h3><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px]">{actions.length}</span></div>
-          {actions.length ? <ol className="mt-4 space-y-4 border-l border-border pl-4">{actions.map((action) => <li key={action.id} className="relative text-xs text-muted-foreground" data-testid={`row-flag-action-${action.id}`}><span className="absolute -left-[21px] top-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" /><p className="font-semibold text-foreground">{actionLabel(action.action)}</p><p className="mt-0.5">{action.actorName} · {dateLabel(action.occurredAt)}</p><p className="mt-1 leading-5">{action.summary}</p></li>)}</ol> : <p className="mt-3 text-xs text-muted-foreground">No actions recorded.</p>}
+          {actions.length ? <ol className="mt-4 space-y-4 border-l border-border pl-4">{actions.map((action) => <li key={action.id} className="relative text-xs text-muted-foreground" data-testid={`row-flag-action-${action.id}`}><span className="absolute -left-[21px] top-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" /><p className="font-semibold text-foreground">{actionLabel(action.action)}</p><p className="mt-0.5">{action.actorName} · {formatIstDateTime(action.occurredAt)}</p>{action.summary && <p className="mt-1 leading-5">{action.summary}</p>}</li>)}</ol> : <p className="mt-3 text-xs text-muted-foreground">No actions recorded.</p>}
         </section>
       </div>
       <footer className="flex shrink-0 flex-wrap justify-between gap-2 border-t border-border bg-background/95 px-5 py-4 sm:px-6">

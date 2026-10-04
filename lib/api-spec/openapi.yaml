@@ -3282,7 +3282,7 @@ components:
           type: number
         flaggedAt:
           type: string
-          format: date
+          format: date-time
         flaggedById:
           type: string
         flaggedBy:
@@ -3358,9 +3358,6 @@ components:
           type: string
           minLength: 1
           maxLength: 1000
-        flaggedAt:
-          type: string
-          format: date
         bounceReason:
           type: string
           maxLength: 500
@@ -3379,7 +3376,7 @@ components:
         followUpNotes:
           type: string
           maxLength: 1000
-      required: [flagType, remarks, flaggedAt]
+      required: [flagType, remarks]
     PaymentFlagResolution:
       type: object
       properties:

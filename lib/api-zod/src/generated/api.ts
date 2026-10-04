@@ -455,7 +455,6 @@ export const createOrderPaymentFlagBodyFollowUpNotesMax = 1000;
 export const CreateOrderPaymentFlagBody = zod.object({
   "flagType": zod.enum(['bounced_payment', 'refusal_to_pay']),
   "remarks": zod.string().min(1).max(createOrderPaymentFlagBodyRemarksMax),
-  "flaggedAt": zod.coerce.date(),
   "bounceReason": zod.string().max(createOrderPaymentFlagBodyBounceReasonMax).optional(),
   "bouncedAmount": zod.number().gt(createOrderPaymentFlagBodyBouncedAmountExclusiveMin).optional(),
   "bankCharges": zod.number().min(createOrderPaymentFlagBodyBankChargesMin).optional(),

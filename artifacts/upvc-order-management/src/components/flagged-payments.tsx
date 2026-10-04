@@ -8,32 +8,7 @@ import { Input } from '@/components/ui/input';
 import { PaymentFlagBadge } from '@/components/payment-flag-badge';
 import { PaymentProgressBar } from '@/components/payment-progress-bar';
 import { PaymentFlagDetails } from '@/components/payment-flag-details';
-
-const money = (amount: number) => new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-}).format(amount);
-
-const dateLabel = (value: string) => {
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-};
-
-const dateTimeLabel = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
+import { formatInr, formatIstDate, formatIstDateTime, getIstDateKey } from '@/lib/formatters';
 
 const flagTypeLabel = (type: PaymentFlag['flagType']) => type === 'bounced_payment' ? 'Bounced Payment' : 'Refusal to Pay';
 
@@ -65,7 +40,7 @@ export function FlaggedPaymentsSection({
       if (typeFilter !== 'all' && flag.flagType !== typeFilter) return false;
       if (statusFilter !== 'all' && flag.status !== statusFilter) return false;
       if (clientFilter !== 'all' && flag.clientName !== clientFilter) return false;
-      const flaggedDate = flag.flaggedAt.slice(0, 10);
+      const flaggedDate = getIstDateKey(flag.flaggedAt);
       if (dateFrom && flaggedDate < dateFrom) return false;
       if (dateTo && flaggedDate > dateTo) return false;
       if (!term) return true;
@@ -95,7 +70,7 @@ export function FlaggedPaymentsSection({
       </Card>
       <Card className="border-rose-200/80 bg-card">
         <CardContent className="flex min-h-24 items-center justify-between p-4">
-          <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Active flagged amount</p><p className="mt-1 font-display text-2xl font-bold" data-testid="value-active-flagged-amount">{money(totalFlaggedAmount)}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Active flagged amount</p><p className="mt-1 font-display text-2xl font-bold" data-testid="value-active-flagged-amount">{formatInr(totalFlaggedAmount)}</p></div>
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-foreground"><CircleAlert size={18} /></span>
         </CardContent>
       </Card>
@@ -166,25 +141,25 @@ function FlaggedPaymentRow({ flag, onOpen }: { flag: PaymentFlag; onOpen: () => 
           <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground">{statusLabel}</span>
           <Link href={`/order-hub/${flag.orderRecordId}`} onClick={(event) => event.stopPropagation()} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-flag-order-${flag.id}`}>{flag.orderId}<ArrowRight size={11} className="ml-1 inline" /></Link>
         </div>
-        <div><p className="text-sm font-semibold">{flag.clientName} <span className="font-normal text-muted-foreground">· {flag.locationName}</span></p><p className="mt-1 text-xs leading-5 text-muted-foreground">{flag.remarks}</p>
+        <div><p className="text-sm font-semibold">{flag.clientName} <span className="font-normal text-muted-foreground">· {flag.locationName}</span></p>{flag.remarks && <p className="mt-1 text-xs leading-5 text-muted-foreground">{flag.remarks}</p>}
           <div className="mt-2 max-w-sm space-y-1.5">
-            <p className="text-[10px] text-muted-foreground">Paid {money(flag.paymentProgress?.paid ?? 0)} <span aria-hidden="true">·</span> Balance {flag.paymentProgress?.balance == null ? 'Unknown' : money(flag.paymentProgress.balance)}</p>
+            <p className="text-[10px] text-muted-foreground">Paid {formatInr(flag.paymentProgress?.paid ?? 0)} <span aria-hidden="true">·</span> Balance {flag.paymentProgress?.balance == null ? 'Unknown' : formatInr(flag.paymentProgress.balance)}</p>
             <PaymentProgressBar percentage={flag.paymentProgress?.percentage ?? 0} compact testId={`progress-payment-flag-${flag.id}`} />
           </div>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
-          <span>Flagged {dateLabel(flag.flaggedAt)} by {flag.flaggedBy}</span>
+          <span>Flagged {formatIstDateTime(flag.flaggedAt)} by {flag.flaggedBy}</span>
           {flag.flagType === 'bounced_payment'
-            ? <span>{flag.bounceReason} · Bank charges {flag.bankCharges == null ? '—' : money(flag.bankCharges)}</span>
-            : <span>{flag.followUpCount} follow-ups · last on {flag.lastFollowUpDate ? dateLabel(flag.lastFollowUpDate) : '—'}</span>}
-          {flag.resolutionDate && <span>Resolved {dateLabel(flag.resolutionDate)}</span>}
-          {flag.removedAt && <span>Removed {dateTimeLabel(flag.removedAt)} by {flag.removedBy || 'Former user'}</span>}
+            ? <span>{flag.bounceReason} · Bank charges {formatInr(flag.bankCharges)}</span>
+            : <span>{flag.followUpCount} follow-ups · last on {flag.lastFollowUpDate ? formatIstDate(flag.lastFollowUpDate) : '—'}</span>}
+          {flag.resolutionDate && <span>Resolved {formatIstDate(flag.resolutionDate)}</span>}
+          {flag.removedAt && <span>Removed {formatIstDateTime(flag.removedAt)} by {flag.removedBy || 'Former user'}</span>}
         </div>
         {flag.followUpNotes && <p className="max-w-3xl text-[11px] leading-5 text-muted-foreground">{flag.followUpNotes}</p>}
         {flag.resolutionNotes && <p className="max-w-3xl rounded-lg bg-primary/5 px-3 py-2 text-[11px] leading-5"><span className="font-semibold">Resolution: </span>{flag.resolutionNotes}</p>}
       </div>
       <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
-        <p className="font-display text-lg font-bold tabular-nums" data-testid={`value-payment-flag-amount-${flag.id}`}>{money(flag.flaggedAmount)}</p>
+        <p className="font-display text-lg font-bold tabular-nums" data-testid={`value-payment-flag-amount-${flag.id}`}>{formatInr(flag.flaggedAmount)}</p>
         <Button type="button" size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onOpen(); }} aria-label={`View flag details for ${flag.orderId}`} data-testid={`button-view-payment-flag-${flag.id}`}>View details</Button>
       </div>
     </div>
