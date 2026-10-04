@@ -143,7 +143,7 @@ const paymentFlagResponse = (flag: OrderPaymentFlagDocument, progress: ReturnTyp
   flagType: flag.flagType,
   remarks: isSample ? "" : flag.remarks,
   flaggedAmount: flag.flaggedAmount,
-  flaggedAt: flag.createdAt.toISOString(),
+  flaggedAt: flag.flaggedAt.toISOString(),
   flaggedById: flag.flaggedById,
   flaggedBy: safeFlagActorName(flag.flaggedById, flag.flaggedBy, isSample),
   bounceReason: flag.bounceReason,
@@ -174,6 +174,27 @@ const parseDateOnly = (value: string | Date): Date | null => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) return null;
   const parsed = new Date(`${dateText}T00:00:00.000Z`);
   return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== dateText ? null : parsed;
+};
+const withIstCalendarDate = (value: string | Date, time: Date): Date | null => {
+  const calendarDate = parseDateOnly(value);
+  if (!calendarDate) return null;
+  const timeParts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(time).map(({ type, value: part }) => [type, part]));
+  const timestamp = Date.UTC(
+    calendarDate.getUTCFullYear(),
+    calendarDate.getUTCMonth(),
+    calendarDate.getUTCDate(),
+    Number(timeParts.hour),
+    Number(timeParts.minute),
+    Number(timeParts.second),
+    time.getUTCMilliseconds(),
+  ) - (5 * 60 + 30) * 60_000;
+  return new Date(timestamp);
 };
 const docResponse = (d: any) => ({ id: d._id, orderRecordId: d.orderRecordId, quotationRequestId: d.quotationRequestId ?? null, filename: d.filename, category: d.category, contentType: d.contentType, sizeBytes: d.sizeBytes, uploadedBy: d.uploadedBy, uploadedAt: d.uploadedAt.toISOString() });
 const activityResponse = (a: any) => ({ ...a, id: a._id, createdAt: a.createdAt.toISOString() });
@@ -471,6 +492,9 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
   const order = actor ? await orderExists(p.data.id, res) : null;
   if (!actor || !order) return;
   if (!b.data.remarks.trim()) { res.status(400).json({ error: "Add remarks describing the payment issue." }); return; }
+  const now = new Date();
+  const flaggedAt = withIstCalendarDate(b.data.flaggedAt, now);
+  if (!flaggedAt) { res.status(400).json({ error: "Enter a valid flag date." }); return; }
   const db = await getMongoDb();
 
   let flaggedAmount: number;
@@ -514,8 +538,6 @@ router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
     followUpNotes = b.data.followUpNotes.trim();
   }
 
-  const now = new Date();
-  const flaggedAt = now;
   const id = randomUUID();
   const historyEntry: PaymentFlagActionDocument = {
     id: randomUUID(),

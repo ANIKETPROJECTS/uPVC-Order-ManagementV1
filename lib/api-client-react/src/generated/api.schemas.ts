@@ -790,6 +790,7 @@ export interface PaymentFlagInput {
      * @maxLength 1000
      */
   remarks: string;
+  flaggedAt: string;
   /** @maxLength 500 */
   bounceReason?: string;
   /** @exclusiveMinimum 0 */

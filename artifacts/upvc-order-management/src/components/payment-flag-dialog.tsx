@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { getIstDateKey } from '@/lib/formatters';
 
 const inputClass = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
@@ -19,6 +20,7 @@ const localDate = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
+const todayInIst = () => getIstDateKey(new Date());
 
 export function PaymentFlagDialog({ orderId, flaggedBy, onOpening }: { orderId: string; flaggedBy: string; onOpening: () => void }) {
   const queryClient = useQueryClient();
@@ -26,6 +28,7 @@ export function PaymentFlagDialog({ orderId, flaggedBy, onOpening }: { orderId: 
   const create = useCreateOrderPaymentFlag();
   const [open, setOpen] = useState(false);
   const [flagType, setFlagType] = useState<PaymentFlagType>('bounced_payment');
+  const [flaggedAt, setFlaggedAt] = useState(todayInIst);
   const [remarks, setRemarks] = useState('');
   const [bounceReason, setBounceReason] = useState('');
   const [bouncedAmount, setBouncedAmount] = useState('');
@@ -37,6 +40,7 @@ export function PaymentFlagDialog({ orderId, flaggedBy, onOpening }: { orderId: 
   const openForm = () => {
     onOpening();
     setFlagType('bounced_payment');
+    setFlaggedAt(todayInIst());
     setRemarks('');
     setBounceReason('');
     setBouncedAmount('');
@@ -53,6 +57,7 @@ export function PaymentFlagDialog({ orderId, flaggedBy, onOpening }: { orderId: 
       ? {
         flagType,
         remarks: remarks.trim(),
+        flaggedAt,
         bounceReason: bounceReason.trim(),
         bouncedAmount: Number(bouncedAmount),
         ...(bankCharges.trim() ? { bankCharges: Number(bankCharges) } : {}),
@@ -60,6 +65,7 @@ export function PaymentFlagDialog({ orderId, flaggedBy, onOpening }: { orderId: 
       : {
         flagType,
         remarks: remarks.trim(),
+        flaggedAt,
         followUpCount: Number(followUpCount),
         lastFollowUpDate,
         followUpNotes: followUpNotes.trim(),
@@ -100,10 +106,10 @@ export function PaymentFlagDialog({ orderId, flaggedBy, onOpening }: { orderId: 
                   <option value="refusal_to_pay">Refusal to Pay</option>
                 </select>
               </label>
-              <div className="min-w-0 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
-                <p className="text-xs font-semibold">Flagged</p>
-                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">Date and time are recorded automatically when you save.</p>
-              </div>
+              <label className="block min-w-0">
+                <span className="mb-1.5 block text-xs font-semibold">Date flagged</span>
+                <Input type="date" required value={flaggedAt} onChange={(event) => setFlaggedAt(event.target.value)} data-testid="input-payment-flag-date" />
+              </label>
             </div>
             <label className="block min-w-0">
               <span className="mb-1.5 block text-xs font-semibold">Flagged by</span>

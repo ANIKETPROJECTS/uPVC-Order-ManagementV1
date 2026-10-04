@@ -438,6 +438,7 @@ function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; 
             data: {
               flagType: 'bounced_payment',
               remarks: `Receipt of ${plainInr(target.amount)} bounced from the bank.`,
+              flaggedAt: bounceDate,
               bounceReason: bounceReason.trim(),
               bouncedAmount: target.amount,
             },
