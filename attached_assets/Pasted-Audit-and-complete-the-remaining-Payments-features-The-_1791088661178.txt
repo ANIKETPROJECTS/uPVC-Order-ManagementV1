@@ -1,0 +1,44 @@
+Audit and complete the remaining Payments features. The Flagged badge, Flag button, Flag Details panel, bounced fields, history log and compact progress bar on the cards already work. Do NOT rebuild or change them. Do not change the WhatsApp button logic or the window readiness checks. Keep the current UI style.
+
+STEP 1: Audit
+Check each item below in the running app. For each one, report "Working" or "Missing/Broken", then build or fix only the ones that are not working.
+
+A. Refusal to Pay flag
+- The Flag button on an order opens the form, and choosing "Refusal to Pay" shows: number of follow-ups, last follow-up date, follow-up notes. The bounced fields must be hidden for this type.
+- Required fields are validated with clear error messages.
+- After saving, the card shows "Flagged: Refusal to Pay" immediately without a page refresh.
+- In the Flag Details panel, an "Add follow-up" button increases the follow-up count, updates the last follow-up date and appends a note. Each follow-up is saved in the action history.
+
+B. Flagged Payments tab (inside Payments)
+- The list shows: order number, client, flag type, status, amount, date flagged.
+- Search by client name or order number.
+- Filters for flag type, status (Active / Resolved / All) and date range.
+- Summary at the top: total flagged count and total flagged amount (active flags only). The summary updates when filters change or a flag is resolved or removed.
+- Clicking a row opens the same Flag Details panel.
+
+C. Resolve and Remove
+- "Mark as resolved" asks for resolution date and notes, then changes the status to Resolved. It is removed from the active count and total, and the history log records it.
+- "Remove" asks for confirmation. It is removed from the active list, and the history log records it.
+- "Edit" saves changes and records them in the history.
+
+D. Full progress bar on the order detail page
+- Show Order Value, Paid, Balance and Percentage with a horizontal bar.
+- Colors: red under 30%, amber 30 to 99%, green at 100%. This applies to both the compact card bar and the full bar.
+- Overpayment caps the bar at 100% but shows the real percentage. Order value of 0 shows 0% with no error.
+- Indian currency format (₹1,00,000). Mobile responsive.
+
+E. Bounced receipts and refunds
+- On the order detail page, each receipt has a "Mark as Bounced" action (date and reason). A bounced receipt does not count as Paid.
+- A "Record Refund" action (amount, date, notes). Refunds are subtracted from Paid.
+- A receipt can only be in one state (received, void or bounced), so it is never deducted twice.
+- When a receipt is marked bounced, optionally offer to create a Bounced Payment flag pre-filled with the receipt amount.
+- Paid, Balance and Percentage come from one shared calculation, so Payments cards, order detail, reminders and the Flagged tab always match.
+- Existing orders must show the same Paid values as before.
+
+STEP 2: Sample data
+Make sure sample data exists for testing: one Refusal to Pay flag, one Resolved flag, and one order at each progress level (under 30%, between 30% and 99%, and 100%). Do not delete the existing sample data.
+
+STEP 3: Verify and report
+Run a typecheck, test the running app, and give me a short table listing items A to E as Done or Not done, and what I should click to test each one.
+
+Show a short plan first, then build.
