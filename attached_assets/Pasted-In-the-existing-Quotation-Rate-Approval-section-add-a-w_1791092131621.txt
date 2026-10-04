@@ -1,0 +1,32 @@
+In the existing Quotation & Rate Approval section, add a way to send push notifications to Uday sir. Do not break existing functionality, keep the current UI style, and do not change the Payments section, WhatsApp logic or window readiness checks. First review how quotations and rate approval currently work, and reuse the existing user/role system.
+
+1. Approver setup
+- Uday sir is the approver. Make him a user with an "Approver" role (or use the existing role if one exists). Do not hardcode his name or email in the code. Add a setting where an admin can choose who receives approval notifications.
+
+2. Send for approval
+- On each quotation and each rate change that needs approval, add a "Send for approval" button.
+- Status values: Draft, Pending approval, Approved, Rejected. Show a status badge on the quotation list and detail page.
+- When clicked, the status becomes "Pending approval", the sender and time are saved, and Uday sir gets a push notification.
+
+3. Push notification (Web Push)
+- Use Web Push with a service worker and VAPID keys. Store the keys in Replit Secrets, not in the code.
+- After Uday sir logs in, show a one-time "Enable notifications" prompt. Save his device subscription in the database. Support multiple devices per user, and remove expired subscriptions automatically.
+- The notification title is "Approval needed: Quotation [number]". The body shows client name, amount and who requested it. Tapping it opens that quotation's approval page directly.
+
+4. Approve or reject
+- On the approval page, Uday sir sees quotation details, rates and the requester. He can Approve, or Reject with a mandatory reason.
+- After his decision, notify the requester (push, plus an in-app notification).
+- Save every action (sent, approved, rejected, who, when, reason) in a history log, and show it on the quotation.
+
+5. Fallbacks
+- Add an in-app notification bell with an unread count, so he still sees pending approvals if push is blocked or unsupported.
+- If push permission is denied or his device is not subscribed, show the sender a message like "Uday sir has not enabled notifications, he will see this in the app".
+- Add a "Pending approvals" list for the approver.
+- Prevent duplicate notifications if the button is clicked twice, and allow "Remind" only after a set gap, for example 1 hour.
+
+6. Test
+- Add a "Send test notification" button in settings for the approver.
+- Add 2 sample quotations (one pending, one approved), and mark them clearly as sample data.
+- Run a typecheck, test the running app, and reply with a table of items 1 to 5 as Done or Not done, with what to click to test each.
+
+Show a short plan first, then build.

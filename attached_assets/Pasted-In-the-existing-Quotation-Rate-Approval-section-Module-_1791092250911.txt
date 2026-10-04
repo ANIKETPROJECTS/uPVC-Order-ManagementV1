@@ -1,0 +1,31 @@
+In the existing Quotation & Rate Approval section (Module 3), add approval and push notifications for Uday sir. Do not break existing functionality, the quotation calculation, the Payments section, WhatsApp logic or window readiness checks. Keep the current UI style. First review how quotations are saved and how users and roles work, and reuse them.
+
+1. Fix layout first: on mobile the quotation form is clipped on the right and scrolls horizontally. Make every field fit the screen width with no horizontal scrolling.
+
+2. Status and send for approval
+- Statuses: Draft, Pending approval, Approved, Rejected, shown as a badge on the quotation list and detail page.
+- After a quotation is saved, show a "Send for approval" button. If any window line uses a Rate override, show a "Rate override" tag and require approval before the quotation can be shared or finalised.
+- Sending sets the status to Pending approval and saves the sender and time. Block duplicate sends.
+
+3. Approver
+- Add an "Approver" role. An admin setting chooses who receives approval requests (Uday sir). Do not hardcode his name or email.
+
+4. Push notifications (Web Push)
+- Use a service worker and VAPID keys stored in Replit Secrets.
+- After the approver logs in, show a one-time "Enable notifications" prompt. Save his device subscription, support multiple devices, and remove expired ones.
+- Title: "Approval needed: Quotation [number]". Body: client name, grand total, requested by. Tapping opens that quotation's approval page.
+
+5. Approval page
+- Show customer, window lines, rates, any overrides, totals and requester.
+- Approve, or Reject with a mandatory reason. Notify the requester after the decision (push plus in-app).
+- Keep a history log (sent, approved, rejected, who, when, reason) shown on the quotation.
+
+6. Fallbacks
+- In-app notification bell with an unread count, and a "Pending approvals" list for the approver.
+- If the approver has not enabled push, tell the sender: "Uday sir has not enabled notifications, he will see this in the app."
+- Allow "Remind" only after a 1-hour gap.
+- A "Send test notification" button in settings.
+
+7. Add 2 sample quotations, clearly labelled as sample data. Run a typecheck, test the running app, and reply with a table of items 1 to 6 as Done or Not done, with what to click to test each.
+
+Show a short plan first, then build.
