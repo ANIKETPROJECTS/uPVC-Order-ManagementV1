@@ -20,13 +20,17 @@ import {
 } from 'lucide-react';
 import {
   getGetPaymentOverviewQueryKey,
+  getListPaymentFlagsQueryKey,
   useGetPaymentOverview,
+  useListPaymentFlags,
 } from '@workspace/api-client-react';
-import type { RecentPaymentUpdate, User } from '@workspace/api-client-react';
+import type { PaymentFlag, RecentPaymentUpdate, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FlaggedPaymentsSection } from '@/components/flagged-payments';
+import { PaymentFlagBadge } from '@/components/payment-flag-badge';
 
 const money = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -69,6 +73,7 @@ function PaymentSkeleton() {
 
 export default function PaymentsPage({ user }: { user: User }) {
   const overview = useGetPaymentOverview({ query: { queryKey: getGetPaymentOverviewQueryKey(), refetchInterval: 30_000, refetchOnWindowFocus: true } });
+  const flagsQuery = useListPaymentFlags({ query: { queryKey: getListPaymentFlagsQueryKey(), refetchInterval: 30_000, refetchOnWindowFocus: true } });
 
   const recentPayments = useMemo(
     () => [...(overview.data?.recentPayments ?? [])].sort(
@@ -76,6 +81,14 @@ export default function PaymentsPage({ user }: { user: User }) {
     ),
     [overview.data?.recentPayments],
   );
+  const activeFlagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const flag of flagsQuery.data ?? []) {
+      if (flag.status === 'active') counts.set(flag.orderRecordId, (counts.get(flag.orderRecordId) ?? 0) + 1);
+    }
+    return counts;
+  }, [flagsQuery.data]);
+  const canEditFlags = user.roleId === 'master-admin' || user.permissions.payments === 'edit';
 
   return <AppShell user={user} title="Payments" eyebrow="Finance workspace">
     <main className="mx-auto w-full max-w-[1440px] space-y-6 pb-10" data-testid="page-payments">
@@ -145,12 +158,15 @@ export default function PaymentsPage({ user }: { user: User }) {
         </section>
 
         <Tabs defaultValue="balance" className="space-y-4" data-testid="tabs-payment-sections">
-          <TabsList className="grid h-auto w-full max-w-xl grid-cols-2 rounded-xl bg-secondary/70 p-1">
+         <TabsList className="grid h-auto w-full max-w-3xl grid-cols-3 rounded-xl bg-secondary/70 p-1">
             <TabsTrigger value="balance" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-payment-balances">
               Balance follow-up <span className="rounded-full bg-background/70 px-2 py-0.5 text-[10px]">{overview.data.reminderOrders.length}</span>
             </TabsTrigger>
             <TabsTrigger value="receipts" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-payment-receipts">
               Recent receipts <span className="rounded-full bg-background/70 px-2 py-0.5 text-[10px]">{recentPayments.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="flags" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-payment-flags">
+              Flagged payments <span className="rounded-full bg-background/70 px-2 py-0.5 text-[10px]">{flagsQuery.data?.filter((flag) => flag.status !== 'removed').length ?? 0}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -183,6 +199,7 @@ export default function PaymentsPage({ user }: { user: User }) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <Link href={`/order-hub/${order.orderRecordId}`} className="font-mono text-xs font-bold text-primary hover:underline" data-testid={`link-reminder-order-${order.orderRecordId}`}>{order.orderId}<ArrowRight size={12} className="ml-1 inline" /></Link>
+                    {(activeFlagCounts.get(order.orderRecordId) ?? 0) > 0 && <PaymentFlagBadge count={activeFlagCounts.get(order.orderRecordId)} />}
                     <span className="text-[10px] text-muted-foreground">{order.windowCount === 0 ? 'No active windows' : `${order.windowCount} windows`}</span>
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary" data-testid={`status-order-lifecycle-${order.orderRecordId}`}>
                       Lifecycle: {lifecycleStatusLabel(order.orderStatus)}
@@ -223,10 +240,19 @@ export default function PaymentsPage({ user }: { user: User }) {
               <p className="font-semibold">No received payments yet</p>
               <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Newly recorded receipts will appear here for quick reconciliation.</p>
             </div> : <div className="divide-y divide-border/70">
-              {recentPayments.map((payment) => <RecentPaymentRow key={payment.id} payment={payment} />)}
+              {recentPayments.map((payment) => <RecentPaymentRow key={payment.id} payment={payment} flagCount={activeFlagCounts.get(payment.orderRecordId) ?? 0} />)}
             </div>}
             {recentPayments.length > 0 && <div className="flex items-center gap-2 border-t border-border bg-muted/25 px-5 py-3 text-[10px] text-muted-foreground"><CalendarClock size={13} /> Sorted by entry time · newest first</div>}
           </section>
+          </TabsContent>
+          <TabsContent value="flags" className="mt-0" data-testid="section-payment-flags-tab">
+            <FlaggedPaymentsSection
+              flags={(flagsQuery.data ?? []) as PaymentFlag[]}
+              canEdit={canEditFlags}
+              isLoading={flagsQuery.isLoading}
+              isError={flagsQuery.isError}
+              onRetry={() => void flagsQuery.refetch()}
+            />
           </TabsContent>
         </Tabs>
       </> : null}
@@ -234,12 +260,12 @@ export default function PaymentsPage({ user }: { user: User }) {
   </AppShell>;
 }
 
-function RecentPaymentRow({ payment }: { payment: RecentPaymentUpdate }) {
+function RecentPaymentRow({ payment, flagCount }: { payment: RecentPaymentUpdate; flagCount: number }) {
   return <article className="flex items-start justify-between gap-3 px-5 py-4" data-testid={`row-recent-payment-${payment.id}`}>
     <div className="flex min-w-0 gap-3">
       <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Banknote size={15} /></span>
       <div className="min-w-0">
-        <Link href={`/order-hub/${payment.orderRecordId}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-payment-order-${payment.id}`}>{payment.orderId}<ArrowRight size={11} className="ml-1 inline" /></Link>
+        <div className="flex flex-wrap items-center gap-2"><Link href={`/order-hub/${payment.orderRecordId}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-payment-order-${payment.id}`}>{payment.orderId}<ArrowRight size={11} className="ml-1 inline" /></Link>{flagCount > 0 && <PaymentFlagBadge count={flagCount} />}</div>
         <p className="mt-1 truncate text-sm font-semibold" data-testid={`text-payment-client-${payment.id}`}>{payment.clientName}</p>
         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[10px] leading-4 text-muted-foreground">
           <span className="inline-flex items-center gap-1"><Building2 size={11} />{payment.locationName}</span><span aria-hidden="true">·</span><span>{methodLabel(payment.method)}</span>

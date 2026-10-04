@@ -197,6 +197,44 @@ export interface OrderPaymentDocument {
   reference: string | null; notes: string | null; paidAt: Date; status: PaymentStatus;
   voidReason: string | null; createdBy: string; createdAt: Date; voidedBy?: string | null; voidedAt?: Date | null;
 }
+export type PaymentFlagType = "bounced_payment" | "refusal_to_pay";
+export type PaymentFlagStatus = "active" | "resolved" | "removed";
+export type PaymentFlagActionType = "created" | "resolved" | "removed";
+export interface PaymentFlagActionDocument {
+  id: string;
+  action: PaymentFlagActionType;
+  actorId: string;
+  actorName: string;
+  occurredAt: Date;
+  summary: string;
+}
+export interface OrderPaymentFlagDocument {
+  _id: string;
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  flagType: PaymentFlagType;
+  remarks: string;
+  flaggedAmount: number;
+  flaggedAt: Date;
+  flaggedById: string;
+  flaggedBy: string;
+  bounceReason: string | null;
+  bouncedAmount: number | null;
+  bankCharges: number | null;
+  followUpCount: number | null;
+  lastFollowUpDate: Date | null;
+  followUpNotes: string | null;
+  status: PaymentFlagStatus;
+  resolutionDate: Date | null;
+  resolutionNotes: string | null;
+  removedAt: Date | null;
+  removedBy: string | null;
+  actions: PaymentFlagActionDocument[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 export type DocumentCategory = string;
 export interface OrderDocumentCategoryDocument {
   _id: string;
@@ -476,6 +514,7 @@ export function getCounters(db: Db): Collection<CounterDocument> {
 }
 export function getOrderWindows(db: Db) { return db.collection<OrderWindowDocument>("order_windows"); }
 export function getOrderPayments(db: Db) { return db.collection<OrderPaymentDocument>("order_payments"); }
+export function getOrderPaymentFlags(db: Db) { return db.collection<OrderPaymentFlagDocument>("order_payment_flags"); }
 export function getOrderDocumentCategories(db: Db) { return db.collection<OrderDocumentCategoryDocument>("order_document_categories"); }
 export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }
 export function getOrderActivity(db: Db) { return db.collection<OrderActivityDocument>("order_activity"); }
@@ -872,6 +911,7 @@ export async function initializeMongo(): Promise<void> {
   const counters = getCounters(db);
   const orderWindows = getOrderWindows(db);
   const orderPayments = getOrderPayments(db);
+  const paymentFlags = getOrderPaymentFlags(db);
   const orderDocumentMetadata = getOrderDocumentMetadata(db);
   const orderActivity = getOrderActivity(db);
   const windowProfiles = getWindowProfiles(db);
@@ -912,6 +952,8 @@ export async function initializeMongo(): Promise<void> {
     orderWindows.createIndex({ orderRecordId: 1, windowNo: 1 }, { unique: true, partialFilterExpression: { archivedAt: null }, name: "active_window_no_unique" }),
     orderWindows.createIndex({ orderRecordId: 1, updatedAt: -1 }, { name: "windows_by_order" }),
     orderPayments.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "payments_by_order" }),
+    paymentFlags.createIndex({ orderRecordId: 1, flaggedAt: -1 }, { name: "payment_flags_by_order_date" }),
+    paymentFlags.createIndex({ status: 1, flaggedAt: -1 }, { name: "payment_flags_by_status_date" }),
     orderDocumentMetadata.createIndex({ orderRecordId: 1, uploadedAt: -1 }, { name: "documents_by_order" }),
     orderActivity.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "activity_by_order" }),
     windowProfiles.createIndex(
@@ -1085,6 +1127,158 @@ export async function initializeMongo(): Promise<void> {
         }),
       );
       logger.info({ orders: seedOrders.length }, "Seeded development order hub records");
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    const sampleOrders = await orders.find({}).sort({ createdAt: -1 }).limit(4).toArray();
+    const sampleDefinitions: Array<{
+      key: string;
+      orderIndex: number;
+      flagType: PaymentFlagType;
+      remarks: string;
+      flaggedAmount: number;
+      daysAgo: number;
+      bounceReason: string | null;
+      bouncedAmount: number | null;
+      bankCharges: number | null;
+      followUpCount: number | null;
+      lastFollowUpDaysAgo: number | null;
+      followUpNotes: string | null;
+      status: PaymentFlagStatus;
+      resolutionDaysAgo: number | null;
+      resolutionNotes: string | null;
+    }> = [
+      {
+        key: "bounced-active",
+        orderIndex: 0,
+        flagType: "bounced_payment",
+        remarks: "Sample record: cheque returned by the bank.",
+        flaggedAmount: 28500,
+        daysAgo: 1,
+        bounceReason: "Insufficient funds",
+        bouncedAmount: 28500,
+        bankCharges: 450,
+        followUpCount: null,
+        lastFollowUpDaysAgo: null,
+        followUpNotes: null,
+        status: "active",
+        resolutionDaysAgo: null,
+        resolutionNotes: null,
+      },
+      {
+        key: "refusal-active",
+        orderIndex: 1,
+        flagType: "refusal_to_pay",
+        remarks: "Sample record: client disputes the pending amount.",
+        flaggedAmount: 42000,
+        daysAgo: 2,
+        bounceReason: null,
+        bouncedAmount: null,
+        bankCharges: null,
+        followUpCount: 3,
+        lastFollowUpDaysAgo: 1,
+        followUpNotes: "Called twice and sent one written reminder; client declined to pay.",
+        status: "active",
+        resolutionDaysAgo: null,
+        resolutionNotes: null,
+      },
+      {
+        key: "bounced-resolved",
+        orderIndex: 2,
+        flagType: "bounced_payment",
+        remarks: "Sample record: returned transfer was replaced by a new payment.",
+        flaggedAmount: 16750,
+        daysAgo: 8,
+        bounceReason: "Transfer returned by receiving bank",
+        bouncedAmount: 16750,
+        bankCharges: 250,
+        followUpCount: null,
+        lastFollowUpDaysAgo: null,
+        followUpNotes: null,
+        status: "resolved",
+        resolutionDaysAgo: 4,
+        resolutionNotes: "Replacement payment received and matched to the order.",
+      },
+      {
+        key: "refusal-active-second",
+        orderIndex: 3,
+        flagType: "refusal_to_pay",
+        remarks: "Sample record: payment remains outstanding after follow-ups.",
+        flaggedAmount: 31500,
+        daysAgo: 5,
+        bounceReason: null,
+        bouncedAmount: null,
+        bankCharges: null,
+        followUpCount: 4,
+        lastFollowUpDaysAgo: 2,
+        followUpNotes: "Three calls and one site visit; client requested more time, then declined.",
+        status: "active",
+        resolutionDaysAgo: null,
+        resolutionNotes: null,
+      },
+    ];
+    for (const sample of sampleDefinitions) {
+      const order = sampleOrders[sample.orderIndex % Math.max(sampleOrders.length, 1)];
+      if (!order) continue;
+      const id = `sample-payment-flag-${sample.key}`;
+      const flaggedAt = new Date(now.getTime() - sample.daysAgo * 24 * 60 * 60 * 1000);
+      const actions: PaymentFlagActionDocument[] = [{
+        id: `${id}-created`,
+        action: "created",
+        actorId: "sample-data",
+        actorName: "Sample data",
+        occurredAt: flaggedAt,
+        summary: "Sample flagged payment created for testing.",
+      }];
+      const resolutionDate = sample.resolutionDaysAgo == null
+        ? null
+        : new Date(now.getTime() - sample.resolutionDaysAgo * 24 * 60 * 60 * 1000);
+      if (resolutionDate && sample.resolutionNotes) {
+        actions.push({
+          id: `${id}-resolved`,
+          action: "resolved",
+          actorId: "sample-data",
+          actorName: "Sample data",
+          occurredAt: resolutionDate,
+          summary: sample.resolutionNotes,
+        });
+      }
+      await paymentFlags.updateOne(
+        { _id: id },
+        {
+          $setOnInsert: {
+            _id: id,
+            orderRecordId: order._id,
+            orderId: order.orderId,
+            clientName: order.clientName,
+            locationName: order.locationName,
+            flagType: sample.flagType,
+            remarks: sample.remarks,
+            flaggedAmount: sample.flaggedAmount,
+            flaggedAt,
+            flaggedById: "sample-data",
+            flaggedBy: "Sample data",
+            bounceReason: sample.bounceReason,
+            bouncedAmount: sample.bouncedAmount,
+            bankCharges: sample.bankCharges,
+            followUpCount: sample.followUpCount,
+            lastFollowUpDate: sample.lastFollowUpDaysAgo == null
+              ? null
+              : new Date(now.getTime() - sample.lastFollowUpDaysAgo * 24 * 60 * 60 * 1000),
+            followUpNotes: sample.followUpNotes,
+            status: sample.status,
+            resolutionDate,
+            resolutionNotes: sample.resolutionNotes,
+            removedAt: null,
+            removedBy: null,
+            actions,
+            createdAt: flaggedAt,
+            updatedAt: resolutionDate ?? flaggedAt,
+          },
+        },
+        { upsert: true },
+      );
     }
   }
 

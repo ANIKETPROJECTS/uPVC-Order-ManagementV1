@@ -4,6 +4,7 @@ import { Router as ExpressRouter, type RequestHandler } from "express";
 import {
   ArchiveOrderDocumentParams, ArchiveOrderWindowParams,
   CreateOrderDocumentCategoryBody, CreateOrderDocumentCategoryResponse,
+  CreateOrderPaymentFlagBody, CreateOrderPaymentFlagParams, CreateOrderPaymentFlagResponse,
   CreateOrderWindowBody, CreateOrderWindowParams, CreateOrderWindowResponse, DownloadOrderDocumentParams,
   DeleteOrderDocumentCategoryParams,
   GetGlassTrackingResponse,
@@ -11,9 +12,11 @@ import {
   GetPurchaseOrderRegisterResponse,
   ListOrderDocumentCategoriesResponse,
   ListOrderActivityParams, ListOrderActivityResponse, ListOrderDocumentsParams, ListOrderDocumentsResponse,
-  ListOrderPaymentsParams, ListOrderPaymentsResponse, ListOrderWindowsParams, ListOrderWindowsResponse,
+  ListOrderPaymentFlagsParams, ListOrderPaymentFlagsResponse, ListOrderPaymentsParams, ListOrderPaymentsResponse, ListOrderWindowsParams, ListOrderWindowsResponse,
+  ListPaymentFlagsResponse, RemovePaymentFlagParams, RemovePaymentFlagResponse,
   OpenPaymentReminderParams,
   RecordOrderPaymentBody, RecordOrderPaymentParams, RecordOrderPaymentResponse, UpdateOrderWindowBody,
+  ResolvePaymentFlagBody, ResolvePaymentFlagParams, ResolvePaymentFlagResponse,
   ReplaceOrderDocumentParams, ReplaceOrderDocumentResponse,
   UpdateOrderDocumentCategoryBody, UpdateOrderDocumentCategoryParams, UpdateOrderDocumentCategoryResponse,
   UpdateOrderWindowParams, UpdateOrderWindowResponse, VoidOrderPaymentBody, VoidOrderPaymentParams, VoidOrderPaymentResponse,
@@ -21,8 +24,9 @@ import {
   UploadQuotationConfirmationDocumentResponse,
 } from "@workspace/api-zod";
 import {
-  getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPayments,
+  getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPaymentFlags, getOrderPayments,
   getOrders, getOrderWindows, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderWindowDocument,
+  type OrderPaymentFlagDocument, type PaymentFlagActionDocument,
 } from "../lib/mongo";
 import {
   ensureDefaultOrderDocumentCategories,
@@ -69,6 +73,41 @@ async function event(orderRecordId: string, actor: UserContext, action: string, 
 }
 const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
 const paymentResponse = (p: any) => ({ ...p, id: p._id, paidAt: p.paidAt.toISOString(), createdAt: p.createdAt.toISOString() });
+const paymentFlagResponse = (flag: OrderPaymentFlagDocument) => ({
+  id: flag._id,
+  orderRecordId: flag.orderRecordId,
+  orderId: flag.orderId,
+  clientName: flag.clientName,
+  locationName: flag.locationName,
+  flagType: flag.flagType,
+  remarks: flag.remarks,
+  flaggedAmount: flag.flaggedAmount,
+  flaggedAt: flag.flaggedAt.toISOString().slice(0, 10),
+  flaggedById: flag.flaggedById,
+  flaggedBy: flag.flaggedBy,
+  bounceReason: flag.bounceReason,
+  bouncedAmount: flag.bouncedAmount,
+  bankCharges: flag.bankCharges,
+  followUpCount: flag.followUpCount,
+  lastFollowUpDate: flag.lastFollowUpDate?.toISOString().slice(0, 10) ?? null,
+  followUpNotes: flag.followUpNotes,
+  status: flag.status,
+  resolutionDate: flag.resolutionDate?.toISOString().slice(0, 10) ?? null,
+  resolutionNotes: flag.resolutionNotes,
+  removedAt: flag.removedAt?.toISOString() ?? null,
+  removedBy: flag.removedBy,
+  actions: flag.actions.map((action) => ({ ...action, occurredAt: action.occurredAt.toISOString() })),
+  createdAt: flag.createdAt.toISOString(),
+  updatedAt: flag.updatedAt.toISOString(),
+});
+const parseDateOnly = (value: string | Date): Date | null => {
+  const dateText = value instanceof Date
+    ? Number.isNaN(value.getTime()) ? "" : value.toISOString().slice(0, 10)
+    : value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) return null;
+  const parsed = new Date(`${dateText}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== dateText ? null : parsed;
+};
 const docResponse = (d: any) => ({ id: d._id, orderRecordId: d.orderRecordId, quotationRequestId: d.quotationRequestId ?? null, filename: d.filename, category: d.category, contentType: d.contentType, sizeBytes: d.sizeBytes, uploadedBy: d.uploadedBy, uploadedAt: d.uploadedAt.toISOString() });
 const activityResponse = (a: any) => ({ ...a, id: a._id, createdAt: a.createdAt.toISOString() });
 const gridFsOptions = (contentType: string, orderRecordId: string, category: string) => ({ contentType, metadata: { orderRecordId, category } });
@@ -218,6 +257,183 @@ router.delete("/orders/:id/windows/:windowId", async (req, res): Promise<void> =
 router.get("/orders/:id/payments", async (req, res): Promise<void> => { const p = ListOrderPaymentsParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } const actor = await context(req, res, "payments"); if (!actor || !(await orderExists(p.data.id, res))) return; const rows = await getOrderPayments(await getMongoDb()).find({ orderRecordId: p.data.id }).sort({ createdAt: -1 }).toArray(); res.json(ListOrderPaymentsResponse.parse(rows.map(paymentResponse))); });
 router.post("/orders/:id/payments", async (req, res): Promise<void> => { const p = RecordOrderPaymentParams.safeParse(req.params), b = RecordOrderPaymentBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; } const actor = await context(req, res, "payments", true); const order = actor ? await orderExists(p.data.id, res) : null; if (!actor || !order) return; const db = await getMongoDb(); const total = await getOrderPayments(db).aggregate([{ $match: { orderRecordId: p.data.id, status: "received" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).toArray(); if (order.orderValue != null && Number(total[0]?.total ?? 0) + b.data.amount > order.orderValue) { res.status(400).json({ error: "Payment exceeds the remaining order balance." }); return; } const paidAt = new Date(b.data.paidAt); if (Number.isNaN(paidAt.getTime())) { res.status(400).json({ error: "Invalid payment date." }); return; } const payment = { _id: randomUUID(), orderRecordId: p.data.id, amount: b.data.amount, method: b.data.method, reference: b.data.reference ?? null, notes: b.data.notes ?? null, paidAt, status: "received" as const, voidReason: null, createdBy: actor.id, createdAt: new Date() }; await getOrderPayments(db).insertOne(payment); await event(p.data.id, actor, "payment.recorded", `Recorded payment of ${payment.amount}.`); res.status(201).json(RecordOrderPaymentResponse.parse(paymentResponse(payment))); });
 router.patch("/orders/:id/payments/:paymentId", async (req, res): Promise<void> => { const p = VoidOrderPaymentParams.safeParse(req.params), b = VoidOrderPaymentBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; } const actor = await context(req, res, "payments", true); if (!actor || !(await orderExists(p.data.id, res))) return; const db = await getMongoDb(); const old = await getOrderPayments(db).findOne({ _id: p.data.paymentId, orderRecordId: p.data.id }); if (!old) { res.status(404).json({ error: "Payment not found." }); return; } if (old.status === "void") { res.status(400).json({ error: "Payment is already void." }); return; } await getOrderPayments(db).updateOne({ _id: old._id }, { $set: { status: "void", voidReason: b.data.voidReason, voidedBy: actor.id, voidedAt: new Date() } }); const updated = await getOrderPayments(db).findOne({ _id: old._id }); await event(p.data.id, actor, "payment.voided", `Voided payment of ${old.amount}.`); res.json(VoidOrderPaymentResponse.parse(paymentResponse(updated))); });
+
+router.get("/payments/flags", async (req, res): Promise<void> => {
+  if (!(await context(req, res, "payments"))) return;
+  const flags = await getOrderPaymentFlags(await getMongoDb()).find({}).sort({ flaggedAt: -1, createdAt: -1 }).toArray();
+  res.json(ListPaymentFlagsResponse.parse(flags.map(paymentFlagResponse)));
+});
+
+router.get("/orders/:id/payment-flags", async (req, res): Promise<void> => {
+  const p = ListOrderPaymentFlagsParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!(await context(req, res, "payments")) || !(await orderExists(p.data.id, res))) return;
+  const flags = await getOrderPaymentFlags(await getMongoDb())
+    .find({ orderRecordId: p.data.id })
+    .sort({ flaggedAt: -1, createdAt: -1 })
+    .toArray();
+  res.json(ListOrderPaymentFlagsResponse.parse(flags.map(paymentFlagResponse)));
+});
+
+router.post("/orders/:id/payment-flags", async (req, res): Promise<void> => {
+  const p = CreateOrderPaymentFlagParams.safeParse(req.params);
+  const b = CreateOrderPaymentFlagBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
+  if (!b.data.remarks.trim()) { res.status(400).json({ error: "Add remarks describing the payment issue." }); return; }
+  const flaggedAt = parseDateOnly(b.data.flaggedAt);
+  if (!flaggedAt) { res.status(400).json({ error: "Enter a valid flag date." }); return; }
+
+  let flaggedAmount: number;
+  let bounceReason: string | null = null;
+  let bouncedAmount: number | null = null;
+  let bankCharges: number | null = null;
+  let followUpCount: number | null = null;
+  let lastFollowUpDate: Date | null = null;
+  let followUpNotes: string | null = null;
+  if (b.data.flagType === "bounced_payment") {
+    if (!b.data.bounceReason?.trim() || b.data.bouncedAmount == null || b.data.bouncedAmount <= 0) {
+      res.status(400).json({ error: "A bounce reason and bounced amount are required." });
+      return;
+    }
+    if (b.data.bankCharges != null && b.data.bankCharges < 0) {
+      res.status(400).json({ error: "Bank charges cannot be negative." });
+      return;
+    }
+    bounceReason = b.data.bounceReason.trim();
+    bouncedAmount = b.data.bouncedAmount;
+    bankCharges = b.data.bankCharges ?? null;
+    flaggedAmount = bouncedAmount;
+  } else {
+    if (b.data.followUpCount == null || b.data.followUpCount < 1 || !b.data.followUpNotes?.trim()) {
+      res.status(400).json({ error: "Follow-up count, last follow-up date, and notes are required." });
+      return;
+    }
+    lastFollowUpDate = b.data.lastFollowUpDate ? parseDateOnly(b.data.lastFollowUpDate) : null;
+    if (!lastFollowUpDate) { res.status(400).json({ error: "Enter a valid last follow-up date." }); return; }
+    if (order.orderValue == null) {
+      res.status(409).json({ error: "Set the order value before flagging a refusal to pay." });
+      return;
+    }
+    const paid = await getOrderPayments(await getMongoDb()).aggregate<{ total: number }>([
+      { $match: { orderRecordId: order._id, status: "received" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]).toArray();
+    flaggedAmount = Math.max(0, order.orderValue - Number(paid[0]?.total ?? 0));
+    if (flaggedAmount <= 0) {
+      res.status(409).json({ error: "This order has no pending amount to flag." });
+      return;
+    }
+    followUpCount = b.data.followUpCount;
+    followUpNotes = b.data.followUpNotes.trim();
+  }
+
+  const db = await getMongoDb();
+  const now = new Date();
+  const id = randomUUID();
+  const historyEntry: PaymentFlagActionDocument = {
+    id: randomUUID(),
+    action: "created",
+    actorId: actor.id,
+    actorName: actor.name,
+    occurredAt: now,
+    summary: `Created ${b.data.flagType === "bounced_payment" ? "bounced payment" : "refusal to pay"} flag.`,
+  };
+  const flag: OrderPaymentFlagDocument = {
+    _id: id,
+    orderRecordId: order._id,
+    orderId: order.orderId,
+    clientName: order.clientName,
+    locationName: order.locationName,
+    flagType: b.data.flagType,
+    remarks: b.data.remarks.trim(),
+    flaggedAmount,
+    flaggedAt,
+    flaggedById: actor.id,
+    flaggedBy: actor.name,
+    bounceReason,
+    bouncedAmount,
+    bankCharges,
+    followUpCount,
+    lastFollowUpDate,
+    followUpNotes,
+    status: "active",
+    resolutionDate: null,
+    resolutionNotes: null,
+    removedAt: null,
+    removedBy: null,
+    actions: [historyEntry],
+    createdAt: now,
+    updatedAt: now,
+  };
+  await getOrderPaymentFlags(db).insertOne(flag);
+  await event(order._id, actor, "payment.flag_created", `${historyEntry.summary} ${flag.remarks}`);
+  res.status(201).json(CreateOrderPaymentFlagResponse.parse(paymentFlagResponse(flag)));
+});
+
+router.patch("/payment-flags/:id/resolve", async (req, res): Promise<void> => {
+  const p = ResolvePaymentFlagParams.safeParse(req.params);
+  const b = ResolvePaymentFlagBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  if (!actor) return;
+  if (!b.data.resolutionNotes.trim()) { res.status(400).json({ error: "Add notes describing how the issue was resolved." }); return; }
+  const resolutionDate = parseDateOnly(b.data.resolutionDate);
+  if (!resolutionDate) { res.status(400).json({ error: "Enter a valid resolution date." }); return; }
+  const flags = getOrderPaymentFlags(await getMongoDb());
+  const old = await flags.findOne({ _id: p.data.id });
+  if (!old) { res.status(404).json({ error: "Payment flag not found." }); return; }
+  if (old.status !== "active") { res.status(409).json({ error: "Only active payment flags can be resolved." }); return; }
+  const now = new Date();
+  const action: PaymentFlagActionDocument = {
+    id: randomUUID(),
+    action: "resolved",
+    actorId: actor.id,
+    actorName: actor.name,
+    occurredAt: now,
+    summary: b.data.resolutionNotes.trim(),
+  };
+  const result = await flags.updateOne({ _id: old._id, status: "active" }, {
+    $set: { status: "resolved", resolutionDate, resolutionNotes: b.data.resolutionNotes.trim(), updatedAt: now },
+    $push: { actions: action },
+  });
+  if (result.modifiedCount === 0) { res.status(409).json({ error: "Payment flag changed before it could be resolved. Refresh and try again." }); return; }
+  const updated = await flags.findOne({ _id: old._id });
+  await event(old.orderRecordId, actor, "payment.flag_resolved", `Resolved payment flag for ${old.orderId}. ${action.summary}`);
+  res.json(ResolvePaymentFlagResponse.parse(paymentFlagResponse(updated!)));
+});
+
+router.delete("/payment-flags/:id", async (req, res): Promise<void> => {
+  const p = RemovePaymentFlagParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  if (!actor) return;
+  const flags = getOrderPaymentFlags(await getMongoDb());
+  const old = await flags.findOne({ _id: p.data.id });
+  if (!old) { res.status(404).json({ error: "Payment flag not found." }); return; }
+  if (old.status === "removed") { res.status(409).json({ error: "Payment flag is already removed." }); return; }
+  const now = new Date();
+  const action: PaymentFlagActionDocument = {
+    id: randomUUID(),
+    action: "removed",
+    actorId: actor.id,
+    actorName: actor.name,
+    occurredAt: now,
+    summary: "Removed from active payment tracking; audit history retained.",
+  };
+  const result = await flags.updateOne({ _id: old._id, status: { $ne: "removed" } }, {
+    $set: { status: "removed", removedAt: now, removedBy: actor.name, updatedAt: now },
+    $push: { actions: action },
+  });
+  if (result.modifiedCount === 0) { res.status(409).json({ error: "Payment flag changed before it could be removed. Refresh and try again." }); return; }
+  const updated = await flags.findOne({ _id: old._id });
+  await event(old.orderRecordId, actor, "payment.flag_removed", `Removed payment flag for ${old.orderId}.`);
+  res.json(RemovePaymentFlagResponse.parse(paymentFlagResponse(updated!)));
+});
 
 router.get("/payments/overview", async (req, res): Promise<void> => {
   const actor = await context(req, res, "payments");

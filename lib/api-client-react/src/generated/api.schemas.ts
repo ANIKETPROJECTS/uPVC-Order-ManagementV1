@@ -621,6 +621,111 @@ export interface OrderPaymentVoid {
 
 export type OrderPaymentList = OrderPayment[];
 
+export type PaymentFlagType = typeof PaymentFlagType[keyof typeof PaymentFlagType];
+
+
+export const PaymentFlagType = {
+  bounced_payment: 'bounced_payment',
+  refusal_to_pay: 'refusal_to_pay',
+} as const;
+
+export type PaymentFlagStatus = typeof PaymentFlagStatus[keyof typeof PaymentFlagStatus];
+
+
+export const PaymentFlagStatus = {
+  active: 'active',
+  resolved: 'resolved',
+  removed: 'removed',
+} as const;
+
+export type PaymentFlagActionAction = typeof PaymentFlagActionAction[keyof typeof PaymentFlagActionAction];
+
+
+export const PaymentFlagActionAction = {
+  created: 'created',
+  resolved: 'resolved',
+  removed: 'removed',
+} as const;
+
+export interface PaymentFlagAction {
+  id: string;
+  action: PaymentFlagActionAction;
+  actorId: string;
+  actorName: string;
+  occurredAt: string;
+  summary: string;
+}
+
+export interface PaymentFlag {
+  id: string;
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  flagType: PaymentFlagType;
+  remarks: string;
+  flaggedAmount: number;
+  flaggedAt: string;
+  flaggedById: string;
+  flaggedBy: string;
+  /** @nullable */
+  bounceReason: string | null;
+  /** @nullable */
+  bouncedAmount: number | null;
+  /** @nullable */
+  bankCharges: number | null;
+  /** @nullable */
+  followUpCount: number | null;
+  /** @nullable */
+  lastFollowUpDate: string | null;
+  /** @nullable */
+  followUpNotes: string | null;
+  status: PaymentFlagStatus;
+  /** @nullable */
+  resolutionDate: string | null;
+  /** @nullable */
+  resolutionNotes: string | null;
+  /** @nullable */
+  removedAt: string | null;
+  /** @nullable */
+  removedBy: string | null;
+  actions: PaymentFlagAction[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentFlagInput {
+  flagType: PaymentFlagType;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  remarks: string;
+  flaggedAt: string;
+  /** @maxLength 500 */
+  bounceReason?: string;
+  /** @exclusiveMinimum 0 */
+  bouncedAmount?: number;
+  /** @minimum 0 */
+  bankCharges?: number;
+  /** @minimum 1 */
+  followUpCount?: number;
+  lastFollowUpDate?: string;
+  /** @maxLength 1000 */
+  followUpNotes?: string;
+}
+
+export interface PaymentFlagResolution {
+  resolutionDate: string;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  resolutionNotes: string;
+}
+
+export type PaymentFlagList = PaymentFlag[];
+
 /**
  * @minLength 1
  * @maxLength 64

@@ -292,6 +292,101 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaymentOverview"
+  /payments/flags:
+    get:
+      operationId: listPaymentFlags
+      tags: [payments]
+      summary: List flagged payment records with their audit histories
+      responses:
+        "200":
+          description: Flagged payment records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentFlagList"
+  /orders/{id}/payment-flags:
+    get:
+      operationId: listOrderPaymentFlags
+      tags: [orders]
+      summary: List payment flags for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment flags for the order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentFlagList"
+    post:
+      operationId: createOrderPaymentFlag
+      tags: [orders]
+      summary: Flag a bounced payment or refusal to pay
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentFlagInput"
+      responses:
+        "201":
+          description: Payment flag created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentFlag"
+  /payment-flags/{id}/resolve:
+    patch:
+      operationId: resolvePaymentFlag
+      tags: [payments]
+      summary: Resolve a payment flag and retain the resolution in its history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentFlagResolution"
+      responses:
+        "200":
+          description: Resolved payment flag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentFlag"
+  /payment-flags/{id}:
+    delete:
+      operationId: removePaymentFlag
+      tags: [payments]
+      summary: Mark a payment flag removed while preserving its audit history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Removed payment flag retained for audit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentFlag"
   /orders/{id}/payment-reminder:
     post:
       operationId: openPaymentReminder
@@ -2914,6 +3009,163 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/OrderPayment"
+    PaymentFlagType:
+      type: string
+      enum: [bounced_payment, refusal_to_pay]
+    PaymentFlagStatus:
+      type: string
+      enum: [active, resolved, removed]
+    PaymentFlagAction:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+          enum: [created, resolved, removed]
+        actorId:
+          type: string
+        actorName:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        summary:
+          type: string
+      required: [id, action, actorId, actorName, occurredAt, summary]
+    PaymentFlag:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        flagType:
+          $ref: "#/components/schemas/PaymentFlagType"
+        remarks:
+          type: string
+        flaggedAmount:
+          type: number
+        flaggedAt:
+          type: string
+          format: date
+        flaggedById:
+          type: string
+        flaggedBy:
+          type: string
+        bounceReason:
+          type: ["string", "null"]
+        bouncedAmount:
+          type: ["number", "null"]
+        bankCharges:
+          type: ["number", "null"]
+        followUpCount:
+          type: ["integer", "null"]
+        lastFollowUpDate:
+          type: ["string", "null"]
+          format: date
+        followUpNotes:
+          type: ["string", "null"]
+        status:
+          $ref: "#/components/schemas/PaymentFlagStatus"
+        resolutionDate:
+          type: ["string", "null"]
+          format: date
+        resolutionNotes:
+          type: ["string", "null"]
+        removedAt:
+          type: ["string", "null"]
+          format: date-time
+        removedBy:
+          type: ["string", "null"]
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentFlagAction"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - orderRecordId
+        - orderId
+        - clientName
+        - locationName
+        - flagType
+        - remarks
+        - flaggedAmount
+        - flaggedAt
+        - flaggedById
+        - flaggedBy
+        - bounceReason
+        - bouncedAmount
+        - bankCharges
+        - followUpCount
+        - lastFollowUpDate
+        - followUpNotes
+        - status
+        - resolutionDate
+        - resolutionNotes
+        - removedAt
+        - removedBy
+        - actions
+        - createdAt
+        - updatedAt
+    PaymentFlagInput:
+      type: object
+      properties:
+        flagType:
+          $ref: "#/components/schemas/PaymentFlagType"
+        remarks:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        flaggedAt:
+          type: string
+          format: date
+        bounceReason:
+          type: string
+          maxLength: 500
+        bouncedAmount:
+          type: number
+          exclusiveMinimum: 0
+        bankCharges:
+          type: number
+          minimum: 0
+        followUpCount:
+          type: integer
+          minimum: 1
+        lastFollowUpDate:
+          type: string
+          format: date
+        followUpNotes:
+          type: string
+          maxLength: 1000
+      required: [flagType, remarks, flaggedAt]
+    PaymentFlagResolution:
+      type: object
+      properties:
+        resolutionDate:
+          type: string
+          format: date
+        resolutionNotes:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required: [resolutionDate, resolutionNotes]
+    PaymentFlagList:
+      type: array
+      items:
+        $ref: "#/components/schemas/PaymentFlag"
     OrderDocumentCategory:
       type: string
       minLength: 1

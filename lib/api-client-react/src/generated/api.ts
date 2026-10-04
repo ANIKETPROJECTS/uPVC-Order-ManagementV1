@@ -86,6 +86,10 @@ import type {
   OrderWindowInput,
   OrderWindowList,
   OrderWindowUpdate,
+  PaymentFlag,
+  PaymentFlagInput,
+  PaymentFlagList,
+  PaymentFlagResolution,
   PaymentOverview,
   PurchaseOrderRegisterList,
   Quotation,
@@ -1354,6 +1358,412 @@ export function useGetPaymentOverview<TData = Awaited<ReturnType<typeof getPayme
 
 
 
+
+export const getListPaymentFlagsUrl = () => {
+
+
+
+
+  return `/api/payments/flags`
+}
+
+/**
+ * @summary List flagged payment records with their audit histories
+ */
+export const listPaymentFlags = async ( options?: Parameters<typeof customFetch>[1]): Promise<PaymentFlagList> => {
+
+  return customFetch<PaymentFlagList>(getListPaymentFlagsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPaymentFlagsQueryKey = () => {
+    return [
+    `/api/payments/flags`
+    ] as const;
+    }
+
+
+export const getListPaymentFlagsQueryOptions = <TData = Awaited<ReturnType<typeof listPaymentFlags>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPaymentFlags>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPaymentFlagsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPaymentFlags>>> = ({ signal }) => listPaymentFlags({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPaymentFlags>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPaymentFlagsQueryResult = NonNullable<Awaited<ReturnType<typeof listPaymentFlags>>>
+export type ListPaymentFlagsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List flagged payment records with their audit histories
+ */
+
+export function useListPaymentFlags<TData = Awaited<ReturnType<typeof listPaymentFlags>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPaymentFlags>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPaymentFlagsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListOrderPaymentFlagsUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/payment-flags`
+}
+
+/**
+ * @summary List payment flags for an order
+ */
+export const listOrderPaymentFlags = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<PaymentFlagList> => {
+
+  return customFetch<PaymentFlagList>(getListOrderPaymentFlagsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderPaymentFlagsQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/payment-flags`
+    ] as const;
+    }
+
+
+export const getListOrderPaymentFlagsQueryOptions = <TData = Awaited<ReturnType<typeof listOrderPaymentFlags>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderPaymentFlags>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderPaymentFlagsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderPaymentFlags>>> = ({ signal }) => listOrderPaymentFlags(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderPaymentFlags>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderPaymentFlagsQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderPaymentFlags>>>
+export type ListOrderPaymentFlagsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List payment flags for an order
+ */
+
+export function useListOrderPaymentFlags<TData = Awaited<ReturnType<typeof listOrderPaymentFlags>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderPaymentFlags>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderPaymentFlagsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateOrderPaymentFlagUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/payment-flags`
+}
+
+/**
+ * @summary Flag a bounced payment or refusal to pay
+ */
+export const createOrderPaymentFlag = async (id: string,
+    paymentFlagInput: PaymentFlagInput, options?: Parameters<typeof customFetch>[1]): Promise<PaymentFlag> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PaymentFlag>(getCreateOrderPaymentFlagUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(paymentFlagInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOrderPaymentFlagMutationKey = () => ['createOrderPaymentFlag'] as const;
+
+export const getCreateOrderPaymentFlagMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderPaymentFlag>>, TError,CreateOrderPaymentFlagMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOrderPaymentFlag>>, TError,CreateOrderPaymentFlagMutationVariables, TContext> => {
+
+const mutationKey = getCreateOrderPaymentFlagMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOrderPaymentFlag>>, CreateOrderPaymentFlagMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createOrderPaymentFlag(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOrderPaymentFlagMutationResult = NonNullable<Awaited<ReturnType<typeof createOrderPaymentFlag>>>
+    export type CreateOrderPaymentFlagMutationBody = BodyType<PaymentFlagInput>
+    export type CreateOrderPaymentFlagMutationError = ErrorType<unknown>
+    export type CreateOrderPaymentFlagMutationVariables = {id: string;data: BodyType<PaymentFlagInput>}
+
+    /**
+ * @summary Flag a bounced payment or refusal to pay
+ */
+export const useCreateOrderPaymentFlag = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderPaymentFlag>>, TError,CreateOrderPaymentFlagMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOrderPaymentFlag>>,
+        TError,
+        CreateOrderPaymentFlagMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOrderPaymentFlagMutationOptions(options));
+    }
+
+export const getResolvePaymentFlagUrl = (id: string,) => {
+
+
+
+
+  return `/api/payment-flags/${id}/resolve`
+}
+
+/**
+ * @summary Resolve a payment flag and retain the resolution in its history
+ */
+export const resolvePaymentFlag = async (id: string,
+    paymentFlagResolution: PaymentFlagResolution, options?: Parameters<typeof customFetch>[1]): Promise<PaymentFlag> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PaymentFlag>(getResolvePaymentFlagUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(paymentFlagResolution)
+  }
+);}
+
+
+
+
+
+export const getResolvePaymentFlagMutationKey = () => ['resolvePaymentFlag'] as const;
+
+export const getResolvePaymentFlagMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolvePaymentFlag>>, TError,ResolvePaymentFlagMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolvePaymentFlag>>, TError,ResolvePaymentFlagMutationVariables, TContext> => {
+
+const mutationKey = getResolvePaymentFlagMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolvePaymentFlag>>, ResolvePaymentFlagMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  resolvePaymentFlag(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolvePaymentFlagMutationResult = NonNullable<Awaited<ReturnType<typeof resolvePaymentFlag>>>
+    export type ResolvePaymentFlagMutationBody = BodyType<PaymentFlagResolution>
+    export type ResolvePaymentFlagMutationError = ErrorType<unknown>
+    export type ResolvePaymentFlagMutationVariables = {id: string;data: BodyType<PaymentFlagResolution>}
+
+    /**
+ * @summary Resolve a payment flag and retain the resolution in its history
+ */
+export const useResolvePaymentFlag = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolvePaymentFlag>>, TError,ResolvePaymentFlagMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolvePaymentFlag>>,
+        TError,
+        ResolvePaymentFlagMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResolvePaymentFlagMutationOptions(options));
+    }
+
+export const getRemovePaymentFlagUrl = (id: string,) => {
+
+
+
+
+  return `/api/payment-flags/${id}`
+}
+
+/**
+ * @summary Mark a payment flag removed while preserving its audit history
+ */
+export const removePaymentFlag = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<PaymentFlag> => {
+
+  return customFetch<PaymentFlag>(getRemovePaymentFlagUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemovePaymentFlagMutationKey = () => ['removePaymentFlag'] as const;
+
+export const getRemovePaymentFlagMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePaymentFlag>>, TError,RemovePaymentFlagMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removePaymentFlag>>, TError,RemovePaymentFlagMutationVariables, TContext> => {
+
+const mutationKey = getRemovePaymentFlagMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removePaymentFlag>>, RemovePaymentFlagMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  removePaymentFlag(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemovePaymentFlagMutationResult = NonNullable<Awaited<ReturnType<typeof removePaymentFlag>>>
+
+    export type RemovePaymentFlagMutationError = ErrorType<unknown>
+    export type RemovePaymentFlagMutationVariables = {id: string}
+
+    /**
+ * @summary Mark a payment flag removed while preserving its audit history
+ */
+export const useRemovePaymentFlag = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePaymentFlag>>, TError,RemovePaymentFlagMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removePaymentFlag>>,
+        TError,
+        RemovePaymentFlagMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRemovePaymentFlagMutationOptions(options));
+    }
 
 export const getOpenPaymentReminderUrl = (id: string,) => {
 

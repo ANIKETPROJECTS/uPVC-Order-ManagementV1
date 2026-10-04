@@ -14,6 +14,7 @@ import {
   CircleAlert,
   Download,
   Eye,
+  Flag,
   FileText,
   IndianRupee,
   Grid2X2,
@@ -40,6 +41,7 @@ import {
   getListOrderGrievancesQueryKey,
   getListOrderDocumentsQueryKey,
   getListOrderMessageTemplatesQueryKey,
+  getListOrderPaymentFlagsQueryKey,
   getListOrderPaymentsQueryKey,
   getListOrderWindowsQueryKey,
   getListOrdersQueryKey,
@@ -61,6 +63,7 @@ import {
   useListOrderDocuments,
   useListOrderGrievances,
   useListOrderMessageTemplates,
+  useListOrderPaymentFlags,
   useListOrderPayments,
   useListOrderWindows,
   useRecordOrderPayment,
@@ -78,6 +81,7 @@ import type {
   OrderDocumentCategory,
   OrderDocumentCategoryConfig,
   OrderGrievance,
+  PaymentFlag,
   OrderPayment,
   OrderWindow,
   User,
@@ -93,6 +97,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { DocumentPreviewDialog } from '@/components/document-preview';
+import { PaymentFlagBadge } from '@/components/payment-flag-badge';
+import { PaymentFlagDialog } from '@/components/payment-flag-dialog';
 
 type Status = (typeof OrderStatus)[keyof typeof OrderStatus];
 type Readiness = (typeof OrderWindowReadiness)[keyof typeof OrderWindowReadiness];
@@ -301,6 +307,51 @@ function PaymentDialog({ orderId, open, onOpenChange, onComplete }: { orderId: s
   useEffect(() => { if (open) form.reset({ amount: 0, method: OrderPaymentMethod.bank_transfer, reference: '', notes: '', paidAt: new Date().toISOString().slice(0, 16) }); }, [form, open]);
   const save = (values: PaymentFormValues) => record.mutate({ id: orderId, data: { amount: values.amount, method: values.method as PaymentMethod, reference: values.reference || null, notes: values.notes || null, paidAt: new Date(values.paidAt).toISOString() } }, { onSuccess: () => { toast({ title: 'Payment recorded' }); onOpenChange(false); onComplete(); }, onError: () => toast({ title: 'Payment could not be recorded', variant: 'destructive' as const }) });
   return <div className={open ? 'fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-3 sm:items-center' : 'hidden'} role="dialog" aria-modal="true" data-testid="dialog-payment"><div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl sm:p-6"><div className="flex items-start justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Payment register</p><h2 className="mt-1 font-display text-xl font-bold">Record payment</h2><p className="mt-1 text-xs text-muted-foreground">Received payments update the order balance immediately.</p></div><Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} data-testid="button-close-payment-dialog">Close</Button></div><Form {...form}><form onSubmit={form.handleSubmit(save)} className="mt-6 space-y-4" data-testid="form-payment"><div className="grid gap-4 sm:grid-cols-2"><FormField control={form.control} name="amount" render={({ field }) => <FormItem><FormLabel>Amount (INR)</FormLabel><FormControl><Input {...field} type="number" min="0.01" step="0.01" data-testid="input-payment-amount" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="paidAt" render={({ field }) => <FormItem><FormLabel>Paid at</FormLabel><FormControl><Input {...field} type="datetime-local" data-testid="input-payment-date" /></FormControl><FormMessage /></FormItem>} /></div><FormField control={form.control} name="method" render={({ field }) => <FormItem><FormLabel>Method</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger data-testid="select-payment-method"><SelectValue /></SelectTrigger></FormControl><SelectContent>{PAYMENT_METHODS.map((item) => <SelectItem value={item.value} key={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} /><FormField control={form.control} name="reference" render={({ field }) => <FormItem><FormLabel>Reference <span className="font-normal text-muted-foreground">(optional)</span></FormLabel><FormControl><Input {...field} data-testid="input-payment-reference" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="notes" render={({ field }) => <FormItem><FormLabel>Notes <span className="font-normal text-muted-foreground">(optional)</span></FormLabel><FormControl><Textarea {...field} rows={3} data-testid="textarea-payment-notes" /></FormControl><FormMessage /></FormItem>} /><div className="flex justify-end gap-2 border-t border-border/70 pt-4"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-payment">Cancel</Button><Button type="submit" disabled={record.isPending} data-testid="button-save-payment">{record.isPending ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} {record.isPending ? 'Recording…' : 'Record payment'}</Button></div></form></Form></div></div>;
+}
+
+function OrderPaymentFlagsPanel({ orderId, user }: { orderId: string; user: User }) {
+  const query = useListOrderPaymentFlags(orderId, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderPaymentFlagsQueryKey(orderId) } });
+  const flags = query.data ?? [];
+  const activeCount = flags.filter((flag) => flag.status === 'active').length;
+  const formatFlagDate = (value: string) => {
+    const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
+    return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: value.length > 10 ? '2-digit' : undefined, minute: value.length > 10 ? '2-digit' : undefined }).format(date);
+  };
+  if (!hasPermission(user, 'payments', 'view')) return null;
+  return <Card className="border-border/80" data-testid="card-order-payment-flags">
+    <CardHeader className="flex-row items-start justify-between gap-3 pb-3">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Issue tracking</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2"><CardTitle className="text-base">Payment flags</CardTitle>{activeCount > 0 && <PaymentFlagBadge count={activeCount} />}</div>
+        <p className="mt-1 text-xs text-muted-foreground">Bounced payments and client refusals are tracked separately from received receipts.</p>
+      </div>
+      {hasPermission(user, 'payments') && <PaymentFlagDialog orderId={orderId} flaggedBy={user.name} />}
+    </CardHeader>
+    <CardContent>
+      {query.isLoading ? <div className="space-y-2" data-testid="state-order-payment-flags-loading"><div className="h-16 animate-pulse rounded-xl bg-muted/55" /><div className="h-16 animate-pulse rounded-xl bg-muted/55" /></div>
+        : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Payment flags could not be loaded." testId="state-order-payment-flags-error" />
+          : flags.length === 0 ? <ZeroState icon={Flag} title="No payment flags" description="Use Flag to track a returned payment or refusal to pay." testId="state-order-payment-flags-empty" />
+            : <div className="space-y-3" data-testid="list-order-payment-flags">{flags.map((flag) => <article key={flag.id} className="rounded-xl border border-border/70 bg-muted/15 p-4" data-testid={`order-payment-flag-${flag.id}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2"><PaymentFlagBadge status={flag.status} /><span className="text-xs font-bold">{flag.flagType === 'bounced_payment' ? 'Bounced Payment' : 'Refusal to Pay'}</span></div>
+                <span className="font-display text-sm font-bold tabular-nums">{plainInr(flag.flaggedAmount)}</span>
+              </div>
+              <p className="mt-2 text-xs leading-5">{flag.remarks}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">Flagged {formatFlagDate(flag.flaggedAt)} by {flag.flaggedBy}</p>
+              {flag.flagType === 'bounced_payment'
+                ? <p className="mt-2 text-[11px] text-muted-foreground">{flag.bounceReason} · Bounced {flag.bouncedAmount == null ? '—' : plainInr(flag.bouncedAmount)} · Bank charges {flag.bankCharges == null ? '—' : plainInr(flag.bankCharges)}</p>
+                : <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{flag.followUpCount} follow-ups · last on {flag.lastFollowUpDate ? formatFlagDate(flag.lastFollowUpDate) : '—'}{flag.followUpNotes ? ` · ${flag.followUpNotes}` : ''}</p>}
+              {flag.resolutionDate && <p className="mt-2 rounded-lg bg-primary/5 px-3 py-2 text-[11px] leading-5"><span className="font-semibold">Resolved {formatFlagDate(flag.resolutionDate)}: </span>{flag.resolutionNotes}</p>}
+              {flag.removedAt && <p className="mt-2 text-[10px] text-muted-foreground">Removed {formatFlagDate(flag.removedAt)} by {flag.removedBy || 'Former user'}; history retained.</p>}
+              <details className="mt-2 text-[11px]">
+                <summary className="w-fit cursor-pointer font-semibold text-primary">Action history ({flag.actions.length})</summary>
+                <ol className="mt-2 space-y-2 border-l border-border pl-3">
+                  {flag.actions.map((action) => <li key={action.id} className="text-muted-foreground"><span className="font-semibold text-foreground">{action.action === 'created' ? 'Flag created' : action.action === 'resolved' ? 'Flag resolved' : 'Flag removed'}</span><span> · {action.actorName} · {formatFlagDate(action.occurredAt)}</span><p className="mt-0.5 leading-4">{action.summary}</p></li>)}
+                </ol>
+              </details>
+            </article>)}</div>}
+    </CardContent>
+  </Card>;
 }
 
 function BillingPanel({ order, user, id }: { order: Order; user: User; id: string }) {
@@ -764,7 +815,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6" data-testid="section-order-lifecycle"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-base font-bold">Where this order is now</h2></div><span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span></div><div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">{timeline.map((item, index) => <div key={item.value} className="relative min-w-0" data-testid={`timeline-stage-${item.value}`}>{index < timeline.length - 1 && <div aria-hidden="true" className={`absolute left-7 -right-4 top-3.5 z-0 hidden h-px lg:block ${item.active ? 'bg-primary/35' : 'bg-border'}`} />}<span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.current ? 'border-primary bg-primary text-primary-foreground' : item.active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}>{item.current ? <Check size={13} /> : String(index + 1).padStart(2, '0')}</span><p className={`mt-2 min-h-8 text-[10px] font-bold leading-4 ${item.active ? 'text-primary' : 'text-muted-foreground'}`}>{item.label}</p></div>)}</div></section>
     <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : new URLSearchParams(window.location.search).get('tab') === 'grievances' ? 'grievances' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-5"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="grievances" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-grievances">Grievances</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
       <TabsContent value="details" className="space-y-5"><OrderQrCard orderId={record.orderId} orderRecordId={record.id} /><div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><OrderRecordCard order={record} user={user} id={id} /><MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} /></div><WindowsPanel orderId={id} user={user} /></TabsContent>
-      <TabsContent value="billing" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><PaymentsPanel orderId={id} user={user} order={record} /></TabsContent>
+      <TabsContent value="billing" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><OrderPaymentFlagsPanel orderId={id} user={user} /><PaymentsPanel orderId={id} user={user} order={record} /></TabsContent>
       <TabsContent value="documents"><DocumentsPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="grievances"><GrievancesPanel order={record} user={user} /></TabsContent>
       <TabsContent value="activity"><ActivityPanel orderId={id} /></TabsContent>
