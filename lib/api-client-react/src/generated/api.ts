@@ -56,6 +56,7 @@ import type {
   MeasurementRecordUpdate,
   MeasurementVersion,
   MeasurementVersionUpdate,
+  NotificationCenter,
   Order,
   OrderActivityList,
   OrderBillingUpdate,
@@ -98,7 +99,14 @@ import type {
   PaymentFlagUpdate,
   PaymentOverview,
   PurchaseOrderRegisterList,
+  PushConfig,
+  PushSubscriptionDeleteInput,
+  PushSubscriptionInput,
   Quotation,
+  QuotationApprovalDecisionInput,
+  QuotationApprovalQueue,
+  QuotationApprovalSettings,
+  QuotationApprovalSettingsInput,
   QuotationInput,
   QuotationList,
   QuotationOrderLinkInput,
@@ -5407,6 +5415,963 @@ export const useArchiveQuotation = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getArchiveQuotationMutationOptions(options));
+    }
+
+export const getSubmitQuotationForApprovalUrl = (quotationId: string,) => {
+
+
+
+
+  return `/api/quotations/${quotationId}/submit-for-approval`
+}
+
+/**
+ * @summary Send a saved quotation to its configured approver
+ */
+export const submitQuotationForApproval = async (quotationId: string, options?: Parameters<typeof customFetch>[1]): Promise<Quotation> => {
+
+  return customFetch<Quotation>(getSubmitQuotationForApprovalUrl(quotationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSubmitQuotationForApprovalMutationKey = () => ['submitQuotationForApproval'] as const;
+
+export const getSubmitQuotationForApprovalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitQuotationForApproval>>, TError,SubmitQuotationForApprovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitQuotationForApproval>>, TError,SubmitQuotationForApprovalMutationVariables, TContext> => {
+
+const mutationKey = getSubmitQuotationForApprovalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitQuotationForApproval>>, SubmitQuotationForApprovalMutationVariables> = (props) => {
+          const {quotationId} = props ?? {};
+
+          return  submitQuotationForApproval(quotationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitQuotationForApprovalMutationResult = NonNullable<Awaited<ReturnType<typeof submitQuotationForApproval>>>
+
+    export type SubmitQuotationForApprovalMutationError = ErrorType<void>
+    export type SubmitQuotationForApprovalMutationVariables = {quotationId: string}
+
+    /**
+ * @summary Send a saved quotation to its configured approver
+ */
+export const useSubmitQuotationForApproval = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitQuotationForApproval>>, TError,SubmitQuotationForApprovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitQuotationForApproval>>,
+        TError,
+        SubmitQuotationForApprovalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitQuotationForApprovalMutationOptions(options));
+    }
+
+export const getListQuotationApprovalsUrl = () => {
+
+
+
+
+  return `/api/quotation-approvals`
+}
+
+/**
+ * @summary List quotations assigned to the current approver
+ */
+export const listQuotationApprovals = async ( options?: Parameters<typeof customFetch>[1]): Promise<QuotationApprovalQueue> => {
+
+  return customFetch<QuotationApprovalQueue>(getListQuotationApprovalsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListQuotationApprovalsQueryKey = () => {
+    return [
+    `/api/quotation-approvals`
+    ] as const;
+    }
+
+
+export const getListQuotationApprovalsQueryOptions = <TData = Awaited<ReturnType<typeof listQuotationApprovals>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuotationApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListQuotationApprovalsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listQuotationApprovals>>> = ({ signal }) => listQuotationApprovals({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listQuotationApprovals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListQuotationApprovalsQueryResult = NonNullable<Awaited<ReturnType<typeof listQuotationApprovals>>>
+export type ListQuotationApprovalsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List quotations assigned to the current approver
+ */
+
+export function useListQuotationApprovals<TData = Awaited<ReturnType<typeof listQuotationApprovals>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuotationApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListQuotationApprovalsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDecideQuotationApprovalUrl = (quotationId: string,) => {
+
+
+
+
+  return `/api/quotation-approvals/${quotationId}/decision`
+}
+
+/**
+ * @summary Approve or reject a submitted quotation
+ */
+export const decideQuotationApproval = async (quotationId: string,
+    quotationApprovalDecisionInput: QuotationApprovalDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<Quotation> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Quotation>(getDecideQuotationApprovalUrl(quotationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationApprovalDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getDecideQuotationApprovalMutationKey = () => ['decideQuotationApproval'] as const;
+
+export const getDecideQuotationApprovalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideQuotationApproval>>, TError,DecideQuotationApprovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideQuotationApproval>>, TError,DecideQuotationApprovalMutationVariables, TContext> => {
+
+const mutationKey = getDecideQuotationApprovalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideQuotationApproval>>, DecideQuotationApprovalMutationVariables> = (props) => {
+          const {quotationId,data} = props ?? {};
+
+          return  decideQuotationApproval(quotationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideQuotationApprovalMutationResult = NonNullable<Awaited<ReturnType<typeof decideQuotationApproval>>>
+    export type DecideQuotationApprovalMutationBody = BodyType<QuotationApprovalDecisionInput>
+    export type DecideQuotationApprovalMutationError = ErrorType<void>
+    export type DecideQuotationApprovalMutationVariables = {quotationId: string;data: BodyType<QuotationApprovalDecisionInput>}
+
+    /**
+ * @summary Approve or reject a submitted quotation
+ */
+export const useDecideQuotationApproval = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideQuotationApproval>>, TError,DecideQuotationApprovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideQuotationApproval>>,
+        TError,
+        DecideQuotationApprovalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDecideQuotationApprovalMutationOptions(options));
+    }
+
+export const getGetQuotationApprovalSettingsUrl = () => {
+
+
+
+
+  return `/api/quotation-approval-settings`
+}
+
+/**
+ * @summary Get approval routing and eligible approvers
+ */
+export const getQuotationApprovalSettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<QuotationApprovalSettings> => {
+
+  return customFetch<QuotationApprovalSettings>(getGetQuotationApprovalSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetQuotationApprovalSettingsQueryKey = () => {
+    return [
+    `/api/quotation-approval-settings`
+    ] as const;
+    }
+
+
+export const getGetQuotationApprovalSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getQuotationApprovalSettings>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuotationApprovalSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetQuotationApprovalSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQuotationApprovalSettings>>> = ({ signal }) => getQuotationApprovalSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQuotationApprovalSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetQuotationApprovalSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getQuotationApprovalSettings>>>
+export type GetQuotationApprovalSettingsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get approval routing and eligible approvers
+ */
+
+export function useGetQuotationApprovalSettings<TData = Awaited<ReturnType<typeof getQuotationApprovalSettings>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuotationApprovalSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetQuotationApprovalSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateQuotationApprovalSettingsUrl = () => {
+
+
+
+
+  return `/api/quotation-approval-settings`
+}
+
+/**
+ * @summary Select the user who receives quotation approval requests
+ */
+export const updateQuotationApprovalSettings = async (quotationApprovalSettingsInput: QuotationApprovalSettingsInput, options?: Parameters<typeof customFetch>[1]): Promise<QuotationApprovalSettings> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QuotationApprovalSettings>(getUpdateQuotationApprovalSettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationApprovalSettingsInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateQuotationApprovalSettingsMutationKey = () => ['updateQuotationApprovalSettings'] as const;
+
+export const getUpdateQuotationApprovalSettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQuotationApprovalSettings>>, TError,UpdateQuotationApprovalSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateQuotationApprovalSettings>>, TError,UpdateQuotationApprovalSettingsMutationVariables, TContext> => {
+
+const mutationKey = getUpdateQuotationApprovalSettingsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateQuotationApprovalSettings>>, UpdateQuotationApprovalSettingsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateQuotationApprovalSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateQuotationApprovalSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateQuotationApprovalSettings>>>
+    export type UpdateQuotationApprovalSettingsMutationBody = BodyType<QuotationApprovalSettingsInput>
+    export type UpdateQuotationApprovalSettingsMutationError = ErrorType<void>
+    export type UpdateQuotationApprovalSettingsMutationVariables = {data: BodyType<QuotationApprovalSettingsInput>}
+
+    /**
+ * @summary Select the user who receives quotation approval requests
+ */
+export const useUpdateQuotationApprovalSettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQuotationApprovalSettings>>, TError,UpdateQuotationApprovalSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateQuotationApprovalSettings>>,
+        TError,
+        UpdateQuotationApprovalSettingsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateQuotationApprovalSettingsMutationOptions(options));
+    }
+
+export const getGetPushConfigUrl = () => {
+
+
+
+
+  return `/api/push/config`
+}
+
+/**
+ * @summary Get browser push availability and public VAPID key
+ */
+export const getPushConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<PushConfig> => {
+
+  return customFetch<PushConfig>(getGetPushConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPushConfigQueryKey = () => {
+    return [
+    `/api/push/config`
+    ] as const;
+    }
+
+
+export const getGetPushConfigQueryOptions = <TData = Awaited<ReturnType<typeof getPushConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPushConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPushConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPushConfig>>> = ({ signal }) => getPushConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPushConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPushConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getPushConfig>>>
+export type GetPushConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get browser push availability and public VAPID key
+ */
+
+export function useGetPushConfig<TData = Awaited<ReturnType<typeof getPushConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPushConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPushConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSavePushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/push-subscriptions`
+}
+
+/**
+ * @summary Save or refresh this device's browser push subscription
+ */
+export const savePushSubscription = async (pushSubscriptionInput: PushSubscriptionInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getSavePushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pushSubscriptionInput)
+  }
+);}
+
+
+
+
+
+export const getSavePushSubscriptionMutationKey = () => ['savePushSubscription'] as const;
+
+export const getSavePushSubscriptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePushSubscription>>, TError,SavePushSubscriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof savePushSubscription>>, TError,SavePushSubscriptionMutationVariables, TContext> => {
+
+const mutationKey = getSavePushSubscriptionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof savePushSubscription>>, SavePushSubscriptionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  savePushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SavePushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof savePushSubscription>>>
+    export type SavePushSubscriptionMutationBody = BodyType<PushSubscriptionInput>
+    export type SavePushSubscriptionMutationError = ErrorType<void>
+    export type SavePushSubscriptionMutationVariables = {data: BodyType<PushSubscriptionInput>}
+
+    /**
+ * @summary Save or refresh this device's browser push subscription
+ */
+export const useSavePushSubscription = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePushSubscription>>, TError,SavePushSubscriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof savePushSubscription>>,
+        TError,
+        SavePushSubscriptionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSavePushSubscriptionMutationOptions(options));
+    }
+
+export const getDeletePushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/push-subscriptions`
+}
+
+/**
+ * @summary Remove this device's browser push subscription
+ */
+export const deletePushSubscription = async (pushSubscriptionDeleteInput: PushSubscriptionDeleteInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getDeletePushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pushSubscriptionDeleteInput)
+  }
+);}
+
+
+
+
+
+export const getDeletePushSubscriptionMutationKey = () => ['deletePushSubscription'] as const;
+
+export const getDeletePushSubscriptionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushSubscription>>, TError,DeletePushSubscriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePushSubscription>>, TError,DeletePushSubscriptionMutationVariables, TContext> => {
+
+const mutationKey = getDeletePushSubscriptionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePushSubscription>>, DeletePushSubscriptionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  deletePushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof deletePushSubscription>>>
+    export type DeletePushSubscriptionMutationBody = BodyType<PushSubscriptionDeleteInput>
+    export type DeletePushSubscriptionMutationError = ErrorType<unknown>
+    export type DeletePushSubscriptionMutationVariables = {data: BodyType<PushSubscriptionDeleteInput>}
+
+    /**
+ * @summary Remove this device's browser push subscription
+ */
+export const useDeletePushSubscription = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushSubscription>>, TError,DeletePushSubscriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePushSubscription>>,
+        TError,
+        DeletePushSubscriptionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeletePushSubscriptionMutationOptions(options));
+    }
+
+export const getListNotificationsUrl = () => {
+
+
+
+
+  return `/api/notifications`
+}
+
+/**
+ * @summary List the current user's in-app notifications
+ */
+export const listNotifications = async ( options?: Parameters<typeof customFetch>[1]): Promise<NotificationCenter> => {
+
+  return customFetch<NotificationCenter>(getListNotificationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListNotificationsQueryKey = () => {
+    return [
+    `/api/notifications`
+    ] as const;
+    }
+
+
+export const getListNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof listNotifications>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNotificationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNotifications>>> = ({ signal }) => listNotifications({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNotifications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListNotificationsQueryResult = NonNullable<Awaited<ReturnType<typeof listNotifications>>>
+export type ListNotificationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the current user's in-app notifications
+ */
+
+export function useListNotifications<TData = Awaited<ReturnType<typeof listNotifications>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListNotificationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getMarkNotificationReadUrl = (notificationId: string,) => {
+
+
+
+
+  return `/api/notifications/${notificationId}/read`
+}
+
+/**
+ * @summary Mark one notification as read
+ */
+export const markNotificationRead = async (notificationId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getMarkNotificationReadUrl(notificationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkNotificationReadMutationKey = () => ['markNotificationRead'] as const;
+
+export const getMarkNotificationReadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markNotificationRead>>, TError,MarkNotificationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markNotificationRead>>, TError,MarkNotificationReadMutationVariables, TContext> => {
+
+const mutationKey = getMarkNotificationReadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markNotificationRead>>, MarkNotificationReadMutationVariables> = (props) => {
+          const {notificationId} = props ?? {};
+
+          return  markNotificationRead(notificationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkNotificationReadMutationResult = NonNullable<Awaited<ReturnType<typeof markNotificationRead>>>
+
+    export type MarkNotificationReadMutationError = ErrorType<unknown>
+    export type MarkNotificationReadMutationVariables = {notificationId: string}
+
+    /**
+ * @summary Mark one notification as read
+ */
+export const useMarkNotificationRead = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markNotificationRead>>, TError,MarkNotificationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markNotificationRead>>,
+        TError,
+        MarkNotificationReadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkNotificationReadMutationOptions(options));
+    }
+
+export const getMarkAllNotificationsReadUrl = () => {
+
+
+
+
+  return `/api/notifications/read-all`
+}
+
+/**
+ * @summary Mark all of the current user's notifications as read
+ */
+export const markAllNotificationsRead = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getMarkAllNotificationsReadUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkAllNotificationsReadMutationKey = () => ['markAllNotificationsRead'] as const;
+
+export const getMarkAllNotificationsReadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markAllNotificationsRead>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markAllNotificationsRead>>, TError,void, TContext> => {
+
+const mutationKey = getMarkAllNotificationsReadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markAllNotificationsRead>>, void> = () => {
+
+
+          return  markAllNotificationsRead(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkAllNotificationsReadMutationResult = NonNullable<Awaited<ReturnType<typeof markAllNotificationsRead>>>
+
+    export type MarkAllNotificationsReadMutationError = ErrorType<unknown>
+
+
+    /**
+ * @summary Mark all of the current user's notifications as read
+ */
+export const useMarkAllNotificationsRead = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markAllNotificationsRead>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markAllNotificationsRead>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getMarkAllNotificationsReadMutationOptions(options));
+    }
+
+export const getSendTestNotificationUrl = () => {
+
+
+
+
+  return `/api/notifications/test`
+}
+
+/**
+ * @summary Send a test push notification to the current administrator's subscribed devices
+ */
+export const sendTestNotification = async ( options?: Parameters<typeof customFetch>[1]): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getSendTestNotificationUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSendTestNotificationMutationKey = () => ['sendTestNotification'] as const;
+
+export const getSendTestNotificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTestNotification>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendTestNotification>>, TError,void, TContext> => {
+
+const mutationKey = getSendTestNotificationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendTestNotification>>, void> = () => {
+
+
+          return  sendTestNotification(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendTestNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof sendTestNotification>>>
+
+    export type SendTestNotificationMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Send a test push notification to the current administrator's subscribed devices
+ */
+export const useSendTestNotification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTestNotification>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendTestNotification>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSendTestNotificationMutationOptions(options));
     }
 
 export const getListQuotationRateSubmissionsUrl = () => {

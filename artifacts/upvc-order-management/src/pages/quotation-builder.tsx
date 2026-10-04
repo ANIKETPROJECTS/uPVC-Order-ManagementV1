@@ -53,6 +53,7 @@ import {
   useSearchMeasurementRecords,
   useUploadQuotationRateSubmissionPdf,
   useUpdateQuotation,
+  useSubmitQuotationForApproval,
   useUpdateWindowProfile,
 } from '@workspace/api-client-react';
 import { useLocation } from 'wouter';
@@ -925,12 +926,27 @@ function RateApprovalDesk({ user }: { user: User }) {
 }
 
 export default function QuotationBuilderPage({ user }: { user: User }) {
+  const [location] = useLocation();
   const canEdit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
-  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('quote'));
   const [activeSection, setActiveSection] = useState<'new' | 'profiles' | 'drafts' | 'rates'>(() => {
     const initialSection = new URLSearchParams(window.location.search).get('section');
+    if (new URLSearchParams(window.location.search).get('quote')) return 'drafts';
     return initialSection === 'profiles' || initialSection === 'drafts' || initialSection === 'rates' ? initialSection : 'new';
   });
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const quoteId = params.get('quote');
+    if (quoteId) {
+      setSelectedQuoteId(quoteId);
+      setActiveSection('drafts');
+      return;
+    }
+    const section = params.get('section');
+    if (section === 'profiles' || section === 'drafts' || section === 'rates') {
+      setActiveSection(section);
+    }
+  }, [location]);
   const [search, setSearch] = useState('');
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<WindowProfile | null>(null);
@@ -939,6 +955,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
   const clientsQuery = useListClients({ includeInactive: false }, { query: { queryKey: getListClientsQueryKey({ includeInactive: false }) } });
   const selectedQuery = useGetQuotation(selectedQuoteId || '', { query: { enabled: Boolean(selectedQuoteId), queryKey: getGetQuotationQueryKey(selectedQuoteId || '') } });
   const archive = useArchiveQuotation();
+  const submitApproval = useSubmitQuotationForApproval();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const quotations = quotationQuery.data || [];
@@ -957,11 +974,26 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
 
   const print = () => {
     if (!selectedQuote) return;
+    if (selectedQuote.requiresRateApproval && selectedQuote.status !== 'approved') {
+      toast({ title: 'Approval required before printing', description: 'This quote contains a rate override and must be approved first.', variant: 'destructive' });
+      return;
+    }
     document.body.classList.add('print-quotation');
     window.setTimeout(() => {
       window.print();
       window.setTimeout(() => document.body.classList.remove('print-quotation'), 300);
     }, 80);
+  };
+  const sendForApproval = () => {
+    if (!selectedQuote) return;
+    submitApproval.mutate({ quotationId: selectedQuote.id }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListQuotationsQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getGetQuotationQueryKey(selectedQuote.id) });
+        toast({ title: 'Sent for approval', description: `${selectedQuote.quoteNo} is now with the assigned approver.` });
+      },
+      onError: () => toast({ title: 'Could not send for approval', description: 'Check that an approver is assigned and retry.', variant: 'destructive' }),
+    });
   };
   const archiveQuote = (quote: Quotation) => {
     if (!window.confirm(`Archive ${quote.quoteNo}? It will no longer appear in the draft register.`)) return;
@@ -988,7 +1020,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
 
   return (
     <AppShell user={user} title="Quotation & Rate Approval" eyebrow="Module 3 · quotation and approval desk">
-      <div className="quotation-builder-page space-y-6">
+      <div className="quotation-builder-page min-w-0 max-w-full space-y-6 overflow-x-hidden">
         <section className="quotation-hero animate-enter-up overflow-hidden rounded-2xl p-6 text-white shadow-sm md:p-8">
           <div className="relative z-10 max-w-4xl">
             <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-sidebar-primary">
@@ -1054,7 +1086,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
                             <button key={quote.id} type="button" onClick={() => openQuote(quote)} className={`group w-full p-4 text-left transition-colors hover:bg-secondary/35 ${selectedQuoteId === quote.id ? 'bg-secondary/50' : ''}`} data-testid={`button-open-quotation-${quote.id}`}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <div className="flex items-center gap-2"><span className="font-mono text-[10px] font-bold text-primary">{quote.quoteNo}</span><span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent-foreground">Draft</span></div>
+                                   <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[10px] font-bold text-primary">{quote.quoteNo}</span>{quote.sampleOnly && <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Sample</span>}<span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent-foreground">{quote.status.replace('_', ' ')}</span>{quote.requiresRateApproval && <span className="rounded-full border border-destructive/20 bg-destructive/5 px-2 py-0.5 text-[9px] font-bold text-destructive">Rate override</span>}</div>
                                   <p className="mt-2 truncate text-sm font-semibold">{quote.customerName || 'Unnamed customer'}</p>
                                   <p className="mt-1 truncate text-[11px] text-muted-foreground">{quote.projectName || 'No project name'} · {dateLabel(quote.quotationDate)}</p>
                                 </div>
@@ -1084,10 +1116,20 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
                 {selectedQuote && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 shadow-sm">
                   <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Saved document</p><p className="mt-1 text-xs text-foreground">{selectedQuote.quoteNo} · {selectedQuote.totals.componentCount} components · {money(selectedQuote.totals.grandTotal)}</p></div>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={print} disabled={selectedQuery.isLoading} data-testid="button-print-quotation"><Printer size={14} /> Print / PDF</Button>
+                    {(selectedQuote.status === 'draft' || selectedQuote.status === 'rejected') && canEdit && <Button size="sm" onClick={sendForApproval} disabled={submitApproval.isPending} data-testid="button-submit-quotation-approval">{submitApproval.isPending ? 'Sending…' : selectedQuote.status === 'rejected' ? 'Resubmit for approval' : 'Send for approval'}</Button>}
+                    <Button variant="outline" size="sm" onClick={print} disabled={selectedQuery.isLoading || (selectedQuote.requiresRateApproval && selectedQuote.status !== 'approved')} title={selectedQuote.requiresRateApproval && selectedQuote.status !== 'approved' ? 'Approval is required before printing' : undefined} data-testid="button-print-quotation"><Printer size={14} /> Print / PDF</Button>
                     {canEdit && <Button variant="ghost" size="sm" onClick={() => archiveQuote(selectedQuote)} data-testid="button-archive-quotation"><Archive size={14} /> Archive</Button>}
                   </div>
                 </div>}
+                {selectedQuote?.approvalHistory.length ? <section className="rounded-xl border border-border/80 bg-card p-4 shadow-sm" aria-label="Quotation approval history">
+                  <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Approval history</h3><span className="text-[10px] text-muted-foreground">{selectedQuote.approvalHistory.length} event{selectedQuote.approvalHistory.length === 1 ? '' : 's'}</span></div>
+                  <ol className="space-y-2">
+                    {[...selectedQuote.approvalHistory].reverse().map((entry, index) => <li key={`${entry.createdAt}-${index}`} className="flex min-w-0 gap-3 rounded-lg border border-border/60 bg-background p-3">
+                      <span className={`mt-1 size-2 shrink-0 rounded-full ${entry.action === 'approved' ? 'bg-primary' : entry.action === 'rejected' ? 'bg-destructive' : 'bg-accent'}`} />
+                      <div className="min-w-0"><p className="text-xs font-semibold capitalize">{entry.action.replace('_', ' ')} · {entry.actorName}</p><p className="mt-1 text-[10px] text-muted-foreground">{new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.createdAt))}</p>{entry.reason && <p className="mt-2 break-words text-xs leading-5 text-foreground">{entry.reason}</p>}</div>
+                    </li>)}
+                  </ol>
+                </section> : null}
               </div>
             </div>
           </TabsContent>

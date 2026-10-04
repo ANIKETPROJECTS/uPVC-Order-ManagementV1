@@ -323,6 +323,8 @@ export interface QuotationItemDocument {
   heightMm: number;
   sqFtPerWindow: number;
   ratePerSqFt: number;
+  catalogueRatePerSqFt?: number;
+  rateOverridden?: boolean;
   unitPrice: number;
   quantity: number;
   value: number;
@@ -341,6 +343,16 @@ export interface QuotationTotalsDocument {
   gstAmount: number;
   grandTotal: number;
   averagePricePerSqFt: number;
+}
+
+export type QuotationApprovalAction = "submitted" | "approved" | "rejected";
+
+export interface QuotationApprovalHistoryEntry {
+  action: QuotationApprovalAction;
+  actorId: string;
+  actorName: string;
+  reason: string | null;
+  createdAt: Date;
 }
 
 export interface QuotationDocument {
@@ -363,12 +375,52 @@ export interface QuotationDocument {
   gstPercent: number;
   notes: string | null;
   totals: QuotationTotalsDocument;
-  status: "draft";
+  status: "draft" | "pending_approval" | "approved" | "rejected";
+  requiresRateApproval?: boolean;
+  approvalApproverId?: string | null;
+  approvalSubmittedAt?: Date | null;
+  approvalLastReminderAt?: Date | null;
+  approvalHistory?: QuotationApprovalHistoryEntry[];
+  sampleOnly?: boolean;
   createdBy: string;
   updatedBy: string;
   createdAt: Date;
   updatedAt: Date;
   archivedAt?: Date | null;
+}
+
+export type AppNotificationType =
+  | "approval_request"
+  | "approval_decision"
+  | "approval_reminder"
+  | "test";
+
+export interface AppNotificationDocument {
+  _id: string;
+  userId: string;
+  type: AppNotificationType;
+  title: string;
+  message: string;
+  url: string;
+  quotationId: string | null;
+  readAt: Date | null;
+  createdAt: Date;
+}
+
+export interface PushSubscriptionDocument {
+  _id: string;
+  userId: string;
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface QuotationApprovalSettingsDocument {
+  _id: "saved-quotation-approval";
+  approverUserId: string | null;
+  updatedBy: string;
+  updatedAt: Date;
 }
 
 export type QuotationRateSubmissionStatus =
@@ -528,6 +580,9 @@ export function getInstallations(db: Db) { return db.collection<InstallationDocu
 export function getOrderGrievances(db: Db) { return db.collection<OrderGrievanceDocument>("order_grievances"); }
 export function getWindowProfiles(db: Db) { return db.collection<WindowProfileDocument>("window_profiles"); }
 export function getQuotations(db: Db) { return db.collection<QuotationDocument>("quotations"); }
+export function getAppNotifications(db: Db) { return db.collection<AppNotificationDocument>("app_notifications"); }
+export function getPushSubscriptions(db: Db) { return db.collection<PushSubscriptionDocument>("push_subscriptions"); }
+export function getQuotationApprovalSettings(db: Db) { return db.collection<QuotationApprovalSettingsDocument>("quotation_approval_settings"); }
 export function getOrderDocumentsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "order_documents" }); }
 export function getQuotationRateSubmissions(db: Db) { return db.collection<QuotationRateSubmissionDocument>("quotation_rate_submissions"); }
 export function getQuotationRatePdfsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "quotation_rate_pdfs" }); }
@@ -672,6 +727,16 @@ const seedRoles: Array<Omit<RoleDocument, "createdAt" | "updatedAt">> = [
     description: "Full system access, including user and role administration.",
     isSystem: true,
     permissions: allEditPermissions(),
+  },
+  {
+    _id: "approver",
+    name: "Approver",
+    nameLower: "approver",
+    description: "Reviews saved quotations assigned by an administrator.",
+    isSystem: true,
+    permissions: makePermissionMap({
+      "quotation-builder": "view",
+    }),
   },
   {
     _id: "operator",
@@ -922,6 +987,8 @@ export async function initializeMongo(): Promise<void> {
   const orderActivity = getOrderActivity(db);
   const windowProfiles = getWindowProfiles(db);
   const quotations = getQuotations(db);
+  const appNotifications = getAppNotifications(db);
+  const pushSubscriptions = getPushSubscriptions(db);
   const quotationRateSubmissions = getQuotationRateSubmissions(db);
 
   await Promise.all([
@@ -976,6 +1043,10 @@ export async function initializeMongo(): Promise<void> {
     quotations.createIndex({ quoteNo: 1 }, { unique: true, name: "quotation_number_unique" }),
     quotations.createIndex({ updatedAt: -1 }, { name: "quotations_by_updated_at" }),
     quotations.createIndex({ clientId: 1, updatedAt: -1 }, { name: "quotations_by_client" }),
+    quotations.createIndex({ status: 1, approvalApproverId: 1, approvalSubmittedAt: -1 }, { name: "quotation_approval_queue" }),
+    appNotifications.createIndex({ userId: 1, createdAt: -1 }, { name: "notifications_by_user_date" }),
+    appNotifications.createIndex({ userId: 1, readAt: 1 }, { name: "notifications_by_user_read_state" }),
+    pushSubscriptions.createIndex({ userId: 1, updatedAt: -1 }, { name: "push_subscriptions_by_user" }),
     quotationRateSubmissions.createIndex(
       { measurementRecordId: 1 },
       {
@@ -1019,6 +1090,186 @@ export async function initializeMongo(): Promise<void> {
       { $setOnInsert: { ...role, createdAt: now, updatedAt: now } },
       { upsert: true },
     );
+  }
+  const profileRates = new Map(
+    (await windowProfiles.find({}).toArray()).map((profile) => [
+      profile._id,
+      profile.ratePerSqFt,
+    ]),
+  );
+  const savedQuotations = await quotations.find({ archivedAt: null }).toArray();
+  for (const quotation of savedQuotations) {
+    let changed = quotation.requiresRateApproval === undefined;
+    const items = quotation.items.map((item) => {
+      if (
+        item.catalogueRatePerSqFt !== undefined &&
+        item.rateOverridden !== undefined
+      ) {
+        return item;
+      }
+      changed = true;
+      const catalogueRatePerSqFt =
+        item.catalogueRatePerSqFt ??
+        profileRates.get(item.profileId) ??
+        item.ratePerSqFt;
+      return {
+        ...item,
+        catalogueRatePerSqFt,
+        rateOverridden:
+          Math.abs(item.ratePerSqFt - catalogueRatePerSqFt) > 0.005,
+      };
+    });
+    if (changed) {
+      await quotations.updateOne(
+        { _id: quotation._id },
+        {
+          $set: {
+            items,
+            requiresRateApproval: items.some((item) => item.rateOverridden),
+            approvalHistory: quotation.approvalHistory ?? [],
+          },
+        },
+      );
+    }
+  }
+  await getQuotationApprovalSettings(db).updateOne(
+    { _id: "saved-quotation-approval" },
+    {
+      $setOnInsert: {
+        _id: "saved-quotation-approval",
+        approverUserId: null,
+        updatedBy: "system",
+        updatedAt: now,
+      },
+    },
+    { upsert: true },
+  );
+
+  if (process.env.NODE_ENV !== "production") {
+    const createSampleQuotation = async ({
+      id,
+      quoteNo,
+      projectName,
+      profileId,
+      widthMm,
+      heightMm,
+      quantity,
+      ratePerSqFt,
+    }: {
+      id: string;
+      quoteNo: string;
+      projectName: string;
+      profileId: string;
+      widthMm: number;
+      heightMm: number;
+      quantity: number;
+      ratePerSqFt?: number;
+    }): Promise<void> => {
+      const profile = await windowProfiles.findOne({ _id: profileId });
+      if (!profile) return;
+      const roundTo = (value: number, places: number) => {
+        const factor = 10 ** places;
+        return Math.round((value + Number.EPSILON) * factor) / factor;
+      };
+      const sqFtPerWindow = roundTo((widthMm * heightMm) / 92903.04, 3);
+      const appliedRate = ratePerSqFt ?? profile.ratePerSqFt;
+      const unitPrice = roundTo(sqFtPerWindow * appliedRate, 2);
+      const value = roundTo(unitPrice * quantity, 2);
+      const totalAreaSqFt = roundTo(sqFtPerWindow * quantity, 2);
+      const subtotal = value;
+      const gstAmount = roundTo((subtotal * 18) / 100, 2);
+      const rateOverridden = Math.abs(appliedRate - profile.ratePerSqFt) > 0.005;
+      const quotation: QuotationDocument = {
+        _id: id,
+        sequenceNo: 0,
+        quoteNo,
+        clientId: null,
+        customerName: "Sample Customer",
+        customerPhone: "0000000000",
+        customerAddress: "Sample data only — not a real customer",
+        customerGstin: null,
+        projectName,
+        quotationDate: now.toISOString().slice(0, 10),
+        items: [{
+          profileId: profile._id,
+          profileCode: profile.code,
+          profileName: profile.name,
+          profileSystem: profile.profileSystem,
+          glass: profile.glass,
+          profileColor: profile.profileColor,
+          meshType: profile.meshType,
+          specifications: profile.specifications,
+          accessories: profile.accessories,
+          remarks: profile.remarks ?? "",
+          imageDataUrl: profile.imageDataUrl ?? null,
+          drawingType: profile.drawingType,
+          code: profile.code,
+          location: "Sample opening",
+          widthMm,
+          heightMm,
+          sqFtPerWindow,
+          ratePerSqFt: appliedRate,
+          catalogueRatePerSqFt: profile.ratePerSqFt,
+          rateOverridden,
+          unitPrice,
+          quantity,
+          value,
+          weightKgPerWindow: roundTo(sqFtPerWindow * profile.weightKgPerSqFt, 3),
+        }],
+        transportationCost: 0,
+        loadingUnloadingCost: 0,
+        additionalChargeDescription: "",
+        additionalChargeRate: 0,
+        additionalChargeAreaSqFt: 0,
+        gstPercent: 18,
+        notes: "SAMPLE ONLY — do not send to a customer.",
+        totals: {
+          componentCount: quantity,
+          totalAreaSqFt,
+          basicValue: value,
+          transportationCost: 0,
+          loadingUnloadingCost: 0,
+          additionalCharge: 0,
+          subtotal,
+          gstPercent: 18,
+          gstAmount,
+          grandTotal: roundTo(subtotal + gstAmount, 2),
+          averagePricePerSqFt: totalAreaSqFt ? roundTo(value / totalAreaSqFt, 2) : 0,
+        },
+        status: "draft",
+        requiresRateApproval: rateOverridden,
+        approvalHistory: [],
+        sampleOnly: true,
+        createdBy: "system",
+        updatedBy: "system",
+        createdAt: now,
+        updatedAt: now,
+      };
+      await quotations.updateOne(
+        { _id: id },
+        { $setOnInsert: quotation },
+        { upsert: true },
+      );
+    };
+    await createSampleQuotation({
+      id: "sample-quotation-standard",
+      quoteNo: "SAMPLE-STD-001",
+      projectName: "[SAMPLE ONLY] Standard quotation",
+      profileId: "profile-openable-exz",
+      widthMm: 1200,
+      heightMm: 1200,
+      quantity: 2,
+    });
+    await createSampleQuotation({
+      id: "sample-quotation-rate-override",
+      quoteNo: "SAMPLE-RATE-002",
+      projectName: "[SAMPLE ONLY] Rate override approval",
+      profileId: "profile-sliding-3-track",
+      widthMm: 1500,
+      heightMm: 1200,
+      quantity: 2,
+      ratePerSqFt: 525,
+    });
   }
 
   if (process.env.NODE_ENV === "production") {

@@ -8,7 +8,9 @@ import measurementDatabaseRouter from "./measurement-database";
 import orderHubRouter from "./order-hub";
 import orderWorkspaceRouter from "./order-workspace";
 import quotationApprovalsRouter from "./quotation-approvals";
+import quotationWorkflowRouter from "./quotation-workflow";
 import quotationsRouter from "./quotations";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -22,5 +24,7 @@ router.use(orderWorkspaceRouter);
 router.use(measurementDatabaseRouter);
 router.use(quotationApprovalsRouter);
 router.use(quotationsRouter);
+router.use(quotationWorkflowRouter);
+router.use(notificationsRouter);
 
 export default router;

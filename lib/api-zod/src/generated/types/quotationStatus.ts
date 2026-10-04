@@ -11,4 +11,7 @@ export type QuotationStatus = typeof QuotationStatus[keyof typeof QuotationStatu
 
 export const QuotationStatus = {
   draft: 'draft',
+  pending_approval: 'pending_approval',
+  approved: 'approved',
+  rejected: 'rejected',
 } as const;

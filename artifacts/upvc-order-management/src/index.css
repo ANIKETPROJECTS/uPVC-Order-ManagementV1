@@ -795,3 +795,17 @@
 @media (max-height: 640px) {
   .app-grid { padding-top: 1rem; padding-bottom: 1rem; }
 }
+
+@media (max-width: 767px) {
+  .quotation-builder-page,
+  .quotation-builder-page [data-testid='card-quote-editor'],
+  .quotation-builder-page [data-testid='card-quote-editor'] form,
+  .quotation-builder-page [data-testid='card-quote-editor'] fieldset {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .quotation-builder-page [data-testid='card-quote-editor'] {
+    overflow: hidden;
+  }
+}

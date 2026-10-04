@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QuotationApprovalHistory } from './quotationApprovalHistory';
 import type { QuotationItem } from './quotationItem';
 import type { QuotationStatus } from './quotationStatus';
 import type { QuotationTotals } from './quotationTotals';
@@ -32,6 +33,9 @@ export interface Quotation {
   notes: string | null;
   totals: QuotationTotals;
   status: QuotationStatus;
+  requiresRateApproval: boolean;
+  sampleOnly: boolean;
+  approvalHistory: QuotationApprovalHistory[];
   createdBy: string;
   updatedBy: string;
   createdAt: Date;

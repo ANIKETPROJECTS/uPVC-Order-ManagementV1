@@ -1362,6 +1362,204 @@ paths:
       responses:
         "204":
           description: Quotation archived
+  /quotations/{quotationId}/submit-for-approval:
+    post:
+      operationId: submitQuotationForApproval
+      tags: [quotations]
+      summary: Send a saved quotation to its configured approver
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotation submitted for approval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "404":
+          description: Quotation not found
+        "409":
+          description: Quotation cannot be submitted in its current state or no approver is configured
+  /quotation-approvals:
+    get:
+      operationId: listQuotationApprovals
+      tags: [quotations]
+      summary: List quotations assigned to the current approver
+      responses:
+        "200":
+          description: Assigned quotation approvals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationApprovalQueue"
+        "403":
+          description: The current user is not the configured approver
+  /quotation-approvals/{quotationId}/decision:
+    post:
+      operationId: decideQuotationApproval
+      tags: [quotations]
+      summary: Approve or reject a submitted quotation
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationApprovalDecisionInput"
+      responses:
+        "200":
+          description: Quotation decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "400":
+          description: A rejection reason is required
+        "403":
+          description: The current user is not assigned to this approval
+        "404":
+          description: Pending quotation not found
+  /quotation-approval-settings:
+    get:
+      operationId: getQuotationApprovalSettings
+      tags: [quotations]
+      summary: Get approval routing and eligible approvers
+      responses:
+        "200":
+          description: Approval routing settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationApprovalSettings"
+        "403":
+          description: Administrator access required
+    put:
+      operationId: updateQuotationApprovalSettings
+      tags: [quotations]
+      summary: Select the user who receives quotation approval requests
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationApprovalSettingsInput"
+      responses:
+        "200":
+          description: Approval routing updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationApprovalSettings"
+        "400":
+          description: The selected user is not an eligible active approver
+        "403":
+          description: Administrator access required
+        "409":
+          description: Existing pending approvals require a replacement approver
+  /push/config:
+    get:
+      operationId: getPushConfig
+      tags: [notifications]
+      summary: Get browser push availability and public VAPID key
+      responses:
+        "200":
+          description: Browser push configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushConfig"
+  /push-subscriptions:
+    post:
+      operationId: savePushSubscription
+      tags: [notifications]
+      summary: Save or refresh this device's browser push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushSubscriptionInput"
+      responses:
+        "204":
+          description: Push subscription saved
+        "400":
+          description: Invalid push subscription
+        "503":
+          description: Browser push is not configured
+    delete:
+      operationId: deletePushSubscription
+      tags: [notifications]
+      summary: Remove this device's browser push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushSubscriptionDeleteInput"
+      responses:
+        "204":
+          description: Push subscription removed
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List the current user's in-app notifications
+      responses:
+        "200":
+          description: Notifications and unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationCenter"
+  /notifications/{notificationId}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark one notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Notification marked read
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all of the current user's notifications as read
+      responses:
+        "204":
+          description: Notifications marked read
+  /notifications/test:
+    post:
+      operationId: sendTestNotification
+      tags: [notifications]
+      summary: Send a test push notification to the current administrator's subscribed devices
+      responses:
+        "200":
+          description: Test notification sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "403":
+          description: Administrator access required
+        "409":
+          description: This device has no active push subscription
+        "503":
+          description: Browser push is not configured
   /quotation-rate-submissions:
     get:
       operationId: listQuotationRateSubmissions
@@ -3964,7 +4162,7 @@ components:
         $ref: "#/components/schemas/WindowProfile"
     QuotationStatus:
       type: string
-      enum: [draft]
+      enum: [draft, pending_approval, approved, rejected]
     QuotationItem:
       type: object
       properties:
@@ -4008,6 +4206,10 @@ components:
           type: number
         ratePerSqFt:
           type: number
+        catalogueRatePerSqFt:
+          type: number
+        rateOverridden:
+          type: boolean
         unitPrice:
           type: number
         quantity:
@@ -4016,7 +4218,7 @@ components:
           type: number
         weightKgPerWindow:
           type: number
-      required: [profileId, profileCode, profileName, profileSystem, glass, profileColor, meshType, specifications, accessories, drawingType, code, location, widthMm, heightMm, sqFtPerWindow, ratePerSqFt, unitPrice, quantity, value, weightKgPerWindow]
+      required: [profileId, profileCode, profileName, profileSystem, glass, profileColor, meshType, specifications, accessories, drawingType, code, location, widthMm, heightMm, sqFtPerWindow, ratePerSqFt, catalogueRatePerSqFt, rateOverridden, unitPrice, quantity, value, weightKgPerWindow]
     QuotationLineInput:
       type: object
       properties:
@@ -4117,6 +4319,14 @@ components:
           $ref: "#/components/schemas/QuotationTotals"
         status:
           $ref: "#/components/schemas/QuotationStatus"
+        requiresRateApproval:
+          type: boolean
+        sampleOnly:
+          type: boolean
+        approvalHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotationApprovalHistory"
         createdBy:
           type: string
         updatedBy:
@@ -4127,7 +4337,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, quoteNo, clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes, totals, status, createdBy, updatedBy, createdAt, updatedAt]
+      required: [id, quoteNo, clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes, totals, status, requiresRateApproval, sampleOnly, approvalHistory, createdBy, updatedBy, createdAt, updatedAt]
     QuotationInput:
       type: object
       properties:
@@ -4189,6 +4399,151 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Quotation"
+    QuotationApprovalHistory:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [submitted, approved, rejected]
+        actorId:
+          type: string
+        actorName:
+          type: string
+        reason:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [action, actorId, actorName, reason, createdAt]
+    QuotationApprovalQueueItem:
+      type: object
+      properties:
+        quotation:
+          $ref: "#/components/schemas/Quotation"
+        submittedByName:
+          type: string
+        approverName:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+      required: [quotation, submittedByName, approverName, submittedAt]
+    QuotationApprovalQueue:
+      type: array
+      items:
+        $ref: "#/components/schemas/QuotationApprovalQueueItem"
+    QuotationApprovalDecisionInput:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected]
+        reason:
+          type: string
+          maxLength: 1000
+      required: [decision]
+    ApprovalCandidate:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        roleName:
+          type: string
+      required: [id, name, roleName]
+    QuotationApprovalSettings:
+      type: object
+      properties:
+        approverUserId:
+          type: ["string", "null"]
+        approverName:
+          type: ["string", "null"]
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalCandidate"
+      required: [approverUserId, approverName, candidates]
+    QuotationApprovalSettingsInput:
+      type: object
+      properties:
+        approverUserId:
+          type: ["string", "null"]
+      required: [approverUserId]
+    PushConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        publicKey:
+          type: ["string", "null"]
+      required: [enabled, publicKey]
+    PushSubscriptionInput:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+        keys:
+          type: object
+          properties:
+            p256dh:
+              type: string
+              minLength: 1
+              maxLength: 512
+            auth:
+              type: string
+              minLength: 1
+              maxLength: 256
+          required: [p256dh, auth]
+      required: [endpoint, keys]
+    PushSubscriptionDeleteInput:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+      required: [endpoint]
+    NotificationType:
+      type: string
+      enum: [approval_request, approval_decision, approval_reminder, test]
+    AppNotification:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/NotificationType"
+        title:
+          type: string
+        message:
+          type: string
+        url:
+          type: string
+        quotationId:
+          type: ["string", "null"]
+        readAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, title, message, url, quotationId, readAt, createdAt]
+    NotificationCenter:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppNotification"
+        unreadCount:
+          type: integer
+          minimum: 0
+      required: [items, unreadCount]
     QuotationRateSubmissionStatus:
       type: string
       enum: [awaiting_pdf, pending_review, approved, rejected]

@@ -1195,6 +1195,9 @@ export type QuotationStatus = typeof QuotationStatus[keyof typeof QuotationStatu
 
 export const QuotationStatus = {
   draft: 'draft',
+  pending_approval: 'pending_approval',
+  approved: 'approved',
+  rejected: 'rejected',
 } as const;
 
 export interface QuotationItem {
@@ -1216,6 +1219,8 @@ export interface QuotationItem {
   heightMm: number;
   sqFtPerWindow: number;
   ratePerSqFt: number;
+  catalogueRatePerSqFt: number;
+  rateOverridden: boolean;
   unitPrice: number;
   quantity: number;
   value: number;
@@ -1268,6 +1273,24 @@ export interface QuotationTotals {
   averagePricePerSqFt: number;
 }
 
+export type QuotationApprovalHistoryAction = typeof QuotationApprovalHistoryAction[keyof typeof QuotationApprovalHistoryAction];
+
+
+export const QuotationApprovalHistoryAction = {
+  submitted: 'submitted',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface QuotationApprovalHistory {
+  action: QuotationApprovalHistoryAction;
+  actorId: string;
+  actorName: string;
+  /** @nullable */
+  reason: string | null;
+  createdAt: string;
+}
+
 export interface Quotation {
   id: string;
   quoteNo: string;
@@ -1291,6 +1314,9 @@ export interface Quotation {
   notes: string | null;
   totals: QuotationTotals;
   status: QuotationStatus;
+  requiresRateApproval: boolean;
+  sampleOnly: boolean;
+  approvalHistory: QuotationApprovalHistory[];
   createdBy: string;
   updatedBy: string;
   createdAt: string;
@@ -1357,6 +1383,113 @@ export interface QuotationInput {
 }
 
 export type QuotationList = Quotation[];
+
+export interface QuotationApprovalQueueItem {
+  quotation: Quotation;
+  submittedByName: string;
+  approverName: string;
+  submittedAt: string;
+}
+
+export type QuotationApprovalQueue = QuotationApprovalQueueItem[];
+
+export type QuotationApprovalDecisionInputDecision = typeof QuotationApprovalDecisionInputDecision[keyof typeof QuotationApprovalDecisionInputDecision];
+
+
+export const QuotationApprovalDecisionInputDecision = {
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface QuotationApprovalDecisionInput {
+  decision: QuotationApprovalDecisionInputDecision;
+  /** @maxLength 1000 */
+  reason?: string;
+}
+
+export interface ApprovalCandidate {
+  id: string;
+  name: string;
+  roleName: string;
+}
+
+export interface QuotationApprovalSettings {
+  /** @nullable */
+  approverUserId: string | null;
+  /** @nullable */
+  approverName: string | null;
+  candidates: ApprovalCandidate[];
+}
+
+export interface QuotationApprovalSettingsInput {
+  /** @nullable */
+  approverUserId: string | null;
+}
+
+export interface PushConfig {
+  enabled: boolean;
+  /** @nullable */
+  publicKey: string | null;
+}
+
+export type PushSubscriptionInputKeys = {
+  /**
+     * @minLength 1
+     * @maxLength 512
+     */
+  p256dh: string;
+  /**
+     * @minLength 1
+     * @maxLength 256
+     */
+  auth: string;
+};
+
+export interface PushSubscriptionInput {
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  endpoint: string;
+  keys: PushSubscriptionInputKeys;
+}
+
+export interface PushSubscriptionDeleteInput {
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  endpoint: string;
+}
+
+export type NotificationType = typeof NotificationType[keyof typeof NotificationType];
+
+
+export const NotificationType = {
+  approval_request: 'approval_request',
+  approval_decision: 'approval_decision',
+  approval_reminder: 'approval_reminder',
+  test: 'test',
+} as const;
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  url: string;
+  /** @nullable */
+  quotationId: string | null;
+  /** @nullable */
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationCenter {
+  items: AppNotification[];
+  /** @minimum 0 */
+  unreadCount: number;
+}
 
 export interface QuotationRateSubmissionRevision {
   revisionNumber: number;

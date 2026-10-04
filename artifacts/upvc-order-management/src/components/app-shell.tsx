@@ -1,13 +1,76 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
-import { ChevronDown, ChevronLeft, ChevronRight, LogOut, Menu, MessageSquareText, ScanLine, Settings2, X } from 'lucide-react';
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, LogOut, Menu, MessageSquareText, ScanLine, Settings2, X, CheckCheck, ExternalLink } from 'lucide-react';
 import type { User } from '@workspace/api-client-react';
-import { getGetAuthSessionQueryKey, useLogout } from '@workspace/api-client-react';
+import { getGetAuthSessionQueryKey, getGetPushConfigQueryKey, getListNotificationsQueryKey, useLogout, useListNotifications, useMarkAllNotificationsRead, useMarkNotificationRead, useGetPushConfig, useSavePushSubscription, useDeletePushSubscription } from '@workspace/api-client-react';
 import { SidebarSectionIcon, type SidebarIconName } from '@/components/sidebar-icons';
 import { SettingsDialog } from '@/components/settings-dialog';
 import { UserAvatar } from '@/components/user-avatar';
 import { MODULES } from '@/lib/modules';
+import { Button } from '@/components/ui/button';
+
+function decodeVapidKey(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(normalized + '='.repeat((4 - normalized.length % 4) % 4));
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
+
+function NotificationCenter({ navigate }: { navigate: (path: string) => void }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState(() => !localStorage.getItem('framewise-browser-notification-prompt'));
+  const notifications = useListNotifications({ query: { queryKey: getListNotificationsQueryKey(), refetchInterval: 30_000 } });
+  const pushConfig = useGetPushConfig();
+  const markOne = useMarkNotificationRead();
+  const markAll = useMarkAllNotificationsRead();
+  const save = useSavePushSubscription();
+  const remove = useDeletePushSubscription();
+  const center = notifications.data;
+  const pushReady = Boolean(pushConfig.data?.enabled && pushConfig.data.publicKey);
+  const enable = async () => {
+    try {
+      if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window) || !pushConfig.data?.publicKey) throw new Error('Push notifications are unavailable in this browser.');
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') throw new Error('Browser permission was not granted.');
+      const registration = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}service-worker.js`);
+      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeVapidKey(pushConfig.data.publicKey) });
+      const json = subscription.toJSON();
+      if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) throw new Error('The browser did not provide a complete push subscription.');
+      save.mutate({ data: { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } } }, { onSuccess: () => { void queryClient.invalidateQueries({ queryKey: getGetPushConfigQueryKey() }); setPrompt(false); localStorage.setItem('framewise-browser-notification-prompt', 'done'); } });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not enable notifications.');
+    }
+  };
+  const disable = async () => {
+    const registration = await navigator.serviceWorker.getRegistration(`${import.meta.env.BASE_URL}`);
+    const subscription = await registration?.pushManager.getSubscription();
+    if (!subscription) return;
+    remove.mutate({ data: { endpoint: subscription.endpoint } }, { onSuccess: async () => { await subscription.unsubscribe(); void queryClient.invalidateQueries({ queryKey: getGetPushConfigQueryKey() }); } });
+  };
+  const openNotification = (item: NonNullable<typeof center>['items'][number]) => {
+    markOne.mutate({ notificationId: item.id }, { onSuccess: () => void queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() }) });
+    const target = item.quotationId ? (item.type === 'approval_request' || item.type === 'approval_reminder' ? `/quotation-approvals?quote=${item.quotationId}` : `/quotation-builder?quote=${item.quotationId}&section=drafts`) : item.url;
+    setOpen(false);
+    navigate(target || '/quotation-builder');
+  };
+  return <div className="relative">
+    <Button variant="ghost" size="icon" aria-label={`Notifications${center?.unreadCount ? `, ${center.unreadCount} unread` : ''}`} onClick={() => setOpen((value) => !value)} data-testid="button-notification-bell" className="relative">
+      <Bell size={18}/>{Boolean(center?.unreadCount) && <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-bold leading-4 text-primary-foreground">{center?.unreadCount}</span>}
+    </Button>
+    {open && <section className="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl">
+      <header className="flex items-center justify-between border-b border-border px-4 py-3"><div><p className="text-sm font-semibold">Notifications</p><p className="text-[10px] text-muted-foreground">{center?.unreadCount || 0} unread</p></div><button type="button" className="text-[10px] font-semibold text-primary disabled:opacity-50" disabled={!center?.unreadCount || markAll.isPending} onClick={() => markAll.mutate(undefined, { onSuccess: () => void queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() }) })}><CheckCheck size={13} className="mr-1 inline"/>Mark all read</button></header>
+      <div className="max-h-[55dvh] overflow-y-auto">
+        {notifications.isLoading ? <div className="space-y-2 p-4"><div className="h-12 animate-pulse rounded-lg bg-muted"/><div className="h-12 animate-pulse rounded-lg bg-muted/70"/></div>
+          : notifications.isError ? <div className="p-5 text-center"><p className="text-xs text-destructive">Could not load notifications.</p><button className="mt-2 text-xs text-primary" onClick={() => void notifications.refetch()}>Retry</button></div>
+            : !center?.items.length ? <div className="p-7 text-center"><Bell size={18} className="mx-auto text-muted-foreground"/><p className="mt-2 text-xs text-muted-foreground">You are all caught up.</p></div>
+              : center.items.map((item) => <button type="button" key={item.id} onClick={() => openNotification(item)} className={`w-full border-b border-border/70 p-4 text-left transition-colors hover:bg-muted/60 ${item.readAt ? '' : 'bg-primary/[.04]'}`}><span className="flex items-start gap-2"><span className={`mt-1.5 size-2 shrink-0 rounded-full ${item.readAt ? 'bg-muted-foreground/25' : 'bg-primary'}`}/><span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{item.title}</span><span className="mt-1 block text-[11px] leading-4 text-muted-foreground">{item.message}</span><span className="mt-2 block text-[10px] text-muted-foreground">{new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(item.createdAt))}</span></span><ExternalLink size={13} className="shrink-0 text-muted-foreground"/></span></button>)}
+      </div>
+      {prompt && pushReady && <div className="border-t border-border bg-secondary/40 p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-xs font-semibold">Get important updates on this device</p><p className="mt-1 text-[10px] leading-4 text-muted-foreground">Enable browser notifications for approval decisions and requests.</p></div><button aria-label="Dismiss notification prompt" onClick={() => { setPrompt(false); localStorage.setItem('framewise-browser-notification-prompt', 'done'); }} className="text-xs text-muted-foreground">×</button></div><Button size="sm" className="mt-2 w-full" disabled={save.isPending || pushConfig.isLoading} onClick={enable}>{save.isPending ? 'Enabling…' : 'Enable browser notifications'}</Button></div>}
+      {!prompt && pushReady && <div className="border-t border-border p-3">{'Notification' in window && Notification.permission === 'granted' ? <Button size="sm" variant="outline" className="w-full" disabled={remove.isPending} onClick={disable}>{remove.isPending ? 'Updating…' : 'Turn off push on this device'}</Button> : <Button size="sm" variant="outline" className="w-full" onClick={() => { setPrompt(true); localStorage.removeItem('framewise-browser-notification-prompt'); }}>Enable browser notifications</Button>}</div>}
+    </section>}
+  </div>;
+}
 
 const iconMap: Record<string, SidebarIconName> = {
   'user-access': 'user-access',
@@ -70,6 +133,10 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
   const queryClient = useQueryClient();
   const logout = useLogout();
   const isMasterAdmin = user.roleId === 'master-admin';
+  const canManageApprover = isMasterAdmin || user.permissions?.['user-access'] === 'edit';
+  const canOpenApprovalQueue = canManageApprover
+    || user.roleId === 'approver'
+    || user.permissions?.['rate-approval'] === 'edit';
 
   useEffect(() => {
     setDesktopFlyout(null);
@@ -350,6 +417,10 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               <MessageSquareText size={24} className="mx-[2px] shrink-0" />
               {!collapsed && <span className="flex-1">Communication</span>}
             </Link>
+            {canOpenApprovalQueue && <Link href="/quotation-approvals" onClick={() => setMobileOpen(false)} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/quotation-approvals') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-quotation-approvals">
+              <Bell size={22} className="mx-[3px] shrink-0" />
+              {!collapsed && <span className="flex-1">Quotation approvals</span>}
+            </Link>}
             {navigationGroups.map((group) => {
               const groupModules = getVisibleGroupModules(group);
               if (groupModules.length === 0) return null;
@@ -461,11 +532,11 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
         <button onClick={() => setCollapsed((value) => !value)} className="absolute -right-3 top-[82px] hidden h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm md:flex" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} data-testid="button-toggle-sidebar">{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button>
       </aside>
       {renderDesktopFlyout()}
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} canManageApprover={canManageApprover} />
       <main className={`min-h-[100dvh] transition-[margin] duration-200 ${collapsed ? 'md:ml-[76px]' : 'md:ml-[260px]'}`}>
          <header className="sticky top-0 z-20 flex min-h-[76px] items-center justify-between gap-3 border-b border-border bg-background/90 px-4 pl-[72px] backdrop-blur sm:px-5 md:px-8">
            <div className="min-w-0"><p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">{eyebrow || 'Workspace'}</p><h1 className="mt-1 break-words font-display text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">{title}</h1></div>
-          <div className="hidden items-center gap-3 sm:flex"><span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground"><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />{user.roleName}</span><UserAvatar name={user.name} src={user.avatarUrl} size="md" /></div>
+            <div className="flex items-center gap-2 sm:gap-3"><NotificationCenter navigate={(path) => setLocation(path)} />{canOpenApprovalQueue && <Link href="/quotation-approvals" className="hidden rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-primary sm:inline-flex">Approvals</Link>}<div className="hidden items-center gap-3 sm:flex"><span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground"><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />{user.roleName}</span><UserAvatar name={user.name} src={user.avatarUrl} size="md" /></div></div>
         </header>
         <div className="app-grid min-h-[calc(100dvh-76px)] px-5 py-6 md:px-8 md:py-8">{children}</div>
       </main>

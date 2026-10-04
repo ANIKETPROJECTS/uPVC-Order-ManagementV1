@@ -138,7 +138,14 @@ function windowProfileResponse(profile: WindowProfileDocument) {
   };
 }
 
-function quotationResponse(quotation: QuotationDocument) {
+export function quotationResponse(quotation: QuotationDocument) {
+  const items = quotation.items.map((item) => ({
+    ...item,
+    catalogueRatePerSqFt: item.catalogueRatePerSqFt ?? item.ratePerSqFt,
+    rateOverridden:
+      item.rateOverridden ??
+      Math.abs(item.ratePerSqFt - (item.catalogueRatePerSqFt ?? item.ratePerSqFt)) > 0.005,
+  }));
   return {
     id: quotation._id,
     quoteNo: quotation.quoteNo,
@@ -149,7 +156,7 @@ function quotationResponse(quotation: QuotationDocument) {
     customerGstin: quotation.customerGstin,
     projectName: quotation.projectName,
     quotationDate: quotation.quotationDate,
-    items: quotation.items,
+    items,
     transportationCost: quotation.transportationCost,
     loadingUnloadingCost: quotation.loadingUnloadingCost,
     additionalChargeDescription: quotation.additionalChargeDescription,
@@ -159,6 +166,13 @@ function quotationResponse(quotation: QuotationDocument) {
     notes: quotation.notes,
     totals: quotation.totals,
     status: quotation.status,
+    sampleOnly: quotation.sampleOnly ?? false,
+    requiresRateApproval:
+      quotation.requiresRateApproval ?? items.some((item) => item.rateOverridden),
+    approvalHistory: (quotation.approvalHistory ?? []).map((entry) => ({
+      ...entry,
+      createdAt: entry.createdAt.toISOString(),
+    })),
     createdBy: quotation.createdBy,
     updatedBy: quotation.updatedBy,
     createdAt: quotation.createdAt.toISOString(),
@@ -173,7 +187,6 @@ function quotationLineKey(line: {
   widthMm: number;
   heightMm: number;
   quantity: number;
-  ratePerSqFt?: number | null;
 }): string {
   return JSON.stringify([
     line.profileId,
@@ -182,7 +195,6 @@ function quotationLineKey(line: {
     line.widthMm,
     line.heightMm,
     line.quantity,
-    line.ratePerSqFt ?? null,
   ]);
 }
 
@@ -239,9 +251,33 @@ async function buildQuotationValues(
 
   const items: QuotationItemDocument[] = input.items.map((line) => {
     const preserved = existingByKey.get(quotationLineKey(line))?.shift();
-    if (preserved) return preserved;
-
     const profile = profilesById.get(line.profileId);
+    if (!profile && !preserved) {
+      throw Object.assign(new Error("A selected window profile is unavailable."), {
+        statusCode: 404,
+      });
+    }
+    if (preserved) {
+      const catalogueRatePerSqFt =
+        preserved.catalogueRatePerSqFt ?? profile?.ratePerSqFt ?? preserved.ratePerSqFt;
+      const ratePerSqFt = line.ratePerSqFt ?? preserved.ratePerSqFt;
+      if (
+        ratePerSqFt === preserved.ratePerSqFt &&
+        preserved.catalogueRatePerSqFt !== undefined &&
+        preserved.rateOverridden !== undefined
+      ) {
+        return preserved;
+      }
+      const unitPrice = roundTo(preserved.sqFtPerWindow * ratePerSqFt, 2);
+      return {
+        ...preserved,
+        ratePerSqFt,
+        catalogueRatePerSqFt,
+        rateOverridden: Math.abs(ratePerSqFt - catalogueRatePerSqFt) > 0.005,
+        unitPrice,
+        value: roundTo(unitPrice * preserved.quantity, 2),
+      };
+    }
     if (!profile) {
       throw Object.assign(new Error("A selected window profile is unavailable."), {
         statusCode: 404,
@@ -252,6 +288,8 @@ async function buildQuotationValues(
       3,
     );
     const ratePerSqFt = line.ratePerSqFt ?? profile.ratePerSqFt;
+    const rateOverridden =
+      Math.abs(ratePerSqFt - profile.ratePerSqFt) > 0.005;
     const unitPrice = roundTo(sqFtPerWindow * ratePerSqFt, 2);
     const value = roundTo(unitPrice * line.quantity, 2);
     const weightKgPerWindow = roundTo(
@@ -277,6 +315,8 @@ async function buildQuotationValues(
       heightMm: line.heightMm,
       sqFtPerWindow,
       ratePerSqFt,
+      catalogueRatePerSqFt: profile.ratePerSqFt,
+      rateOverridden,
       unitPrice,
       quantity: line.quantity,
       value,
@@ -542,6 +582,12 @@ router.post("/quotations", async (req, res): Promise<void> => {
       notes: parsed.data.notes?.trim() || null,
       totals: values.totals,
       status: "draft",
+      sampleOnly: false,
+      requiresRateApproval: values.items.some((item) => item.rateOverridden),
+      approvalApproverId: null,
+      approvalSubmittedAt: null,
+      approvalLastReminderAt: null,
+      approvalHistory: [],
       createdBy: actor.id,
       updatedBy: actor.id,
       createdAt: now,
@@ -607,10 +653,20 @@ router.patch("/quotations/:quotationId", async (req, res): Promise<void> => {
     const values = await buildQuotationValues(parsedBody.data, existing.items);
     const now = new Date();
     const updated = await collection.findOneAndUpdate(
-      { _id: existing._id, archivedAt: null, status: "draft" },
+      {
+        _id: existing._id,
+        archivedAt: null,
+        status: { $in: ["draft", "rejected"] },
+      },
       {
         $set: {
           ...values,
+          status: "draft",
+          requiresRateApproval: values.items.some((item) => item.rateOverridden),
+          approvalApproverId: null,
+          approvalSubmittedAt: null,
+          approvalLastReminderAt: null,
+          approvalHistory: existing.approvalHistory ?? [],
           projectName: parsedBody.data.projectName.trim(),
           quotationDate: parsedBody.data.quotationDate.toISOString().slice(0, 10),
           transportationCost: roundTo(parsedBody.data.transportationCost, 2),
@@ -627,7 +683,7 @@ router.patch("/quotations/:quotationId", async (req, res): Promise<void> => {
       { returnDocument: "after" },
     );
     if (!updated) {
-      res.status(409).json({ error: "Only draft quotations can be edited." });
+      res.status(409).json({ error: "Only draft or rejected quotations can be edited." });
       return;
     }
     res.json(UpdateQuotationResponse.parse(quotationResponse(updated)));

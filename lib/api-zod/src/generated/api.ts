@@ -1805,6 +1805,8 @@ export const ListQuotationsResponseItem = zod.object({
   "heightMm": zod.number(),
   "sqFtPerWindow": zod.number(),
   "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
   "unitPrice": zod.number(),
   "quantity": zod.number().int(),
   "value": zod.number(),
@@ -1830,7 +1832,16 @@ export const ListQuotationsResponseItem = zod.object({
   "grandTotal": zod.number(),
   "averagePricePerSqFt": zod.number()
 }),
-  "status": zod.enum(['draft']),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
   "createdBy": zod.string(),
   "updatedBy": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -1952,6 +1963,8 @@ export const CreateQuotationResponse = zod.object({
   "heightMm": zod.number(),
   "sqFtPerWindow": zod.number(),
   "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
   "unitPrice": zod.number(),
   "quantity": zod.number().int(),
   "value": zod.number(),
@@ -1977,7 +1990,16 @@ export const CreateQuotationResponse = zod.object({
   "grandTotal": zod.number(),
   "averagePricePerSqFt": zod.number()
 }),
-  "status": zod.enum(['draft']),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
   "createdBy": zod.string(),
   "updatedBy": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -2027,6 +2049,8 @@ export const GetQuotationResponse = zod.object({
   "heightMm": zod.number(),
   "sqFtPerWindow": zod.number(),
   "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
   "unitPrice": zod.number(),
   "quantity": zod.number().int(),
   "value": zod.number(),
@@ -2052,7 +2076,16 @@ export const GetQuotationResponse = zod.object({
   "grandTotal": zod.number(),
   "averagePricePerSqFt": zod.number()
 }),
-  "status": zod.enum(['draft']),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
   "createdBy": zod.string(),
   "updatedBy": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -2177,6 +2210,8 @@ export const UpdateQuotationResponse = zod.object({
   "heightMm": zod.number(),
   "sqFtPerWindow": zod.number(),
   "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
   "unitPrice": zod.number(),
   "quantity": zod.number().int(),
   "value": zod.number(),
@@ -2202,7 +2237,16 @@ export const UpdateQuotationResponse = zod.object({
   "grandTotal": zod.number(),
   "averagePricePerSqFt": zod.number()
 }),
-  "status": zod.enum(['draft']),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
   "createdBy": zod.string(),
   "updatedBy": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -2218,6 +2262,398 @@ export const ArchiveQuotationParams = zod.object({
 })
 
 export const ArchiveQuotationResponse = zod.void()
+
+
+/**
+ * @summary Send a saved quotation to its configured approver
+ */
+export const SubmitQuotationForApprovalParams = zod.object({
+  "quotationId": zod.coerce.string()
+})
+
+export const submitQuotationForApprovalResponseItemsItemImageDataUrlOneMax = 220000;
+
+
+export const submitQuotationForApprovalResponseItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
+export const SubmitQuotationForApprovalResponse = zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(submitQuotationForApprovalResponseItemsItemImageDataUrlOneMax).regex(submitQuotationForApprovalResponseItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List quotations assigned to the current approver
+ */
+export const listQuotationApprovalsResponseQuotationItemsItemImageDataUrlOneMax = 220000;
+
+
+export const listQuotationApprovalsResponseQuotationItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
+export const ListQuotationApprovalsResponseItem = zod.object({
+  "quotation": zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(listQuotationApprovalsResponseQuotationItemsItemImageDataUrlOneMax).regex(listQuotationApprovalsResponseQuotationItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "submittedByName": zod.string(),
+  "approverName": zod.string(),
+  "submittedAt": zod.coerce.date()
+})
+export const ListQuotationApprovalsResponse = zod.array(ListQuotationApprovalsResponseItem)
+
+
+/**
+ * @summary Approve or reject a submitted quotation
+ */
+export const DecideQuotationApprovalParams = zod.object({
+  "quotationId": zod.coerce.string()
+})
+
+export const decideQuotationApprovalBodyReasonMax = 1000;
+
+
+
+export const DecideQuotationApprovalBody = zod.object({
+  "decision": zod.enum(['approved', 'rejected']),
+  "reason": zod.string().max(decideQuotationApprovalBodyReasonMax).optional()
+})
+
+export const decideQuotationApprovalResponseItemsItemImageDataUrlOneMax = 220000;
+
+
+export const decideQuotationApprovalResponseItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
+export const DecideQuotationApprovalResponse = zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(decideQuotationApprovalResponseItemsItemImageDataUrlOneMax).regex(decideQuotationApprovalResponseItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get approval routing and eligible approvers
+ */
+export const GetQuotationApprovalSettingsResponse = zod.object({
+  "approverUserId": zod.string().nullable(),
+  "approverName": zod.string().nullable(),
+  "candidates": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "roleName": zod.string()
+}))
+})
+
+
+/**
+ * @summary Select the user who receives quotation approval requests
+ */
+export const UpdateQuotationApprovalSettingsBody = zod.object({
+  "approverUserId": zod.string().nullable()
+})
+
+export const UpdateQuotationApprovalSettingsResponse = zod.object({
+  "approverUserId": zod.string().nullable(),
+  "approverName": zod.string().nullable(),
+  "candidates": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "roleName": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get browser push availability and public VAPID key
+ */
+export const GetPushConfigResponse = zod.object({
+  "enabled": zod.boolean(),
+  "publicKey": zod.string().nullable()
+})
+
+
+/**
+ * @summary Save or refresh this device's browser push subscription
+ */
+export const savePushSubscriptionBodyEndpointMax = 2048;
+
+export const savePushSubscriptionBodyKeysP256dhMax = 512;
+
+export const savePushSubscriptionBodyKeysAuthMax = 256;
+
+
+
+export const SavePushSubscriptionBody = zod.object({
+  "endpoint": zod.string().url().min(1).max(savePushSubscriptionBodyEndpointMax),
+  "keys": zod.object({
+  "p256dh": zod.string().min(1).max(savePushSubscriptionBodyKeysP256dhMax),
+  "auth": zod.string().min(1).max(savePushSubscriptionBodyKeysAuthMax)
+})
+})
+
+export const SavePushSubscriptionResponse = zod.void()
+
+
+/**
+ * @summary Remove this device's browser push subscription
+ */
+export const deletePushSubscriptionBodyEndpointMax = 2048;
+
+
+
+export const DeletePushSubscriptionBody = zod.object({
+  "endpoint": zod.string().url().min(1).max(deletePushSubscriptionBodyEndpointMax)
+})
+
+export const DeletePushSubscriptionResponse = zod.void()
+
+
+/**
+ * @summary List the current user's in-app notifications
+ */
+export const listNotificationsResponseUnreadCountMin = 0;
+
+
+
+export const ListNotificationsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['approval_request', 'approval_decision', 'approval_reminder', 'test']),
+  "title": zod.string(),
+  "message": zod.string(),
+  "url": zod.string(),
+  "quotationId": zod.string().nullable(),
+  "readAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "unreadCount": zod.number().int().min(listNotificationsResponseUnreadCountMin)
+})
+
+
+/**
+ * @summary Mark one notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  "notificationId": zod.coerce.string()
+})
+
+export const MarkNotificationReadResponse = zod.void()
+
+
+/**
+ * @summary Mark all of the current user's notifications as read
+ */
+export const MarkAllNotificationsReadResponse = zod.void()
+
+
+/**
+ * @summary Send a test push notification to the current administrator's subscribed devices
+ */
+export const SendTestNotificationResponse = zod.object({
+  "success": zod.boolean()
+})
 
 
 /**

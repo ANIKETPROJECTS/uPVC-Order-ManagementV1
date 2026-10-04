@@ -26,6 +26,8 @@ export interface QuotationItem {
   heightMm: number;
   sqFtPerWindow: number;
   ratePerSqFt: number;
+  catalogueRatePerSqFt: number;
+  rateOverridden: boolean;
   unitPrice: number;
   quantity: number;
   value: number;
