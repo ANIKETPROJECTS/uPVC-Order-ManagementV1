@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import {
   ArrowDownLeft,
@@ -11,6 +11,7 @@ import {
   CircleAlert,
   Clock3,
   CreditCard,
+  Flag,
   LoaderCircle,
   MapPin,
   RefreshCw,
@@ -32,6 +33,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FlaggedPaymentsSection } from '@/components/flagged-payments';
 import { PaymentFlagBadge } from '@/components/payment-flag-badge';
 import { PaymentProgressBar } from '@/components/payment-progress-bar';
+import { PaymentFlagDetails } from '@/components/payment-flag-details';
+import { PaymentFlagDialog } from '@/components/payment-flag-dialog';
 
 const money = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -89,6 +92,14 @@ export default function PaymentsPage({ user }: { user: User }) {
     }
     return counts;
   }, [flagsQuery.data]);
+  const activeFlagByOrder = useMemo(() => {
+    const map = new Map<string, PaymentFlag>();
+    for (const flag of flagsQuery.data ?? []) {
+      if (flag.status === 'active' && !map.has(flag.orderRecordId)) map.set(flag.orderRecordId, flag);
+    }
+    return map;
+  }, [flagsQuery.data]);
+  const [selectedFlag, setSelectedFlag] = useState<PaymentFlag | null>(null);
   const canEditFlags = user.roleId === 'master-admin' || user.permissions.payments === 'edit';
 
   return <AppShell user={user} title="Payments" eyebrow="Finance workspace">
@@ -200,7 +211,7 @@ export default function PaymentsPage({ user }: { user: User }) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <Link href={`/order-hub/${order.orderRecordId}`} className="font-mono text-xs font-bold text-primary hover:underline" data-testid={`link-reminder-order-${order.orderRecordId}`}>{order.orderId}<ArrowRight size={12} className="ml-1 inline" /></Link>
-                    {(activeFlagCounts.get(order.orderRecordId) ?? 0) > 0 && <PaymentFlagBadge count={activeFlagCounts.get(order.orderRecordId)} />}
+                    {(activeFlagCounts.get(order.orderRecordId) ?? 0) > 0 && <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedFlag(activeFlagByOrder.get(order.orderRecordId) ?? null); }} aria-label="View flag details" className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid={`button-view-order-flag-${order.orderRecordId}`}><Flag size={11} fill="currentColor" />Flagged: {activeFlagByOrder.get(order.orderRecordId)?.flagType === 'bounced_payment' ? 'Bounced' : 'Refusal to Pay'}</button>}
                     <span className="text-[10px] text-muted-foreground">{order.windowCount === 0 ? 'No active windows' : `${order.windowCount} windows`}</span>
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary" data-testid={`status-order-lifecycle-${order.orderRecordId}`}>
                       Lifecycle: {lifecycleStatusLabel(order.orderStatus)}
@@ -215,11 +226,12 @@ export default function PaymentsPage({ user }: { user: User }) {
                   {!order.productionReady && <p className="mt-1 text-[10px] text-muted-foreground">Add at least one window, then complete frame, shutter and glass readiness to enable a draft.</p>}
                   {order.productionReady && !order.canOpenWhatsApp && <p className="mt-1 text-[10px] text-muted-foreground">Add a valid WhatsApp number to enable the draft.</p>}
                 </div>
-                <div className="flex items-center justify-between gap-4 sm:justify-end">
+                <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
                   <div className="sm:text-right">
                     <p className="font-display text-lg font-bold tabular-nums" data-testid={`value-balance-${order.orderRecordId}`}>{money(order.balance)}</p>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Balance due</p>
                   </div>
+                  {(activeFlagCounts.get(order.orderRecordId) ?? 0) === 0 && <PaymentFlagDialog orderId={order.orderRecordId} flaggedBy={user.name} />}
                   <form method="post" action={`/api/orders/${encodeURIComponent(order.orderRecordId)}/payment-reminder`} target="_blank" rel="noreferrer">
                     <Button type="submit" size="sm" variant="outline" disabled={!order.canOpenWhatsApp} data-testid={`button-send-reminder-${order.orderRecordId}`} title={!order.canOpenWhatsApp ? !order.productionReady ? 'Every active window must be ready and glass received before opening a reminder.' : 'Add a valid WhatsApp number to this order.' : 'Open a draft for manual sending in WhatsApp'}>
                       <Send size={14} className="mr-1.5" /> Open WhatsApp
@@ -242,7 +254,16 @@ export default function PaymentsPage({ user }: { user: User }) {
               <p className="font-semibold">No received payments yet</p>
               <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Newly recorded receipts will appear here for quick reconciliation.</p>
             </div> : <div className="divide-y divide-border/70">
-              {recentPayments.map((payment) => <RecentPaymentRow key={payment.id} payment={payment} flagCount={activeFlagCounts.get(payment.orderRecordId) ?? 0} />)}
+              {recentPayments.map((payment) => {
+                const activeFlag = activeFlagByOrder.get(payment.orderRecordId) ?? null;
+                return <RecentPaymentRow
+                  key={payment.id}
+                  payment={payment}
+                  flagCount={activeFlagCounts.get(payment.orderRecordId) ?? 0}
+                  activeFlag={activeFlag}
+                  onViewFlag={() => setSelectedFlag(activeFlag)}
+                />;
+              })}
             </div>}
             {recentPayments.length > 0 && <div className="flex items-center gap-2 border-t border-border bg-muted/25 px-5 py-3 text-[10px] text-muted-foreground"><CalendarClock size={13} /> Sorted by entry time · newest first</div>}
           </section>
@@ -257,17 +278,23 @@ export default function PaymentsPage({ user }: { user: User }) {
             />
           </TabsContent>
         </Tabs>
+        <PaymentFlagDetails flag={selectedFlag} canEdit={canEditFlags} onClose={() => setSelectedFlag(null)} onFlagUpdated={setSelectedFlag} />
       </> : null}
     </main>
   </AppShell>;
 }
 
-function RecentPaymentRow({ payment, flagCount }: { payment: RecentPaymentUpdate; flagCount: number }) {
+function RecentPaymentRow({ payment, flagCount, activeFlag, onViewFlag }: { payment: RecentPaymentUpdate; flagCount: number; activeFlag: PaymentFlag | null; onViewFlag: () => void }) {
   return <article className="flex items-start justify-between gap-3 px-5 py-4" data-testid={`row-recent-payment-${payment.id}`}>
     <div className="flex min-w-0 gap-3">
       <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Banknote size={15} /></span>
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2"><Link href={`/order-hub/${payment.orderRecordId}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-payment-order-${payment.id}`}>{payment.orderId}<ArrowRight size={11} className="ml-1 inline" /></Link>{flagCount > 0 && <PaymentFlagBadge count={flagCount} />}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={`/order-hub/${payment.orderRecordId}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-payment-order-${payment.id}`}>{payment.orderId}<ArrowRight size={11} className="ml-1 inline" /></Link>
+          {activeFlag && <button type="button" onClick={onViewFlag} aria-label={`View ${activeFlag.flagType === 'bounced_payment' ? 'bounced payment' : 'refusal to pay'} flag details`} className="rounded-full transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid={`button-view-receipt-flag-${payment.id}`}>
+            <PaymentFlagBadge count={flagCount} label={activeFlag.flagType === 'bounced_payment' ? 'Flagged: Bounced' : 'Flagged: Refusal to Pay'} />
+          </button>}
+        </div>
         <p className="mt-1 truncate text-sm font-semibold" data-testid={`text-payment-client-${payment.id}`}>{payment.clientName}</p>
         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[10px] leading-4 text-muted-foreground">
           <span className="inline-flex items-center gap-1"><Building2 size={11} />{payment.locationName}</span><span aria-hidden="true">·</span><span>{methodLabel(payment.method)}</span>

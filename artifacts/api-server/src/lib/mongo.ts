@@ -204,7 +204,7 @@ export interface OrderRefundDocument {
 }
 export type PaymentFlagType = "bounced_payment" | "refusal_to_pay";
 export type PaymentFlagStatus = "active" | "resolved" | "removed";
-export type PaymentFlagActionType = "created" | "resolved" | "removed";
+export type PaymentFlagActionType = "created" | "edited" | "follow_up_added" | "resolved" | "removed";
 export interface PaymentFlagActionDocument {
   id: string;
   action: PaymentFlagActionType;

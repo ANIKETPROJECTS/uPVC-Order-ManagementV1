@@ -687,11 +687,50 @@ export const PaymentFlagStatus = {
   removed: 'removed',
 } as const;
 
+export interface PaymentFlagUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  remarks: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  bounceReason?: string;
+  /** @exclusiveMinimum 0 */
+  bouncedAmount?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  bankCharges?: number | null;
+  /** @minimum 1 */
+  followUpCount?: number;
+  lastFollowUpDate?: string;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  followUpNotes?: string;
+}
+
+export interface PaymentFlagFollowUpInput {
+  followUpDate: string;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  notes: string;
+}
+
 export type PaymentFlagActionAction = typeof PaymentFlagActionAction[keyof typeof PaymentFlagActionAction];
 
 
 export const PaymentFlagActionAction = {
   created: 'created',
+  edited: 'edited',
+  follow_up_added: 'follow_up_added',
   resolved: 'resolved',
   removed: 'removed',
 } as const;

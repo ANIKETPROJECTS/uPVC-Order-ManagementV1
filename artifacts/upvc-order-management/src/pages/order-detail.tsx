@@ -106,6 +106,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DocumentPreviewDialog } from '@/components/document-preview';
 import { PaymentFlagBadge } from '@/components/payment-flag-badge';
 import { PaymentFlagDialog } from '@/components/payment-flag-dialog';
+import { PaymentFlagDetails } from '@/components/payment-flag-details';
 import { PaymentProgressBar } from '@/components/payment-progress-bar';
 import { calculatePaymentProgress } from '@/lib/payment-progress';
 
@@ -320,6 +321,7 @@ function PaymentDialog({ orderId, open, onOpenChange, onComplete }: { orderId: s
 
 function OrderPaymentFlagsPanel({ orderId, user }: { orderId: string; user: User }) {
   const query = useListOrderPaymentFlags(orderId, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderPaymentFlagsQueryKey(orderId) } });
+  const [selectedFlag, setSelectedFlag] = useState<PaymentFlag | null>(null);
   const flags = query.data ?? [];
   const activeCount = flags.filter((flag) => flag.status === 'active').length;
   const formatFlagDate = (value: string) => {
@@ -334,7 +336,7 @@ function OrderPaymentFlagsPanel({ orderId, user }: { orderId: string; user: User
         <div className="mt-1 flex flex-wrap items-center gap-2"><CardTitle className="text-base">Payment flags</CardTitle>{activeCount > 0 && <PaymentFlagBadge count={activeCount} />}</div>
         <p className="mt-1 text-xs text-muted-foreground">Bounced payments and client refusals are tracked separately from received receipts.</p>
       </div>
-      {hasPermission(user, 'payments') && <PaymentFlagDialog orderId={orderId} flaggedBy={user.name} />}
+      {hasPermission(user, 'payments') && activeCount === 0 && <PaymentFlagDialog orderId={orderId} flaggedBy={user.name} />}
     </CardHeader>
     <CardContent>
       {query.isLoading ? <div className="space-y-2" data-testid="state-order-payment-flags-loading"><div className="h-16 animate-pulse rounded-xl bg-muted/55" /><div className="h-16 animate-pulse rounded-xl bg-muted/55" /></div>
@@ -342,7 +344,11 @@ function OrderPaymentFlagsPanel({ orderId, user }: { orderId: string; user: User
           : flags.length === 0 ? <ZeroState icon={Flag} title="No payment flags" description="Use Flag to track a returned payment or refusal to pay." testId="state-order-payment-flags-empty" />
             : <div className="space-y-3" data-testid="list-order-payment-flags">{flags.map((flag) => <article key={flag.id} className="rounded-xl border border-border/70 bg-muted/15 p-4" data-testid={`order-payment-flag-${flag.id}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2"><PaymentFlagBadge status={flag.status} /><span className="text-xs font-bold">{flag.flagType === 'bounced_payment' ? 'Bounced Payment' : 'Refusal to Pay'}</span></div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {flag.status === 'active'
+                    ? <button type="button" onClick={() => setSelectedFlag(flag)} aria-label={`View ${flag.flagType === 'bounced_payment' ? 'bounced payment' : 'refusal to pay'} flag details`} className="rounded-full transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid={`button-view-order-flag-${flag.id}`}><PaymentFlagBadge status={flag.status} label={`Flagged: ${flag.flagType === 'bounced_payment' ? 'Bounced' : 'Refusal to Pay'}`} /></button>
+                    : <><PaymentFlagBadge status={flag.status} /><span className="text-xs font-bold">{flag.flagType === 'bounced_payment' ? 'Bounced Payment' : 'Refusal to Pay'}</span></>}
+                </div>
                 <span className="font-display text-sm font-bold tabular-nums">{plainInr(flag.flaggedAmount)}</span>
               </div>
               <p className="mt-2 text-xs leading-5">{flag.remarks}</p>
@@ -352,14 +358,16 @@ function OrderPaymentFlagsPanel({ orderId, user }: { orderId: string; user: User
                 : <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{flag.followUpCount} follow-ups · last on {flag.lastFollowUpDate ? formatFlagDate(flag.lastFollowUpDate) : '—'}{flag.followUpNotes ? ` · ${flag.followUpNotes}` : ''}</p>}
               {flag.resolutionDate && <p className="mt-2 rounded-lg bg-primary/5 px-3 py-2 text-[11px] leading-5"><span className="font-semibold">Resolved {formatFlagDate(flag.resolutionDate)}: </span>{flag.resolutionNotes}</p>}
               {flag.removedAt && <p className="mt-2 text-[10px] text-muted-foreground">Removed {formatFlagDate(flag.removedAt)} by {flag.removedBy || 'Former user'}; history retained.</p>}
+              <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => setSelectedFlag(flag)} data-testid={`button-open-order-flag-details-${flag.id}`}>View flag details</Button>
               <details className="mt-2 text-[11px]">
                 <summary className="w-fit cursor-pointer font-semibold text-primary">Action history ({flag.actions.length})</summary>
                 <ol className="mt-2 space-y-2 border-l border-border pl-3">
-                  {flag.actions.map((action) => <li key={action.id} className="text-muted-foreground"><span className="font-semibold text-foreground">{action.action === 'created' ? 'Flag created' : action.action === 'resolved' ? 'Flag resolved' : 'Flag removed'}</span><span> · {action.actorName} · {formatFlagDate(action.occurredAt)}</span><p className="mt-0.5 leading-4">{action.summary}</p></li>)}
+                  {[...flag.actions].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).map((action) => <li key={action.id} className="text-muted-foreground"><span className="font-semibold text-foreground">{action.action === 'created' ? 'Flag created' : action.action === 'edited' ? 'Flag edited' : action.action === 'follow_up_added' ? 'Follow-up added' : action.action === 'resolved' ? 'Flag resolved' : 'Flag removed'}</span><span> · {action.actorName} · {formatFlagDate(action.occurredAt)}</span><p className="mt-0.5 leading-4">{action.summary}</p></li>)}
                 </ol>
               </details>
             </article>)}</div>}
     </CardContent>
+    <PaymentFlagDetails flag={selectedFlag} canEdit={hasPermission(user, 'payments')} onClose={() => setSelectedFlag(null)} onFlagUpdated={setSelectedFlag} />
   </Card>;
 }
 

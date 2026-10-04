@@ -91,9 +91,11 @@ import type {
   OrderWindowList,
   OrderWindowUpdate,
   PaymentFlag,
+  PaymentFlagFollowUpInput,
   PaymentFlagInput,
   PaymentFlagList,
   PaymentFlagResolution,
+  PaymentFlagUpdate,
   PaymentOverview,
   PurchaseOrderRegisterList,
   Quotation,
@@ -1695,6 +1697,95 @@ export const useResolvePaymentFlag = <TError = ErrorType<unknown>,
       return useMutation(getResolvePaymentFlagMutationOptions(options));
     }
 
+export const getUpdatePaymentFlagUrl = (id: string,) => {
+
+
+
+
+  return `/api/payment-flags/${id}`
+}
+
+/**
+ * @summary Edit payment flag details and retain the change in its history
+ */
+export const updatePaymentFlag = async (id: string,
+    paymentFlagUpdate: PaymentFlagUpdate, options?: Parameters<typeof customFetch>[1]): Promise<PaymentFlag> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PaymentFlag>(getUpdatePaymentFlagUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(paymentFlagUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdatePaymentFlagMutationKey = () => ['updatePaymentFlag'] as const;
+
+export const getUpdatePaymentFlagMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePaymentFlag>>, TError,UpdatePaymentFlagMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePaymentFlag>>, TError,UpdatePaymentFlagMutationVariables, TContext> => {
+
+const mutationKey = getUpdatePaymentFlagMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePaymentFlag>>, UpdatePaymentFlagMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePaymentFlag(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePaymentFlagMutationResult = NonNullable<Awaited<ReturnType<typeof updatePaymentFlag>>>
+    export type UpdatePaymentFlagMutationBody = BodyType<PaymentFlagUpdate>
+    export type UpdatePaymentFlagMutationError = ErrorType<unknown>
+    export type UpdatePaymentFlagMutationVariables = {id: string;data: BodyType<PaymentFlagUpdate>}
+
+    /**
+ * @summary Edit payment flag details and retain the change in its history
+ */
+export const useUpdatePaymentFlag = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePaymentFlag>>, TError,UpdatePaymentFlagMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePaymentFlag>>,
+        TError,
+        UpdatePaymentFlagMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdatePaymentFlagMutationOptions(options));
+    }
+
 export const getRemovePaymentFlagUrl = (id: string,) => {
 
 
@@ -1767,6 +1858,95 @@ export const useRemovePaymentFlag = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRemovePaymentFlagMutationOptions(options));
+    }
+
+export const getAddPaymentFlagFollowUpUrl = (id: string,) => {
+
+
+
+
+  return `/api/payment-flags/${id}/follow-ups`
+}
+
+/**
+ * @summary Append a refusal-to-pay follow-up and retain the action in history
+ */
+export const addPaymentFlagFollowUp = async (id: string,
+    paymentFlagFollowUpInput: PaymentFlagFollowUpInput, options?: Parameters<typeof customFetch>[1]): Promise<PaymentFlag> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PaymentFlag>(getAddPaymentFlagFollowUpUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(paymentFlagFollowUpInput)
+  }
+);}
+
+
+
+
+
+export const getAddPaymentFlagFollowUpMutationKey = () => ['addPaymentFlagFollowUp'] as const;
+
+export const getAddPaymentFlagFollowUpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPaymentFlagFollowUp>>, TError,AddPaymentFlagFollowUpMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addPaymentFlagFollowUp>>, TError,AddPaymentFlagFollowUpMutationVariables, TContext> => {
+
+const mutationKey = getAddPaymentFlagFollowUpMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addPaymentFlagFollowUp>>, AddPaymentFlagFollowUpMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addPaymentFlagFollowUp(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddPaymentFlagFollowUpMutationResult = NonNullable<Awaited<ReturnType<typeof addPaymentFlagFollowUp>>>
+    export type AddPaymentFlagFollowUpMutationBody = BodyType<PaymentFlagFollowUpInput>
+    export type AddPaymentFlagFollowUpMutationError = ErrorType<unknown>
+    export type AddPaymentFlagFollowUpMutationVariables = {id: string;data: BodyType<PaymentFlagFollowUpInput>}
+
+    /**
+ * @summary Append a refusal-to-pay follow-up and retain the action in history
+ */
+export const useAddPaymentFlagFollowUp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPaymentFlagFollowUp>>, TError,AddPaymentFlagFollowUpMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addPaymentFlagFollowUp>>,
+        TError,
+        AddPaymentFlagFollowUpMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAddPaymentFlagFollowUpMutationOptions(options));
     }
 
 export const getOpenPaymentReminderUrl = (id: string,) => {

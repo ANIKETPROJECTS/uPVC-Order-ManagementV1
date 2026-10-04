@@ -370,6 +370,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaymentFlag"
   /payment-flags/{id}:
+    patch:
+      operationId: updatePaymentFlag
+      tags: [payments]
+      summary: Edit payment flag details and retain the change in its history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentFlagUpdate"
+      responses:
+        "200":
+          description: Updated payment flag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentFlag"
     delete:
       operationId: removePaymentFlag
       tags: [payments]
@@ -383,6 +406,30 @@ paths:
       responses:
         "200":
           description: Removed payment flag retained for audit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentFlag"
+  /payment-flags/{id}/follow-ups:
+    post:
+      operationId: addPaymentFlagFollowUp
+      tags: [payments]
+      summary: Append a refusal-to-pay follow-up and retain the action in history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentFlagFollowUpInput"
+      responses:
+        "200":
+          description: Updated payment flag
           content:
             application/json:
               schema:
@@ -3155,6 +3202,45 @@ components:
     PaymentFlagStatus:
       type: string
       enum: [active, resolved, removed]
+    PaymentFlagUpdate:
+      type: object
+      properties:
+        remarks:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        bounceReason:
+          type: string
+          minLength: 1
+          maxLength: 500
+        bouncedAmount:
+          type: number
+          exclusiveMinimum: 0
+        bankCharges:
+          type: ["number", "null"]
+          minimum: 0
+        followUpCount:
+          type: integer
+          minimum: 1
+        lastFollowUpDate:
+          type: string
+          format: date
+        followUpNotes:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required: [remarks]
+    PaymentFlagFollowUpInput:
+      type: object
+      properties:
+        followUpDate:
+          type: string
+          format: date
+        notes:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required: [followUpDate, notes]
     PaymentFlagAction:
       type: object
       properties:
@@ -3162,7 +3248,7 @@ components:
           type: string
         action:
           type: string
-          enum: [created, resolved, removed]
+          enum: [created, edited, follow_up_added, resolved, removed]
         actorId:
           type: string
         actorName:

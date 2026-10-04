@@ -11,6 +11,8 @@ export type PaymentFlagActionAction = typeof PaymentFlagActionAction[keyof typeo
 
 export const PaymentFlagActionAction = {
   created: 'created',
+  edited: 'edited',
+  follow_up_added: 'follow_up_added',
   resolved: 'resolved',
   removed: 'removed',
 } as const;

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { Router as ExpressRouter, type RequestHandler } from "express";
 import {
+  AddPaymentFlagFollowUpBody, AddPaymentFlagFollowUpParams, AddPaymentFlagFollowUpResponse,
   ArchiveOrderDocumentParams, ArchiveOrderWindowParams,
   BounceOrderPaymentBody, BounceOrderPaymentParams, BounceOrderPaymentResponse,
   CreateOrderDocumentCategoryBody, CreateOrderDocumentCategoryResponse,
@@ -22,7 +23,7 @@ import {
   ResolvePaymentFlagBody, ResolvePaymentFlagParams, ResolvePaymentFlagResponse,
   ReplaceOrderDocumentParams, ReplaceOrderDocumentResponse,
   UpdateOrderDocumentCategoryBody, UpdateOrderDocumentCategoryParams, UpdateOrderDocumentCategoryResponse,
-  UpdateOrderWindowParams, UpdateOrderWindowResponse, VoidOrderPaymentBody, VoidOrderPaymentParams, VoidOrderPaymentResponse,
+  UpdateOrderWindowParams, UpdateOrderWindowResponse, UpdatePaymentFlagBody, UpdatePaymentFlagParams, UpdatePaymentFlagResponse, VoidOrderPaymentBody, VoidOrderPaymentParams, VoidOrderPaymentResponse,
   UploadOrderDocumentParams, UploadOrderDocumentResponse, UploadQuotationConfirmationDocumentParams,
   UploadQuotationConfirmationDocumentResponse,
 } from "@workspace/api-zod";
@@ -578,6 +579,117 @@ router.patch("/payment-flags/:id/resolve", async (req, res): Promise<void> => {
     ? (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!
     : paymentProgress(null, 0, 0);
   res.json(ResolvePaymentFlagResponse.parse(paymentFlagResponse(updated!, progress)));
+});
+
+router.patch("/payment-flags/:id", async (req, res): Promise<void> => {
+  const p = UpdatePaymentFlagParams.safeParse(req.params);
+  const b = UpdatePaymentFlagBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const flags = getOrderPaymentFlags(db);
+  const old = await flags.findOne({ _id: p.data.id });
+  if (!old) { res.status(404).json({ error: "Payment flag not found." }); return; }
+  if (old.status === "removed") { res.status(409).json({ error: "Removed payment flags cannot be edited." }); return; }
+  const remarks = b.data.remarks.trim();
+  if (!remarks) { res.status(400).json({ error: "Add remarks describing the payment issue." }); return; }
+
+  const now = new Date();
+  const set: Record<string, unknown> = { remarks, updatedAt: now };
+  let summary: string;
+  if (old.flagType === "bounced_payment") {
+    const bounceReason = b.data.bounceReason?.trim();
+    if (!bounceReason || b.data.bouncedAmount == null || b.data.bouncedAmount <= 0) {
+      res.status(400).json({ error: "A bounce reason and bounced amount are required." });
+      return;
+    }
+    if (b.data.bankCharges != null && b.data.bankCharges < 0) {
+      res.status(400).json({ error: "Bank charges cannot be negative." });
+      return;
+    }
+    set.bounceReason = bounceReason;
+    set.bouncedAmount = b.data.bouncedAmount;
+    set.bankCharges = b.data.bankCharges ?? null;
+    set.flaggedAmount = b.data.bouncedAmount;
+    summary = "Edited remarks and bounced payment details.";
+  } else {
+    const lastFollowUpDate = b.data.lastFollowUpDate ? parseDateOnly(b.data.lastFollowUpDate) : null;
+    const followUpNotes = b.data.followUpNotes?.trim();
+    if (b.data.followUpCount == null || b.data.followUpCount < 1 || !lastFollowUpDate || !followUpNotes) {
+      res.status(400).json({ error: "Follow-up count, last follow-up date, and notes are required." });
+      return;
+    }
+    set.followUpCount = b.data.followUpCount;
+    set.lastFollowUpDate = lastFollowUpDate;
+    set.followUpNotes = followUpNotes;
+    summary = "Edited remarks and refusal-to-pay follow-up details.";
+  }
+  const action: PaymentFlagActionDocument = {
+    id: randomUUID(),
+    action: "edited",
+    actorId: actor.id,
+    actorName: actor.name,
+    occurredAt: now,
+    summary,
+  };
+  const result = await flags.updateOne({ _id: old._id, status: old.status, updatedAt: old.updatedAt }, {
+    $set: set,
+    $push: { actions: action },
+  });
+  if (result.modifiedCount === 0) { res.status(409).json({ error: "Payment flag changed before it could be edited. Refresh and try again." }); return; }
+  const updated = await flags.findOne({ _id: old._id });
+  await event(old.orderRecordId, actor, "payment.flag_edited", `${summary} ${old.orderId}.`);
+  const order = await getOrders(db).findOne({ _id: old.orderRecordId });
+  const progress = order
+    ? (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!
+    : paymentProgress(null, 0, 0);
+  res.json(UpdatePaymentFlagResponse.parse(paymentFlagResponse(updated!, progress)));
+});
+
+router.post("/payment-flags/:id/follow-ups", async (req, res): Promise<void> => {
+  const p = AddPaymentFlagFollowUpParams.safeParse(req.params);
+  const b = AddPaymentFlagFollowUpBody.safeParse(req.body);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
+  const actor = await context(req, res, "payments", true);
+  if (!actor) return;
+  const followUpDate = parseDateOnly(b.data.followUpDate);
+  const notes = b.data.notes.trim();
+  if (!followUpDate || !notes) { res.status(400).json({ error: "Enter a valid follow-up date and notes." }); return; }
+  const db = await getMongoDb();
+  const flags = getOrderPaymentFlags(db);
+  const old = await flags.findOne({ _id: p.data.id });
+  if (!old) { res.status(404).json({ error: "Payment flag not found." }); return; }
+  if (old.flagType !== "refusal_to_pay" || old.status !== "active") {
+    res.status(409).json({ error: "Follow-ups can only be added to active refusal-to-pay flags." });
+    return;
+  }
+  const followUpCount = Math.max(0, old.followUpCount ?? 0) + 1;
+  const dateText = followUpDate.toISOString().slice(0, 10);
+  const followUpNotes = [old.followUpNotes?.trim(), `${dateText} — ${notes}`].filter(Boolean).join("\n");
+  const now = new Date();
+  const action: PaymentFlagActionDocument = {
+    id: randomUUID(),
+    action: "follow_up_added",
+    actorId: actor.id,
+    actorName: actor.name,
+    occurredAt: now,
+    summary: `Follow-up ${followUpCount} on ${dateText}: ${notes}`,
+  };
+  const result = await flags.updateOne({ _id: old._id, status: "active", updatedAt: old.updatedAt }, {
+    $set: { followUpCount, lastFollowUpDate: followUpDate, followUpNotes, updatedAt: now },
+    $push: { actions: action },
+  });
+  if (result.modifiedCount === 0) { res.status(409).json({ error: "Payment flag changed before the follow-up was saved. Refresh and try again." }); return; }
+  const updated = await flags.findOne({ _id: old._id });
+  await event(old.orderRecordId, actor, "payment.flag_follow_up_added", action.summary);
+  const order = await getOrders(db).findOne({ _id: old.orderRecordId });
+  const progress = order
+    ? (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!
+    : paymentProgress(null, 0, 0);
+  res.json(AddPaymentFlagFollowUpResponse.parse(paymentFlagResponse(updated!, progress)));
 });
 
 router.delete("/payment-flags/:id", async (req, res): Promise<void> => {

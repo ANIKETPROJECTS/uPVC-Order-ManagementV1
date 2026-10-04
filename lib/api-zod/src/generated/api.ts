@@ -370,7 +370,7 @@ export const ListPaymentFlagsResponseItem = zod.object({
   "removedBy": zod.string().nullable(),
   "actions": zod.array(zod.object({
   "id": zod.string(),
-  "action": zod.enum(['created', 'resolved', 'removed']),
+  "action": zod.enum(['created', 'edited', 'follow_up_added', 'resolved', 'removed']),
   "actorId": zod.string(),
   "actorName": zod.string(),
   "occurredAt": zod.coerce.date(),
@@ -420,7 +420,7 @@ export const ListOrderPaymentFlagsResponseItem = zod.object({
   "removedBy": zod.string().nullable(),
   "actions": zod.array(zod.object({
   "id": zod.string(),
-  "action": zod.enum(['created', 'resolved', 'removed']),
+  "action": zod.enum(['created', 'edited', 'follow_up_added', 'resolved', 'removed']),
   "actorId": zod.string(),
   "actorName": zod.string(),
   "occurredAt": zod.coerce.date(),
@@ -495,7 +495,7 @@ export const CreateOrderPaymentFlagResponse = zod.object({
   "removedBy": zod.string().nullable(),
   "actions": zod.array(zod.object({
   "id": zod.string(),
-  "action": zod.enum(['created', 'resolved', 'removed']),
+  "action": zod.enum(['created', 'edited', 'follow_up_added', 'resolved', 'removed']),
   "actorId": zod.string(),
   "actorName": zod.string(),
   "occurredAt": zod.coerce.date(),
@@ -553,7 +553,79 @@ export const ResolvePaymentFlagResponse = zod.object({
   "removedBy": zod.string().nullable(),
   "actions": zod.array(zod.object({
   "id": zod.string(),
-  "action": zod.enum(['created', 'resolved', 'removed']),
+  "action": zod.enum(['created', 'edited', 'follow_up_added', 'resolved', 'removed']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "occurredAt": zod.coerce.date(),
+  "summary": zod.string()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Edit payment flag details and retain the change in its history
+ */
+export const UpdatePaymentFlagParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updatePaymentFlagBodyRemarksMax = 1000;
+
+export const updatePaymentFlagBodyBounceReasonMax = 500;
+
+export const updatePaymentFlagBodyBouncedAmountExclusiveMin = 0;
+
+export const updatePaymentFlagBodyBankChargesMin = 0;
+
+
+export const updatePaymentFlagBodyFollowUpNotesMax = 1000;
+
+
+
+export const UpdatePaymentFlagBody = zod.object({
+  "remarks": zod.string().min(1).max(updatePaymentFlagBodyRemarksMax),
+  "bounceReason": zod.string().min(1).max(updatePaymentFlagBodyBounceReasonMax).optional(),
+  "bouncedAmount": zod.number().gt(updatePaymentFlagBodyBouncedAmountExclusiveMin).optional(),
+  "bankCharges": zod.number().min(updatePaymentFlagBodyBankChargesMin).nullish(),
+  "followUpCount": zod.number().int().min(1).optional(),
+  "lastFollowUpDate": zod.coerce.date().optional(),
+  "followUpNotes": zod.string().min(1).max(updatePaymentFlagBodyFollowUpNotesMax).optional()
+})
+
+export const UpdatePaymentFlagResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "paymentProgress": zod.object({
+  "orderValue": zod.number().nullable(),
+  "paid": zod.number(),
+  "balance": zod.number().nullable(),
+  "percentage": zod.number()
+}),
+  "flagType": zod.enum(['bounced_payment', 'refusal_to_pay']),
+  "remarks": zod.string(),
+  "flaggedAmount": zod.number(),
+  "flaggedAt": zod.coerce.date(),
+  "flaggedById": zod.string(),
+  "flaggedBy": zod.string(),
+  "bounceReason": zod.string().nullable(),
+  "bouncedAmount": zod.number().nullable(),
+  "bankCharges": zod.number().nullable(),
+  "followUpCount": zod.number().int().nullable(),
+  "lastFollowUpDate": zod.coerce.date().nullable(),
+  "followUpNotes": zod.string().nullable(),
+  "status": zod.enum(['active', 'resolved', 'removed']),
+  "resolutionDate": zod.coerce.date().nullable(),
+  "resolutionNotes": zod.string().nullable(),
+  "removedAt": zod.coerce.date().nullable(),
+  "removedBy": zod.string().nullable(),
+  "actions": zod.array(zod.object({
+  "id": zod.string(),
+  "action": zod.enum(['created', 'edited', 'follow_up_added', 'resolved', 'removed']),
   "actorId": zod.string(),
   "actorName": zod.string(),
   "occurredAt": zod.coerce.date(),
@@ -602,7 +674,65 @@ export const RemovePaymentFlagResponse = zod.object({
   "removedBy": zod.string().nullable(),
   "actions": zod.array(zod.object({
   "id": zod.string(),
-  "action": zod.enum(['created', 'resolved', 'removed']),
+  "action": zod.enum(['created', 'edited', 'follow_up_added', 'resolved', 'removed']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "occurredAt": zod.coerce.date(),
+  "summary": zod.string()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Append a refusal-to-pay follow-up and retain the action in history
+ */
+export const AddPaymentFlagFollowUpParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const addPaymentFlagFollowUpBodyNotesMax = 1000;
+
+
+
+export const AddPaymentFlagFollowUpBody = zod.object({
+  "followUpDate": zod.coerce.date(),
+  "notes": zod.string().min(1).max(addPaymentFlagFollowUpBodyNotesMax)
+})
+
+export const AddPaymentFlagFollowUpResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "paymentProgress": zod.object({
+  "orderValue": zod.number().nullable(),
+  "paid": zod.number(),
+  "balance": zod.number().nullable(),
+  "percentage": zod.number()
+}),
+  "flagType": zod.enum(['bounced_payment', 'refusal_to_pay']),
+  "remarks": zod.string(),
+  "flaggedAmount": zod.number(),
+  "flaggedAt": zod.coerce.date(),
+  "flaggedById": zod.string(),
+  "flaggedBy": zod.string(),
+  "bounceReason": zod.string().nullable(),
+  "bouncedAmount": zod.number().nullable(),
+  "bankCharges": zod.number().nullable(),
+  "followUpCount": zod.number().int().nullable(),
+  "lastFollowUpDate": zod.coerce.date().nullable(),
+  "followUpNotes": zod.string().nullable(),
+  "status": zod.enum(['active', 'resolved', 'removed']),
+  "resolutionDate": zod.coerce.date().nullable(),
+  "resolutionNotes": zod.string().nullable(),
+  "removedAt": zod.coerce.date().nullable(),
+  "removedBy": zod.string().nullable(),
+  "actions": zod.array(zod.object({
+  "id": zod.string(),
+  "action": zod.enum(['created', 'edited', 'follow_up_added', 'resolved', 'removed']),
   "actorId": zod.string(),
   "actorName": zod.string(),
   "occurredAt": zod.coerce.date(),
