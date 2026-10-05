@@ -12,6 +12,7 @@ export interface GlassTrackingWindow {
   windowId: string;
   orderRecordId: string;
   orderId: string;
+  orderCreatedAt?: Date;
   orderStatus: OrderStatus;
   clientName: string;
   locationCode: string;

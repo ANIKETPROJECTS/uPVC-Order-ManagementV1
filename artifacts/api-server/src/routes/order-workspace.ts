@@ -224,6 +224,7 @@ router.get("/glass-tracking", async (req, res): Promise<void> => {
       windowId: window._id,
       orderRecordId: order._id,
       orderId: order.orderId,
+      orderCreatedAt: order.createdAt.toISOString(),
       orderStatus: order.status,
       clientName: order.clientName,
       locationCode: order.locationCode,

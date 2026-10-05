@@ -543,6 +543,7 @@ export interface GlassTrackingWindow {
   windowId: string;
   orderRecordId: string;
   orderId: string;
+  orderCreatedAt?: string;
   orderStatus: OrderStatus;
   clientName: string;
   locationCode: string;
