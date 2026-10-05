@@ -48,6 +48,7 @@ import {
   getListPaymentFlagsQueryKey,
   getListOrderWindowsQueryKey,
   getListOrdersQueryKey,
+  useAddOrderLot,
   OrderGlassStatus,
   OrderPaymentMethod,
   OrderPaymentStatus,
@@ -233,7 +234,161 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
       toast({ title: 'Order record updated', description: `${updated.orderId} is now ${statusLabel(updated.status)}.` });
     },
   });
-  return <Card className="border-border/80" data-testid="card-order-record"><CardHeader className="flex-row items-start justify-between pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order facts</p><CardTitle className="mt-1 text-base">Central record</CardTitle></div>{canEdit && <Button variant="outline" size="sm" onClick={() => { setEditing((value) => !value); form.reset({ status: order.status, notes: order.notes || '' }); }} data-testid="button-toggle-order-edit"><Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}</Button>}</CardHeader><CardContent>{editing && canEdit ? <Form {...form}><form onSubmit={form.handleSubmit(save)} className="space-y-4" data-testid="form-order-detail"><FormField control={form.control} name="status" render={({ field }) => <FormItem><FormLabel>Lifecycle status</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger data-testid="select-order-status"><SelectValue /></SelectTrigger></FormControl><SelectContent>{STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} /><FormField control={form.control} name="notes" render={({ field }) => <FormItem><FormLabel>Internal notes</FormLabel><FormControl><Textarea {...field} value={field.value || ''} rows={5} placeholder="Notes for the office and factory teams" data-testid="textarea-order-notes" /></FormControl><FormMessage /></FormItem>} /><div className="flex justify-end"><Button type="submit" disabled={update.isPending} data-testid="button-save-order-detail">{update.isPending ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} {update.isPending ? 'Saving…' : 'Save order record'}</Button></div></form></Form> : <div className="grid gap-5 sm:grid-cols-2"><div className="order-rule pl-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Client contact</p><p className="mt-2 text-sm font-semibold" data-testid="text-client-phone">{order.clientPhone || 'Not provided'}</p><p className="mt-1 text-xs leading-5 text-muted-foreground" data-testid="text-client-address">{order.clientAddress || 'No address on record'}</p></div><div className="order-rule pl-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Tax identity</p><p className="mt-2 font-mono text-sm font-semibold" data-testid="text-client-gstin">{order.clientGstin || 'Not provided'}</p><p className="mt-1 text-xs text-muted-foreground">Client prefix · {order.clientPrefix}</p></div><div className="order-rule pl-4 sm:col-span-2"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Internal notes</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/80" data-testid="text-order-notes">{order.notes || 'No notes have been added to this record.'}</p></div><div className="border-t border-border/70 pt-4 text-[10px] text-muted-foreground sm:col-span-2"><span className="font-semibold text-foreground">Created by</span> {order.createdBy} · <span className="font-semibold text-foreground">Last updated by</span> {order.updatedBy || 'System'}</div></div>}</CardContent></Card>;
+  return (
+    <Card className="border-border/80" data-testid="card-order-record">
+      <CardHeader className="flex-row items-start justify-between pb-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order facts</p>
+          <CardTitle className="mt-1 text-base">Central record</CardTitle>
+        </div>
+        {canEdit && (
+          <Button variant="outline" size="sm" onClick={() => {
+            setEditing((value) => !value);
+            form.reset({ status: order.status, notes: order.notes || '' });
+          }} data-testid="button-toggle-order-edit">
+            <Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {editing && canEdit ? (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(save)} className="space-y-4" data-testid="form-order-detail">
+              <FormField control={form.control} name="status" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Lifecycle status</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl><SelectTrigger data-testid="select-order-status"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>{STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Internal notes</FormLabel>
+                  <FormControl><Textarea {...field} value={field.value || ''} rows={5} placeholder="Notes for the office and factory teams" data-testid="textarea-order-notes" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="flex justify-end">
+                <Button type="submit" disabled={update.isPending} data-testid="button-save-order-detail">
+                  {update.isPending ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                  {update.isPending ? 'Saving…' : 'Save order record'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="order-rule pl-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Client contact</p>
+              <p className="mt-2 text-sm font-semibold" data-testid="text-client-phone">{order.clientPhone || 'Not provided'}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground" data-testid="text-client-address">{order.clientAddress || 'No address on record'}</p>
+            </div>
+            <div className="order-rule pl-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Tax identity</p>
+              <p className="mt-2 font-mono text-sm font-semibold" data-testid="text-client-gstin">{order.clientGstin || 'Not provided'}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Client prefix · {order.clientPrefix}</p>
+            </div>
+            <div className="order-rule pl-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Client type</p>
+              <p className="mt-2 text-sm font-semibold" data-testid="text-order-client-type">{order.clientType || 'Type not set'}</p>
+            </div>
+            <div className="order-rule pl-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Linked quotation</p>
+              <p className="mt-2 font-mono text-sm font-semibold" data-testid="text-order-quotation">{order.quotationNo || 'Not linked'}</p>
+            </div>
+            {order.legacyOrderId && order.legacyOrderId !== order.orderId && (
+              <div className="order-rule pl-4 sm:col-span-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Legacy order ID</p>
+                <p className="mt-2 break-all font-mono text-sm font-semibold" data-testid="text-order-legacy-id">{order.legacyOrderId}</p>
+              </div>
+            )}
+            <div className="order-rule pl-4 sm:col-span-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Internal notes</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/80" data-testid="text-order-notes">{order.notes || 'No notes have been added to this record.'}</p>
+            </div>
+            <div className="border-t border-border/70 pt-4 text-[10px] text-muted-foreground sm:col-span-2">
+              <span className="font-semibold text-foreground">Created by</span> {order.createdBy} · <span className="font-semibold text-foreground">Last updated by</span> {order.updatedBy || 'System'}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function OrderLotsCard({ order, user, id }: { order: Order; user: User; id: string }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const canEdit = hasPermission(user, 'order-hub');
+  const addLot = useAddOrderLot();
+  const lots = [...(order.lots ?? [])].sort((left, right) => left.sequence - right.sequence);
+  const canManageLots = canEdit && !order.needsReview && Boolean(order.clientType && order.quotationId);
+
+  const onSuccess = (updated: Order, message: string) => {
+    queryClient.setQueryData(getGetOrderQueryKey(id), updated);
+    void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+    toast({ title: message, description: updated.orderId });
+  };
+
+  const add = () => addLot.mutate(
+    { id },
+    {
+      onSuccess: (updated) => onSuccess(updated, 'Lot added'),
+      onError: (error) => toast({
+        title: 'Lot could not be added',
+        description: error instanceof Error ? error.message : 'Try again after checking the order.',
+        variant: 'destructive',
+      }),
+    },
+  );
+
+  return (
+    <Card className="border-border/80" data-testid="card-order-lots">
+      <CardHeader className="flex-row items-start justify-between gap-4 pb-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lot register</p>
+          <CardTitle className="mt-1 text-base">Order lots <span className="font-mono text-xs text-muted-foreground">({lots.length})</span></CardTitle>
+        </div>
+        {canManageLots && (
+          <Button size="sm" onClick={add} disabled={addLot.isPending} data-testid="button-add-order-lot">
+            {addLot.isPending ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
+            Add lot
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {order.needsReview && (
+          <p className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2.5 text-xs text-amber-900" role="status" data-testid="notice-order-lots-review">
+            Needs review. Resolve this order’s client type and quotation before adding or changing lots.
+          </p>
+        )}
+        {lots.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground" data-testid="empty-order-lots">
+            {order.clientType === 'Project' ? 'No lots are recorded for this Project order.' : 'This Retail order has no lots.'}
+          </p>
+        ) : (
+          <div className="divide-y divide-border/70 rounded-xl border border-border/70">
+            {lots.map((lot) => {
+              return (
+                <div key={lot.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3" data-testid={`row-order-lot-${lot.id}`}>
+                  <div className="min-w-0">
+                    <p className="break-all font-mono text-sm font-bold text-primary" data-testid={`text-lot-id-${lot.id}`}>{lot.lotId}</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground">Lot {String(lot.sequence).padStart(2, '0')} · created {formatIstDate(lot.createdAt)}</p>
+                  </div>
+                  {order.clientType === 'Project' && lots.length === 1 ? (
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-bold text-secondary-foreground">Required lot</span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 const windowSchema = z.object({
@@ -988,7 +1143,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Windows" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Total area" value={`${summary.sqFt.toFixed(2)} sq ft`} detail="Summed from window records" testId="text-summary-area" /><SummaryStat label="Glass state" value={summary.glass} detail="Aggregate procurement state" testId="text-summary-glass" /><SummaryStat label="Paid" value={hasPermission(user, 'payments', 'view') ? plainInr(received) : 'Restricted'} detail="Received receipts less refunds" testId="text-summary-received" /></div>
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6" data-testid="section-order-lifecycle"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-base font-bold">Where this order is now</h2></div><span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span></div><div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">{timeline.map((item, index) => <div key={item.value} className="relative min-w-0" data-testid={`timeline-stage-${item.value}`}>{index < timeline.length - 1 && <div aria-hidden="true" className={`absolute left-7 -right-4 top-3.5 z-0 hidden h-px lg:block ${item.active ? 'bg-primary/35' : 'bg-border'}`} />}<span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.current ? 'border-primary bg-primary text-primary-foreground' : item.active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}>{item.current ? <Check size={13} /> : String(index + 1).padStart(2, '0')}</span><p className={`mt-2 min-h-8 text-[10px] font-bold leading-4 ${item.active ? 'text-primary' : 'text-muted-foreground'}`}>{item.label}</p></div>)}</div></section>
     <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : new URLSearchParams(window.location.search).get('tab') === 'grievances' ? 'grievances' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-5"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="grievances" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-grievances">Grievances</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
-      <TabsContent value="details" className="space-y-5"><OrderQrCard orderId={record.orderId} orderRecordId={record.id} /><div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><OrderRecordCard order={record} user={user} id={id} /><MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} /></div><WindowsPanel orderId={id} user={user} /></TabsContent>
+      <TabsContent value="details" className="space-y-5"><OrderQrCard orderId={record.orderId} orderRecordId={record.id} /><OrderLotsCard order={record} user={user} id={id} /><div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><OrderRecordCard order={record} user={user} id={id} /><MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} /></div><WindowsPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="billing" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><OrderPaymentFlagsPanel orderId={id} user={user} /><PaymentsPanel orderId={id} user={user} order={record} /></TabsContent>
       <TabsContent value="documents"><DocumentsPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="grievances"><GrievancesPanel order={record} user={user} /></TabsContent>

@@ -155,8 +155,17 @@ export interface SuccessResponse {
   success: boolean;
 }
 
+export type ClientType = typeof ClientType[keyof typeof ClientType];
+
+
+export const ClientType = {
+  Project: 'Project',
+  Retail: 'Retail',
+} as const;
+
 export interface Client {
   id: string;
+  type: ClientType | null;
   name: string;
   phone: string;
   address: string;
@@ -169,6 +178,7 @@ export interface Client {
 }
 
 export interface ClientInput {
+  type: ClientType;
   /**
      * @minLength 2
      * @maxLength 120
@@ -199,6 +209,7 @@ export interface ClientInput {
 }
 
 export interface ClientUpdate {
+  type?: ClientType;
   /**
      * @minLength 2
      * @maxLength 120
@@ -379,9 +390,26 @@ export interface CreateOrderGrievance {
 
 export type OrderGrievanceList = OrderGrievance[];
 
+export interface OrderLot {
+  id: string;
+  lotId: string;
+  /** @minimum 1 */
+  sequence: number;
+  createdAt: string;
+}
+
 export interface Order {
   id: string;
   orderId: string;
+  /** @nullable */
+  legacyOrderId: string | null;
+  clientType: ClientType | null;
+  /** @nullable */
+  quotationId: string | null;
+  /** @nullable */
+  quotationNo: string | null;
+  needsReview: boolean;
+  lots: OrderLot[];
   sequenceNo: number;
   clientId: string;
   clientName: string;
@@ -409,6 +437,8 @@ export interface Order {
 export interface OrderInput {
   /** @minLength 1 */
   clientId: string;
+  /** @minLength 1 */
+  quotationId: string;
   /**
      * @minLength 2
      * @maxLength 5

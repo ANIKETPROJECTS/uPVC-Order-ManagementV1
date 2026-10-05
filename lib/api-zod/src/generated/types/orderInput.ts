@@ -9,6 +9,8 @@
 export interface OrderInput {
   /** @minLength 1 */
   clientId: string;
+  /** @minLength 1 */
+  quotationId: string;
   /**
      * @minLength 2
      * @maxLength 5

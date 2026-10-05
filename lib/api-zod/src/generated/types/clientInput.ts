@@ -5,8 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ClientType } from './clientType';
 
 export interface ClientInput {
+  type: ClientType;
   /**
      * @minLength 2
      * @maxLength 120

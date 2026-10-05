@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
+  AddOrderLotParams,
+  AddOrderLotResponse,
   CreateClientBody,
   CreateClientResponse,
   CreateOrderBody,
@@ -42,19 +44,21 @@ import {
   getOrders,
   getOrderActivity,
   getOrderPayments,
+  getQuotations,
   getPublicUser,
   getUsers,
+  type ClientType,
   type ClientDocument,
+  type OrderLotDocument,
   type OrderDocument,
   type OrderLocationDocument,
   type OrderMessageTemplateDocument,
   type OrderStatus,
 } from "../lib/mongo";
 import {
-  formatOrderId,
+  formatLotId,
+  formatQuotationOrderId,
   normalizeLocationCode,
-  orderDailyCounterId,
-  orderDateKey,
 } from "../lib/order-identifiers";
 
 const router: IRouter = Router();
@@ -132,6 +136,7 @@ function clientResponse(client: ClientDocument) {
   return {
     id: client._id,
     name: client.name,
+    type: client.type ?? null,
     phone: client.phone,
     address: client.address,
     gstin: client.gstin,
@@ -157,6 +162,19 @@ function orderResponse(order: OrderDocument) {
   return {
     id: order._id,
     orderId: order.orderId,
+    legacyOrderId: order.legacyOrderId ?? null,
+    clientType: order.clientType ?? null,
+    quotationId: order.quotationId ?? null,
+    quotationNo: order.quotationNo ?? null,
+    needsReview: order.needsReview ?? (!order.clientType || !order.quotationId),
+    lots: [...(order.lots ?? [])]
+      .sort((left, right) => left.sequence - right.sequence)
+      .map((lot) => ({
+        id: lot._id,
+        lotId: lot.lotId,
+        sequence: lot.sequence,
+        createdAt: lot.createdAt.toISOString(),
+      })),
     sequenceNo: order.sequenceNo,
     clientId: order.clientId,
     clientName: order.clientName,
@@ -249,6 +267,7 @@ router.post(
       gstin: parsed.data.gstin?.trim().toUpperCase() || null,
       prefix,
       prefixUpper: prefix,
+      type: parsed.data.type as ClientType,
       isActive: true,
       createdAt: now,
       updatedAt: now,
@@ -325,6 +344,7 @@ router.patch(
       updates.prefix = prefix;
       updates.prefixUpper = prefix;
     }
+    if (parsed.data.type !== undefined) updates.type = parsed.data.type as ClientType;
     if (parsed.data.isActive !== undefined) updates.isActive = parsed.data.isActive;
 
     const db = await getMongoDb();
@@ -507,6 +527,8 @@ router.get("/orders", async (req, res): Promise<void> => {
     const matcher = new RegExp(escapeRegex(query), "i");
     filter.$or = [
       { orderId: matcher },
+      { legacyOrderId: matcher },
+      { "lots.lotId": matcher },
       { clientName: matcher },
       { clientPrefix: matcher },
       { locationName: matcher },
@@ -542,6 +564,36 @@ router.post(
       res.status(404).json({ error: "Choose an active client and location." });
       return;
     }
+    if (client.type !== "Project" && client.type !== "Retail") {
+      res.status(409).json({ error: "Choose Project or Retail for this client before creating an order." });
+      return;
+    }
+    const quotation = await getQuotations(db).findOne({ _id: parsed.data.quotationId });
+    if (!quotation || quotation.archivedAt) {
+      res.status(404).json({ error: "Choose an active quotation for this order." });
+      return;
+    }
+    if (quotation.sampleOnly) {
+      res.status(400).json({ error: "Sample quotations cannot be used to create an order." });
+      return;
+    }
+    if (quotation.clientId !== client._id) {
+      res.status(400).json({ error: "Choose a quotation linked to the selected client." });
+      return;
+    }
+    const generatedOrderId = formatQuotationOrderId(client.type, quotation.quoteNo);
+    if (!generatedOrderId) {
+      res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
+      return;
+    }
+    if (await getOrders(db).findOne({ quotationId: quotation._id })) {
+      res.status(409).json({ error: "This quotation is already linked to an order." });
+      return;
+    }
+    if (await getOrders(db).findOne({ orderId: generatedOrderId })) {
+      res.status(409).json({ error: `Order ID ${generatedOrderId} is already in use.` });
+      return;
+    }
     const actorId = req.session.userId;
     if (!actorId) {
       res.status(401).json({ error: "Sign in to continue." });
@@ -558,22 +610,24 @@ router.post(
       throw new Error("The order sequence counter could not be allocated.");
     }
     const sequenceNo = counter.value;
-    const dateKey = orderDateKey(now);
     const normalizedLocationCode = normalizeLocationCode(location.code);
-    const dailyCounter = await getCounters(db).findOneAndUpdate(
-      { _id: orderDailyCounterId(dateKey, normalizedLocationCode) },
-      { $inc: { value: 1 }, $set: { updatedAt: now } },
-      { upsert: true, returnDocument: "after" },
-    );
-    if (!dailyCounter) {
-      throw new Error("The daily order sequence could not be allocated.");
-    }
-    const dailySequenceNo = dailyCounter.value;
+    const lots: OrderLotDocument[] =
+      client.type === "Project"
+        ? [{
+            _id: randomUUID(),
+            sequence: 1,
+            lotId: formatLotId(generatedOrderId, 1),
+            createdBy: actorId,
+            createdAt: now,
+          }]
+        : [];
     const order: OrderDocument = {
       _id: randomUUID(),
-      orderId: formatOrderId(dateKey, normalizedLocationCode, dailySequenceNo),
+      orderId: generatedOrderId,
+      legacyOrderId: null,
       sequenceNo,
       clientId: client._id,
+      clientType: client.type,
       clientName: client.name,
       clientPrefix: client.prefix,
       clientPhone: client.phone,
@@ -581,6 +635,11 @@ router.post(
       clientGstin: client.gstin,
       locationCode: normalizedLocationCode,
       locationName: location.name,
+      quotationId: quotation._id,
+      quotationNo: quotation.quoteNo,
+      needsReview: false,
+      lots,
+      nextLotSequence: client.type === "Project" ? 2 : 1,
       status: "quotation_stage",
       dispatchStatus: "pending_dispatch",
       notes: parsed.data.notes?.trim() || null,
@@ -590,7 +649,15 @@ router.post(
       updatedBy: null,
       updatedAt: now,
     };
-    await getOrders(db).insertOne(order);
+    try {
+      await getOrders(db).insertOne(order);
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        res.status(409).json({ error: `Order ID ${generatedOrderId} is already in use.` });
+        return;
+      }
+      throw error;
+    }
     const actor = await getUsers(db).findOne({ _id: actorId });
     if (actor) {
       await getOrderActivity(db).insertOne({
@@ -675,6 +742,72 @@ router.patch(
       await getOrderActivity(db).insertOne({ _id: randomUUID(), orderRecordId: order._id, actorId, actorName: actor.name, action: "order.updated", summary: `Updated ${changes}.`, createdAt: new Date() });
     }
     res.json(UpdateOrderResponse.parse(orderResponse(order)));
+  },
+);
+
+router.post(
+  "/orders/:id/lots",
+  requireOrderHubPermission("edit"),
+  async (req, res): Promise<void> => {
+    const params = AddOrderLotParams.safeParse(req.params);
+    if (!params.success) {
+      inputError(req, res, params.error);
+      return;
+    }
+    const db = await getMongoDb();
+    const actorId = req.session.userId;
+    if (!actorId) {
+      res.status(401).json({ error: "Sign in to continue." });
+      return;
+    }
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const order = await getOrders(db).findOne({ _id: params.data.id });
+      if (!order) {
+        res.status(404).json({ error: "Order not found." });
+        return;
+      }
+      if (order.needsReview || !order.clientType || !order.quotationId) {
+        res.status(409).json({ error: "Resolve this order's client type and quotation before adding lots." });
+        return;
+      }
+
+      const expectedNext = order.nextLotSequence;
+      const highestLotSequence = (order.lots ?? []).reduce(
+        (highest, lot) => Math.max(highest, lot.sequence),
+        0,
+      );
+      const sequence = Math.max(expectedNext ?? 1, highestLotSequence + 1);
+      const lot: OrderLotDocument = {
+        _id: randomUUID(),
+        sequence,
+        lotId: formatLotId(order.orderId, sequence),
+        createdBy: actorId,
+        createdAt: new Date(),
+      };
+      const filter =
+        expectedNext === undefined
+          ? { _id: order._id, nextLotSequence: { $exists: false } }
+          : { _id: order._id, nextLotSequence: expectedNext };
+      const result = await getOrders(db).updateOne(filter, {
+        $push: { lots: lot },
+        $set: {
+          nextLotSequence: sequence + 1,
+          updatedAt: lot.createdAt,
+          updatedBy: actorId,
+        },
+      });
+      if (result.matchedCount > 0) {
+        const updated = await getOrders(db).findOne({ _id: order._id });
+        if (!updated) {
+          res.status(404).json({ error: "Order not found." });
+          return;
+        }
+        res.status(201).json(AddOrderLotResponse.parse(orderResponse(updated)));
+        return;
+      }
+    }
+    res.status(409).json({ error: "The next lot number could not be allocated. Try again." });
   },
 );
 

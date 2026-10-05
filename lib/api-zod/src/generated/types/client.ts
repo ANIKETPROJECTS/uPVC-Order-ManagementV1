@@ -5,9 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ClientType } from './clientType';
 
 export interface Client {
   id: string;
+  type: ClientType | null;
   name: string;
   phone: string;
   address: string;

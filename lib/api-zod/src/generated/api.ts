@@ -836,6 +836,7 @@ export const ListClientsQueryParams = zod.object({
 
 export const ListClientsResponseItem = zod.object({
   "id": zod.string(),
+  "type": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
   "name": zod.string(),
   "phone": zod.string(),
   "address": zod.string(),
@@ -849,7 +850,7 @@ export const ListClientsResponse = zod.array(ListClientsResponseItem)
 
 
 /**
- * @summary Add a client and assign its order ID prefix
+ * @summary Add a client, choose its type, and assign its order ID prefix
  */
 export const createClientBodyNameMin = 2;
 export const createClientBodyNameMax = 120;
@@ -871,6 +872,7 @@ export const createClientBodyPrefixRegExp = new RegExp('^[A-Za-z0-9]+$');
 
 
 export const CreateClientBody = zod.object({
+  "type": zod.enum(['Project', 'Retail']),
   "name": zod.string().min(createClientBodyNameMin).max(createClientBodyNameMax),
   "phone": zod.string().min(createClientBodyPhoneMin).max(createClientBodyPhoneMax),
   "address": zod.string().min(createClientBodyAddressMin).max(createClientBodyAddressMax),
@@ -880,6 +882,7 @@ export const CreateClientBody = zod.object({
 
 export const CreateClientResponse = zod.object({
   "id": zod.string(),
+  "type": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
   "name": zod.string(),
   "phone": zod.string(),
   "address": zod.string(),
@@ -918,6 +921,7 @@ export const updateClientBodyPrefixRegExp = new RegExp('^[A-Za-z0-9]+$');
 
 
 export const UpdateClientBody = zod.object({
+  "type": zod.enum(['Project', 'Retail']).optional(),
   "name": zod.string().min(updateClientBodyNameMin).max(updateClientBodyNameMax).optional(),
   "phone": zod.string().min(updateClientBodyPhoneMin).max(updateClientBodyPhoneMax).optional(),
   "address": zod.string().min(updateClientBodyAddressMin).max(updateClientBodyAddressMax).optional(),
@@ -928,6 +932,7 @@ export const UpdateClientBody = zod.object({
 
 export const UpdateClientResponse = zod.object({
   "id": zod.string(),
+  "type": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
   "name": zod.string(),
   "phone": zod.string(),
   "address": zod.string(),
@@ -1034,9 +1039,23 @@ export const ListOrdersQueryParams = zod.object({
   "to": zod.date().optional()
 })
 
+
+
+
 export const ListOrdersResponseItem = zod.object({
   "id": zod.string(),
   "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
   "sequenceNo": zod.number().int(),
   "clientId": zod.string(),
   "clientName": zod.string(),
@@ -1058,8 +1077,9 @@ export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
 
 
 /**
- * @summary Create an order with a canonical Order ID
+ * @summary Link a quotation and generate the canonical Order ID
  */
+
 
 export const createOrderBodyLocationCodeMin = 2;
 export const createOrderBodyLocationCodeMax = 5;
@@ -1070,13 +1090,28 @@ export const createOrderBodyNotesMax = 2000;
 
 export const CreateOrderBody = zod.object({
   "clientId": zod.string().min(1),
+  "quotationId": zod.string().min(1),
   "locationCode": zod.string().min(createOrderBodyLocationCodeMin).max(createOrderBodyLocationCodeMax),
   "notes": zod.string().max(createOrderBodyNotesMax).nullish()
 })
 
+
+
+
 export const CreateOrderResponse = zod.object({
   "id": zod.string(),
   "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
   "sequenceNo": zod.number().int(),
   "clientId": zod.string(),
   "clientName": zod.string(),
@@ -1103,9 +1138,23 @@ export const GetOrderParams = zod.object({
   "id": zod.coerce.string()
 })
 
+
+
+
 export const GetOrderResponse = zod.object({
   "id": zod.string(),
   "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
   "sequenceNo": zod.number().int(),
   "clientId": zod.string(),
   "clientName": zod.string(),
@@ -1141,9 +1190,66 @@ export const UpdateOrderBody = zod.object({
   "notes": zod.string().max(updateOrderBodyNotesMax).nullish()
 })
 
+
+
+
 export const UpdateOrderResponse = zod.object({
   "id": zod.string(),
   "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Add the next server-numbered lot to an order
+ */
+export const AddOrderLotParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+
+
+export const AddOrderLotResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
   "sequenceNo": zod.number().int(),
   "clientId": zod.string(),
   "clientName": zod.string(),
@@ -4323,9 +4429,23 @@ export const UpdateOrderBillingBody = zod.object({
   "orderValue": zod.number().min(updateOrderBillingBodyOrderValueMin).nullable()
 })
 
+
+
+
 export const UpdateOrderBillingResponse = zod.object({
   "id": zod.string(),
   "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
   "sequenceNo": zod.number().int(),
   "clientId": zod.string(),
   "clientName": zod.string(),

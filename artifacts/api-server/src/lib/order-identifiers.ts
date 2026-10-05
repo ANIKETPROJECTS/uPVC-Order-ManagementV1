@@ -34,3 +34,20 @@ export function formatOrderId(
 ): string {
   return `${dateKey}${normalizeLocationCode(locationCode)}${dailySequenceNo}`;
 }
+
+export function formatQuotationOrderId(
+  clientType: "Project" | "Retail",
+  quoteNo: string,
+): string | null {
+  const match = /^QT-(\d+)$/i.exec(quoteNo.trim());
+  if (!match) return null;
+  const number = match[1].replace(/^0+/, "") || "0";
+  return `${clientType === "Project" ? "P" : "R"}${number}`;
+}
+
+export function formatLotId(orderId: string, sequence: number): string {
+  if (!Number.isInteger(sequence) || sequence < 1) {
+    throw new Error("Lot sequence must be a positive integer.");
+  }
+  return `${orderId}-L${String(sequence).padStart(2, "0")}`;
+}

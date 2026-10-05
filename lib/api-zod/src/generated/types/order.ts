@@ -5,11 +5,22 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ClientType } from './clientType';
+import type { OrderLot } from './orderLot';
 import type { OrderStatus } from './orderStatus';
 
 export interface Order {
   id: string;
   orderId: string;
+  /** @nullable */
+  legacyOrderId: string | null;
+  clientType: ClientType | null;
+  /** @nullable */
+  quotationId: string | null;
+  /** @nullable */
+  quotationNo: string | null;
+  needsReview: boolean;
+  lots: OrderLot[];
   sequenceNo: number;
   clientId: string;
   clientName: string;

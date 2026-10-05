@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -29,6 +29,7 @@ import {
   getListOrderLocationsQueryKey,
   getListOrdersQueryKey,
   getListOrderMessageTemplatesQueryKey,
+  getListQuotationsQueryKey,
   OrderStatus,
   useCreateClient,
   useCreateOrder,
@@ -37,11 +38,12 @@ import {
   useListOrderLocations,
   useListOrders,
   useListOrderMessageTemplates,
+  useListQuotations,
   useUpdateClient,
   useUpdateOrderMessageTemplate,
   useUpdateOrderLocation,
 } from '@workspace/api-client-react';
-import type { Client, OrderLocation, OrderMessageTemplate, User } from '@workspace/api-client-react';
+import type { Client, OrderLocation, OrderMessageTemplate, Quotation, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,8 +69,15 @@ const statusLabel = (status: string) => STATUS_OPTIONS.find((item) => item.value
 const statusTone = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.tone || 'bg-muted text-muted-foreground';
 const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
 const shortDate = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' }).format(new Date(value));
+const orderIdPreview = (type: Client['type'], quoteNo: string | undefined) => {
+  if (!type || !quoteNo) return null;
+  const match = /^QT-(\d+)$/i.exec(quoteNo.trim());
+  if (!match) return null;
+  return `${type === 'Project' ? 'P' : 'R'}${match[1].replace(/^0+/, '') || '0'}`;
+};
 
 const clientSchema = z.object({
+  type: z.enum(['Project', 'Retail'], { required_error: 'Choose Project or Retail.' }),
   name: z.string().min(2, 'Enter the client or company name.'),
   phone: z.string().min(7, 'Enter a valid phone number.'),
   address: z.string().min(3, 'Add a delivery or billing address.'),
@@ -81,6 +90,7 @@ const locationSchema = z.object({
 });
 const orderSchema = z.object({
   clientId: z.string().min(1, 'Select a client.'),
+  quotationId: z.string().min(1, 'Select a quotation before creating the order.'),
   locationCode: z.string().min(2, 'Select a location.'),
   notes: z.string().max(2000).optional(),
 });
@@ -101,11 +111,11 @@ function ClientDialog({ open, onOpenChange, editing, onDone }: { open: boolean; 
   const queryClient = useQueryClient();
   const create = useCreateClient();
   const update = useUpdateClient();
-  const form = useForm<z.infer<typeof clientSchema>>({ resolver: zodResolver(clientSchema), defaultValues: { name: '', phone: '', address: '', gstin: '', prefix: '' } });
+  const form = useForm<z.infer<typeof clientSchema>>({ resolver: zodResolver(clientSchema), defaultValues: { type: undefined, name: '', phone: '', address: '', gstin: '', prefix: '' } });
   const busy = create.isPending || update.isPending;
 
-  useMemo(() => {
-    if (open) form.reset(editing ? { name: editing.name, phone: editing.phone, address: editing.address, gstin: editing.gstin || '', prefix: editing.prefix } : { name: '', phone: '', address: '', gstin: '', prefix: '' });
+  useEffect(() => {
+    if (open) form.reset(editing ? { type: editing.type === 'Project' || editing.type === 'Retail' ? editing.type : undefined, name: editing.name, phone: editing.phone, address: editing.address, gstin: editing.gstin || '', prefix: editing.prefix } : { type: undefined, name: '', phone: '', address: '', gstin: '', prefix: '' });
   }, [open, editing, form]);
 
   const submit = (values: z.infer<typeof clientSchema>) => {
@@ -116,7 +126,74 @@ function ClientDialog({ open, onOpenChange, editing, onDone }: { open: boolean; 
       create.mutate({ data }, { onSuccess: () => { void queryClient.invalidateQueries({ queryKey: getListClientsQueryKey() }); toast({ title: 'Client added', description: `${values.prefix} prefix is now reserved.` }); onDone(); } });
     }
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>{editing ? 'Edit client record' : 'Add a client'}</DialogTitle><DialogDescription>Keep the central client identity consistent across every order record.</DialogDescription></DialogHeader><Form {...form}><form onSubmit={form.handleSubmit(submit)} className="space-y-4" data-testid="form-client"><div className="grid gap-4 sm:grid-cols-2"><FormField control={form.control} name="name" render={({ field }) => <FormItem className="sm:col-span-2"><FormLabel>Client / company name</FormLabel><FormControl><Input {...field} placeholder="e.g. Meridian Habitat" data-testid="input-client-name" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="phone" render={({ field }) => <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} placeholder="+91 98…" data-testid="input-client-phone" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="prefix" render={({ field }) => <FormItem><FormLabel>Unique order prefix</FormLabel><FormControl><Input {...field} maxLength={8} placeholder="MHAB" data-testid="input-client-prefix" /></FormControl><FormMessage /></FormItem>} /></div><FormField control={form.control} name="address" render={({ field }) => <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea {...field} rows={3} placeholder="Site or billing address" data-testid="input-client-address" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="gstin" render={({ field }) => <FormItem><FormLabel>GSTIN <span className="font-normal text-muted-foreground">(optional)</span></FormLabel><FormControl><Input {...field} value={field.value || ''} maxLength={15} data-testid="input-client-gstin" /></FormControl><FormMessage /></FormItem>} /><DialogFooter><Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-cancel-client">Cancel</Button><Button type="submit" disabled={busy} data-testid="button-save-client">{busy ? 'Saving…' : editing ? 'Save changes' : 'Add client'}</Button></DialogFooter></form></Form></DialogContent></Dialog>;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{editing ? 'Edit client record' : 'Add a client'}</DialogTitle>
+          <DialogDescription>Choose a client type before creating orders. Existing unset types must be selected manually.</DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(submit)} className="space-y-4" data-testid="form-client">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Client / company name</FormLabel>
+                  <FormControl><Input {...field} placeholder="e.g. Meridian Habitat" data-testid="input-client-name" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="phone" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl><Input {...field} placeholder="+91 98…" data-testid="input-client-phone" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="prefix" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unique order prefix</FormLabel>
+                  <FormControl><Input {...field} maxLength={8} placeholder="MHAB" data-testid="input-client-prefix" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="type" render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Client type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <FormControl><SelectTrigger data-testid="select-client-type"><SelectValue placeholder="Choose Project or Retail" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="Project">Project</SelectItem>
+                      <SelectItem value="Retail">Retail</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+            <FormField control={form.control} name="address" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Address</FormLabel>
+                <FormControl><Textarea {...field} rows={3} placeholder="Site or billing address" data-testid="input-client-address" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="gstin" render={({ field }) => (
+              <FormItem>
+                <FormLabel>GSTIN <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
+                <FormControl><Input {...field} value={field.value || ''} maxLength={15} data-testid="input-client-gstin" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-cancel-client">Cancel</Button>
+              <Button type="submit" disabled={busy} data-testid="button-save-client">{busy ? 'Saving…' : editing ? 'Save changes' : 'Add client'}</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function LocationDialog({ open, onOpenChange, editing, onDone }: { open: boolean; onOpenChange: (open: boolean) => void; editing: OrderLocation | null; onDone: () => void }) {
@@ -134,13 +211,176 @@ function LocationDialog({ open, onOpenChange, editing, onDone }: { open: boolean
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>{editing ? 'Edit location code' : 'Add location code'}</DialogTitle><DialogDescription>Location codes make order IDs traceable to the operating branch or site.</DialogDescription></DialogHeader><Form {...form}><form onSubmit={form.handleSubmit(submit)} className="space-y-4" data-testid="form-location"><div className="grid gap-4 sm:grid-cols-[130px_1fr]"><FormField control={form.control} name="code" render={({ field }) => <FormItem><FormLabel>Code</FormLabel><FormControl><Input {...field} maxLength={5} placeholder="BLR" data-testid="input-location-code" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="name" render={({ field }) => <FormItem><FormLabel>Location name</FormLabel><FormControl><Input {...field} placeholder="Bengaluru" data-testid="input-location-name" /></FormControl><FormMessage /></FormItem>} /></div><DialogFooter><Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-cancel-location">Cancel</Button><Button type="submit" disabled={busy} data-testid="button-save-location">{busy ? 'Saving…' : editing ? 'Save changes' : 'Add location'}</Button></DialogFooter></form></Form></DialogContent></Dialog>;
 }
 
-function NewOrderDialog({ open, onOpenChange, clients, locations, onDone }: { open: boolean; onOpenChange: (open: boolean) => void; clients: Client[]; locations: OrderLocation[]; onDone: () => void }) {
+function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEditClient }: { open: boolean; onOpenChange: (open: boolean) => void; clients: Client[]; locations: OrderLocation[]; onDone: () => void; onEditClient: (client: Client) => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const create = useCreateOrder();
-  const form = useForm<z.infer<typeof orderSchema>>({ resolver: zodResolver(orderSchema), defaultValues: { clientId: '', locationCode: '', notes: '' } });
-  const submit = (values: z.infer<typeof orderSchema>) => create.mutate({ data: { ...values, notes: values.notes || null } }, { onSuccess: (order) => { void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }); toast({ title: 'Order created', description: order.orderId }); onDone(); } });
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Create central order</DialogTitle><DialogDescription>Start the traceable record. Quotation and production modules will attach to this order later.</DialogDescription></DialogHeader><Form {...form}><form onSubmit={form.handleSubmit(submit)} className="space-y-4" data-testid="form-order"><FormField control={form.control} name="clientId" render={({ field }) => <FormItem><FormLabel>Client</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger data-testid="select-order-client"><SelectValue placeholder="Choose a client" /></SelectTrigger></FormControl><SelectContent>{clients.filter((client) => client.isActive).map((client) => <SelectItem key={client.id} value={client.id}>{client.name} · {client.prefix}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} /><FormField control={form.control} name="locationCode" render={({ field }) => <FormItem><FormLabel>Order location</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger data-testid="select-order-location"><SelectValue placeholder="Choose a location" /></SelectTrigger></FormControl><SelectContent>{locations.filter((location) => location.isActive).map((location) => <SelectItem key={location.code} value={location.code}>{location.code} · {location.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} /><FormField control={form.control} name="notes" render={({ field }) => <FormItem><FormLabel>Initial notes <span className="font-normal text-muted-foreground">(optional)</span></FormLabel><FormControl><Textarea {...field} rows={3} placeholder="Context the office team should see first" data-testid="input-order-notes" /></FormControl><FormMessage /></FormItem>} /><DialogFooter><Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-cancel-order">Cancel</Button><Button type="submit" disabled={create.isPending} data-testid="button-save-order">{create.isPending ? 'Creating…' : 'Create order'}</Button></DialogFooter></form></Form></DialogContent></Dialog>;
+  const quotationsQuery = useListQuotations({
+    query: { queryKey: getListQuotationsQueryKey(), enabled: open },
+  });
+  const form = useForm<z.infer<typeof orderSchema>>({
+    resolver: zodResolver(orderSchema),
+    defaultValues: { clientId: '', quotationId: '', locationCode: '', notes: '' },
+  });
+  const selectedClient = clients.find((client) => client.id === form.watch('clientId'));
+  const clientQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
+    quotation.clientId === selectedClient?.id &&
+    !quotation.sampleOnly &&
+    /^QT-\d+$/i.test(quotation.quoteNo.trim()),
+  );
+  const selectedQuotation = clientQuotations.find((quotation) => quotation.id === form.watch('quotationId'));
+  const previewId = orderIdPreview(selectedClient?.type ?? null, selectedQuotation?.quoteNo);
+  const canCreate =
+    Boolean(selectedClient?.type && selectedQuotation && form.watch('locationCode')) &&
+    !create.isPending;
+
+  useEffect(() => {
+    if (open) form.reset({ clientId: '', quotationId: '', locationCode: '', notes: '' });
+  }, [open, form]);
+
+  const submit = (values: z.infer<typeof orderSchema>) => {
+    if (!selectedClient?.type) {
+      toast({ title: 'Client type required', description: 'Choose Project or Retail on the client record before creating an order.', variant: 'destructive' });
+      return;
+    }
+    if (!values.quotationId) {
+      toast({ title: 'Quotation required', description: 'Select a quotation before saving this order.', variant: 'destructive' });
+      return;
+    }
+    create.mutate(
+      { data: { ...values, notes: values.notes || null } },
+      {
+        onSuccess: (order) => {
+          void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+          toast({ title: 'Order created', description: order.orderId });
+          onDone();
+        },
+        onError: (error) => toast({
+          title: 'Order could not be created',
+          description: error instanceof Error ? error.message : 'Check the client type and linked quotation.',
+          variant: 'destructive',
+        }),
+      },
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create central order</DialogTitle>
+          <DialogDescription>Link a quotation. The server generates and stores the order ID from its quotation number.</DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(submit)} className="space-y-4" data-testid="form-order">
+            <FormField control={form.control} name="clientId" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Client</FormLabel>
+                <Select
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    form.setValue('quotationId', '', { shouldValidate: true });
+                  }}
+                  value={field.value}
+                >
+                  <FormControl><SelectTrigger data-testid="select-order-client"><SelectValue placeholder="Choose a client" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {clients.filter((client) => client.isActive).map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name} · {client.prefix} · {client.type ?? 'Type not set'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {selectedClient && !selectedClient.type && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2.5 text-xs text-amber-900" role="status" data-testid="notice-order-client-type">
+                <p><strong>Type not set.</strong> Choose Project or Retail before creating an order.</p>
+                <Button type="button" size="sm" variant="outline" onClick={() => onEditClient(selectedClient)} data-testid="button-set-client-type">
+                  Set client type
+                </Button>
+              </div>
+            )}
+
+            <FormField control={form.control} name="quotationId" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Linked quotation</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value}
+                  disabled={!selectedClient || quotationsQuery.isLoading || clientQuotations.length === 0}
+                >
+                  <FormControl><SelectTrigger data-testid="select-order-quotation"><SelectValue placeholder="Choose a quotation" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {clientQuotations.map((quotation) => (
+                      <SelectItem key={quotation.id} value={quotation.id}>
+                        {quotation.quoteNo} · {quotation.projectName || quotation.customerName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {selectedClient && quotationsQuery.isLoading && (
+              <p className="text-xs text-muted-foreground" role="status">Loading this client’s quotations…</p>
+            )}
+            {selectedClient && quotationsQuery.isError && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs" role="alert">
+                <span>Quotations could not be loaded. Try again before creating the order.</span>
+                <Button type="button" size="sm" variant="outline" onClick={() => void quotationsQuery.refetch()}>Retry</Button>
+              </div>
+            )}
+            {selectedClient && !quotationsQuery.isLoading && !quotationsQuery.isError && clientQuotations.length === 0 && (
+              <p className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2.5 text-xs text-amber-900" role="status" data-testid="notice-order-no-quotation">
+                No usable QT-numbered quotation is linked to this client. Select or create a quotation before saving an order.
+              </p>
+            )}
+            {previewId && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs" data-testid="text-order-id-preview">
+                <p className="font-semibold text-primary">Order ID preview · <span className="font-mono">{previewId}</span></p>
+                <p className="mt-1 text-muted-foreground">
+                  {selectedClient?.type === 'Project'
+                    ? `A Project order starts with lot ${previewId}-L01.`
+                    : 'A Retail order starts without a lot; lots can be added later.'}
+                </p>
+              </div>
+            )}
+
+            <FormField control={form.control} name="locationCode" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Order location</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl><SelectTrigger data-testid="select-order-location"><SelectValue placeholder="Choose a location" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {locations.filter((location) => location.isActive).map((location) => (
+                      <SelectItem key={location.code} value={location.code}>{location.code} · {location.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="notes" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Initial notes <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
+                <FormControl><Textarea {...field} rows={3} placeholder="Context the office team should see first" data-testid="input-order-notes" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-cancel-order">Cancel</Button>
+              <Button type="submit" disabled={!canCreate} data-testid="button-save-order">{create.isPending ? 'Creating…' : 'Create order'}</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function TemplateEditor({ templates, canEdit, loading, error, onRetry }: { templates: OrderMessageTemplate[]; canEdit: boolean; loading: boolean; error: boolean; onRetry: () => void }) {
@@ -204,7 +444,7 @@ export default function OrderHubPage({ user }: { user: User }) {
 
     <section className="grid gap-4 sm:grid-cols-3"><Card className="animate-enter-up delay-1 border-border/80"><CardContent className="p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Order register</p><ClipboardList size={16} className="text-primary" /></div><p className="mt-3 font-display text-3xl font-bold" data-testid="metric-orders-visible">{orderList.length}</p><p className="mt-1 text-xs text-muted-foreground">matching current filters</p></CardContent></Card><Card className="animate-enter-up delay-2 border-border/80"><CardContent className="p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">In production</p><Settings2 size={16} className="text-accent-foreground" /></div><p className="mt-3 font-display text-3xl font-bold" data-testid="metric-orders-production">{orderList.filter((item) => item.status === OrderStatus.in_production).length}</p><p className="mt-1 text-xs text-muted-foreground">active factory handoffs</p></CardContent></Card><Card className="animate-enter-up delay-3 border-border/80"><CardContent className="p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Installed</p><Check size={17} className="text-primary" /></div><p className="mt-3 font-display text-3xl font-bold" data-testid="metric-orders-installed">{orderList.filter((item) => item.status === OrderStatus.installed).length}</p><p className="mt-1 text-xs text-muted-foreground">closed lifecycle records</p></CardContent></Card></section>
 
-     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5 md:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><SectionHeading eyebrow="Central register" title="Orders" detail="Search by order ID, client, phone, or address." action={canEdit ? <Button onClick={() => setOrderOpen(true)} data-testid="button-create-order"><Plus size={15} /> Create order</Button> : undefined} /><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary" /> Live query</div></div><div className="mt-5 grid gap-2 md:grid-cols-[minmax(220px,1.4fr)_repeat(2,minmax(150px,0.7fr))]"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order register" className="pl-9" data-testid="input-search-orders" /></div><Select value={status} onValueChange={setStatus}><SelectTrigger data-testid="select-filter-status"><SelectValue placeholder="Any status" /></SelectTrigger><SelectContent><SelectItem value="all">Any status</SelectItem>{STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><Select value={locationCode} onValueChange={setLocationCode}><SelectTrigger data-testid="select-filter-location"><SelectValue placeholder="Any location" /></SelectTrigger><SelectContent><SelectItem value="all">Any location</SelectItem>{locationList.filter((item) => item.isActive).map((item) => <SelectItem key={item.code} value={item.code}>{item.code} · {item.name}</SelectItem>)}</SelectContent></Select></div><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]"><Select value={clientId} onValueChange={setClientId}><SelectTrigger data-testid="select-filter-client"><SelectValue placeholder="Any client" /></SelectTrigger><SelectContent><SelectItem value="all">Any client</SelectItem>{clientList.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="From date" data-testid="input-filter-from" /><Input type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="To date" data-testid="input-filter-to" /></div><Button variant="ghost" onClick={clearFilters} className="text-xs" data-testid="button-clear-order-filters"><X size={14} /> Clear</Button><label className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-border px-3 py-1 text-[11px] text-muted-foreground"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="accent-primary" data-testid="checkbox-show-inactive" /> Include inactive</label></div><div className="mt-5 overflow-hidden rounded-xl border border-border/80">{orders.isLoading ? <div className="p-4"><StatePanel type="loading" /></div> : orders.isError ? <div className="p-4"><StatePanel type="error" onRetry={() => void orders.refetch()} /></div> : orderList.length === 0 ? <div className="p-4"><StatePanel type="empty" /></div> : <><div className="divide-y divide-border/70 md:hidden">{orderList.map((order) => <Link key={order.id} href={`/order-hub/${order.id}`} className="block p-4 transition-colors hover:bg-primary/[0.025]" data-testid={`card-order-${order.id}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="break-all font-mono text-[11px] font-bold text-primary">{order.orderId}</p><p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-mobile-${order.id}`}>{statusLabel(order.status)}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-[10px]"><div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p></div><div><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div></div><div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3 text-[10px] text-muted-foreground"><span>{order.clientPhone || 'No phone recorded'}</span><span className="inline-flex items-center gap-1 font-bold text-primary">Open <ArrowRight size={13} /></span></div></Link>)}</div><table className="hidden w-full min-w-[760px] text-left text-xs md:table"><thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><tr><th className="px-4 py-3 font-bold">Order</th><th className="px-4 py-3 font-bold">Client</th><th className="px-4 py-3 font-bold">Location</th><th className="px-4 py-3 font-bold">Status</th><th className="px-4 py-3 font-bold">Created</th><th className="px-4 py-3 text-right font-bold">Open</th></tr></thead><tbody className="divide-y divide-border/70">{orderList.map((order) => <tr key={order.id} className="group hover:bg-primary/[0.025]" data-testid={`row-order-${order.id}`}><td className="px-4 py-3.5"><Link href={`/order-hub/${order.id}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-order-${order.id}`}>{order.orderId}</Link><p className="mt-1 text-[10px] text-muted-foreground">Sequence {String(order.sequenceNo).padStart(3, '0')}</p></td><td className="px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td><td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p></td><td className="px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td><td className="px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td><td className="px-4 py-3.5 text-right"><Link href={`/order-hub/${order.id}`} className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/10" data-testid={`button-open-order-${order.id}`}>View <ArrowRight size={13} /></Link></td></tr>)}</tbody></table></>}</div></section>
+     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5 md:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><SectionHeading eyebrow="Central register" title="Orders" detail="Search by order ID, lot ID, client, phone, or address." action={canEdit ? <Button onClick={() => setOrderOpen(true)} data-testid="button-create-order"><Plus size={15} /> Create order</Button> : undefined} /><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary" /> Live query</div></div><div className="mt-5 grid gap-2 md:grid-cols-[minmax(220px,1.4fr)_repeat(2,minmax(150px,0.7fr))]"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order register" className="pl-9" data-testid="input-search-orders" /></div><Select value={status} onValueChange={setStatus}><SelectTrigger data-testid="select-filter-status"><SelectValue placeholder="Any status" /></SelectTrigger><SelectContent><SelectItem value="all">Any status</SelectItem>{STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><Select value={locationCode} onValueChange={setLocationCode}><SelectTrigger data-testid="select-filter-location"><SelectValue placeholder="Any location" /></SelectTrigger><SelectContent><SelectItem value="all">Any location</SelectItem>{locationList.filter((item) => item.isActive).map((item) => <SelectItem key={item.code} value={item.code}>{item.code} · {item.name}</SelectItem>)}</SelectContent></Select></div><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]"><Select value={clientId} onValueChange={setClientId}><SelectTrigger data-testid="select-filter-client"><SelectValue placeholder="Any client" /></SelectTrigger><SelectContent><SelectItem value="all">Any client</SelectItem>{clientList.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="From date" data-testid="input-filter-from" /><Input type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="To date" data-testid="input-filter-to" /></div><Button variant="ghost" onClick={clearFilters} className="text-xs" data-testid="button-clear-order-filters"><X size={14} /> Clear</Button><label className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-border px-3 py-1 text-[11px] text-muted-foreground"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="accent-primary" data-testid="checkbox-show-inactive" /> Include inactive</label></div><div className="mt-5 overflow-hidden rounded-xl border border-border/80">{orders.isLoading ? <div className="p-4"><StatePanel type="loading" /></div> : orders.isError ? <div className="p-4"><StatePanel type="error" onRetry={() => void orders.refetch()} /></div> : orderList.length === 0 ? <div className="p-4"><StatePanel type="empty" /></div> : <><div className="divide-y divide-border/70 md:hidden">{orderList.map((order) => <Link key={order.id} href={`/order-hub/${order.id}`} className="block p-4 transition-colors hover:bg-primary/[0.025]" data-testid={`card-order-${order.id}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="break-all font-mono text-[11px] font-bold text-primary">{order.orderId}</p>{order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}<p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-mobile-${order.id}`}>{statusLabel(order.status)}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-[10px]"><div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p></div><div><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div></div><div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3 text-[10px] text-muted-foreground"><span>{order.clientPhone || 'No phone recorded'}</span><span className="inline-flex items-center gap-1 font-bold text-primary">Open <ArrowRight size={13} /></span></div></Link>)}</div><table className="hidden w-full min-w-[760px] text-left text-xs md:table"><thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><tr><th className="px-4 py-3 font-bold">Order</th><th className="px-4 py-3 font-bold">Client</th><th className="px-4 py-3 font-bold">Location</th><th className="px-4 py-3 font-bold">Status</th><th className="px-4 py-3 font-bold">Created</th><th className="px-4 py-3 text-right font-bold">Open</th></tr></thead><tbody className="divide-y divide-border/70">{orderList.map((order) => <tr key={order.id} className="group hover:bg-primary/[0.025]" data-testid={`row-order-${order.id}`}><td className="px-4 py-3.5"><Link href={`/order-hub/${order.id}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-order-${order.id}`}>{order.orderId}</Link><p className="mt-1 text-[10px] text-muted-foreground">Sequence {String(order.sequenceNo).padStart(3, '0')}</p>{order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}</td><td className="px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td><td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p></td><td className="px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td><td className="px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td><td className="px-4 py-3.5 text-right"><Link href={`/order-hub/${order.id}`} className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/10" data-testid={`button-open-order-${order.id}`}>View <ArrowRight size={13} /></Link></td></tr>)}</tbody></table></>}</div></section>
 
     <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
       <Card>
@@ -242,6 +482,12 @@ export default function OrderHubPage({ user }: { user: User }) {
                         </p>
                         <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
                           {client.prefix}
+                        </span>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ${client.type ? 'bg-secondary text-secondary-foreground' : 'bg-amber-100 text-amber-900'}`}
+                          data-testid={`badge-client-type-${client.id}`}
+                        >
+                          {client.type || 'Type not set'}
                         </span>
                         {!client.isActive && <span className="text-[10px] font-bold text-muted-foreground">Inactive</span>}
                       </div>
@@ -361,6 +607,6 @@ export default function OrderHubPage({ user }: { user: User }) {
     {isMasterAdmin && <TemplateEditor templates={templates.data || []} canEdit={isMasterAdmin} loading={templates.isLoading} error={templates.isError} onRetry={() => void templates.refetch()} />}
     <ClientDialog open={clientOpen} onOpenChange={setClientOpen} editing={editingClient} onDone={() => { setClientOpen(false); setEditingClient(null); }} />
     <LocationDialog open={locationOpen} onOpenChange={setLocationOpen} editing={editingLocation} onDone={() => { setLocationOpen(false); setEditingLocation(null); }} />
-    <NewOrderDialog open={orderOpen} onOpenChange={setOrderOpen} clients={clientList} locations={locationList} onDone={() => setOrderOpen(false)} />
+    <NewOrderDialog open={orderOpen} onOpenChange={setOrderOpen} clients={clientList} locations={locationList} onDone={() => setOrderOpen(false)} onEditClient={(client) => { setEditingClient(client); setOrderOpen(false); setClientOpen(true); }} />
   </div></AppShell>;
 }

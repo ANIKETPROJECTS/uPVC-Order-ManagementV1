@@ -2365,7 +2365,7 @@ export const getCreateClientUrl = () => {
 }
 
 /**
- * @summary Add a client and assign its order ID prefix
+ * @summary Add a client, choose its type, and assign its order ID prefix
  */
 export const createClient = async (clientInput: ClientInput, options?: Parameters<typeof customFetch>[1]): Promise<Client> => {
 
@@ -2431,7 +2431,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateClientMutationVariables = {data: BodyType<ClientInput>}
 
     /**
- * @summary Add a client and assign its order ID prefix
+ * @summary Add a client, choose its type, and assign its order ID prefix
  */
 export const useCreateClient = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createClient>>, TError,CreateClientMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -2887,7 +2887,7 @@ export const getCreateOrderUrl = () => {
 }
 
 /**
- * @summary Create an order with a canonical Order ID
+ * @summary Link a quotation and generate the canonical Order ID
  */
 export const createOrder = async (orderInput: OrderInput, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
 
@@ -2953,7 +2953,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateOrderMutationVariables = {data: BodyType<OrderInput>}
 
     /**
- * @summary Create an order with a canonical Order ID
+ * @summary Link a quotation and generate the canonical Order ID
  */
 export const useCreateOrder = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrder>>, TError,CreateOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -3130,6 +3130,80 @@ export const useUpdateOrder = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateOrderMutationOptions(options));
+    }
+
+export const getAddOrderLotUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/lots`
+}
+
+/**
+ * @summary Add the next server-numbered lot to an order
+ */
+export const addOrderLot = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+  return customFetch<Order>(getAddOrderLotUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAddOrderLotMutationKey = () => ['addOrderLot'] as const;
+
+export const getAddOrderLotMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addOrderLot>>, TError,AddOrderLotMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addOrderLot>>, TError,AddOrderLotMutationVariables, TContext> => {
+
+const mutationKey = getAddOrderLotMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addOrderLot>>, AddOrderLotMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  addOrderLot(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddOrderLotMutationResult = NonNullable<Awaited<ReturnType<typeof addOrderLot>>>
+
+    export type AddOrderLotMutationError = ErrorType<void>
+    export type AddOrderLotMutationVariables = {id: string}
+
+    /**
+ * @summary Add the next server-numbered lot to an order
+ */
+export const useAddOrderLot = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addOrderLot>>, TError,AddOrderLotMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addOrderLot>>,
+        TError,
+        AddOrderLotMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAddOrderLotMutationOptions(options));
     }
 
 export const getListDispatchOrdersUrl = () => {

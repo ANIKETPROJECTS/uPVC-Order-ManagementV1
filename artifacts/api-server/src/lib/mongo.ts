@@ -2,7 +2,9 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypt
 import { GridFSBucket, MongoClient, type Collection, type Db } from "mongodb";
 import { logger } from "./logger";
 import {
+  formatLotId,
   formatOrderId,
+  formatQuotationOrderId,
   normalizeLocationCode,
   orderDailyCounterId,
   orderDateKey,
@@ -28,6 +30,7 @@ let clientPromise: Promise<MongoClient> | undefined;
 export type PermissionLevel = "none" | "view" | "edit";
 export type PermissionMap = Record<string, PermissionLevel>;
 export type UserStatus = "active" | "inactive";
+export type ClientType = "Project" | "Retail";
 
 export const MODULES = [
   { id: "user-access", label: "Multi-User Access & Roles" },
@@ -145,6 +148,7 @@ export interface ClientDocument {
   gstin: string | null;
   prefix: string;
   prefixUpper: string;
+  type?: ClientType | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -160,11 +164,21 @@ export interface OrderLocationDocument {
   updatedAt: Date;
 }
 
+export interface OrderLotDocument {
+  _id: string;
+  sequence: number;
+  lotId: string;
+  createdBy: string;
+  createdAt: Date;
+}
+
 export interface OrderDocument {
   _id: string;
   orderId: string;
+  legacyOrderId?: string | null;
   sequenceNo: number;
   clientId: string;
+  clientType?: ClientType | null;
   clientName: string;
   clientPrefix: string;
   clientPhone: string | null;
@@ -172,6 +186,11 @@ export interface OrderDocument {
   clientGstin: string | null;
   locationCode: string;
   locationName: string;
+  quotationId?: string | null;
+  quotationNo?: string | null;
+  needsReview?: boolean;
+  lots?: OrderLotDocument[];
+  nextLotSequence?: number;
   status: OrderStatus;
   dispatchStatus?: DispatchStatus;
   notes: string | null;
@@ -881,6 +900,155 @@ async function migrateOrderIds(db: Db, now: Date): Promise<void> {
   }
 }
 
+async function migrateQuotationOrderIds(db: Db, now: Date): Promise<void> {
+  const counters = getCounters(db);
+  const migrationMarkerId = "quotationOrderIdFormatV1";
+  const marker = await counters.findOne({ _id: migrationMarkerId });
+  if (marker?.value === 1) return;
+
+  const [orders, clients, quotations] = await Promise.all([
+    getOrders(db).find({}).sort({ createdAt: 1, sequenceNo: 1, _id: 1 }).toArray(),
+    getClients(db).find({}).toArray(),
+    getQuotations(db).find({}).toArray(),
+  ]);
+  const clientById = new Map(clients.map((client) => [client._id, client]));
+  const quotationById = new Map(quotations.map((quotation) => [quotation._id, quotation]));
+
+  const plans = orders.map((order) => {
+    const legacyOrderId = order.legacyOrderId ?? order.orderId;
+    const client = clientById.get(order.clientId);
+    const candidateType = order.clientType ?? client?.type ?? null;
+    const clientType: ClientType | null =
+      candidateType === "Project" || candidateType === "Retail" ? candidateType : null;
+    const quotationId = order.quotationId ?? null;
+    const quotation = quotationId ? quotationById.get(quotationId) : undefined;
+    const quotationMatchesClient = quotation?.clientId === order.clientId;
+    const targetOrderId =
+      quotation && clientType && quotationMatchesClient
+        ? formatQuotationOrderId(clientType, quotation.quoteNo)
+        : null;
+
+    return {
+      order,
+      legacyOrderId,
+      clientType,
+      quotationId,
+      quotationNo: quotation?.quoteNo ?? order.quotationNo ?? null,
+      targetOrderId,
+      eligible: Boolean(targetOrderId),
+    };
+  });
+
+  const countByTargetId = new Map<string, number>();
+  const countByQuotationId = new Map<string, number>();
+  for (const plan of plans) {
+    if (!plan.eligible || !plan.targetOrderId) continue;
+    countByTargetId.set(plan.targetOrderId, (countByTargetId.get(plan.targetOrderId) ?? 0) + 1);
+    if (plan.quotationId) {
+      countByQuotationId.set(plan.quotationId, (countByQuotationId.get(plan.quotationId) ?? 0) + 1);
+    }
+  }
+  for (const plan of plans) {
+    if (!plan.eligible || !plan.targetOrderId) continue;
+    if (
+      (countByTargetId.get(plan.targetOrderId) ?? 0) > 1 ||
+      (plan.quotationId && (countByQuotationId.get(plan.quotationId) ?? 0) > 1)
+    ) {
+      plan.eligible = false;
+    }
+  }
+
+  let removedCollision = true;
+  while (removedCollision) {
+    removedCollision = false;
+    const occupiedByReviewOrders = new Set(
+      plans.filter((plan) => !plan.eligible).map((plan) => plan.order.orderId),
+    );
+    for (const plan of plans) {
+      if (plan.eligible && plan.targetOrderId && occupiedByReviewOrders.has(plan.targetOrderId)) {
+        plan.eligible = false;
+        removedCollision = true;
+      }
+    }
+  }
+
+  const lotTargets = plans.map((plan) => {
+    const parentId = plan.eligible && plan.targetOrderId ? plan.targetOrderId : plan.legacyOrderId;
+    const lots = [...(plan.order.lots ?? [])].map((lot) => ({
+      ...lot,
+      lotId: formatLotId(parentId, lot.sequence),
+    }));
+    if (plan.clientType === "Project" && lots.length === 0) {
+      lots.push({
+        _id: randomUUID(),
+        sequence: 1,
+        lotId: formatLotId(parentId, 1),
+        createdBy: "system",
+        createdAt: plan.order.createdAt,
+      });
+    }
+    const highestLotSequence = lots.reduce((highest, lot) => Math.max(highest, lot.sequence), 0);
+    return {
+      lots,
+      nextLotSequence: Math.max(plan.order.nextLotSequence ?? 1, highestLotSequence + 1),
+    };
+  });
+
+  const converting = plans.filter(
+    (plan) => plan.eligible && plan.targetOrderId && plan.order.orderId !== plan.targetOrderId,
+  );
+  if (converting.length > 0) {
+    const migrationToken = randomUUID();
+    await getOrders(db).bulkWrite(
+      converting.map((plan, index) => ({
+        updateOne: {
+          filter: { _id: plan.order._id },
+          update: { $set: { orderId: `__quotation_order_id_${migrationToken}_${index}` } },
+        },
+      })),
+    );
+  }
+
+  if (plans.length > 0) {
+    await getOrders(db).bulkWrite(
+      plans.map((plan, index) => ({
+        updateOne: {
+          filter: { _id: plan.order._id },
+          update: {
+            $set: {
+              orderId: plan.eligible && plan.targetOrderId ? plan.targetOrderId : plan.legacyOrderId,
+              legacyOrderId: plan.legacyOrderId,
+              clientType: plan.clientType,
+              quotationId: plan.quotationId,
+              quotationNo: plan.quotationNo,
+              needsReview: !plan.eligible,
+              lots: lotTargets[index].lots,
+              nextLotSequence: lotTargets[index].nextLotSequence,
+            },
+          },
+        },
+      })),
+    );
+  }
+
+  await counters.updateOne(
+    { _id: migrationMarkerId },
+    { $set: { value: 1, updatedAt: now } },
+    { upsert: true },
+  );
+  await counters.updateOne(
+    { _id: "orderIdFormatV1" },
+    { $set: { value: 1, updatedAt: now } },
+    { upsert: true },
+  );
+
+  const convertedCount = plans.filter((plan) => plan.eligible).length;
+  logger.info(
+    { convertedOrders: convertedCount, needsReviewOrders: plans.length - convertedCount },
+    "Migrated orders to quotation-based IDs",
+  );
+}
+
 export function emptyPermissionMap(): PermissionMap {
   return Object.fromEntries(MODULES.map(({ id }) => [id, "none"]));
 }
@@ -1257,6 +1425,9 @@ export async function initializeMongo(): Promise<void> {
     clients.createIndex({ nameLower: 1 }, { name: "clients_by_name" }),
     locations.createIndex({ codeUpper: 1 }, { unique: true, name: "location_code_unique" }),
     orders.createIndex({ orderId: 1 }, { unique: true, name: "order_id_unique" }),
+    orders.createIndex({ legacyOrderId: 1 }, { name: "orders_by_legacy_id" }),
+    orders.createIndex({ quotationId: 1 }, { name: "orders_by_quotation" }),
+    orders.createIndex({ "lots.lotId": 1 }, { name: "orders_by_lot_id" }),
     orders.createIndex({ sequenceNo: 1 }, { unique: true, name: "order_sequence_unique" }),
     orders.createIndex({ clientId: 1, createdAt: -1 }, { name: "orders_by_client_date" }),
     orders.createIndex({ status: 1, createdAt: -1 }, { name: "orders_by_status_date" }),
@@ -1931,6 +2102,7 @@ export async function initializeMongo(): Promise<void> {
     { upsert: true },
   );
 
+  await migrateQuotationOrderIds(db, now);
   await migrateOrderIds(db, now);
   await migrateMeasurementSheetIds(db, now);
 
