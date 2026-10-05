@@ -57,6 +57,7 @@ export * from './measurementRecordLookup';
 export * from './measurementRecordLookupList';
 export * from './measurementRecordUpdate';
 export * from './measurementReferenceInput';
+export * from './measurementReferenceInputKind';
 export * from './measurementReferenceOption';
 export * from './measurementReferenceOptionKind';
 export * from './measurementReferenceOptions';

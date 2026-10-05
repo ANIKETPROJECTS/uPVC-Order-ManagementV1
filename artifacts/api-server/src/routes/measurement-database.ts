@@ -119,21 +119,21 @@ function versionResponse(version: MeasurementVersionDocument) {
   };
 }
 
-function referenceResponse(reference: Pick<MeasurementReferenceDocument, "_id" | "name">) {
-  return { id: reference._id, name: reference.name, kind: "custom" as const };
+function referenceResponse(reference: Pick<MeasurementReferenceDocument, "_id" | "name" | "kind">) {
+  return { id: reference._id, name: reference.name, kind: reference.kind ?? "custom" };
 }
 
 router.get("/measurement-references", async (req, res): Promise<void> => {
   const actor = await actorContext(req, res);
   if (!actor) return;
   const db = await getMongoDb();
-  const [users, customReferences] = await Promise.all([
+  const [users, managedReferences] = await Promise.all([
     getUsers(db).find({ status: "active" }, { projection: { _id: 1, name: 1 } }).sort({ name: 1 }).toArray(),
     getMeasurementReferences(db).find({}).sort({ nameLower: 1 }).toArray(),
   ]);
   const references = [
     ...users.map((user) => ({ id: user._id, name: user.name, kind: "user" as const })),
-    ...customReferences.map(referenceResponse),
+    ...managedReferences.map(referenceResponse),
   ].sort((a, b) => a.name.localeCompare(b.name));
   res.json(ListMeasurementReferencesResponse.parse(references));
 });
@@ -156,6 +156,7 @@ router.post("/measurement-references", async (req, res): Promise<void> => {
     _id: randomUUID(),
     name,
     nameLower: name.toLowerCase(),
+    kind: parsed.data.kind ?? "custom",
     createdBy: actor.id,
     updatedBy: actor.id,
     createdAt: now,
@@ -165,7 +166,7 @@ router.post("/measurement-references", async (req, res): Promise<void> => {
     await getMeasurementReferences(await getMongoDb()).insertOne(reference);
   } catch (error) {
     if (isDuplicateKeyError(error)) {
-      res.status(409).json({ error: "A custom reference with that name already exists." });
+      res.status(409).json({ error: "A reference with that name already exists." });
       return;
     }
     throw error;
@@ -190,30 +191,37 @@ router.patch("/measurement-references/:referenceId", async (req, res): Promise<v
     return;
   }
   const db = await getMongoDb();
+  const referenceCollection = getMeasurementReferences(db);
+  const existingReference = await referenceCollection.findOne({ _id: parsedParams.data.referenceId });
+  if (!existingReference) {
+    res.status(404).json({ error: "Measurement reference not found." });
+    return;
+  }
+  const kind = existingReference.kind ?? "custom";
   try {
-    const updated = await getMeasurementReferences(db).updateOne(
+    const updated = await referenceCollection.updateOne(
       { _id: parsedParams.data.referenceId },
       { $set: { name, nameLower: name.toLowerCase(), updatedBy: actor.id, updatedAt: new Date() } },
     );
     if (!updated.matchedCount) {
-      res.status(404).json({ error: "Custom measurement reference not found." });
+      res.status(404).json({ error: "Measurement reference not found." });
       return;
     }
   } catch (error) {
     if (isDuplicateKeyError(error)) {
-      res.status(409).json({ error: "A custom reference with that name already exists." });
+      res.status(409).json({ error: "A reference with that name already exists." });
       return;
     }
     throw error;
   }
   await getMeasurementVersions(db).updateMany(
-    { referenceType: "custom", referenceId: parsedParams.data.referenceId },
+    { referenceType: kind, referenceId: parsedParams.data.referenceId },
     { $set: { referenceName: name } },
   );
   res.json(UpdateMeasurementReferenceResponse.parse({
     id: parsedParams.data.referenceId,
     name,
-    kind: "custom",
+    kind,
   }));
 });
 
@@ -227,7 +235,7 @@ router.delete("/measurement-references/:referenceId", async (req, res): Promise<
   if (!actor) return;
   const deleted = await getMeasurementReferences(await getMongoDb()).deleteOne({ _id: parsed.data.referenceId });
   if (!deleted.deletedCount) {
-    res.status(404).json({ error: "Custom measurement reference not found." });
+    res.status(404).json({ error: "Measurement reference not found." });
     return;
   }
   res.status(204).send();
@@ -567,14 +575,15 @@ router.patch("/measurement-records/:recordId/versions/:versionId", async (req, r
       fields.referenceId = referenceId;
       fields.referenceName = referenceUser.name;
     } else {
-      const customReference = await getMeasurementReferences(db).findOne({ _id: referenceId });
-      if (!customReference) {
-        res.status(404).json({ error: "The selected custom reference no longer exists." });
+      const managedReference = await getMeasurementReferences(db).findOne({ _id: referenceId });
+      const managedReferenceKind = managedReference?.kind ?? "custom";
+      if (!managedReference || managedReferenceKind !== referenceType) {
+        res.status(404).json({ error: "The selected reference no longer exists." });
         return;
       }
-      fields.referenceType = "custom";
+      fields.referenceType = managedReferenceKind;
       fields.referenceId = referenceId;
-      fields.referenceName = customReference.name;
+      fields.referenceName = managedReference.name;
     }
   }
 

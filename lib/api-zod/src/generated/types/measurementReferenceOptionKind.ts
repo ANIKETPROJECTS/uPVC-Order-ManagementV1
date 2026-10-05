@@ -12,4 +12,5 @@ export type MeasurementReferenceOptionKind = typeof MeasurementReferenceOptionKi
 export const MeasurementReferenceOptionKind = {
   user: 'user',
   custom: 'custom',
+  customer: 'customer',
 } as const;

@@ -3142,7 +3142,7 @@ export const ListMeasurementRecordsResponseItem = zod.object({
   "uploadedByName": zod.string(),
   "name": zod.string().max(listMeasurementRecordsResponseVersionsItemNameMax).nullable(),
   "measurementType": zod.union([zod.literal('quotation'),zod.literal('final'),zod.literal(null)]).nullable(),
-  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal(null)]).nullable(),
+  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal('customer'),zod.literal(null)]).nullable(),
   "referenceId": zod.string().nullable(),
   "referenceName": zod.string().max(listMeasurementRecordsResponseVersionsItemReferenceNameMax).nullable(),
   "uploadedAt": zod.coerce.date()
@@ -3192,7 +3192,7 @@ export const CreateMeasurementRecordResponse = zod.object({
   "uploadedByName": zod.string(),
   "name": zod.string().max(createMeasurementRecordResponseVersionsItemNameMax).nullable(),
   "measurementType": zod.union([zod.literal('quotation'),zod.literal('final'),zod.literal(null)]).nullable(),
-  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal(null)]).nullable(),
+  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal('customer'),zod.literal(null)]).nullable(),
   "referenceId": zod.string().nullable(),
   "referenceName": zod.string().max(createMeasurementRecordResponseVersionsItemReferenceNameMax).nullable(),
   "uploadedAt": zod.coerce.date()
@@ -3213,7 +3213,7 @@ export const listMeasurementReferencesResponseNameMax = 160;
 export const ListMeasurementReferencesResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string().max(listMeasurementReferencesResponseNameMax),
-  "kind": zod.enum(['user', 'custom'])
+  "kind": zod.enum(['user', 'custom', 'customer'])
 })
 export const ListMeasurementReferencesResponse = zod.array(ListMeasurementReferencesResponseItem)
 
@@ -3226,7 +3226,8 @@ export const createMeasurementReferenceBodyNameMax = 160;
 
 
 export const CreateMeasurementReferenceBody = zod.object({
-  "name": zod.string().min(1).max(createMeasurementReferenceBodyNameMax)
+  "name": zod.string().min(1).max(createMeasurementReferenceBodyNameMax),
+  "kind": zod.enum(['custom', 'customer']).optional()
 })
 
 export const createMeasurementReferenceResponseNameMax = 160;
@@ -3236,7 +3237,7 @@ export const createMeasurementReferenceResponseNameMax = 160;
 export const CreateMeasurementReferenceResponse = zod.object({
   "id": zod.string(),
   "name": zod.string().max(createMeasurementReferenceResponseNameMax),
-  "kind": zod.enum(['user', 'custom'])
+  "kind": zod.enum(['user', 'custom', 'customer'])
 })
 
 
@@ -3262,7 +3263,7 @@ export const updateMeasurementReferenceResponseNameMax = 160;
 export const UpdateMeasurementReferenceResponse = zod.object({
   "id": zod.string(),
   "name": zod.string().max(updateMeasurementReferenceResponseNameMax),
-  "kind": zod.enum(['user', 'custom'])
+  "kind": zod.enum(['user', 'custom', 'customer'])
 })
 
 
@@ -3341,7 +3342,7 @@ export const UpdateMeasurementRecordResponse = zod.object({
   "uploadedByName": zod.string(),
   "name": zod.string().max(updateMeasurementRecordResponseVersionsItemNameMax).nullable(),
   "measurementType": zod.union([zod.literal('quotation'),zod.literal('final'),zod.literal(null)]).nullable(),
-  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal(null)]).nullable(),
+  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal('customer'),zod.literal(null)]).nullable(),
   "referenceId": zod.string().nullable(),
   "referenceName": zod.string().max(updateMeasurementRecordResponseVersionsItemReferenceNameMax).nullable(),
   "uploadedAt": zod.coerce.date()
@@ -3398,7 +3399,7 @@ export const UploadMeasurementVersionResponse = zod.object({
   "uploadedByName": zod.string(),
   "name": zod.string().max(uploadMeasurementVersionResponseNameMax).nullable(),
   "measurementType": zod.union([zod.literal('quotation'),zod.literal('final'),zod.literal(null)]).nullable(),
-  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal(null)]).nullable(),
+  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal('customer'),zod.literal(null)]).nullable(),
   "referenceId": zod.string().nullable(),
   "referenceName": zod.string().max(uploadMeasurementVersionResponseReferenceNameMax).nullable(),
   "uploadedAt": zod.coerce.date()
@@ -3420,7 +3421,7 @@ export const updateMeasurementVersionBodyNameMax = 160;
 export const UpdateMeasurementVersionBody = zod.object({
   "name": zod.string().max(updateMeasurementVersionBodyNameMax).nullish().describe('Blank or null removes the custom label and falls back to the original filename.'),
   "measurementType": zod.union([zod.literal('quotation'),zod.literal('final'),zod.literal(null)]).nullish(),
-  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal(null)]).nullish(),
+  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal('customer'),zod.literal(null)]).nullish(),
   "referenceId": zod.string().nullish()
 })
 
@@ -3440,7 +3441,7 @@ export const UpdateMeasurementVersionResponse = zod.object({
   "uploadedByName": zod.string(),
   "name": zod.string().max(updateMeasurementVersionResponseNameMax).nullable(),
   "measurementType": zod.union([zod.literal('quotation'),zod.literal('final'),zod.literal(null)]).nullable(),
-  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal(null)]).nullable(),
+  "referenceType": zod.union([zod.literal('user'),zod.literal('custom'),zod.literal('customer'),zod.literal(null)]).nullable(),
   "referenceId": zod.string().nullable(),
   "referenceName": zod.string().max(updateMeasurementVersionResponseReferenceNameMax).nullable(),
   "uploadedAt": zod.coerce.date()

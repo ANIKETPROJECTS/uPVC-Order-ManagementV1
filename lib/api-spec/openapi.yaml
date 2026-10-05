@@ -4872,7 +4872,7 @@ components:
           enum: [quotation, final, null]
         referenceType:
           type: ["string", "null"]
-          enum: [user, custom, null]
+          enum: [user, custom, customer, null]
         referenceId:
           type: ["string", "null"]
         referenceName:
@@ -4892,7 +4892,7 @@ components:
           maxLength: 160
         kind:
           type: string
-          enum: [user, custom]
+          enum: [user, custom, customer]
       required: [id, name, kind]
     MeasurementReferenceOptions:
       type: array
@@ -4905,6 +4905,9 @@ components:
           type: string
           minLength: 1
           maxLength: 160
+        kind:
+          type: string
+          enum: [custom, customer]
       required: [name]
     MeasurementReferenceUpdate:
       type: object
@@ -5004,7 +5007,7 @@ components:
           enum: [quotation, final, null]
         referenceType:
           type: ["string", "null"]
-          enum: [user, custom, null]
+          enum: [user, custom, customer, null]
         referenceId:
           type: ["string", "null"]
 

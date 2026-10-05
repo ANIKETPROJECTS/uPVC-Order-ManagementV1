@@ -93,7 +93,7 @@ export function MeasurementVersionMetadataFields({
     const separator = value.indexOf(':');
     const kind = value.slice(0, separator);
     const id = value.slice(separator + 1);
-    if ((kind !== 'user' && kind !== 'custom') || !id || value === selectedReferenceValue) return;
+    if ((kind !== 'user' && kind !== 'custom' && kind !== 'customer') || !id || value === selectedReferenceValue) return;
     save({ referenceType: kind, referenceId: id });
   };
 
@@ -154,6 +154,14 @@ export function MeasurementVersionMetadataFields({
                 ))}
               </SelectGroup>
             )}
+            {references.some((reference) => reference.kind === 'customer') && (
+              <SelectGroup>
+                <SelectLabel>Customers</SelectLabel>
+                {references.filter((reference) => reference.kind === 'customer').map((reference) => (
+                  <SelectItem key={reference.id} value={referenceValue(reference.kind, reference.id)}>{reference.name}</SelectItem>
+                ))}
+              </SelectGroup>
+            )}
             {selectedReferenceValue !== 'none' && !selectedReference && (
               <SelectItem value={selectedReferenceValue} disabled>
                 {version.referenceName || 'Unavailable reference'} (no longer available)
@@ -167,13 +175,19 @@ export function MeasurementVersionMetadataFields({
   );
 }
 
-export function MeasurementReferenceManager({
-  canEdit,
+type ManagedReferenceKind = 'custom' | 'customer';
+
+function MeasurementReferenceCollectionManager({
+  kind,
+  title,
+  singularLabel,
   references,
   loading,
   error,
 }: {
-  canEdit: boolean;
+  kind: ManagedReferenceKind;
+  title: string;
+  singularLabel: string;
   references: MeasurementReferenceOption[];
   loading: boolean;
   error: boolean;
@@ -186,9 +200,8 @@ export function MeasurementReferenceManager({
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
-  const customReferences = references.filter((reference) => reference.kind === 'custom');
-
-  if (!canEdit) return null;
+  const managedReferences = references.filter((reference) => reference.kind === kind);
+  const testPrefix = kind === 'custom' ? 'measurement-reference' : 'customer-reference';
 
   const invalidateReferences = () => Promise.all([
     queryClient.invalidateQueries({ queryKey: getListMeasurementReferencesQueryKey() }),
@@ -199,14 +212,14 @@ export function MeasurementReferenceManager({
     event.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    createReference.mutate({ data: { name } }, {
+    createReference.mutate({ data: { name, kind } }, {
       onSuccess: async () => {
         await invalidateReferences();
         setNewName('');
-        toast({ title: 'Custom reference added', description: `${name} can now be selected for measurement files.` });
+        toast({ title: `${singularLabel} added`, description: `${name} can now be selected for measurement files.` });
       },
       onError: () => toast({
-        title: 'Could not add custom reference',
+        title: `Could not add ${singularLabel.toLowerCase()}`,
         description: 'Choose a unique name and try again.',
         variant: 'destructive',
       }),
@@ -221,10 +234,10 @@ export function MeasurementReferenceManager({
         await invalidateReferences();
         setEditingId(null);
         setEditingName('');
-        toast({ title: 'Custom reference updated', description: 'Files using this reference now show its new name.' });
+        toast({ title: `${singularLabel} updated`, description: 'Files using this reference now show its new name.' });
       },
       onError: () => toast({
-        title: 'Could not update custom reference',
+        title: `Could not update ${singularLabel.toLowerCase()}`,
         description: 'Choose a unique name and try again.',
         variant: 'destructive',
       }),
@@ -232,7 +245,7 @@ export function MeasurementReferenceManager({
   };
 
   const removeReference = (reference: MeasurementReferenceOption) => {
-    if (!window.confirm(`Delete "${reference.name}" from the custom reference list? Existing measurement files keep their saved label.`)) return;
+    if (!window.confirm(`Delete "${reference.name}" from the ${title.toLowerCase()} list? Existing measurement files keep their saved label.`)) return;
     deleteReference.mutate({ referenceId: reference.id }, {
       onSuccess: async () => {
         await invalidateReferences();
@@ -240,10 +253,10 @@ export function MeasurementReferenceManager({
           setEditingId(null);
           setEditingName('');
         }
-        toast({ title: 'Custom reference deleted', description: 'Existing measurement files keep their saved label.' });
+        toast({ title: `${singularLabel} deleted`, description: 'Existing measurement files keep their saved label.' });
       },
       onError: () => toast({
-        title: 'Could not delete custom reference',
+        title: `Could not delete ${singularLabel.toLowerCase()}`,
         description: 'The reference list was not changed. Try again.',
         variant: 'destructive',
       }),
@@ -251,65 +264,92 @@ export function MeasurementReferenceManager({
   };
 
   return (
+    <section className="space-y-3 rounded-lg border border-border/70 bg-card p-3" data-testid={`section-${testPrefix}-manager`}>
+      <div>
+        <h4 className="text-xs font-semibold text-foreground">{title} <span className="font-normal text-muted-foreground">({managedReferences.length})</span></h4>
+        <p className="mt-1 text-[10px] leading-4 text-muted-foreground">These names are independent from staff users and client records. Removing one does not erase labels already saved on files.</p>
+      </div>
+      {error && <p className="text-xs text-destructive">Reference choices could not be loaded. Refresh and try again.</p>}
+      <form className="flex flex-wrap gap-2" onSubmit={addReference}>
+        <Input
+          className="h-9 min-w-48 flex-1 text-xs"
+          value={newName}
+          onChange={(event) => setNewName(event.target.value)}
+          maxLength={160}
+          placeholder={`New ${singularLabel.toLowerCase()} name`}
+          aria-label={`New ${singularLabel.toLowerCase()} name`}
+          data-testid={`input-new-${testPrefix}`}
+        />
+        <Button type="submit" size="sm" disabled={!newName.trim() || createReference.isPending || loading || error} data-testid={`button-add-${testPrefix}`}>
+          <Plus size={14} /> Add
+        </Button>
+      </form>
+      {loading
+        ? <p className="text-xs text-muted-foreground">Loading reference options…</p>
+        : managedReferences.length === 0
+          ? <p className="text-xs text-muted-foreground">No {title.toLowerCase()} yet.</p>
+          : <ul className="space-y-2" aria-label={title}>
+              {managedReferences.map((reference) => (
+                <li key={reference.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-card p-2" data-testid={`row-${testPrefix}-${reference.id}`}>
+                  {editingId === reference.id ? (
+                    <>
+                      <Input
+                        className="h-8 min-w-40 flex-1 text-xs"
+                        value={editingName}
+                        onChange={(event) => setEditingName(event.target.value)}
+                        maxLength={160}
+                        aria-label={`Edit ${singularLabel.toLowerCase()} ${reference.name}`}
+                        data-testid={`input-edit-${testPrefix}-${reference.id}`}
+                      />
+                      <Button type="button" size="sm" disabled={!editingName.trim() || updateReference.isPending} onClick={() => saveReference(reference)} data-testid={`button-save-${testPrefix}-${reference.id}`}>
+                        <Save size={13} /> Save
+                      </Button>
+                      <Button type="button" size="icon" variant="ghost" aria-label="Cancel edit" disabled={updateReference.isPending} onClick={() => { setEditingId(null); setEditingName(''); }}>
+                        <X size={14} />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="min-w-40 flex-1 text-xs font-medium">{reference.name}</span>
+                      <Button type="button" size="sm" variant="outline" disabled={updateReference.isPending || deleteReference.isPending} onClick={() => { setEditingId(reference.id); setEditingName(reference.name); }} data-testid={`button-edit-${testPrefix}-${reference.id}`}>
+                        <Pencil size={13} /> Edit
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={updateReference.isPending || deleteReference.isPending} onClick={() => removeReference(reference)} data-testid={`button-delete-${testPrefix}-${reference.id}`}>
+                        <Trash2 size={13} /> Delete
+                      </Button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>}
+    </section>
+  );
+}
+
+export function MeasurementReferenceManager({
+  canEdit,
+  references,
+  loading,
+  error,
+}: {
+  canEdit: boolean;
+  references: MeasurementReferenceOption[];
+  loading: boolean;
+  error: boolean;
+}) {
+  if (!canEdit) return null;
+
+  const customReferences = references.filter((reference) => reference.kind === 'custom');
+  const customerReferences = references.filter((reference) => reference.kind === 'customer');
+
+  return (
     <details className="rounded-xl border border-border/70 bg-muted/20 p-3" data-testid="manager-measurement-references">
       <summary className="cursor-pointer text-xs font-semibold text-foreground">
-        Manage custom references <span className="font-normal text-muted-foreground">({customReferences.length})</span>
+        Manage custom and customer references <span className="font-normal text-muted-foreground">({customReferences.length} custom · {customerReferences.length} customers)</span>
       </summary>
       <div className="mt-3 space-y-3">
-        <p className="text-[10px] leading-4 text-muted-foreground">Custom reference names are shared across measurement files. Removing one does not erase labels already saved on files.</p>
-        {error && <p className="text-xs text-destructive">Reference choices could not be loaded. Refresh and try again.</p>}
-        <form className="flex flex-wrap gap-2" onSubmit={addReference}>
-          <Input
-            className="h-9 min-w-48 flex-1 text-xs"
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            maxLength={160}
-            placeholder="New custom reference"
-            aria-label="New custom reference name"
-            data-testid="input-new-measurement-reference"
-          />
-          <Button type="submit" size="sm" disabled={!newName.trim() || createReference.isPending || loading || error} data-testid="button-add-measurement-reference">
-            <Plus size={14} /> Add
-          </Button>
-        </form>
-        {loading
-          ? <p className="text-xs text-muted-foreground">Loading reference options…</p>
-          : customReferences.length === 0
-            ? <p className="text-xs text-muted-foreground">No custom references yet.</p>
-            : <ul className="space-y-2" aria-label="Custom measurement references">
-                {customReferences.map((reference) => (
-                  <li key={reference.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-card p-2" data-testid={`row-measurement-reference-${reference.id}`}>
-                    {editingId === reference.id ? (
-                      <>
-                        <Input
-                          className="h-8 min-w-40 flex-1 text-xs"
-                          value={editingName}
-                          onChange={(event) => setEditingName(event.target.value)}
-                          maxLength={160}
-                          aria-label={`Edit custom reference ${reference.name}`}
-                          data-testid={`input-edit-measurement-reference-${reference.id}`}
-                        />
-                        <Button type="button" size="sm" disabled={!editingName.trim() || updateReference.isPending} onClick={() => saveReference(reference)} data-testid={`button-save-measurement-reference-${reference.id}`}>
-                          <Save size={13} /> Save
-                        </Button>
-                        <Button type="button" size="icon" variant="ghost" aria-label="Cancel edit" disabled={updateReference.isPending} onClick={() => { setEditingId(null); setEditingName(''); }}>
-                          <X size={14} />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="min-w-40 flex-1 text-xs font-medium">{reference.name}</span>
-                        <Button type="button" size="sm" variant="outline" disabled={updateReference.isPending || deleteReference.isPending} onClick={() => { setEditingId(reference.id); setEditingName(reference.name); }} data-testid={`button-edit-measurement-reference-${reference.id}`}>
-                          <Pencil size={13} /> Edit
-                        </Button>
-                        <Button type="button" size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={updateReference.isPending || deleteReference.isPending} onClick={() => removeReference(reference)} data-testid={`button-delete-measurement-reference-${reference.id}`}>
-                          <Trash2 size={13} /> Delete
-                        </Button>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>}
+        <MeasurementReferenceCollectionManager kind="custom" title="Custom references" singularLabel="Custom reference" references={references} loading={loading} error={error} />
+        <MeasurementReferenceCollectionManager kind="customer" title="Customer references" singularLabel="Customer reference" references={references} loading={loading} error={error} />
       </div>
     </details>
   );

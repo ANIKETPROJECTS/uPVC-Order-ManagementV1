@@ -492,7 +492,7 @@ export interface MeasurementVersionDocument {
   filename: string;
   name?: string | null;
   measurementType?: "quotation" | "final" | null;
-  referenceType?: "user" | "custom" | null;
+  referenceType?: "user" | "custom" | "customer" | null;
   referenceId?: string | null;
   referenceName?: string | null;
   contentType: string;
@@ -507,6 +507,7 @@ export interface MeasurementReferenceDocument {
   _id: string;
   name: string;
   nameLower: string;
+  kind?: "custom" | "customer";
   createdBy: string;
   updatedBy: string;
   createdAt: Date;
@@ -1006,6 +1007,20 @@ export async function initializeMongo(): Promise<void> {
   const quotationRateSubmissions = getQuotationRateSubmissions(db);
   const measurementReferences = getMeasurementReferences(db);
 
+  const measurementReferencesExists = await db
+    .listCollections({ name: "measurement_references" }, { nameOnly: true })
+    .hasNext();
+  if (measurementReferencesExists) {
+    await measurementReferences.updateMany(
+      { kind: { $exists: false } },
+      { $set: { kind: "custom" } },
+    );
+    const measurementReferenceIndexes = await measurementReferences.indexes();
+    if (measurementReferenceIndexes.some((index) => index.name === "measurement_reference_name_unique")) {
+      await measurementReferences.dropIndex("measurement_reference_name_unique");
+    }
+  }
+
   await Promise.all([
     users.createIndex({ usernameLower: 1 }, { unique: true, name: "username_unique" }),
     roles.createIndex({ nameLower: 1 }, { unique: true, name: "role_name_unique" }),
@@ -1062,7 +1077,10 @@ export async function initializeMongo(): Promise<void> {
     appNotifications.createIndex({ userId: 1, createdAt: -1 }, { name: "notifications_by_user_date" }),
     appNotifications.createIndex({ userId: 1, readAt: 1 }, { name: "notifications_by_user_read_state" }),
     pushSubscriptions.createIndex({ userId: 1, updatedAt: -1 }, { name: "push_subscriptions_by_user" }),
-    measurementReferences.createIndex({ nameLower: 1 }, { unique: true, name: "measurement_reference_name_unique" }),
+    measurementReferences.createIndex(
+      { kind: 1, nameLower: 1 },
+      { unique: true, name: "measurement_reference_kind_name_unique" },
+    ),
     quotationRateSubmissions.createIndex(
       { measurementRecordId: 1 },
       {

@@ -1655,6 +1655,7 @@ export type MeasurementVersionReferenceType = typeof MeasurementVersionReference
 export const MeasurementVersionReferenceType = {
   user: 'user',
   custom: 'custom',
+  customer: 'customer',
 } as const;
 
 export interface MeasurementVersion {
@@ -1690,6 +1691,7 @@ export type MeasurementReferenceOptionKind = typeof MeasurementReferenceOptionKi
 export const MeasurementReferenceOptionKind = {
   user: 'user',
   custom: 'custom',
+  customer: 'customer',
 } as const;
 
 export interface MeasurementReferenceOption {
@@ -1701,12 +1703,21 @@ export interface MeasurementReferenceOption {
 
 export type MeasurementReferenceOptions = MeasurementReferenceOption[];
 
+export type MeasurementReferenceInputKind = typeof MeasurementReferenceInputKind[keyof typeof MeasurementReferenceInputKind];
+
+
+export const MeasurementReferenceInputKind = {
+  custom: 'custom',
+  customer: 'customer',
+} as const;
+
 export interface MeasurementReferenceInput {
   /**
      * @minLength 1
      * @maxLength 160
      */
   name: string;
+  kind?: MeasurementReferenceInputKind;
 }
 
 export interface MeasurementReferenceUpdate {
@@ -1804,6 +1815,7 @@ export type MeasurementVersionUpdateReferenceType = typeof MeasurementVersionUpd
 export const MeasurementVersionUpdateReferenceType = {
   user: 'user',
   custom: 'custom',
+  customer: 'customer',
 } as const;
 
 export interface MeasurementVersionUpdate {

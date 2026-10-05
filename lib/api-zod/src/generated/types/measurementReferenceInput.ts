@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MeasurementReferenceInputKind } from './measurementReferenceInputKind';
 
 export interface MeasurementReferenceInput {
   /**
@@ -12,4 +13,5 @@ export interface MeasurementReferenceInput {
      * @maxLength 160
      */
   name: string;
+  kind?: MeasurementReferenceInputKind;
 }

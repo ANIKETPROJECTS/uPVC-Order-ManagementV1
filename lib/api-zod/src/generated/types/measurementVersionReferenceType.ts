@@ -15,4 +15,5 @@ export type MeasurementVersionReferenceType = typeof MeasurementVersionReference
 export const MeasurementVersionReferenceType = {
   user: 'user',
   custom: 'custom',
+  customer: 'customer',
 } as const;
