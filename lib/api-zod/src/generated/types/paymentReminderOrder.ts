@@ -10,6 +10,7 @@ import type { OrderStatus } from './orderStatus';
 export interface PaymentReminderOrder {
   orderRecordId: string;
   orderId: string;
+  orderCreatedAt: Date;
   orderStatus: OrderStatus;
   clientName: string;
   locationName: string;

@@ -13,3 +13,4 @@
 - [OpenAPI codegen and Vite restarts](openapi-codegen-vite-race.md) — restart Vite after clean Orval generation; HMR can race with temporarily removed client files.
 - [Installation and grievances](installation-grievances.md) — delivered orders enter Installation; post-install grievances stay in each order’s own tab.
 - [Flagged payment audits](payment-flag-audits.md) — keep flags ledger-independent; Paid excludes void/bounced receipts, and `createdAt` is the canonical displayed flag time.
+- [Payment follow-up vs. full history](payment-follow-up-vs-history.md) — follow-up lists only outstanding balances; the separate Balance Payment register owns all-time transaction history.

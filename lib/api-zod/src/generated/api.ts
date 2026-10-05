@@ -363,6 +363,7 @@ export const GetPaymentOverviewResponse = zod.object({
   "reminderOrders": zod.array(zod.object({
   "orderRecordId": zod.string(),
   "orderId": zod.string(),
+  "orderCreatedAt": zod.coerce.date(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "clientName": zod.string(),
   "locationName": zod.string(),
@@ -3380,7 +3381,6 @@ export const GetGlassTrackingResponseItem = zod.object({
   "windowId": zod.string(),
   "orderRecordId": zod.string(),
   "orderId": zod.string(),
-  "orderCreatedAt": zod.coerce.date().optional(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "clientName": zod.string(),
   "locationCode": zod.string(),

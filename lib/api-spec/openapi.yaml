@@ -3251,9 +3251,6 @@ components:
           type: string
         orderId:
           type: string
-        orderCreatedAt:
-          type: string
-          format: date-time
         orderStatus:
           $ref: "#/components/schemas/OrderStatus"
         clientName:
@@ -3836,6 +3833,9 @@ components:
           type: string
         orderId:
           type: string
+        orderCreatedAt:
+          type: string
+          format: date-time
         orderStatus:
           $ref: "#/components/schemas/OrderStatus"
         clientName:
