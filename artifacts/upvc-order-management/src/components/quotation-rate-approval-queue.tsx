@@ -408,7 +408,37 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
                                     <Download size={13} /> <span className="truncate">{submission.pdfNeedsRefresh ? `Previous PDF · ${submission.pdfFilename}` : 'Download Eva PDF'}</span>
                                   </a>
                                 : <span className="text-[10px] text-muted-foreground">PDF not attached yet</span>}
-                              {submission.measurementRecordId && <span className="text-[10px] text-muted-foreground">Measurement sheet linked</span>}
+                              {submission.measurementRecordId && <span className="text-[10px] text-muted-foreground">Measurement sheet {measurementSheetIdLabel(submission.measurementRecordId)}</span>}
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2" data-testid={`assigned-request-actions-${submission.id}`}>
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/quotation-builder/requests/${submission.id}`)} data-testid={`button-view-assigned-request-${submission.id}`}>
+                                <Eye size={13} /> View
+                              </Button>
+                              {canManageSubmission(submission) && <Button size="sm" variant="outline" onClick={() => navigate(`/quotation-builder/requests/${submission.id}?edit=1`)} data-testid={`button-edit-assigned-request-${submission.id}`}>
+                                <Pencil size={13} /> Edit
+                              </Button>}
+                              {canManageSubmission(submission) && <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={deleteSubmission.isPending} onClick={() => removeSubmission(submission)} data-testid={`button-delete-assigned-request-${submission.id}`}>
+                                <Trash2 size={13} /> Delete
+                              </Button>}
+                              {canLinkSubmission(submission) && <Button size="sm" variant="outline" onClick={() => openOrderLink(submission)} data-testid={`button-link-assigned-request-order-${submission.id}`}>
+                                <Link2 size={13} /> {submission.orderId ? 'Update links' : 'Link to order'}
+                              </Button>}
+                              {submission.status === 'awaiting_pdf' && canManageSubmission(submission) && <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[11px] font-semibold hover:bg-muted ${upload.isPending ? 'pointer-events-none opacity-50' : ''}`} data-testid={`label-attach-assigned-request-pdf-${submission.id}`}>
+                                <FilePlus2 size={13} /> Attach Eva PDF
+                                <input
+                                  type="file"
+                                  accept="application/pdf,.pdf"
+                                  className="sr-only"
+                                  disabled={upload.isPending}
+                                  data-testid={`input-attach-assigned-request-pdf-${submission.id}`}
+                                  onChange={(event) => {
+                                    const file = event.currentTarget.files?.[0];
+                                    if (file) uploadPdf(submission.id, file);
+                                    event.currentTarget.value = '';
+                                  }}
+                                />
+                              </label>}
                             </div>
 
                             {submission.pdfNeedsRefresh && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-[10px] text-amber-800">An updated PDF is required before this request can be reviewed.</p>}
@@ -433,6 +463,47 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
                     </div>}
         </CardContent>
       </Card>
+
+      <Dialog open={Boolean(linkingSubmission)} onOpenChange={(open) => { if (!open) setLinkingSubmission(null); }}>
+        <DialogContent className="max-w-none sm:max-h-[90vh] sm:w-[min(90vw,52rem)] sm:max-w-none" data-testid="dialog-link-assigned-quotation-order">
+          <DialogHeader>
+            <DialogTitle>Link quotation request and measurement sheet</DialogTitle>
+            <DialogDescription>{linkingSubmission ? `${linkingSubmission.id} · ${linkingSubmission.clientName}` : 'Choose an order for this quotation request.'}</DialogDescription>
+          </DialogHeader>
+          <div className="min-w-0 w-full space-y-4">
+            <label className="block space-y-1.5 text-xs font-semibold">Order ID
+              <Select value={linkOrderRecordId || 'unassigned'} onValueChange={(value) => setLinkOrderRecordId(value === 'unassigned' ? '' : value)}>
+                <SelectTrigger data-testid="select-link-assigned-quotation-order"><SelectValue placeholder="Select an order" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Choose an order</SelectItem>
+                  {ordersQuery.isLoading
+                    ? <SelectItem value="loading" disabled>Loading orders…</SelectItem>
+                    : ordersQuery.isError
+                      ? <SelectItem value="orders-error" disabled>Orders could not be loaded</SelectItem>
+                      : (ordersQuery.data || []).map((order) => <SelectItem key={order.id} value={order.id}>{order.orderId} · {order.clientName} · {order.locationName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+            {ordersQuery.isError && <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-destructive"><span>Orders could not be loaded. Retry before saving.</span><Button type="button" size="sm" variant="outline" onClick={() => void ordersQuery.refetch()} data-testid="button-retry-assigned-request-orders"><RefreshCw size={13} /> Retry</Button></div>}
+            {linkOrderRecordId && <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+              <label className="flex items-center gap-2 text-xs font-semibold">
+                <input type="checkbox" checked={linkMeasurementSheet} onChange={(event) => { setLinkMeasurementSheet(event.target.checked); if (!event.target.checked) { setLinkMeasurementId(null); setLinkMeasurementLabel(''); } }} className="h-4 w-4 accent-primary" data-testid="checkbox-link-measurement-from-assigned-request" />
+                Link a measurement sheet ID to this request
+              </label>
+              {linkMeasurementSheet && <MeasurementSheetLookup
+                selectedId={linkMeasurementId}
+                selectedLabel={linkMeasurementLabel}
+                currentQuotationRequestId={linkingSubmission?.id || ''}
+                onSelect={(item) => { setLinkMeasurementId(item.id); setLinkMeasurementLabel(`${measurementSheetIdLabel(item.id)} · ${item.clientName}`); }}
+              />}
+            </div>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setLinkingSubmission(null)} data-testid="button-cancel-link-assigned-quotation">Cancel</Button>
+            <Button type="button" onClick={saveOrderLink} disabled={linkOrder.isPending || ordersQuery.isError || !linkOrderRecordId} data-testid="button-save-link-assigned-quotation">{linkOrder.isPending ? 'Saving…' : 'Save links'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
