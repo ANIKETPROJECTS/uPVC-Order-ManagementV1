@@ -4,26 +4,41 @@ import {
   CalendarDays,
   Check,
   Download,
+  Eye,
   FileCheck2,
+  FilePlus2,
   Grid2X2,
+  Link2,
   List,
+  Pencil,
   RefreshCw,
   Search,
+  Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import {
   getDownloadQuotationRateSubmissionPdfUrl,
+  getListMeasurementRecordsQueryKey,
+  getListOrdersQueryKey,
   getListQuotationRateSubmissionsQueryKey,
+  useDeleteQuotationRateSubmission,
   useDecideQuotationRateSubmission,
+  useLinkQuotationRateSubmissionOrder,
   useListQuotationRateSubmissions,
+  useListOrders,
+  useUploadQuotationRateSubmissionPdf,
 } from '@workspace/api-client-react';
 import type { QuotationRateSubmission, User } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { MeasurementSheetLookup, measurementSheetIdLabel } from '@/components/link-record-lookups';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
 
 type RequestStatusFilter = 'all' | QuotationRateSubmission['status'];
 type RequestSort = 'priority' | 'newest' | 'oldest' | 'updated' | 'client' | 'request-id';
@@ -47,9 +62,11 @@ const dateTime = (value: string) =>
   new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 
 export function QuotationRateApprovalQueue({ user }: { user: User }) {
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const canReview = user.roleId === 'master-admin' || user.permissions?.['rate-approval'] === 'edit';
+  const canSubmit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
   const submissionsQuery = useListQuotationRateSubmissions({
     query: {
       queryKey: getListQuotationRateSubmissionsQueryKey(),
@@ -57,7 +74,16 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
       refetchOnWindowFocus: true,
     },
   });
+  const ordersQuery = useListOrders({}, {
+    query: {
+      queryKey: getListOrdersQueryKey({}),
+      enabled: canReview,
+    },
+  });
   const decide = useDecideQuotationRateSubmission();
+  const deleteSubmission = useDeleteQuotationRateSubmission();
+  const upload = useUploadQuotationRateSubmissionPdf();
+  const linkOrder = useLinkQuotationRateSubmissionOrder();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>('all');
   const [locationFilter, setLocationFilter] = useState('all');
@@ -66,6 +92,11 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [linkingSubmission, setLinkingSubmission] = useState<QuotationRateSubmission | null>(null);
+  const [linkOrderRecordId, setLinkOrderRecordId] = useState('');
+  const [linkMeasurementSheet, setLinkMeasurementSheet] = useState(false);
+  const [linkMeasurementId, setLinkMeasurementId] = useState<string | null>(null);
+  const [linkMeasurementLabel, setLinkMeasurementLabel] = useState('');
 
   const assignedRequests = useMemo(() => {
     const submissions = submissionsQuery.data ?? [];
@@ -156,6 +187,87 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
         description: 'The request is unchanged. Refresh the queue and try again.',
         variant: 'destructive',
       }),
+    });
+  };
+
+  const canManageSubmission = (submission: QuotationRateSubmission) =>
+    user.roleId === 'master-admin' || (canSubmit && submission.submittedBy === user.id);
+  const canLinkSubmission = (submission: QuotationRateSubmission) =>
+    user.roleId === 'master-admin'
+    || user.permissions?.['rate-approval'] === 'edit'
+    || (canSubmit && submission.submittedBy === user.id);
+
+  const uploadPdf = (submissionId: string, file: File) => {
+    if (!file.name.toLowerCase().endsWith('.pdf') || (file.type && file.type !== 'application/pdf' && file.type !== 'application/octet-stream')) {
+      toast({ title: 'PDF file required', description: 'Attach the Eva Software quotation as a PDF.', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'File exceeds 10 MiB', description: 'Choose a smaller PDF before uploading.', variant: 'destructive' });
+      return;
+    }
+    upload.mutate({ submissionId, filename: file.name, data: file }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
+        toast({ title: 'PDF attached', description: 'The rate request is now in the approval queue.' });
+      },
+      onError: () => toast({ title: 'PDF upload failed', description: 'The request remains available for another upload attempt.', variant: 'destructive' }),
+    });
+  };
+
+  const removeSubmission = (submission: QuotationRateSubmission) => {
+    if (!canManageSubmission(submission)) return;
+    if (!window.confirm(`Delete ${submission.id} for ${submission.clientName}? This removes the request, its approval history, and its attached PDF.`)) return;
+    deleteSubmission.mutate({ submissionId: submission.id }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
+        setComments((current) => {
+          const next = { ...current };
+          delete next[submission.id];
+          return next;
+        });
+        toast({ title: 'Quotation request deleted', description: `${submission.id} and its approval record were removed.` });
+      },
+      onError: () => toast({ title: 'Could not delete the request', description: 'The request was not removed. Refresh and try again.', variant: 'destructive' }),
+    });
+  };
+
+  const openOrderLink = (submission: QuotationRateSubmission) => {
+    setLinkingSubmission(submission);
+    setLinkOrderRecordId(submission.orderRecordId || '');
+    setLinkMeasurementSheet(Boolean(submission.measurementRecordId));
+    setLinkMeasurementId(submission.measurementRecordId || null);
+    setLinkMeasurementLabel(submission.measurementRecordId ? measurementSheetIdLabel(submission.measurementRecordId) : '');
+  };
+
+  const saveOrderLink = () => {
+    if (!linkingSubmission || !linkOrderRecordId) {
+      toast({ title: 'Choose an order', description: 'Select the order before saving the link.', variant: 'destructive' });
+      return;
+    }
+    if (linkMeasurementSheet && !linkMeasurementId) {
+      toast({ title: 'Choose a measurement sheet', description: 'Search and select the sheet to link to this order.', variant: 'destructive' });
+      return;
+    }
+    linkOrder.mutate({
+      submissionId: linkingSubmission.id,
+      data: { orderRecordId: linkOrderRecordId, measurementRecordId: linkMeasurementSheet ? linkMeasurementId : null },
+    }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
+        setLinkingSubmission(null);
+        toast({
+          title: 'Quotation request links saved',
+          description: linkMeasurementSheet
+            ? `${measurementSheetIdLabel(linkMeasurementId || '')} is linked directly to ${linkingSubmission.id}.`
+            : linkingSubmission.measurementRecordId
+              ? 'The order link is saved and the measurement sheet link is removed.'
+              : 'The order link is saved.',
+        });
+      },
+      onError: () => toast({ title: 'Could not link the quotation', description: 'The order links were not changed. Refresh and try again.', variant: 'destructive' }),
     });
   };
 
