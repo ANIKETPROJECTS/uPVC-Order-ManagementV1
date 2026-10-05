@@ -22,6 +22,8 @@ import type {
 import type {
   AdminSummary,
   AuthSession,
+  BalancePaymentRegisterList,
+  BalancePaymentTransactions,
   ChatConversation,
   ChatGroup,
   ChatGroupInput,
@@ -1284,6 +1286,160 @@ export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDashboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBalancePaymentRegisterUrl = () => {
+
+
+
+
+  return `/api/payments/balance-register`
+}
+
+/**
+ * @summary List every order with all-time payment progress
+ */
+export const getBalancePaymentRegister = async ( options?: Parameters<typeof customFetch>[1]): Promise<BalancePaymentRegisterList> => {
+
+  return customFetch<BalancePaymentRegisterList>(getGetBalancePaymentRegisterUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBalancePaymentRegisterQueryKey = () => {
+    return [
+    `/api/payments/balance-register`
+    ] as const;
+    }
+
+
+export const getGetBalancePaymentRegisterQueryOptions = <TData = Awaited<ReturnType<typeof getBalancePaymentRegister>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalancePaymentRegister>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBalancePaymentRegisterQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBalancePaymentRegister>>> = ({ signal }) => getBalancePaymentRegister({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBalancePaymentRegister>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBalancePaymentRegisterQueryResult = NonNullable<Awaited<ReturnType<typeof getBalancePaymentRegister>>>
+export type GetBalancePaymentRegisterQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List every order with all-time payment progress
+ */
+
+export function useGetBalancePaymentRegister<TData = Awaited<ReturnType<typeof getBalancePaymentRegister>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalancePaymentRegister>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBalancePaymentRegisterQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBalancePaymentTransactionsUrl = (orderRecordId: string,) => {
+
+
+
+
+  return `/api/payments/balance-register/${orderRecordId}/transactions`
+}
+
+/**
+ * @summary List all receipt and refund records for one order
+ */
+export const getBalancePaymentTransactions = async (orderRecordId: string, options?: Parameters<typeof customFetch>[1]): Promise<BalancePaymentTransactions> => {
+
+  return customFetch<BalancePaymentTransactions>(getGetBalancePaymentTransactionsUrl(orderRecordId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBalancePaymentTransactionsQueryKey = (orderRecordId: string,) => {
+    return [
+    `/api/payments/balance-register/${orderRecordId}/transactions`
+    ] as const;
+    }
+
+
+export const getGetBalancePaymentTransactionsQueryOptions = <TData = Awaited<ReturnType<typeof getBalancePaymentTransactions>>, TError = ErrorType<unknown>>(orderRecordId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalancePaymentTransactions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBalancePaymentTransactionsQueryKey(orderRecordId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBalancePaymentTransactions>>> = ({ signal }) => getBalancePaymentTransactions(orderRecordId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderRecordId !== null && orderRecordId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBalancePaymentTransactions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBalancePaymentTransactionsQueryResult = NonNullable<Awaited<ReturnType<typeof getBalancePaymentTransactions>>>
+export type GetBalancePaymentTransactionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all receipt and refund records for one order
+ */
+
+export function useGetBalancePaymentTransactions<TData = Awaited<ReturnType<typeof getBalancePaymentTransactions>>, TError = ErrorType<unknown>>(
+ orderRecordId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalancePaymentTransactions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBalancePaymentTransactionsQueryOptions(orderRecordId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

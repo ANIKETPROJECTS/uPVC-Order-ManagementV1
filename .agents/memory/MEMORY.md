@@ -10,5 +10,6 @@
 - [Quotation request lifecycle](quotation-request-lifecycle.md) — edits and deletes are allowed in every status; edits require a fresh approval cycle.
 - [Quotation-linked confirmations](quotation-linked-confirmations.md) — associate new confirmations with the linked request; keep historical order-only files unassigned.
 - [Orval parameter collisions](orval-parameter-collisions.md) — adding query fields can duplicate generated `*Params` exports; separate preview operations avoid the collision.
+- [OpenAPI codegen and Vite restarts](openapi-codegen-vite-race.md) — restart Vite after clean Orval generation; HMR can race with temporarily removed client files.
 - [Installation and grievances](installation-grievances.md) — delivered orders enter Installation; post-install grievances stay in each order’s own tab.
 - [Flagged payment audits](payment-flag-audits.md) — keep flags ledger-independent; Paid excludes void/bounced receipts, and `createdAt` is the canonical displayed flag time.

@@ -280,6 +280,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /payments/balance-register:
+    get:
+      operationId: getBalancePaymentRegister
+      tags: [payments]
+      summary: List every order with all-time payment progress
+      responses:
+        "200":
+          description: All orders with net paid and outstanding balances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalancePaymentRegisterList"
+  /payments/balance-register/{orderRecordId}/transactions:
+    get:
+      operationId: getBalancePaymentTransactions
+      tags: [payments]
+      summary: List all receipt and refund records for one order
+      parameters:
+        - name: orderRecordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full receipt and refund history for the order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalancePaymentTransactions"
   /payments/overview:
     get:
       operationId: getPaymentOverview
@@ -3858,6 +3888,45 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/RecentPaymentUpdate"
+    BalancePaymentRegisterOrder:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        orderStatus:
+          $ref: "#/components/schemas/OrderStatus"
+        orderValue:
+          type: ["number", "null"]
+        netPaid:
+          type: number
+        balance:
+          type: ["number", "null"]
+        percentage:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required: [orderRecordId, orderId, clientName, locationName, orderStatus, orderValue, netPaid, balance, percentage, createdAt]
+    BalancePaymentRegisterList:
+      type: array
+      items:
+        $ref: "#/components/schemas/BalancePaymentRegisterOrder"
+    BalancePaymentTransactions:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        receipts:
+          $ref: "#/components/schemas/OrderPaymentList"
+        refunds:
+          $ref: "#/components/schemas/OrderRefundList"
+      required: [orderRecordId, receipts, refunds]
     PaymentOverview:
       type: object
       properties:

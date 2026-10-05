@@ -9,6 +9,9 @@ import {
   CreateOrderPaymentFlagBody, CreateOrderPaymentFlagParams, CreateOrderPaymentFlagResponse,
   CreateOrderWindowBody, CreateOrderWindowParams, CreateOrderWindowResponse, DownloadOrderDocumentParams,
   DeleteOrderDocumentCategoryParams,
+  GetBalancePaymentRegisterResponse,
+  GetBalancePaymentTransactionsParams,
+  GetBalancePaymentTransactionsResponse,
   GetGlassTrackingResponse,
   GetPaymentOverviewResponse,
   GetPurchaseOrderRegisterResponse,
@@ -765,6 +768,57 @@ router.delete("/payment-flags/:id", async (req, res): Promise<void> => {
     ? (await getPaymentProgressMap(db, new Map([[order._id, order]]))).get(order._id)!
     : paymentProgress(null, 0, 0);
   res.json(RemovePaymentFlagResponse.parse(paymentFlagResponse(updated!, progress)));
+});
+
+router.get("/payments/balance-register", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "balance-payment");
+  if (!actor) return;
+  const db = await getMongoDb();
+  const orders = await getOrders(db).find({})
+    .sort({ createdAt: -1, sequenceNo: -1 })
+    .toArray();
+  const ordersById = new Map(orders.map((order) => [order._id, order]));
+  const progressByOrder = await getPaymentProgressMap(db, ordersById);
+  res.json(GetBalancePaymentRegisterResponse.parse(orders.map((order) => {
+    const progress = progressByOrder.get(order._id) ?? paymentProgress(order.orderValue, 0, 0);
+    return {
+      orderRecordId: order._id,
+      orderId: order.orderId,
+      clientName: order.clientName,
+      locationName: order.locationName,
+      orderStatus: order.status,
+      orderValue: progress.orderValue,
+      netPaid: progress.paid,
+      balance: progress.balance,
+      percentage: progress.percentage,
+      createdAt: order.createdAt.toISOString(),
+    };
+  })));
+});
+
+router.get("/payments/balance-register/:orderRecordId/transactions", async (req, res): Promise<void> => {
+  const params = GetBalancePaymentTransactionsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const actor = await context(req, res, "balance-payment");
+  if (!actor) return;
+  const db = await getMongoDb();
+  const order = await getOrders(db).findOne({ _id: params.data.orderRecordId });
+  if (!order) {
+    res.status(404).json({ error: "Order not found." });
+    return;
+  }
+  const [receipts, refunds] = await Promise.all([
+    getOrderPayments(db).find({ orderRecordId: order._id }).sort({ paidAt: -1, createdAt: -1 }).toArray(),
+    getOrderRefunds(db).find({ orderRecordId: order._id }).sort({ refundDate: -1, createdAt: -1 }).toArray(),
+  ]);
+  res.json(GetBalancePaymentTransactionsResponse.parse({
+    orderRecordId: order._id,
+    receipts: receipts.map(paymentResponse),
+    refunds: refunds.map(refundResponse),
+  }));
 });
 
 router.get("/payments/overview", async (req, res): Promise<void> => {

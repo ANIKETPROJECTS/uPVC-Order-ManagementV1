@@ -40,7 +40,7 @@ export const MODULES = [
   { id: "window-readiness", label: "Window-wise Readiness" },
   { id: "glass-procurement", label: "Glass Procurement & Delivery" },
   { id: "payments", label: "Order Value & Payment Tracking" },
-  { id: "balance-payment", label: "Balance Payment Messages" },
+  { id: "balance-payment", label: "Balance Payment Register" },
   { id: "dispatch", label: "Dispatch QR & Gate Pass" },
   { id: "installation", label: "Installation Scheduling" },
   { id: "reporting", label: "Central Dashboard & Reporting" },

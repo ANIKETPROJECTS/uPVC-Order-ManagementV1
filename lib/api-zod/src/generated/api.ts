@@ -299,6 +299,61 @@ export const GetDashboardResponse = zod.object({
 
 
 /**
+ * @summary List every order with all-time payment progress
+ */
+export const GetBalancePaymentRegisterResponseItem = zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "orderValue": zod.number().nullable(),
+  "netPaid": zod.number(),
+  "balance": zod.number().nullable(),
+  "percentage": zod.number(),
+  "createdAt": zod.coerce.date()
+})
+export const GetBalancePaymentRegisterResponse = zod.array(GetBalancePaymentRegisterResponseItem)
+
+
+/**
+ * @summary List all receipt and refund records for one order
+ */
+export const GetBalancePaymentTransactionsParams = zod.object({
+  "orderRecordId": zod.coerce.string()
+})
+
+export const GetBalancePaymentTransactionsResponse = zod.object({
+  "orderRecordId": zod.string(),
+  "receipts": zod.array(zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "amount": zod.number(),
+  "method": zod.enum(['cash', 'bank_transfer', 'upi', 'cheque', 'other']),
+  "reference": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "paidAt": zod.coerce.date(),
+  "status": zod.enum(['received', 'void', 'bounced']),
+  "voidReason": zod.string().nullable(),
+  "bouncedAt": zod.coerce.date().nullable(),
+  "bounceReason": zod.string().nullable(),
+  "bouncedBy": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "refunds": zod.array(zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "amount": zod.number(),
+  "refundDate": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
  * @summary Get payment totals, balance reminders, and recent payment entries
  */
 export const GetPaymentOverviewResponse = zod.object({

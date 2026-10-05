@@ -25,6 +25,7 @@ import QuotationBuilderPage from '@/pages/quotation-builder';
 import MeasurementDatabasePage from '@/pages/measurement-database';
 import MeasurementRecordDetailPage from '@/pages/measurement-record-detail';
 import PaymentsPage from '@/pages/payments';
+import BalancePaymentPage from '@/pages/balance-payment';
 import GlassTrackingPage from '@/pages/glass-tracking';
 import ConfirmationPage from '@/pages/confirmation';
 import QuotationApprovalsPage from '@/pages/quotation-approvals';
@@ -50,6 +51,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/quotation-approvals" component={() => <QuotationApprovalsPage user={user} />} />
     <Route path="/measurements/:recordId" component={() => <MeasurementRecordDetailPage user={user} />} />
     <Route path="/measurements" component={() => <MeasurementDatabasePage user={user} />} />
+    <Route path="/balance-payment" component={() => <BalancePaymentPage user={user} />} />
     <Route path="/payments" component={() => <PaymentsPage user={user} />} />
     <Route path="/glass-procurement" component={() => <GlassTrackingPage user={user} />} />
     <Route path="/confirmation" component={() => <ConfirmationPage user={user} />} />

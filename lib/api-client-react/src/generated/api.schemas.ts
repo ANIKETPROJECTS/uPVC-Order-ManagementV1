@@ -974,6 +974,29 @@ export interface RecentPaymentUpdate {
 
 export type RecentPaymentUpdateList = RecentPaymentUpdate[];
 
+export interface BalancePaymentRegisterOrder {
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  orderStatus: OrderStatus;
+  /** @nullable */
+  orderValue: number | null;
+  netPaid: number;
+  /** @nullable */
+  balance: number | null;
+  percentage: number;
+  createdAt: string;
+}
+
+export type BalancePaymentRegisterList = BalancePaymentRegisterOrder[];
+
+export interface BalancePaymentTransactions {
+  orderRecordId: string;
+  receipts: OrderPaymentList;
+  refunds: OrderRefundList;
+}
+
 export interface PaymentOverview {
   totalCollected: number;
   totalOutstanding: number;

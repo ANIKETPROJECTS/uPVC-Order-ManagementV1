@@ -18,7 +18,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'window-readiness', label: 'Window-wise Readiness Tracking', short: 'Window readiness' },
   { key: 'glass-procurement', label: 'Glass Tracking', short: 'Glass tracking', built: true },
   { key: 'payments', label: 'Order Value & Payment Tracking', short: 'Payments', built: true },
-  { key: 'balance-payment', label: 'Balance Payment Automated Message Generator', short: 'Balance payment' },
+  { key: 'balance-payment', label: 'Balance Payment Register', short: 'Balance payment', built: true },
   { key: 'dispatch', label: 'Dispatch Status & QR Tracking', short: 'Dispatch', built: true },
   { key: 'installation', label: 'Installation Scheduling', short: 'Installation', built: true },
   { key: 'reporting', label: 'Central Dashboard & Reporting', short: 'Reports' },
