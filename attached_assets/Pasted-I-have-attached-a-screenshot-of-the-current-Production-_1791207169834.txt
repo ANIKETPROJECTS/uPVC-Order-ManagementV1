@@ -1,0 +1,23 @@
+I have attached a screenshot of the current Production > Measurements page. Refer to it to see the existing layout, columns and style, and make the changes below in that same page. Do not break existing functionality, and keep the current UI style. Do not change the Payments, Quotation & Approval, WhatsApp or window readiness logic.
+
+1. Measurement ID format
+- Every measurement ID must follow this format: MS-001-ddmmyy
+  - MS = fixed prefix
+  - 001 = serial number, 3 digits with leading zeros (MS-001 ... MS-999, then 1000 and beyond without breaking)
+  - ddmmyy = the date the measurement was created, in Indian Standard Time. Example: 5 Oct 2026 gives MS-001-051026, then MS-002-051026.
+- The serial is a running counter. It always increases and is never reused, even if a measurement is deleted.
+- Generate the ID on the server when the measurement is saved, so two users saving at the same time can never get the same ID. The ID must be unique and cannot be edited after creation.
+- Show the new ID everywhere a measurement ID is used (list, detail page, search, links, exports, and any other place that references it).
+- Existing measurements: convert them to the new format using their original created date, keeping the order they were created in. Keep the old ID saved as a "legacy ID" so nothing linked to it breaks, and make search work with both the new and the old ID.
+
+2. Add two columns to the Measurements list (as in the attached screenshot)
+- Location: the site or place where the measurement was taken. Add it as a field on the measurement form (text, prefilled from the client's project location if one exists, and editable). Show it as a column in the list and include it in search.
+- Last updated date: set automatically whenever a measurement is created or edited, never typed by the user. Show it as a column formatted like "05 Oct 2026, 09:21 am" in IST. The list can be sorted by this column.
+- For existing measurements, set Last updated to their last modified time (or created time if none), and leave Location blank so it can be filled in later.
+
+3. Layout
+- Add the two new columns in the same style as the existing ones in the screenshot. On mobile they must not cause horizontal scrolling or clipping.
+
+Then run a typecheck, test the running app, and reply with a short table: ID format, uniqueness, existing data converted, Location column, Last updated column, as Done or Not done, with what I should click to test each.
+
+Show a short plan first, then build.
