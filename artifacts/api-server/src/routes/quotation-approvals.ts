@@ -147,7 +147,13 @@ router.get("/quotation-rate-submissions", async (req, res): Promise<void> => {
   if (!actor) return;
   const db = await getMongoDb();
   const filter = canApprove(actor)
-    ? { $or: [{ submittedBy: actor.id }, { approverIds: actor.id }] }
+    ? {
+        $or: [
+          { submittedBy: actor.id },
+          { approverIds: actor.id },
+          { status: { $in: ["awaiting_pdf", "pending_review"] as const } },
+        ],
+      }
     : { submittedBy: actor.id };
   const items = await getQuotationRateSubmissions(db)
     .find(filter)
@@ -575,7 +581,12 @@ router.get("/quotation-rate-submissions/:submissionId/pdf", async (req, res, nex
   const canViewLinkedOrderQuotation = Boolean(item.orderRecordId)
     && (actor.masterAdmin || ["view", "edit"].includes(actor.permissions["order-hub"] ?? "none"))
     && (actor.masterAdmin || ["view", "edit"].includes(actor.permissions.confirmation ?? "none"));
-  if (item.submittedBy !== actor.id && !item.approverIds.includes(actor.id) && !canViewLinkedOrderQuotation) {
+  if (
+    item.submittedBy !== actor.id &&
+    !item.approverIds.includes(actor.id) &&
+    !canApprove(actor) &&
+    !canViewLinkedOrderQuotation
+  ) {
     res.status(403).json({ error: "You do not have access to this quotation PDF." });
     return;
   }
@@ -630,7 +641,6 @@ router.post("/quotation-rate-submissions/:submissionId/decision", async (req, re
     {
       _id: parsedParams.data.submissionId,
       status: "pending_review",
-      ...(actor.masterAdmin ? {} : { approverIds: actor.id }),
     },
     {
       $set: {
@@ -640,6 +650,7 @@ router.post("/quotation-rate-submissions/:submissionId/decision", async (req, re
         decidedByName: actor.name,
         updatedAt: new Date(),
       },
+      $addToSet: { approverIds: actor.id },
     },
     { returnDocument: "after" },
   );
