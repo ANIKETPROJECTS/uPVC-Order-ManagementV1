@@ -1,0 +1,39 @@
+In the existing Sales & Orders section, on the Clients and Orders pages, change how Order IDs are generated and shown. Do not break existing functionality, and keep the current UI style. Do not change the Payments, Quotation & Approval, Production, WhatsApp or window readiness logic.
+
+1. Client type
+- Every client must have a type: "Project" or "Retail". Add this as a required field on the client form and show it as a badge in the Clients list.
+- The type decides the Order ID prefix: P for Project, R for Retail.
+- Existing clients without a type: do not guess. Mark them "Type not set" and ask the user to choose before a new order can be created for them.
+
+2. Order ID format
+- Format: P or R, followed by the quotation number with leading zeros removed. No dates, no dashes and no "QT" in the ID.
+  - Quotation QT-0001429 for a Project client gives order ID P1429.
+  - Quotation QT-0001430 for a Retail client gives order ID R1430.
+  - Only leading zeros are removed. Zeros inside the number stay (QT-0001029 gives P1029).
+- The order must be linked to a quotation, and the ID is generated on the server from that quotation's number. If an order has no quotation, block saving and show a clear message.
+- The ID must be unique and cannot be edited after creation.
+
+3. Lot-wise orders
+- If an order is dispatched in lots, the lot number is added as a suffix: P1429-L01, P1429-L02, and so on. Use two digits (L01 to L99), then L100 and beyond without breaking.
+- Lot numbers are generated on the server, increase in order, and are never reused, even if a lot is deleted.
+- Projects: lot numbers are compulsory. A Project order cannot be saved without at least one lot. Every Project order must have its lots (P1429-L01 at minimum), even if there is only one lot. Add an "Add lot" action so more lots can be added later.
+- Retail: lots are optional. If there are no lots the ID stays R1430. If lots are added, they show as R1430-L01 and so on.
+- Each lot shows its own ID in the order detail, and the parent order shows its lots as a list.
+- Search by the order ID (P1429) must also find all of its lots (P1429-L01, P1429-L02).
+
+4. Show the new IDs everywhere
+- Use the new order and lot IDs in the Orders list, order detail page, Clients page, search, links, exports, and in any other place that references an order or lot (Payments, Production, Quotation, reminders).
+- Do not change the Payments, Production or Quotation logic. Only update how the ID is displayed and looked up.
+
+5. Existing data
+- Convert existing orders to the new format using their linked quotation number and the client type. Keep the old ID saved as a "legacy ID" so nothing linked to it breaks, and make search work with both the new and the old ID.
+- Existing Project orders without a lot: create L01 for them automatically.
+- If an existing order has no quotation or the client type is not set, do not guess. Leave its old ID, mark it "Needs review", and list all such orders in your reply.
+- Before changing anything, list how many orders will be converted and how many need review.
+
+6. Layout
+- On mobile, the IDs must fit without clipping or horizontal scrolling.
+
+Then run a typecheck, test the running app, and reply with a short table: client type, order ID format, lot suffix, compulsory lots for Projects, optional lots for Retail, existing data converted, as Done or Not done, with what I should click to test each.
+
+Show a short plan first, then build.
