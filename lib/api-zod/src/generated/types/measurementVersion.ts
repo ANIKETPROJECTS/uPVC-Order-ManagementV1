@@ -5,6 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MeasurementVersionMeasurementType } from './measurementVersionMeasurementType';
+import type { MeasurementVersionReferenceType } from './measurementVersionReferenceType';
 
 export interface MeasurementVersion {
   id: string;
@@ -19,5 +21,16 @@ export interface MeasurementVersion {
      * @nullable
      */
   name: string | null;
+  /** @nullable */
+  measurementType: MeasurementVersionMeasurementType;
+  /** @nullable */
+  referenceType: MeasurementVersionReferenceType;
+  /** @nullable */
+  referenceId: string | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  referenceName: string | null;
   uploadedAt: Date;
 }

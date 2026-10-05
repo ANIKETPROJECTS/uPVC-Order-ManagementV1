@@ -3,13 +3,20 @@ import { ObjectId } from "mongodb";
 import {
   CreateMeasurementRecordBody,
   CreateMeasurementRecordResponse,
+  CreateMeasurementReferenceBody,
+  CreateMeasurementReferenceResponse,
   DeleteMeasurementRecordParams,
+  DeleteMeasurementReferenceParams,
   DeleteMeasurementVersionParams,
   DownloadMeasurementVersionParams,
   ListMeasurementRecordsResponse,
+  ListMeasurementReferencesResponse,
   PreviewMeasurementVersionParams,
   SearchMeasurementRecordsQueryParams,
   SearchMeasurementRecordsResponse,
+  UpdateMeasurementReferenceBody,
+  UpdateMeasurementReferenceParams,
+  UpdateMeasurementReferenceResponse,
   UpdateMeasurementRecordBody,
   UpdateMeasurementRecordParams,
   UpdateMeasurementRecordResponse,
@@ -23,6 +30,7 @@ import {
 import { Router, type Request, type RequestHandler } from "express";
 import {
   getMeasurementRecords,
+  getMeasurementReferences,
   getMongoClient,
   getMeasurementSheetsBucket,
   getMeasurementVersions,
@@ -32,6 +40,7 @@ import {
   getQuotationRateSubmissions,
   getUsers,
   type MeasurementRecordDocument,
+  type MeasurementReferenceDocument,
   type MeasurementVersionDocument,
   type OrderDocument,
 } from "../lib/mongo";
@@ -102,9 +111,127 @@ function versionResponse(version: MeasurementVersionDocument) {
     uploadedBy: version.uploadedBy,
     uploadedByName: version.uploadedByName,
     name: version.name ?? null,
+    measurementType: version.measurementType ?? null,
+    referenceType: version.referenceType ?? null,
+    referenceId: version.referenceId ?? null,
+    referenceName: version.referenceName ?? null,
     uploadedAt: version.uploadedAt.toISOString(),
   };
 }
+
+function referenceResponse(reference: Pick<MeasurementReferenceDocument, "_id" | "name">) {
+  return { id: reference._id, name: reference.name, kind: "custom" as const };
+}
+
+router.get("/measurement-references", async (req, res): Promise<void> => {
+  const actor = await actorContext(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const [users, customReferences] = await Promise.all([
+    getUsers(db).find({ status: "active" }, { projection: { _id: 1, name: 1 } }).sort({ name: 1 }).toArray(),
+    getMeasurementReferences(db).find({}).sort({ nameLower: 1 }).toArray(),
+  ]);
+  const references = [
+    ...users.map((user) => ({ id: user._id, name: user.name, kind: "user" as const })),
+    ...customReferences.map(referenceResponse),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  res.json(ListMeasurementReferencesResponse.parse(references));
+});
+
+router.post("/measurement-references", async (req, res): Promise<void> => {
+  const parsed = CreateMeasurementReferenceBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const name = parsed.data.name.trim();
+  if (!name) {
+    res.status(400).json({ error: "Reference name cannot be blank." });
+    return;
+  }
+  const now = new Date();
+  const reference: MeasurementReferenceDocument = {
+    _id: randomUUID(),
+    name,
+    nameLower: name.toLowerCase(),
+    createdBy: actor.id,
+    updatedBy: actor.id,
+    createdAt: now,
+    updatedAt: now,
+  };
+  try {
+    await getMeasurementReferences(await getMongoDb()).insertOne(reference);
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      res.status(409).json({ error: "A custom reference with that name already exists." });
+      return;
+    }
+    throw error;
+  }
+  res.status(201).json(CreateMeasurementReferenceResponse.parse(referenceResponse(reference)));
+});
+
+router.patch("/measurement-references/:referenceId", async (req, res): Promise<void> => {
+  const parsedParams = UpdateMeasurementReferenceParams.safeParse(req.params);
+  const parsedBody = UpdateMeasurementReferenceBody.safeParse(req.body);
+  if (!parsedParams.success || !parsedBody.success) {
+    res.status(400).json({
+      error: !parsedParams.success ? parsedParams.error.message : parsedBody.success ? "" : parsedBody.error.message,
+    });
+    return;
+  }
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const name = parsedBody.data.name.trim();
+  if (!name) {
+    res.status(400).json({ error: "Reference name cannot be blank." });
+    return;
+  }
+  const db = await getMongoDb();
+  try {
+    const updated = await getMeasurementReferences(db).updateOne(
+      { _id: parsedParams.data.referenceId },
+      { $set: { name, nameLower: name.toLowerCase(), updatedBy: actor.id, updatedAt: new Date() } },
+    );
+    if (!updated.matchedCount) {
+      res.status(404).json({ error: "Custom measurement reference not found." });
+      return;
+    }
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      res.status(409).json({ error: "A custom reference with that name already exists." });
+      return;
+    }
+    throw error;
+  }
+  await getMeasurementVersions(db).updateMany(
+    { referenceType: "custom", referenceId: parsedParams.data.referenceId },
+    { $set: { referenceName: name } },
+  );
+  res.json(UpdateMeasurementReferenceResponse.parse({
+    id: parsedParams.data.referenceId,
+    name,
+    kind: "custom",
+  }));
+});
+
+router.delete("/measurement-references/:referenceId", async (req, res): Promise<void> => {
+  const parsed = DeleteMeasurementReferenceParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const actor = await actorContext(req, res, true);
+  if (!actor) return;
+  const deleted = await getMeasurementReferences(await getMongoDb()).deleteOne({ _id: parsed.data.referenceId });
+  if (!deleted.deletedCount) {
+    res.status(404).json({ error: "Custom measurement reference not found." });
+    return;
+  }
+  res.status(204).send();
+});
 
 async function recordResponse(record: MeasurementRecordDocument) {
   const db = await getMongoDb();
@@ -402,16 +529,65 @@ router.patch("/measurement-records/:recordId/versions/:versionId", async (req, r
     res.status(404).json({ error: "Measurement record not found." });
     return;
   }
-  const name = parsedBody.data.name?.trim() || null;
+  const body = parsedBody.data;
+  if (
+    body.name === undefined &&
+    body.measurementType === undefined &&
+    body.referenceType === undefined &&
+    body.referenceId === undefined
+  ) {
+    res.status(400).json({ error: "Provide at least one measurement sheet field to update." });
+    return;
+  }
+  const fields: Partial<MeasurementVersionDocument> = {};
+  if (body.name !== undefined) fields.name = body.name?.trim() || null;
+  if (body.measurementType !== undefined) fields.measurementType = body.measurementType;
+
+  const hasReferenceUpdate = body.referenceType !== undefined || body.referenceId !== undefined;
+  if (hasReferenceUpdate) {
+    const referenceType = body.referenceType ?? null;
+    const referenceId = body.referenceId?.trim() || null;
+    if (!referenceType && !referenceId) {
+      fields.referenceType = null;
+      fields.referenceId = null;
+      fields.referenceName = null;
+    } else if (!referenceType || !referenceId) {
+      res.status(400).json({ error: "Select both a reference type and reference." });
+      return;
+    } else if (referenceType === "user") {
+      const referenceUser = await getUsers(db).findOne(
+        { _id: referenceId, status: "active" },
+        { projection: { name: 1 } },
+      );
+      if (!referenceUser) {
+        res.status(404).json({ error: "The selected user is not active or no longer exists." });
+        return;
+      }
+      fields.referenceType = "user";
+      fields.referenceId = referenceId;
+      fields.referenceName = referenceUser.name;
+    } else {
+      const customReference = await getMeasurementReferences(db).findOne({ _id: referenceId });
+      if (!customReference) {
+        res.status(404).json({ error: "The selected custom reference no longer exists." });
+        return;
+      }
+      fields.referenceType = "custom";
+      fields.referenceId = referenceId;
+      fields.referenceName = customReference.name;
+    }
+  }
+
+  const updatedAt = new Date();
   const result = await getMeasurementVersions(db).updateOne(
     { _id: parsedParams.data.versionId, recordId: record._id },
-    { $set: { name } },
+    { $set: fields },
   );
   if (!result.matchedCount) {
     res.status(404).json({ error: "Measurement sheet version not found." });
     return;
   }
-  await getMeasurementRecords(db).updateOne({ _id: record._id }, { $set: { updatedAt: new Date() } });
+  await getMeasurementRecords(db).updateOne({ _id: record._id }, { $set: { updatedAt } });
   const updated = await getMeasurementVersions(db).findOne({
     _id: parsedParams.data.versionId,
     recordId: record._id,
@@ -550,6 +726,10 @@ router.post("/measurement-records/:recordId/versions/:filename", async (req, res
       versionNumber: versionedRecord.versionCount ?? 1,
       filename: parsed.data.filename,
       name,
+      measurementType: null,
+      referenceType: null,
+      referenceId: null,
+      referenceName: null,
       contentType,
       sizeBytes: body.length,
       gridFsId: null,

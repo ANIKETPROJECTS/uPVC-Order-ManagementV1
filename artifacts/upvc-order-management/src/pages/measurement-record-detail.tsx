@@ -20,6 +20,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { measurementSheetIdLabel, QuotationRequestLookup } from '@/components/link-record-lookups';
+import {
+  MeasurementReferenceManager,
+  MeasurementVersionMetadataFields,
+  useMeasurementReferenceOptions,
+} from '@/components/measurement-version-metadata';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useParams } from 'wouter';
 
@@ -46,6 +51,8 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
     query: { queryKey: getListMeasurementRecordsQueryKey() },
   });
   const canEdit = user.roleId === 'master-admin' || user.permissions?.measurements === 'edit';
+  const referencesQuery = useMeasurementReferenceOptions(canEdit);
+  const references = referencesQuery.data ?? [];
   const updateRecord = useUpdateMeasurementRecord();
   const updateVersion = useUpdateMeasurementVersion();
   const deleteVersion = useDeleteMeasurementVersion();
@@ -241,6 +248,9 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Retained documents</p>
                 <CardTitle className="mt-1 font-display text-lg">Sheet files and version history</CardTitle>
                 <p className="text-xs text-muted-foreground">Use each file’s own View action. Replace adds a new version; previous files remain in history until deleted.</p>
+                {canEdit && <div className="mt-3">
+                  <MeasurementReferenceManager canEdit references={references} loading={referencesQuery.isLoading} error={referencesQuery.isError} />
+                </div>}
               </CardHeader>
               <CardContent className="p-4 sm:p-5">
                 {versions.length === 0 ? (
@@ -252,49 +262,54 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
                 ) : (
                   <ol className="space-y-3" aria-label={`Sheet file history for ${record.clientName}`} data-testid="list-measurement-detail-versions">
                     {versions.map((version) => (
-                      <li key={version.id} className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between" data-testid={`row-measurement-detail-version-${version.id}`}>
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><FileSpreadsheet size={17} /></span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{version.name || version.filename}</p>
-                            {version.name && <p className="mt-0.5 truncate text-xs text-muted-foreground">Original filename: {version.filename}</p>}
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Version {version.versionNumber} · {sizeLabel(version.sizeBytes)} · {dateLabel(version.uploadedAt)} · {version.uploadedByName}
-                            </p>
+                      <li key={version.id} className="rounded-xl border border-border/70 bg-card p-4" data-testid={`row-measurement-detail-version-${version.id}`}>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><FileSpreadsheet size={17} /></span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold">{version.name || version.filename}</p>
+                              {version.name && <p className="mt-0.5 truncate text-xs text-muted-foreground">Original filename: {version.filename}</p>}
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Version {version.versionNumber} · {sizeLabel(version.sizeBytes)} · {dateLabel(version.uploadedAt)} · {version.uploadedByName}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            {canEdit && editingVersionId === version.id ? (
+                              <div className="flex items-center gap-1.5" data-testid={`form-edit-measurement-version-${version.id}`}>
+                                <Input
+                                  className="h-9 w-36 text-xs sm:w-44"
+                                  value={versionNameDraft}
+                                  onChange={(event) => setVersionNameDraft(event.target.value)}
+                                  maxLength={160}
+                                  aria-label={`Sheet name for version ${version.versionNumber}`}
+                                  data-testid={`input-edit-measurement-version-name-${version.id}`}
+                                />
+                                <Button type="button" size="sm" aria-label={`Save name for version ${version.versionNumber}`} disabled={updateVersion.isPending} onClick={() => saveVersionName(version)} data-testid={`button-save-measurement-version-name-${version.id}`}><Save size={14} /> Save</Button>
+                                <Button type="button" size="icon" variant="ghost" aria-label={`Cancel editing version ${version.versionNumber}`} disabled={updateVersion.isPending} onClick={() => { setEditingVersionId(null); setVersionNameDraft(''); }} data-testid={`button-cancel-edit-measurement-version-${version.id}`}><X size={15} /></Button>
+                              </div>
+                            ) : canEdit && (
+                              <Button type="button" variant="outline" size="sm" disabled={editingVersionId !== null || updateVersion.isPending} onClick={() => { setEditingVersionId(version.id); setVersionNameDraft(version.name || ''); }} data-testid={`button-edit-measurement-version-${version.id}`}><Pencil size={14} /> Edit</Button>
+                            )}
+                            <a href={getPreviewMeasurementVersionUrl(record.id, version.id)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted" data-testid={`link-preview-measurement-version-${version.id}`}>
+                              <Eye size={14} /> View file
+                            </a>
+                            <a href={getDownloadMeasurementVersionUrl(record.id, version.id)} download={version.filename} className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold text-primary hover:bg-primary/5" data-testid={`link-download-measurement-version-${version.id}`}>
+                              <Download size={14} /> Download
+                            </a>
+                            {canEdit && <label className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold hover:bg-muted ${upload.isPending ? 'pointer-events-none opacity-50' : ''}`} data-testid={`label-replace-measurement-version-${version.id}`}>
+                              <Upload size={14} /> Replace
+                              <input type="file" className="sr-only" disabled={upload.isPending} accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label={`Replace version ${version.versionNumber} with a new file`} data-testid={`input-replace-measurement-version-${version.id}`} onChange={(event) => {
+                                const file = event.currentTarget.files?.[0];
+                                event.currentTarget.value = '';
+                                if (file) replaceVersion(version, file);
+                              }} />
+                            </label>}
+                            {canEdit && <Button type="button" variant="outline" size="sm" className="text-destructive hover:text-destructive" aria-label={`Delete version ${version.versionNumber}`} disabled={deleteVersion.isPending || upload.isPending} onClick={() => removeVersion(version)} data-testid={`button-delete-measurement-version-${version.id}`}><Trash2 size={14} /> Delete</Button>}
                           </div>
                         </div>
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
-                          {canEdit && editingVersionId === version.id ? (
-                            <div className="flex items-center gap-1.5" data-testid={`form-edit-measurement-version-${version.id}`}>
-                              <Input
-                                className="h-9 w-36 text-xs sm:w-44"
-                                value={versionNameDraft}
-                                onChange={(event) => setVersionNameDraft(event.target.value)}
-                                maxLength={160}
-                                aria-label={`Sheet name for version ${version.versionNumber}`}
-                                data-testid={`input-edit-measurement-version-name-${version.id}`}
-                              />
-                              <Button type="button" size="sm" aria-label={`Save name for version ${version.versionNumber}`} disabled={updateVersion.isPending} onClick={() => saveVersionName(version)} data-testid={`button-save-measurement-version-name-${version.id}`}><Save size={14} /> Save</Button>
-                              <Button type="button" size="icon" variant="ghost" aria-label={`Cancel editing version ${version.versionNumber}`} disabled={updateVersion.isPending} onClick={() => { setEditingVersionId(null); setVersionNameDraft(''); }} data-testid={`button-cancel-edit-measurement-version-${version.id}`}><X size={15} /></Button>
-                            </div>
-                          ) : canEdit && (
-                            <Button type="button" variant="outline" size="sm" disabled={editingVersionId !== null || updateVersion.isPending} onClick={() => { setEditingVersionId(version.id); setVersionNameDraft(version.name || ''); }} data-testid={`button-edit-measurement-version-${version.id}`}><Pencil size={14} /> Edit</Button>
-                          )}
-                          <a href={getPreviewMeasurementVersionUrl(record.id, version.id)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted" data-testid={`link-preview-measurement-version-${version.id}`}>
-                            <Eye size={14} /> View file
-                          </a>
-                          <a href={getDownloadMeasurementVersionUrl(record.id, version.id)} download={version.filename} className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold text-primary hover:bg-primary/5" data-testid={`link-download-measurement-version-${version.id}`}>
-                            <Download size={14} /> Download
-                          </a>
-                          {canEdit && <label className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold hover:bg-muted ${upload.isPending ? 'pointer-events-none opacity-50' : ''}`} data-testid={`label-replace-measurement-version-${version.id}`}>
-                            <Upload size={14} /> Replace
-                            <input type="file" className="sr-only" disabled={upload.isPending} accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label={`Replace version ${version.versionNumber} with a new file`} data-testid={`input-replace-measurement-version-${version.id}`} onChange={(event) => {
-                              const file = event.currentTarget.files?.[0];
-                              event.currentTarget.value = '';
-                              if (file) replaceVersion(version, file);
-                            }} />
-                          </label>}
-                          {canEdit && <Button type="button" variant="outline" size="sm" className="text-destructive hover:text-destructive" aria-label={`Delete version ${version.versionNumber}`} disabled={deleteVersion.isPending || upload.isPending} onClick={() => removeVersion(version)} data-testid={`button-delete-measurement-version-${version.id}`}><Trash2 size={14} /> Delete</Button>}
+                        <div className="mt-4 border-t border-border/70 pt-3">
+                          <MeasurementVersionMetadataFields recordId={record.id} version={version} canEdit={canEdit} references={references} referencesLoading={referencesQuery.isLoading} referencesError={referencesQuery.isError} />
                         </div>
                       </li>
                     ))}

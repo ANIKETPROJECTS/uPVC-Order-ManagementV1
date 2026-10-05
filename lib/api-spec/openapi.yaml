@@ -1842,6 +1842,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeasurementRecord"
+  /measurement-references:
+    get:
+      operationId: listMeasurementReferences
+      tags: [orders]
+      summary: List active users and custom measurement references
+      responses:
+        "200":
+          description: Available measurement references
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementReferenceOptions"
+    post:
+      operationId: createMeasurementReference
+      tags: [orders]
+      summary: Add a reusable custom measurement reference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeasurementReferenceInput"
+      responses:
+        "201":
+          description: Custom measurement reference created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementReferenceOption"
+        "409":
+          description: A reference with this name already exists
+  /measurement-references/{referenceId}:
+    patch:
+      operationId: updateMeasurementReference
+      tags: [orders]
+      summary: Rename a reusable custom measurement reference
+      parameters:
+        - name: referenceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeasurementReferenceUpdate"
+      responses:
+        "200":
+          description: Custom measurement reference updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementReferenceOption"
+        "404":
+          description: Custom reference not found
+        "409":
+          description: A reference with this name already exists
+    delete:
+      operationId: deleteMeasurementReference
+      tags: [orders]
+      summary: Remove a reusable custom measurement reference
+      parameters:
+        - name: referenceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Custom reference removed; existing sheet labels are retained
+        "404":
+          description: Custom reference not found
   /measurement-records/lookup:
     get:
       operationId: searchMeasurementRecords
@@ -4793,10 +4867,53 @@ components:
         name:
           type: ["string", "null"]
           maxLength: 160
+        measurementType:
+          type: ["string", "null"]
+          enum: [quotation, final, null]
+        referenceType:
+          type: ["string", "null"]
+          enum: [user, custom, null]
+        referenceId:
+          type: ["string", "null"]
+        referenceName:
+          type: ["string", "null"]
+          maxLength: 160
         uploadedAt:
           type: string
           format: date-time
-      required: [id, versionNumber, filename, contentType, sizeBytes, uploadedBy, uploadedByName, name, uploadedAt]
+      required: [id, versionNumber, filename, contentType, sizeBytes, uploadedBy, uploadedByName, name, measurementType, referenceType, referenceId, referenceName, uploadedAt]
+    MeasurementReferenceOption:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          maxLength: 160
+        kind:
+          type: string
+          enum: [user, custom]
+      required: [id, name, kind]
+    MeasurementReferenceOptions:
+      type: array
+      items:
+        $ref: "#/components/schemas/MeasurementReferenceOption"
+    MeasurementReferenceInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+      required: [name]
+    MeasurementReferenceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+      required: [name]
     MeasurementRecord:
       type: object
       properties:
@@ -4882,5 +4999,12 @@ components:
           type: ["string", "null"]
           maxLength: 160
           description: Blank or null removes the custom label and falls back to the original filename.
-      required: [name]
+        measurementType:
+          type: ["string", "null"]
+          enum: [quotation, final, null]
+        referenceType:
+          type: ["string", "null"]
+          enum: [user, custom, null]
+        referenceId:
+          type: ["string", "null"]
 

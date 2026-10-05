@@ -56,6 +56,10 @@ import type {
   MeasurementRecordList,
   MeasurementRecordLookupList,
   MeasurementRecordUpdate,
+  MeasurementReferenceInput,
+  MeasurementReferenceOption,
+  MeasurementReferenceOptions,
+  MeasurementReferenceUpdate,
   MeasurementVersion,
   MeasurementVersionUpdate,
   NotificationCenter,
@@ -7451,6 +7455,334 @@ export const useCreateMeasurementRecord = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateMeasurementRecordMutationOptions(options));
+    }
+
+export const getListMeasurementReferencesUrl = () => {
+
+
+
+
+  return `/api/measurement-references`
+}
+
+/**
+ * @summary List active users and custom measurement references
+ */
+export const listMeasurementReferences = async ( options?: Parameters<typeof customFetch>[1]): Promise<MeasurementReferenceOptions> => {
+
+  return customFetch<MeasurementReferenceOptions>(getListMeasurementReferencesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMeasurementReferencesQueryKey = () => {
+    return [
+    `/api/measurement-references`
+    ] as const;
+    }
+
+
+export const getListMeasurementReferencesQueryOptions = <TData = Awaited<ReturnType<typeof listMeasurementReferences>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMeasurementReferences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMeasurementReferencesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMeasurementReferences>>> = ({ signal }) => listMeasurementReferences({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMeasurementReferences>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMeasurementReferencesQueryResult = NonNullable<Awaited<ReturnType<typeof listMeasurementReferences>>>
+export type ListMeasurementReferencesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active users and custom measurement references
+ */
+
+export function useListMeasurementReferences<TData = Awaited<ReturnType<typeof listMeasurementReferences>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMeasurementReferences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMeasurementReferencesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateMeasurementReferenceUrl = () => {
+
+
+
+
+  return `/api/measurement-references`
+}
+
+/**
+ * @summary Add a reusable custom measurement reference
+ */
+export const createMeasurementReference = async (measurementReferenceInput: MeasurementReferenceInput, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementReferenceOption> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MeasurementReferenceOption>(getCreateMeasurementReferenceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(measurementReferenceInput)
+  }
+);}
+
+
+
+
+
+export const getCreateMeasurementReferenceMutationKey = () => ['createMeasurementReference'] as const;
+
+export const getCreateMeasurementReferenceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMeasurementReference>>, TError,CreateMeasurementReferenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMeasurementReference>>, TError,CreateMeasurementReferenceMutationVariables, TContext> => {
+
+const mutationKey = getCreateMeasurementReferenceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMeasurementReference>>, CreateMeasurementReferenceMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMeasurementReference(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMeasurementReferenceMutationResult = NonNullable<Awaited<ReturnType<typeof createMeasurementReference>>>
+    export type CreateMeasurementReferenceMutationBody = BodyType<MeasurementReferenceInput>
+    export type CreateMeasurementReferenceMutationError = ErrorType<void>
+    export type CreateMeasurementReferenceMutationVariables = {data: BodyType<MeasurementReferenceInput>}
+
+    /**
+ * @summary Add a reusable custom measurement reference
+ */
+export const useCreateMeasurementReference = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMeasurementReference>>, TError,CreateMeasurementReferenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMeasurementReference>>,
+        TError,
+        CreateMeasurementReferenceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateMeasurementReferenceMutationOptions(options));
+    }
+
+export const getUpdateMeasurementReferenceUrl = (referenceId: string,) => {
+
+
+
+
+  return `/api/measurement-references/${referenceId}`
+}
+
+/**
+ * @summary Rename a reusable custom measurement reference
+ */
+export const updateMeasurementReference = async (referenceId: string,
+    measurementReferenceUpdate: MeasurementReferenceUpdate, options?: Parameters<typeof customFetch>[1]): Promise<MeasurementReferenceOption> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MeasurementReferenceOption>(getUpdateMeasurementReferenceUrl(referenceId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(measurementReferenceUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateMeasurementReferenceMutationKey = () => ['updateMeasurementReference'] as const;
+
+export const getUpdateMeasurementReferenceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementReference>>, TError,UpdateMeasurementReferenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementReference>>, TError,UpdateMeasurementReferenceMutationVariables, TContext> => {
+
+const mutationKey = getUpdateMeasurementReferenceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMeasurementReference>>, UpdateMeasurementReferenceMutationVariables> = (props) => {
+          const {referenceId,data} = props ?? {};
+
+          return  updateMeasurementReference(referenceId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMeasurementReferenceMutationResult = NonNullable<Awaited<ReturnType<typeof updateMeasurementReference>>>
+    export type UpdateMeasurementReferenceMutationBody = BodyType<MeasurementReferenceUpdate>
+    export type UpdateMeasurementReferenceMutationError = ErrorType<void>
+    export type UpdateMeasurementReferenceMutationVariables = {referenceId: string;data: BodyType<MeasurementReferenceUpdate>}
+
+    /**
+ * @summary Rename a reusable custom measurement reference
+ */
+export const useUpdateMeasurementReference = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMeasurementReference>>, TError,UpdateMeasurementReferenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMeasurementReference>>,
+        TError,
+        UpdateMeasurementReferenceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateMeasurementReferenceMutationOptions(options));
+    }
+
+export const getDeleteMeasurementReferenceUrl = (referenceId: string,) => {
+
+
+
+
+  return `/api/measurement-references/${referenceId}`
+}
+
+/**
+ * @summary Remove a reusable custom measurement reference
+ */
+export const deleteMeasurementReference = async (referenceId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteMeasurementReferenceUrl(referenceId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteMeasurementReferenceMutationKey = () => ['deleteMeasurementReference'] as const;
+
+export const getDeleteMeasurementReferenceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementReference>>, TError,DeleteMeasurementReferenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementReference>>, TError,DeleteMeasurementReferenceMutationVariables, TContext> => {
+
+const mutationKey = getDeleteMeasurementReferenceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMeasurementReference>>, DeleteMeasurementReferenceMutationVariables> = (props) => {
+          const {referenceId} = props ?? {};
+
+          return  deleteMeasurementReference(referenceId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMeasurementReferenceMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMeasurementReference>>>
+
+    export type DeleteMeasurementReferenceMutationError = ErrorType<void>
+    export type DeleteMeasurementReferenceMutationVariables = {referenceId: string}
+
+    /**
+ * @summary Remove a reusable custom measurement reference
+ */
+export const useDeleteMeasurementReference = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMeasurementReference>>, TError,DeleteMeasurementReferenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMeasurementReference>>,
+        TError,
+        DeleteMeasurementReferenceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteMeasurementReferenceMutationOptions(options));
     }
 
 export const getSearchMeasurementRecordsUrl = (params: SearchMeasurementRecordsParams,) => {

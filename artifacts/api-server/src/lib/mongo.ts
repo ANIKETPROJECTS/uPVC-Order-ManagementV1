@@ -491,6 +491,10 @@ export interface MeasurementVersionDocument {
   versionNumber: number;
   filename: string;
   name?: string | null;
+  measurementType?: "quotation" | "final" | null;
+  referenceType?: "user" | "custom" | null;
+  referenceId?: string | null;
+  referenceName?: string | null;
   contentType: string;
   sizeBytes: number;
   gridFsId: string | null;
@@ -498,6 +502,15 @@ export interface MeasurementVersionDocument {
   uploadedBy: string;
   uploadedByName: string;
   uploadedAt: Date;
+}
+export interface MeasurementReferenceDocument {
+  _id: string;
+  name: string;
+  nameLower: string;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface OrderMessageTemplateDocument {
@@ -588,6 +601,7 @@ export function getQuotationRateSubmissions(db: Db) { return db.collection<Quota
 export function getQuotationRatePdfsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "quotation_rate_pdfs" }); }
 export function getMeasurementRecords(db: Db) { return db.collection<MeasurementRecordDocument>("measurement_records"); }
 export function getMeasurementVersions(db: Db) { return db.collection<MeasurementVersionDocument>("measurement_versions"); }
+export function getMeasurementReferences(db: Db) { return db.collection<MeasurementReferenceDocument>("measurement_references"); }
 export function getMeasurementSheetsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "measurement_sheets" }); }
 
 async function migrateOrderIds(db: Db, now: Date): Promise<void> {
@@ -990,6 +1004,7 @@ export async function initializeMongo(): Promise<void> {
   const appNotifications = getAppNotifications(db);
   const pushSubscriptions = getPushSubscriptions(db);
   const quotationRateSubmissions = getQuotationRateSubmissions(db);
+  const measurementReferences = getMeasurementReferences(db);
 
   await Promise.all([
     users.createIndex({ usernameLower: 1 }, { unique: true, name: "username_unique" }),
@@ -1047,6 +1062,7 @@ export async function initializeMongo(): Promise<void> {
     appNotifications.createIndex({ userId: 1, createdAt: -1 }, { name: "notifications_by_user_date" }),
     appNotifications.createIndex({ userId: 1, readAt: 1 }, { name: "notifications_by_user_read_state" }),
     pushSubscriptions.createIndex({ userId: 1, updatedAt: -1 }, { name: "push_subscriptions_by_user" }),
+    measurementReferences.createIndex({ nameLower: 1 }, { unique: true, name: "measurement_reference_name_unique" }),
     quotationRateSubmissions.createIndex(
       { measurementRecordId: 1 },
       {

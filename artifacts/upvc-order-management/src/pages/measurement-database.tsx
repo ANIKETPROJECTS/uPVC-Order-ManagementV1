@@ -43,6 +43,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { measurementSheetIdLabel, QuotationRequestLookup } from '@/components/link-record-lookups';
+import {
+  MeasurementReferenceManager,
+  MeasurementVersionMetadataFields,
+  useMeasurementReferenceOptions,
+} from '@/components/measurement-version-metadata';
 import { useLocation } from 'wouter';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -81,6 +86,8 @@ function RecordState({ state, onRetry }: { state: 'loading' | 'error' | 'empty';
 export default function MeasurementDatabasePage({ user }: { user: User }) {
   const [, navigate] = useLocation();
   const canEdit = user.roleId === 'master-admin' || user.permissions?.measurements === 'edit';
+  const referencesQuery = useMeasurementReferenceOptions(canEdit);
+  const references = referencesQuery.data ?? [];
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const recordsQuery = useListMeasurementRecords({ query: { queryKey: getListMeasurementRecordsQueryKey() } });
@@ -403,6 +410,9 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
               <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Register</p><CardTitle className="mt-1 font-display text-lg">Client measurement sheets</CardTitle><p className="mt-1 text-xs text-muted-foreground">One record per list or grid card, with a permanent sheet ID, Rate Approval link, and retained versions.</p></div>
               <span className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground"><ClipboardList size={13} /> {records.length} records</span>
             </div>
+            {canEdit && <div className="mt-3">
+              <MeasurementReferenceManager canEdit references={references} loading={referencesQuery.isLoading} error={referencesQuery.isError} />
+            </div>}
             {ordersQuery.isError && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" data-testid="state-measurement-orders-error"><span>Order list unavailable. Existing records remain visible; order choices may be incomplete.</span><Button size="sm" variant="outline" onClick={() => void ordersQuery.refetch()} data-testid="button-retry-measurement-orders"><RefreshCw size={13} /> Retry orders</Button></div>}
           </CardHeader>
           <CardContent className="p-0">
@@ -572,6 +582,9 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                                 </label>}
                                 {canEdit && <Button type="button" variant="ghost" size="icon" aria-label={`Delete version ${version.versionNumber}`} title="Delete file" disabled={deleteVersion.isPending || uploadingBatch} onClick={() => removeVersion(record, version)} data-testid={`button-delete-measurement-version-${version.id}`}><Trash2 size={14} /></Button>}
                               </div>
+                            </div>
+                            <div className="mt-3 border-t border-border/70 pt-3">
+                              <MeasurementVersionMetadataFields recordId={record.id} version={version} canEdit={canEdit} references={references} referencesLoading={referencesQuery.isLoading} referencesError={referencesQuery.isError} />
                             </div>
                           </li>)}
                         </ol> : <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground" data-testid={`state-measurement-versions-empty-${record.id}`}>No sheet uploaded yet. Add the first version when it is ready.</div>}

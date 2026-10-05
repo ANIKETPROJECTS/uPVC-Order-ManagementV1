@@ -1635,6 +1635,28 @@ export interface QuotationRateDecisionInput {
   comment: string;
 }
 
+/**
+ * @nullable
+ */
+export type MeasurementVersionMeasurementType = typeof MeasurementVersionMeasurementType[keyof typeof MeasurementVersionMeasurementType] | null;
+
+
+export const MeasurementVersionMeasurementType = {
+  quotation: 'quotation',
+  final: 'final',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MeasurementVersionReferenceType = typeof MeasurementVersionReferenceType[keyof typeof MeasurementVersionReferenceType] | null;
+
+
+export const MeasurementVersionReferenceType = {
+  user: 'user',
+  custom: 'custom',
+} as const;
+
 export interface MeasurementVersion {
   id: string;
   versionNumber: number;
@@ -1648,7 +1670,51 @@ export interface MeasurementVersion {
      * @nullable
      */
   name: string | null;
+  /** @nullable */
+  measurementType: MeasurementVersionMeasurementType;
+  /** @nullable */
+  referenceType: MeasurementVersionReferenceType;
+  /** @nullable */
+  referenceId: string | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  referenceName: string | null;
   uploadedAt: string;
+}
+
+export type MeasurementReferenceOptionKind = typeof MeasurementReferenceOptionKind[keyof typeof MeasurementReferenceOptionKind];
+
+
+export const MeasurementReferenceOptionKind = {
+  user: 'user',
+  custom: 'custom',
+} as const;
+
+export interface MeasurementReferenceOption {
+  id: string;
+  /** @maxLength 160 */
+  name: string;
+  kind: MeasurementReferenceOptionKind;
+}
+
+export type MeasurementReferenceOptions = MeasurementReferenceOption[];
+
+export interface MeasurementReferenceInput {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  name: string;
+}
+
+export interface MeasurementReferenceUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  name: string;
 }
 
 export interface MeasurementRecord {
@@ -1718,13 +1784,41 @@ export interface MeasurementRecordUpdate {
   linkQuotationSubmissionId?: string | null;
 }
 
+/**
+ * @nullable
+ */
+export type MeasurementVersionUpdateMeasurementType = typeof MeasurementVersionUpdateMeasurementType[keyof typeof MeasurementVersionUpdateMeasurementType] | null;
+
+
+export const MeasurementVersionUpdateMeasurementType = {
+  quotation: 'quotation',
+  final: 'final',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MeasurementVersionUpdateReferenceType = typeof MeasurementVersionUpdateReferenceType[keyof typeof MeasurementVersionUpdateReferenceType] | null;
+
+
+export const MeasurementVersionUpdateReferenceType = {
+  user: 'user',
+  custom: 'custom',
+} as const;
+
 export interface MeasurementVersionUpdate {
   /**
      * Blank or null removes the custom label and falls back to the original filename.
      * @maxLength 160
      * @nullable
      */
-  name: string | null;
+  name?: string | null;
+  /** @nullable */
+  measurementType?: MeasurementVersionUpdateMeasurementType;
+  /** @nullable */
+  referenceType?: MeasurementVersionUpdateReferenceType;
+  /** @nullable */
+  referenceId?: string | null;
 }
 
 export type ListUsersParams = {
