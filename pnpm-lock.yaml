@@ -195,6 +195,9 @@ importers:
       pino-http:
         specifier: ^10.5.0
         version: 10.5.0
+      read-excel-file:
+        specifier: ^9.3.10
+        version: 9.3.10
       web-push:
         specifier: ^3.6.7
         version: 3.6.7

@@ -2127,14 +2127,119 @@ paths:
     get:
       operationId: getGlassTracking
       tags: [orders]
-      summary: List active order windows with their glass tracking details
+      summary: List all created orders with glass order quantities and invoice status
       responses:
         "200":
-          description: Glass tracking entries
+          description: Glass tracking orders
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GlassTrackingWindowList"
+                $ref: "#/components/schemas/GlassTrackingOrderList"
+  /glass-tracking/workbooks/{filename}/preview:
+    post:
+      operationId: previewGlassOrderWorkbook
+      tags: [orders]
+      summary: Preview client sections and glass quantities in an XLSX workbook
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              $ref: "#/components/schemas/GlassOrderWorkbookBinary"
+      responses:
+        "200":
+          description: Parsed workbook preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlassWorkbookPreview"
+        "400":
+          description: Invalid upload
+        "413":
+          description: Workbook exceeds the upload limit
+        "422":
+          description: Workbook could not be parsed
+  /glass-tracking/workbooks/{filename}/import/{mappingToken}:
+    post:
+      operationId: importGlassOrderWorkbook
+      tags: [orders]
+      summary: Import a workbook revision for its mapped orders
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+        - name: mappingToken
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]+$"
+            maxLength: 8192
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              $ref: "#/components/schemas/GlassOrderWorkbookBinary"
+      responses:
+        "200":
+          description: Orders updated from this workbook revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlassTrackingOrderList"
+        "400":
+          description: Invalid workbook mapping or upload
+        "403":
+          description: Glass tracking edit access is required
+        "413":
+          description: Workbook exceeds the upload limit
+        "422":
+          description: Workbook could not be parsed
+  /orders/{id}/glass-tracking/quantities:
+    patch:
+      operationId: updateGlassTrackingQuantities
+      tags: [orders]
+      summary: Update received and broken glass quantities for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GlassTrackingQuantitiesInput"
+      responses:
+        "200":
+          description: Updated glass tracking order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlassTrackingOrder"
+        "400":
+          description: Invalid quantities
+        "403":
+          description: Glass tracking edit access is required
+        "404":
+          description: Order not found
+        "409":
+          description: Received and broken quantities exceed the ordered quantity
   /orders/{id}/windows:
     get:
       operationId: listOrderWindows
@@ -3316,43 +3421,153 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/OrderWindow"
-    GlassTrackingWindow:
+    GlassTrackingStatus:
+      type: string
+      enum: [glass_input_pending, pending, partial, received]
+    GlassTrackingItem:
       type: object
       properties:
-        windowId:
+        id:
           type: string
-        orderRecordId:
-          type: string
-        orderId:
-          type: string
-        orderStatus:
-          $ref: "#/components/schemas/OrderStatus"
-        clientName:
-          type: string
-        locationCode:
-          type: string
-        locationName:
-          type: string
+        villaNo:
+          type: ["string", "null"]
         windowNo:
           type: string
-        windowType:
+        glassType:
           type: string
         widthMm:
           type: number
         heightMm:
           type: number
-        sqFt:
-          type: number
-        glassStatus:
-          $ref: "#/components/schemas/OrderGlassStatus"
+        ordered:
+          type: integer
+          minimum: 0
+        received:
+          type: integer
+          minimum: 0
+        broken:
+          type: integer
+          minimum: 0
+      required: [id, villaNo, windowNo, glassType, widthMm, heightMm, ordered, received, broken]
+    GlassTrackingItemList:
+      type: array
+      items:
+        $ref: "#/components/schemas/GlassTrackingItem"
+    GlassTrackingOrder:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        invoiceNo:
+          type: ["string", "null"]
+        invoiceFilename:
+          type: ["string", "null"]
+        glassInputFilename:
+          type: ["string", "null"]
+        glassInputRevision:
+          type: integer
+          minimum: 0
+        glassInputUploadedAt:
+          type: ["string", "null"]
+          format: date-time
+        ordered:
+          type: integer
+          minimum: 0
+        received:
+          type: integer
+          minimum: 0
+        broken:
+          type: integer
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/GlassTrackingStatus"
+        items:
+          $ref: "#/components/schemas/GlassTrackingItemList"
         updatedAt:
           type: string
           format: date-time
-      required: [windowId, orderRecordId, orderId, orderStatus, clientName, locationCode, locationName, windowNo, windowType, widthMm, heightMm, sqFt, glassStatus, updatedAt]
-    GlassTrackingWindowList:
+      required: [orderRecordId, orderId, clientName, locationName, invoiceNo, invoiceFilename, glassInputFilename, glassInputRevision, glassInputUploadedAt, ordered, received, broken, status, items, updatedAt]
+    GlassTrackingOrderList:
       type: array
       items:
-        $ref: "#/components/schemas/GlassTrackingWindow"
+        $ref: "#/components/schemas/GlassTrackingOrder"
+    GlassWorkbookItem:
+      type: object
+      properties:
+        id:
+          type: string
+        villaNo:
+          type: ["string", "null"]
+        windowNo:
+          type: string
+        glassType:
+          type: string
+        widthMm:
+          type: number
+        heightMm:
+          type: number
+        ordered:
+          type: integer
+          minimum: 1
+      required: [id, villaNo, windowNo, glassType, widthMm, heightMm, ordered]
+    GlassWorkbookItemList:
+      type: array
+      items:
+        $ref: "#/components/schemas/GlassWorkbookItem"
+    GlassWorkbookSection:
+      type: object
+      properties:
+        clientLabel:
+          type: string
+        items:
+          $ref: "#/components/schemas/GlassWorkbookItemList"
+      required: [clientLabel, items]
+    GlassWorkbookSectionList:
+      type: array
+      items:
+        $ref: "#/components/schemas/GlassWorkbookSection"
+    GlassWorkbookPreview:
+      type: object
+      properties:
+        filename:
+          type: string
+        sections:
+          $ref: "#/components/schemas/GlassWorkbookSectionList"
+      required: [filename, sections]
+    GlassOrderWorkbookBinary:
+      type: string
+      format: binary
+    GlassTrackingQuantityInput:
+      type: object
+      properties:
+        id:
+          type: string
+        received:
+          type: integer
+          minimum: 0
+          maximum: 100000
+        broken:
+          type: integer
+          minimum: 0
+          maximum: 100000
+      required: [id, received, broken]
+    GlassTrackingQuantityInputList:
+      type: array
+      items:
+        $ref: "#/components/schemas/GlassTrackingQuantityInput"
+      minItems: 1
+    GlassTrackingQuantitiesInput:
+      type: object
+      properties:
+        items:
+          $ref: "#/components/schemas/GlassTrackingQuantityInputList"
+      required: [items]
     OrderPaymentMethod:
       type: string
       enum: [cash, bank_transfer, upi, cheque, other]

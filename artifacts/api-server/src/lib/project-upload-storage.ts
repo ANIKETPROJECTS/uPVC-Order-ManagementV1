@@ -5,6 +5,7 @@ import path from "node:path";
 
 export const PROJECT_UPLOAD_CATEGORIES = [
   "order-documents",
+  "glass-order-workbooks",
   "measurement-sheets",
   "quotation-rate-pdfs",
   "avatars",

@@ -13,6 +13,7 @@ import {
   GetBalancePaymentTransactionsParams,
   GetBalancePaymentTransactionsResponse,
   GetGlassTrackingResponse,
+  ImportGlassOrderWorkbookParams, ImportGlassOrderWorkbookResponse,
   GetPaymentOverviewResponse,
   GetPurchaseOrderRegisterResponse,
   ListOrderDocumentCategoriesResponse,
@@ -24,7 +25,9 @@ import {
   RecordOrderPaymentBody, RecordOrderPaymentParams, RecordOrderPaymentResponse, UpdateOrderWindowBody,
   RecordOrderRefundBody, RecordOrderRefundParams, RecordOrderRefundResponse,
   ResolvePaymentFlagBody, ResolvePaymentFlagParams, ResolvePaymentFlagResponse,
+  PreviewGlassOrderWorkbookParams, PreviewGlassOrderWorkbookResponse,
   ReplaceOrderDocumentParams, ReplaceOrderDocumentResponse,
+  UpdateGlassTrackingQuantitiesBody, UpdateGlassTrackingQuantitiesParams, UpdateGlassTrackingQuantitiesResponse,
   UpdateOrderDocumentCategoryBody, UpdateOrderDocumentCategoryParams, UpdateOrderDocumentCategoryResponse,
   UpdateOrderWindowParams, UpdateOrderWindowResponse, UpdatePaymentFlagBody, UpdatePaymentFlagParams, UpdatePaymentFlagResponse, VoidOrderPaymentBody, VoidOrderPaymentParams, VoidOrderPaymentResponse,
   UploadOrderDocumentParams, UploadOrderDocumentResponse, UploadQuotationConfirmationDocumentParams,
@@ -32,7 +35,8 @@ import {
 } from "@workspace/api-zod";
 import {
   getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPaymentFlags, getOrderPayments,
-  getOrderRefunds, getOrders, getOrderWindows, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderDocument, type OrderWindowDocument,
+  getOrderRefunds, getOrders, getOrderWindows, getGlassTrackingOrders, getGlassTrackingWorkbookImports, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderDocument, type OrderWindowDocument,
+  type GlassTrackingItemDocument, type GlassTrackingOrderDocument,
   type OrderPaymentFlagDocument, type PaymentFlagActionDocument, type OrderRefundDocument,
 } from "../lib/mongo";
 import {
@@ -45,6 +49,7 @@ import {
   resolveProjectUploadPath,
   storeProjectUpload,
 } from "../lib/project-upload-storage";
+import { parseGlassOrderWorkbook, type ParsedGlassWorkbookSection } from "../lib/glass-order-workbook";
 
 const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
@@ -208,36 +213,328 @@ const toWhatsAppNumber = (value: string | null | undefined) => {
   return normalized.length >= 8 && normalized.length <= 15 ? normalized : null;
 };
 const formatReminderAmount = (value: number) => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(value);
+const workbookContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+function validGlassWorkbookUpload(
+  filename: string,
+  rawContentType: string | string[] | undefined,
+  body: Buffer,
+): boolean {
+  const declaredType = (Array.isArray(rawContentType) ? rawContentType[0] : rawContentType ?? "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+  return Boolean(
+    body?.length
+    && filename.toLowerCase().endsWith(".xlsx")
+    && !/[\\/\0-\x1f]/.test(filename)
+    && (declaredType === "application/octet-stream" || declaredType === workbookContentType),
+  );
+}
+
+function glassTrackingOrderResponse(
+  order: OrderDocument,
+  tracking: GlassTrackingOrderDocument | null,
+  invoice: { filename: string } | null,
+) {
+  const items = tracking?.items ?? [];
+  const ordered = items.reduce((sum, item) => sum + item.ordered, 0);
+  const received = items.reduce((sum, item) => sum + item.received, 0);
+  const broken = items.reduce((sum, item) => sum + item.broken, 0);
+  const status = !tracking
+    ? "glass_input_pending"
+    : received + broken === 0
+      ? "pending"
+      : received + broken < ordered
+        ? "partial"
+        : "received";
+  const invoiceFilename = invoice?.filename ?? null;
+
+  return {
+    orderRecordId: order._id,
+    orderId: order.orderId,
+    clientName: order.clientName,
+    locationName: order.locationName,
+    invoiceNo: invoiceFilename ? invoiceFilename.replace(/\.[^.]+$/, "") : null,
+    invoiceFilename,
+    glassInputFilename: tracking?.workbookFilename ?? null,
+    glassInputRevision: tracking?.revision ?? 0,
+    glassInputUploadedAt: tracking?.uploadedAt.toISOString() ?? null,
+    ordered,
+    received,
+    broken,
+    status,
+    items,
+    updatedAt: (tracking?.updatedAt ?? order.updatedAt).toISOString(),
+  };
+}
 
 router.get("/glass-tracking", async (req, res): Promise<void> => {
   if (!(await context(req, res, "glass-procurement"))) return;
   const db = await getMongoDb();
-  const [orders, windows] = await Promise.all([
+  const [orders, trackingRows, invoiceRows] = await Promise.all([
     getOrders(db).find({}).toArray(),
-    getOrderWindows(db).find({ archivedAt: { $exists: false } }).toArray(),
+    getGlassTrackingOrders(db).find({}).toArray(),
+    getOrderDocumentMetadata(db)
+      .find({ category: "invoice", archivedAt: { $exists: false } })
+      .sort({ uploadedAt: -1 })
+      .toArray(),
   ]);
-  const ordersById = new Map(orders.map((order) => [order._id, order]));
-  const trackingRows = windows.flatMap((window) => {
-    const order = ordersById.get(window.orderRecordId);
-    if (!order) return [];
-    return [{
-      windowId: window._id,
-      orderRecordId: order._id,
-      orderId: order.orderId,
-      orderStatus: order.status,
-      clientName: order.clientName,
-      locationCode: order.locationCode,
-      locationName: order.locationName,
-      windowNo: window.windowNo,
-      windowType: window.windowType,
-      widthMm: window.widthMm,
-      heightMm: window.heightMm,
-      sqFt: window.sqFt,
-      glassStatus: window.glassStatus,
-      updatedAt: window.updatedAt.toISOString(),
-    }];
-  }).sort((a, b) => a.orderId.localeCompare(b.orderId) || a.windowNo.localeCompare(b.windowNo));
-  res.json(GetGlassTrackingResponse.parse(trackingRows));
+  const trackingByOrderId = new Map(trackingRows.map((tracking) => [tracking.orderRecordId, tracking]));
+  const invoiceByOrderId = new Map<string, (typeof invoiceRows)[number]>();
+  for (const invoice of invoiceRows) {
+    if (!invoiceByOrderId.has(invoice.orderRecordId)) invoiceByOrderId.set(invoice.orderRecordId, invoice);
+  }
+  const response = orders
+    .map((order) => glassTrackingOrderResponse(
+      order,
+      trackingByOrderId.get(order._id) ?? null,
+      invoiceByOrderId.get(order._id) ?? null,
+    ))
+    .sort((a, b) => a.orderId.localeCompare(b.orderId, undefined, { numeric: true, sensitivity: "base" }));
+  res.json(GetGlassTrackingResponse.parse(response));
+});
+
+router.post("/glass-tracking/workbooks/:filename/preview", async (req, res, next): Promise<void> => {
+  const p = PreviewGlassOrderWorkbookParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "glass-procurement", true);
+  if (!actor) return;
+  expressRaw(req, res, next, async () => {
+    const body = req.body as Buffer;
+    if (!validGlassWorkbookUpload(p.data.filename, req.headers["content-type"], body)) {
+      res.status(400).json({ error: "Choose an .xlsx workbook no larger than 10 MiB." });
+      return;
+    }
+    try {
+      const sections = await parseGlassOrderWorkbook(body);
+      res.json(PreviewGlassOrderWorkbookResponse.parse({ filename: p.data.filename, sections }));
+    } catch (error) {
+      res.status(422).json({ error: error instanceof Error ? error.message : "The workbook could not be parsed." });
+    }
+  });
+});
+
+router.post("/glass-tracking/workbooks/:filename/import/:mappingToken", async (req, res, next): Promise<void> => {
+  const p = ImportGlassOrderWorkbookParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "glass-procurement", true);
+  if (!actor) return;
+
+  expressRaw(req, res, next, async () => {
+    const body = req.body as Buffer;
+    if (!validGlassWorkbookUpload(p.data.filename, req.headers["content-type"], body)) {
+      res.status(400).json({ error: "Choose an .xlsx workbook no larger than 10 MiB." });
+      return;
+    }
+
+    let sections: ParsedGlassWorkbookSection[];
+    let orderRecordIds: string[];
+    try {
+      sections = await parseGlassOrderWorkbook(body);
+      const decoded = Buffer.from(p.data.mappingToken, "base64url").toString("utf8");
+      const parsedMapping: unknown = JSON.parse(decoded);
+      if (!Array.isArray(parsedMapping) || !parsedMapping.every((id) => typeof id === "string" && id.length > 0)) {
+        res.status(400).json({ error: "Choose an order for every client section before importing." });
+        return;
+      }
+      orderRecordIds = parsedMapping as string[];
+      if (orderRecordIds.length !== sections.length) {
+        res.status(400).json({ error: "The workbook sections changed after preview. Preview the file again before importing." });
+        return;
+      }
+    } catch (error) {
+      res.status(422).json({ error: error instanceof Error ? error.message : "The workbook or order mapping could not be read." });
+      return;
+    }
+
+    const db = await getMongoDb();
+    const uniqueOrderIds = [...new Set(orderRecordIds)];
+    const orders = await getOrders(db).find({ _id: { $in: uniqueOrderIds } }).toArray();
+    const ordersById = new Map(orders.map((order) => [order._id, order]));
+    if (ordersById.size !== uniqueOrderIds.length) {
+      res.status(400).json({ error: "One or more mapped orders no longer exist. Refresh the register and try again." });
+      return;
+    }
+
+    const sectionItemsByOrder = new Map<string, {
+      clientLabels: string[];
+      items: ParsedGlassWorkbookSection["items"];
+    }>();
+    sections.forEach((section, index) => {
+      const orderRecordId = orderRecordIds[index];
+      const target = sectionItemsByOrder.get(orderRecordId) ?? { clientLabels: [], items: [] };
+      target.clientLabels.push(section.clientLabel);
+      target.items.push(...section.items);
+      sectionItemsByOrder.set(orderRecordId, target);
+    });
+
+    const previousRows = await getGlassTrackingOrders(db)
+      .find({ orderRecordId: { $in: uniqueOrderIds } })
+      .toArray();
+    const previousByOrderId = new Map(previousRows.map((row) => [row.orderRecordId, row]));
+    const now = new Date();
+    const importId = randomUUID();
+    const plannedRows: Array<{
+      order: (typeof orders)[number];
+      previous: GlassTrackingOrderDocument | null;
+      next: GlassTrackingOrderDocument;
+      clientLabels: string[];
+    }> = [];
+
+    for (const [orderRecordId, mapped] of sectionItemsByOrder) {
+      const order = ordersById.get(orderRecordId)!;
+      const previous = previousByOrderId.get(orderRecordId) ?? null;
+      const previousItems = new Map((previous?.items ?? []).map((item) => [item.id, item]));
+      const items: GlassTrackingItemDocument[] = mapped.items.map((item) => {
+        const old = previousItems.get(item.id);
+        return {
+          ...item,
+          received: old?.received ?? 0,
+          broken: old?.broken ?? 0,
+        };
+      });
+      const overOrderedItem = items.find((item) => item.received + item.broken > item.ordered);
+      if (overOrderedItem) {
+        res.status(409).json({
+          error: `The revised quantity for ${order.orderId}, ${overOrderedItem.glassType} · window ${overOrderedItem.windowNo}, is below its recorded received and broken counts. Correct those counts before importing this revision.`,
+        });
+        return;
+      }
+      plannedRows.push({
+        order,
+        previous,
+        clientLabels: mapped.clientLabels,
+        next: {
+          _id: orderRecordId,
+          orderRecordId,
+          importId,
+          workbookFilename: p.data.filename,
+          revision: (previous?.revision ?? 0) + 1,
+          items,
+          uploadedBy: actor.id,
+          updatedBy: actor.id,
+          uploadedAt: now,
+          updatedAt: now,
+        },
+      });
+    }
+
+    let storagePath: string;
+    try {
+      storagePath = await storeProjectUpload("glass-order-workbooks", p.data.filename, body);
+    } catch (error) {
+      req.log.error({ err: error }, "Failed to store a glass-order workbook");
+      res.status(500).json({ error: "The workbook could not be saved. Try again." });
+      return;
+    }
+
+    const importDocument = {
+      _id: importId,
+      filename: p.data.filename,
+      storagePath,
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      sizeBytes: body.length,
+      uploadedBy: actor.id,
+      uploadedAt: now,
+      mappings: sections.map((section, index) => ({
+        clientLabel: section.clientLabel,
+        orderRecordId: orderRecordIds[index],
+      })),
+      sections,
+    };
+
+    try {
+      await getGlassTrackingWorkbookImports(db).insertOne(importDocument);
+      await getGlassTrackingOrders(db).bulkWrite(plannedRows.map(({ next }) => ({
+        replaceOne: { filter: { _id: next._id }, replacement: next, upsert: true },
+      })));
+    } catch (error) {
+      await getGlassTrackingWorkbookImports(db).deleteOne({ _id: importId }).catch(() => undefined);
+      await Promise.all(plannedRows.map(({ order, previous }) =>
+        previous
+          ? getGlassTrackingOrders(db).replaceOne({ _id: order._id }, previous).catch(() => undefined)
+          : getGlassTrackingOrders(db).deleteOne({ _id: order._id }).catch(() => undefined),
+      ));
+      await removeProjectUpload(storagePath).catch((cleanupError: unknown) =>
+        req.log.error({ err: cleanupError, storagePath }, "Failed to clean up an unsuccessful glass workbook import"),
+      );
+      throw error;
+    }
+
+    await Promise.all(plannedRows.map(({ order, next, clientLabels }) =>
+      event(order._id, actor, "glass.workbook.imported", `Imported ${p.data.filename} revision ${next.revision} for ${clientLabels.join(", ")}.`),
+    ));
+    const invoices = await getOrderDocumentMetadata(db)
+      .find({ orderRecordId: { $in: uniqueOrderIds }, category: "invoice", archivedAt: { $exists: false } })
+      .sort({ uploadedAt: -1 })
+      .toArray();
+    const invoiceByOrderId = new Map<string, (typeof invoices)[number]>();
+    for (const invoice of invoices) {
+      if (!invoiceByOrderId.has(invoice.orderRecordId)) invoiceByOrderId.set(invoice.orderRecordId, invoice);
+    }
+    const result = plannedRows
+      .map(({ order, next }) => glassTrackingOrderResponse(order, next, invoiceByOrderId.get(order._id) ?? null))
+      .sort((a, b) => a.orderId.localeCompare(b.orderId, undefined, { numeric: true, sensitivity: "base" }));
+    res.json(ImportGlassOrderWorkbookResponse.parse(result));
+  });
+});
+
+router.patch("/orders/:id/glass-tracking/quantities", async (req, res): Promise<void> => {
+  const p = UpdateGlassTrackingQuantitiesParams.safeParse(req.params);
+  const body = UpdateGlassTrackingQuantitiesBody.safeParse(req.body);
+  if (!p.success) {
+    res.status(400).json({ error: p.error.message });
+    return;
+  }
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const actor = await context(req, res, "glass-procurement", true);
+  if (!actor) return;
+  const order = await orderExists(p.data.id, res);
+  if (!order) return;
+
+  const collection = getGlassTrackingOrders(await getMongoDb());
+  const tracking = await collection.findOne({ orderRecordId: p.data.id });
+  if (!tracking) {
+    res.status(409).json({ error: "Import a glass-order workbook before recording received or broken quantities." });
+    return;
+  }
+  const updates = new Map(body.data.items.map((item) => [item.id, item]));
+  if (updates.size !== body.data.items.length) {
+    res.status(400).json({ error: "Each glass item can appear only once in a quantity update." });
+    return;
+  }
+  const items = tracking.items.map((item) => {
+    const update = updates.get(item.id);
+    return update ? { ...item, received: update.received, broken: update.broken } : item;
+  });
+  if (body.data.items.some((item) => !tracking.items.some((current) => current.id === item.id))) {
+    res.status(400).json({ error: "One or more glass items are no longer in this order. Refresh and try again." });
+    return;
+  }
+  const exceedingItem = items.find((item) => item.received + item.broken > item.ordered);
+  if (exceedingItem) {
+    res.status(409).json({ error: `Received and broken pieces cannot exceed the ordered quantity for ${exceedingItem.glassType}, window ${exceedingItem.windowNo}.` });
+    return;
+  }
+
+  const updatedAt = new Date();
+  await collection.updateOne(
+    { orderRecordId: p.data.id },
+    { $set: { items, updatedBy: actor.id, updatedAt } },
+  );
+  await event(p.data.id, actor, "glass.quantities.updated", "Updated received and broken glass quantities.");
+  const invoice = await getOrderDocumentMetadata(await getMongoDb()).findOne({
+    orderRecordId: p.data.id,
+    category: "invoice",
+    archivedAt: { $exists: false },
+  }, { sort: { uploadedAt: -1 } });
+  res.json(UpdateGlassTrackingQuantitiesResponse.parse(
+    glassTrackingOrderResponse(order, { ...tracking, items, updatedBy: actor.id, updatedAt }, invoice),
+  ));
 });
 
 router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {

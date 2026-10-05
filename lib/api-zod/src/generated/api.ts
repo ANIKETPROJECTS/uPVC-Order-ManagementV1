@@ -3482,25 +3482,214 @@ export const PreviewMeasurementVersionResponse = zod.unknown()
 
 
 /**
- * @summary List active order windows with their glass tracking details
+ * @summary List all created orders with glass order quantities and invoice status
  */
+export const getGlassTrackingResponseGlassInputRevisionMin = 0;
+
+export const getGlassTrackingResponseOrderedMin = 0;
+
+export const getGlassTrackingResponseReceivedMin = 0;
+
+export const getGlassTrackingResponseBrokenMin = 0;
+
+export const getGlassTrackingResponseItemsItemOrderedMin = 0;
+
+export const getGlassTrackingResponseItemsItemReceivedMin = 0;
+
+export const getGlassTrackingResponseItemsItemBrokenMin = 0;
+
+
+
 export const GetGlassTrackingResponseItem = zod.object({
-  "windowId": zod.string(),
   "orderRecordId": zod.string(),
   "orderId": zod.string(),
-  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "clientName": zod.string(),
-  "locationCode": zod.string(),
   "locationName": zod.string(),
+  "invoiceNo": zod.string().nullable(),
+  "invoiceFilename": zod.string().nullable(),
+  "glassInputFilename": zod.string().nullable(),
+  "glassInputRevision": zod.number().int().min(getGlassTrackingResponseGlassInputRevisionMin),
+  "glassInputUploadedAt": zod.coerce.date().nullable(),
+  "ordered": zod.number().int().min(getGlassTrackingResponseOrderedMin),
+  "received": zod.number().int().min(getGlassTrackingResponseReceivedMin),
+  "broken": zod.number().int().min(getGlassTrackingResponseBrokenMin),
+  "status": zod.enum(['glass_input_pending', 'pending', 'partial', 'received']),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "villaNo": zod.string().nullable(),
   "windowNo": zod.string(),
-  "windowType": zod.string(),
+  "glassType": zod.string(),
   "widthMm": zod.number(),
   "heightMm": zod.number(),
-  "sqFt": zod.number(),
-  "glassStatus": zod.enum(['pending', 'partial', 'received']),
+  "ordered": zod.number().int().min(getGlassTrackingResponseItemsItemOrderedMin),
+  "received": zod.number().int().min(getGlassTrackingResponseItemsItemReceivedMin),
+  "broken": zod.number().int().min(getGlassTrackingResponseItemsItemBrokenMin)
+})),
   "updatedAt": zod.coerce.date()
 })
 export const GetGlassTrackingResponse = zod.array(GetGlassTrackingResponseItem)
+
+
+/**
+ * @summary Preview client sections and glass quantities in an XLSX workbook
+ */
+export const previewGlassOrderWorkbookPathFilenameMax = 255;
+
+
+
+export const PreviewGlassOrderWorkbookParams = zod.object({
+  "filename": zod.coerce.string().min(1).max(previewGlassOrderWorkbookPathFilenameMax)
+})
+
+
+
+
+export const PreviewGlassOrderWorkbookResponse = zod.object({
+  "filename": zod.string(),
+  "sections": zod.array(zod.object({
+  "clientLabel": zod.string(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "villaNo": zod.string().nullable(),
+  "windowNo": zod.string(),
+  "glassType": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "ordered": zod.number().int().min(1)
+}))
+}))
+})
+
+
+/**
+ * @summary Import a workbook revision for its mapped orders
+ */
+export const importGlassOrderWorkbookPathFilenameMax = 255;
+
+export const importGlassOrderWorkbookPathMappingTokenMax = 8192;
+
+
+export const importGlassOrderWorkbookPathMappingTokenRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+
+
+export const ImportGlassOrderWorkbookParams = zod.object({
+  "filename": zod.coerce.string().min(1).max(importGlassOrderWorkbookPathFilenameMax),
+  "mappingToken": zod.coerce.string().max(importGlassOrderWorkbookPathMappingTokenMax).regex(importGlassOrderWorkbookPathMappingTokenRegExp)
+})
+
+export const importGlassOrderWorkbookResponseGlassInputRevisionMin = 0;
+
+export const importGlassOrderWorkbookResponseOrderedMin = 0;
+
+export const importGlassOrderWorkbookResponseReceivedMin = 0;
+
+export const importGlassOrderWorkbookResponseBrokenMin = 0;
+
+export const importGlassOrderWorkbookResponseItemsItemOrderedMin = 0;
+
+export const importGlassOrderWorkbookResponseItemsItemReceivedMin = 0;
+
+export const importGlassOrderWorkbookResponseItemsItemBrokenMin = 0;
+
+
+
+export const ImportGlassOrderWorkbookResponseItem = zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "invoiceNo": zod.string().nullable(),
+  "invoiceFilename": zod.string().nullable(),
+  "glassInputFilename": zod.string().nullable(),
+  "glassInputRevision": zod.number().int().min(importGlassOrderWorkbookResponseGlassInputRevisionMin),
+  "glassInputUploadedAt": zod.coerce.date().nullable(),
+  "ordered": zod.number().int().min(importGlassOrderWorkbookResponseOrderedMin),
+  "received": zod.number().int().min(importGlassOrderWorkbookResponseReceivedMin),
+  "broken": zod.number().int().min(importGlassOrderWorkbookResponseBrokenMin),
+  "status": zod.enum(['glass_input_pending', 'pending', 'partial', 'received']),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "villaNo": zod.string().nullable(),
+  "windowNo": zod.string(),
+  "glassType": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "ordered": zod.number().int().min(importGlassOrderWorkbookResponseItemsItemOrderedMin),
+  "received": zod.number().int().min(importGlassOrderWorkbookResponseItemsItemReceivedMin),
+  "broken": zod.number().int().min(importGlassOrderWorkbookResponseItemsItemBrokenMin)
+})),
+  "updatedAt": zod.coerce.date()
+})
+export const ImportGlassOrderWorkbookResponse = zod.array(ImportGlassOrderWorkbookResponseItem)
+
+
+/**
+ * @summary Update received and broken glass quantities for an order
+ */
+export const UpdateGlassTrackingQuantitiesParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateGlassTrackingQuantitiesBodyItemsItemReceivedMin = 0;
+export const updateGlassTrackingQuantitiesBodyItemsItemReceivedMax = 100000;
+
+export const updateGlassTrackingQuantitiesBodyItemsItemBrokenMin = 0;
+export const updateGlassTrackingQuantitiesBodyItemsItemBrokenMax = 100000;
+
+
+
+
+export const UpdateGlassTrackingQuantitiesBody = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "received": zod.number().int().min(updateGlassTrackingQuantitiesBodyItemsItemReceivedMin).max(updateGlassTrackingQuantitiesBodyItemsItemReceivedMax),
+  "broken": zod.number().int().min(updateGlassTrackingQuantitiesBodyItemsItemBrokenMin).max(updateGlassTrackingQuantitiesBodyItemsItemBrokenMax)
+})).min(1)
+})
+
+export const updateGlassTrackingQuantitiesResponseGlassInputRevisionMin = 0;
+
+export const updateGlassTrackingQuantitiesResponseOrderedMin = 0;
+
+export const updateGlassTrackingQuantitiesResponseReceivedMin = 0;
+
+export const updateGlassTrackingQuantitiesResponseBrokenMin = 0;
+
+export const updateGlassTrackingQuantitiesResponseItemsItemOrderedMin = 0;
+
+export const updateGlassTrackingQuantitiesResponseItemsItemReceivedMin = 0;
+
+export const updateGlassTrackingQuantitiesResponseItemsItemBrokenMin = 0;
+
+
+
+export const UpdateGlassTrackingQuantitiesResponse = zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "invoiceNo": zod.string().nullable(),
+  "invoiceFilename": zod.string().nullable(),
+  "glassInputFilename": zod.string().nullable(),
+  "glassInputRevision": zod.number().int().min(updateGlassTrackingQuantitiesResponseGlassInputRevisionMin),
+  "glassInputUploadedAt": zod.coerce.date().nullable(),
+  "ordered": zod.number().int().min(updateGlassTrackingQuantitiesResponseOrderedMin),
+  "received": zod.number().int().min(updateGlassTrackingQuantitiesResponseReceivedMin),
+  "broken": zod.number().int().min(updateGlassTrackingQuantitiesResponseBrokenMin),
+  "status": zod.enum(['glass_input_pending', 'pending', 'partial', 'received']),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "villaNo": zod.string().nullable(),
+  "windowNo": zod.string(),
+  "glassType": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "ordered": zod.number().int().min(updateGlassTrackingQuantitiesResponseItemsItemOrderedMin),
+  "received": zod.number().int().min(updateGlassTrackingQuantitiesResponseItemsItemReceivedMin),
+  "broken": zod.number().int().min(updateGlassTrackingQuantitiesResponseItemsItemBrokenMin)
+})),
+  "updatedAt": zod.coerce.date()
+})
 
 
 /**

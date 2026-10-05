@@ -539,24 +539,112 @@ export interface OrderWindowUpdate {
 
 export type OrderWindowList = OrderWindow[];
 
-export interface GlassTrackingWindow {
-  windowId: string;
-  orderRecordId: string;
-  orderId: string;
-  orderStatus: OrderStatus;
-  clientName: string;
-  locationCode: string;
-  locationName: string;
+export type GlassTrackingStatus = typeof GlassTrackingStatus[keyof typeof GlassTrackingStatus];
+
+
+export const GlassTrackingStatus = {
+  glass_input_pending: 'glass_input_pending',
+  pending: 'pending',
+  partial: 'partial',
+  received: 'received',
+} as const;
+
+export interface GlassTrackingItem {
+  id: string;
+  /** @nullable */
+  villaNo: string | null;
   windowNo: string;
-  windowType: string;
+  glassType: string;
   widthMm: number;
   heightMm: number;
-  sqFt: number;
-  glassStatus: OrderGlassStatus;
+  /** @minimum 0 */
+  ordered: number;
+  /** @minimum 0 */
+  received: number;
+  /** @minimum 0 */
+  broken: number;
+}
+
+export type GlassTrackingItemList = GlassTrackingItem[];
+
+export interface GlassTrackingOrder {
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  /** @nullable */
+  invoiceNo: string | null;
+  /** @nullable */
+  invoiceFilename: string | null;
+  /** @nullable */
+  glassInputFilename: string | null;
+  /** @minimum 0 */
+  glassInputRevision: number;
+  /** @nullable */
+  glassInputUploadedAt: string | null;
+  /** @minimum 0 */
+  ordered: number;
+  /** @minimum 0 */
+  received: number;
+  /** @minimum 0 */
+  broken: number;
+  status: GlassTrackingStatus;
+  items: GlassTrackingItemList;
   updatedAt: string;
 }
 
-export type GlassTrackingWindowList = GlassTrackingWindow[];
+export type GlassTrackingOrderList = GlassTrackingOrder[];
+
+export interface GlassWorkbookItem {
+  id: string;
+  /** @nullable */
+  villaNo: string | null;
+  windowNo: string;
+  glassType: string;
+  widthMm: number;
+  heightMm: number;
+  /** @minimum 1 */
+  ordered: number;
+}
+
+export type GlassWorkbookItemList = GlassWorkbookItem[];
+
+export interface GlassWorkbookSection {
+  clientLabel: string;
+  items: GlassWorkbookItemList;
+}
+
+export type GlassWorkbookSectionList = GlassWorkbookSection[];
+
+export interface GlassWorkbookPreview {
+  filename: string;
+  sections: GlassWorkbookSectionList;
+}
+
+export type GlassOrderWorkbookBinary = Blob;
+
+export interface GlassTrackingQuantityInput {
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  received: number;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  broken: number;
+}
+
+/**
+ * @minItems 1
+ */
+export type GlassTrackingQuantityInputList = GlassTrackingQuantityInput[];
+
+export interface GlassTrackingQuantitiesInput {
+  items: GlassTrackingQuantityInputList;
+}
 
 export type OrderPaymentMethod = typeof OrderPaymentMethod[keyof typeof OrderPaymentMethod];
 

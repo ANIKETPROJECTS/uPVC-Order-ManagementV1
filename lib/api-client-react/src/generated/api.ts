@@ -41,7 +41,10 @@ import type {
   DispatchOrder,
   DispatchOrderList,
   DispatchStatusUpdate,
-  GlassTrackingWindowList,
+  GlassTrackingOrder,
+  GlassTrackingOrderList,
+  GlassTrackingQuantitiesInput,
+  GlassWorkbookPreview,
   HealthStatus,
   InstallationOrder,
   InstallationOrderList,
@@ -8463,11 +8466,11 @@ export const getGetGlassTrackingUrl = () => {
 }
 
 /**
- * @summary List active order windows with their glass tracking details
+ * @summary List all created orders with glass order quantities and invoice status
  */
-export const getGlassTracking = async ( options?: Parameters<typeof customFetch>[1]): Promise<GlassTrackingWindowList> => {
+export const getGlassTracking = async ( options?: Parameters<typeof customFetch>[1]): Promise<GlassTrackingOrderList> => {
 
-  return customFetch<GlassTrackingWindowList>(getGetGlassTrackingUrl(),
+  return customFetch<GlassTrackingOrderList>(getGetGlassTrackingUrl(),
   {
     ...options,
     method: 'GET'
@@ -8510,7 +8513,7 @@ export type GetGlassTrackingQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List active order windows with their glass tracking details
+ * @summary List all created orders with glass order quantities and invoice status
  */
 
 export function useGetGlassTracking<TData = Awaited<ReturnType<typeof getGlassTracking>>, TError = ErrorType<unknown>>(
@@ -8530,6 +8533,275 @@ export function useGetGlassTracking<TData = Awaited<ReturnType<typeof getGlassTr
 
 
 
+
+export const getPreviewGlassOrderWorkbookUrl = (filename: string,) => {
+
+
+
+
+  return `/api/glass-tracking/workbooks/${filename}/preview`
+}
+
+/**
+ * @summary Preview client sections and glass quantities in an XLSX workbook
+ */
+export const previewGlassOrderWorkbook = async (filename: string,
+    previewGlassOrderWorkbookBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<GlassWorkbookPreview> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<GlassWorkbookPreview>(getPreviewGlassOrderWorkbookUrl(filename),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: previewGlassOrderWorkbookBody
+  }
+);}
+
+
+
+
+
+export const getPreviewGlassOrderWorkbookMutationKey = () => ['previewGlassOrderWorkbook'] as const;
+
+export const getPreviewGlassOrderWorkbookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewGlassOrderWorkbook>>, TError,PreviewGlassOrderWorkbookMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewGlassOrderWorkbook>>, TError,PreviewGlassOrderWorkbookMutationVariables, TContext> => {
+
+const mutationKey = getPreviewGlassOrderWorkbookMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewGlassOrderWorkbook>>, PreviewGlassOrderWorkbookMutationVariables> = (props) => {
+          const {filename,data} = props ?? {};
+
+          return  previewGlassOrderWorkbook(filename,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewGlassOrderWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof previewGlassOrderWorkbook>>>
+    export type PreviewGlassOrderWorkbookMutationBody = BodyType<Blob>
+    export type PreviewGlassOrderWorkbookMutationError = ErrorType<void>
+    export type PreviewGlassOrderWorkbookMutationVariables = {filename: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Preview client sections and glass quantities in an XLSX workbook
+ */
+export const usePreviewGlassOrderWorkbook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewGlassOrderWorkbook>>, TError,PreviewGlassOrderWorkbookMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewGlassOrderWorkbook>>,
+        TError,
+        PreviewGlassOrderWorkbookMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPreviewGlassOrderWorkbookMutationOptions(options));
+    }
+
+export const getImportGlassOrderWorkbookUrl = (filename: string,
+    mappingToken: string,) => {
+
+
+
+
+  return `/api/glass-tracking/workbooks/${filename}/import/${mappingToken}`
+}
+
+/**
+ * @summary Import a workbook revision for its mapped orders
+ */
+export const importGlassOrderWorkbook = async (filename: string,
+    mappingToken: string,
+    importGlassOrderWorkbookBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<GlassTrackingOrderList> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<GlassTrackingOrderList>(getImportGlassOrderWorkbookUrl(filename,mappingToken),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: importGlassOrderWorkbookBody
+  }
+);}
+
+
+
+
+
+export const getImportGlassOrderWorkbookMutationKey = () => ['importGlassOrderWorkbook'] as const;
+
+export const getImportGlassOrderWorkbookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importGlassOrderWorkbook>>, TError,ImportGlassOrderWorkbookMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importGlassOrderWorkbook>>, TError,ImportGlassOrderWorkbookMutationVariables, TContext> => {
+
+const mutationKey = getImportGlassOrderWorkbookMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importGlassOrderWorkbook>>, ImportGlassOrderWorkbookMutationVariables> = (props) => {
+          const {filename,mappingToken,data} = props ?? {};
+
+          return  importGlassOrderWorkbook(filename,mappingToken,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportGlassOrderWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof importGlassOrderWorkbook>>>
+    export type ImportGlassOrderWorkbookMutationBody = BodyType<Blob>
+    export type ImportGlassOrderWorkbookMutationError = ErrorType<void>
+    export type ImportGlassOrderWorkbookMutationVariables = {filename: string;mappingToken: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Import a workbook revision for its mapped orders
+ */
+export const useImportGlassOrderWorkbook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importGlassOrderWorkbook>>, TError,ImportGlassOrderWorkbookMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importGlassOrderWorkbook>>,
+        TError,
+        ImportGlassOrderWorkbookMutationVariables,
+        TContext
+      > => {
+      return useMutation(getImportGlassOrderWorkbookMutationOptions(options));
+    }
+
+export const getUpdateGlassTrackingQuantitiesUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/glass-tracking/quantities`
+}
+
+/**
+ * @summary Update received and broken glass quantities for an order
+ */
+export const updateGlassTrackingQuantities = async (id: string,
+    glassTrackingQuantitiesInput: GlassTrackingQuantitiesInput, options?: Parameters<typeof customFetch>[1]): Promise<GlassTrackingOrder> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<GlassTrackingOrder>(getUpdateGlassTrackingQuantitiesUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(glassTrackingQuantitiesInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateGlassTrackingQuantitiesMutationKey = () => ['updateGlassTrackingQuantities'] as const;
+
+export const getUpdateGlassTrackingQuantitiesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateGlassTrackingQuantities>>, TError,UpdateGlassTrackingQuantitiesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateGlassTrackingQuantities>>, TError,UpdateGlassTrackingQuantitiesMutationVariables, TContext> => {
+
+const mutationKey = getUpdateGlassTrackingQuantitiesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateGlassTrackingQuantities>>, UpdateGlassTrackingQuantitiesMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateGlassTrackingQuantities(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateGlassTrackingQuantitiesMutationResult = NonNullable<Awaited<ReturnType<typeof updateGlassTrackingQuantities>>>
+    export type UpdateGlassTrackingQuantitiesMutationBody = BodyType<GlassTrackingQuantitiesInput>
+    export type UpdateGlassTrackingQuantitiesMutationError = ErrorType<void>
+    export type UpdateGlassTrackingQuantitiesMutationVariables = {id: string;data: BodyType<GlassTrackingQuantitiesInput>}
+
+    /**
+ * @summary Update received and broken glass quantities for an order
+ */
+export const useUpdateGlassTrackingQuantities = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateGlassTrackingQuantities>>, TError,UpdateGlassTrackingQuantitiesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateGlassTrackingQuantities>>,
+        TError,
+        UpdateGlassTrackingQuantitiesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateGlassTrackingQuantitiesMutationOptions(options));
+    }
 
 export const getListOrderWindowsUrl = (id: string,) => {
 

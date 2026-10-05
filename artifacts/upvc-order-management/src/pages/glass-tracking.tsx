@@ -1,26 +1,22 @@
-import { useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { ArrowDownUp, Check, Clock3, LayoutGrid, List, MapPin, PackageCheck, RefreshCw, Search, ShieldCheck } from 'lucide-react';
-import {
-  getGetGlassTrackingQueryKey,
-  getListOrderActivityQueryKey,
-  getListOrderWindowsQueryKey,
-  OrderGlassStatus,
-  useGetGlassTracking,
-  useUpdateOrderWindow,
-} from '@workspace/api-client-react';
-import type { GlassTrackingWindow, User } from '@workspace/api-client-react';
+import { Fragment, useMemo, useState } from 'react';
+import { ArrowDownUp, Check, ChevronDown, ChevronUp, Clock3, FileSpreadsheet, LayoutGrid, List, PackageCheck, RefreshCw, Search, ShieldCheck, UploadCloud } from 'lucide-react';
+import { getGetGlassTrackingQueryKey, useGetGlassTracking, useUpdateGlassTrackingQuantities } from '@workspace/api-client-react';
+import type { GlassTrackingOrder, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
+import { GlassQuantityEditor } from '@/components/glass-quantity-editor';
+import { GlassWorkbookImportDialog } from '@/components/glass-workbook-import-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
-type GlassStatus = (typeof OrderGlassStatus)[keyof typeof OrderGlassStatus];
-type SortValue = 'updated' | 'order' | 'client' | 'window' | 'status' | 'area';
+type GlassStatus = GlassTrackingOrder['status'];
+type SortValue = 'updated' | 'order' | 'client' | 'status' | 'ordered';
 type ViewMode = 'list' | 'grid';
 
-const STATUS_OPTIONS: { value: GlassStatus; label: string; tone: string; dot: string }[] = [
-  { value: OrderGlassStatus.pending, label: 'Pending', tone: 'bg-amber-100 text-amber-900 ring-amber-200', dot: 'bg-amber-500' },
-  { value: OrderGlassStatus.partial, label: 'Partial', tone: 'bg-sky-100 text-sky-900 ring-sky-200', dot: 'bg-sky-600' },
-  { value: OrderGlassStatus.received, label: 'Received', tone: 'bg-emerald-100 text-emerald-900 ring-emerald-200', dot: 'bg-emerald-600' },
+const STATUS_OPTIONS: { value: GlassStatus; label: string; tone: string; dot: string; icon: typeof Clock3 }[] = [
+  { value: 'glass_input_pending', label: 'Glass Input Pending', tone: 'bg-rose-100 text-rose-900 ring-rose-200', dot: 'bg-rose-500', icon: UploadCloud },
+  { value: 'pending', label: 'Pending', tone: 'bg-amber-100 text-amber-900 ring-amber-200', dot: 'bg-amber-500', icon: Clock3 },
+  { value: 'partial', label: 'Partial', tone: 'bg-sky-100 text-sky-900 ring-sky-200', dot: 'bg-sky-600', icon: ArrowDownUp },
+  { value: 'received', label: 'Received', tone: 'bg-emerald-100 text-emerald-900 ring-emerald-200', dot: 'bg-emerald-600', icon: Check },
 ];
 
 function statusLabel(status: string) {
@@ -36,70 +32,120 @@ function StatusBadge({ status, id }: { status: string; id: string }) {
 }
 
 function LoadingState() {
-  return <div className="space-y-2" aria-label="Loading glass tracking records" data-testid="state-glass-loading">
-    {[0, 1, 2, 3].map((item) => <div key={item} className="grid animate-pulse grid-cols-1 gap-4 rounded-xl border border-border/70 bg-card p-4 md:grid-cols-[1.1fr_1fr_.8fr_.8fr_auto]">
+  return <div className="space-y-2" aria-label="Loading glass tracking orders" data-testid="state-glass-loading">
+    {[0, 1, 2, 3].map((item) => <div key={item} className="grid animate-pulse grid-cols-1 gap-4 rounded-xl border border-border/70 bg-card p-4 md:grid-cols-[1.2fr_1fr_.6fr_.6fr_.6fr_auto]">
       <div className="space-y-2"><div className="h-4 w-28 rounded bg-muted" /><div className="h-3 w-36 rounded bg-muted/70" /></div>
-      <div className="h-4 w-32 rounded bg-muted/70" /><div className="h-4 w-24 rounded bg-muted/70" /><div className="h-4 w-20 rounded bg-muted/70" /><div className="h-8 w-24 rounded-lg bg-muted/70" />
+      <div className="h-4 w-32 rounded bg-muted/70" /><div className="h-4 w-16 rounded bg-muted/70" /><div className="h-4 w-16 rounded bg-muted/70" /><div className="h-4 w-16 rounded bg-muted/70" /><div className="h-8 w-24 rounded-lg bg-muted/70" />
     </div>)}
   </div>;
 }
 
-function GlassRow({ item, canEdit, busy, onChange }: {
-  item: GlassTrackingWindow;
-  canEdit: boolean;
-  busy: boolean;
-  onChange: (item: GlassTrackingWindow, status: GlassStatus) => void;
-}) {
-  return <tr className="border-b border-border/60 last:border-0 hover:bg-muted/25" data-testid={`row-glass-window-${item.windowId}`}>
-    <td className="px-4 py-3">
-      <p className="font-mono text-xs font-bold text-primary" data-testid={`text-glass-order-${item.windowId}`}>{item.orderId}</p>
-      <p className="mt-1 max-w-[220px] truncate text-xs font-semibold" title={item.clientName}>{item.clientName}</p>
-    </td>
-    <td className="px-4 py-3">
-      <p className="text-xs font-semibold">{item.locationName}</p>
-      <p className="mt-1 font-mono text-[10px] text-muted-foreground">{item.locationCode}</p>
-    </td>
-    <td className="px-4 py-3">
-      <p className="text-xs font-semibold">{item.windowNo} <span className="font-normal text-muted-foreground">· {item.windowType}</span></p>
-      <p className="mt-1 font-mono text-[10px] text-muted-foreground">{item.widthMm} × {item.heightMm} mm</p>
-    </td>
-    <td className="px-4 py-3 font-mono text-xs" data-testid={`text-glass-area-${item.windowId}`}>{item.sqFt.toFixed(2)} sq ft</td>
-    <td className="px-4 py-3">
-      {canEdit ? <label className="sr-only" htmlFor={`glass-status-${item.windowId}`}>Glass status for order {item.orderId}, window {item.windowNo}</label> : null}
-      {canEdit ? <select id={`glass-status-${item.windowId}`} value={item.glassStatus} disabled={busy} onChange={(event) => onChange(item, event.target.value as GlassStatus)} className="h-9 min-w-32 rounded-lg border border-input bg-background px-2.5 text-xs font-semibold disabled:cursor-wait disabled:opacity-60" data-testid={`select-glass-status-${item.windowId}`}>
-        {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select> : <StatusBadge status={item.glassStatus} id={item.windowId} />}
-    </td>
-  </tr>;
+function orderSearchText(order: GlassTrackingOrder) {
+  return [
+    order.orderId,
+    order.clientName,
+    order.locationName,
+    order.invoiceNo ?? '',
+    order.invoiceFilename ?? '',
+    order.glassInputFilename ?? '',
+    ...order.items.flatMap((item) => [item.villaNo ?? '', item.windowNo, item.glassType]),
+  ].join(' ').toLocaleLowerCase();
 }
 
-function GlassCard({ item, canEdit, busy, onChange }: {
-  item: GlassTrackingWindow;
-  canEdit: boolean;
-  busy: boolean;
-  onChange: (item: GlassTrackingWindow, status: GlassStatus) => void;
-}) {
-  return <article className="rounded-xl border border-border/75 bg-card p-4 shadow-sm transition-shadow hover:shadow-md" data-testid={`card-glass-window-${item.windowId}`}>
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="font-mono text-xs font-bold text-primary">{item.orderId}</p>
-        <p className="mt-1 truncate text-sm font-semibold">{item.clientName}</p>
-      </div>
-      <StatusBadge status={item.glassStatus} id={item.windowId} />
+function formatCount(value: number) {
+  return value.toLocaleString('en-IN');
+}
+
+function invoiceFilenameStem(filename: string | null) {
+  if (!filename) return null;
+  const name = filename.split(/[\\/]/).pop() || filename;
+  return name.replace(/\.[^.]+$/, '') || null;
+}
+
+function DemoDataPreview() {
+  const demoOrders: GlassTrackingOrder[] = [
+    {
+      orderRecordId: 'demo-glass-order-2401',
+      orderId: 'DEMO-GL-2401',
+      clientName: 'Cedar Grove Villas',
+      locationName: 'Pune',
+      invoiceNo: 'INV-DEMO-2401',
+      invoiceFilename: 'INV-DEMO-2401.pdf',
+      glassInputFilename: 'glass-order-demo-rev2.xlsx',
+      glassInputRevision: 2,
+      glassInputUploadedAt: '2026-10-05T10:00:00.000Z',
+      ordered: 18,
+      received: 14,
+      broken: 2,
+      status: 'partial',
+      updatedAt: '2026-10-05T10:00:00.000Z',
+      items: [
+        { id: 'demo-glass-item-1', villaNo: '4-A', windowNo: '1', glassType: '6mm Toughened Glass', widthMm: 1026, heightMm: 2082, ordered: 8, received: 8, broken: 0 },
+        { id: 'demo-glass-item-2', villaNo: '4-B', windowNo: '2', glassType: '5mm Frosted Toughened', widthMm: 1055, heightMm: 1540, ordered: 10, received: 6, broken: 2 },
+      ],
+    },
+    {
+      orderRecordId: 'demo-glass-order-2402',
+      orderId: 'DEMO-GL-2402',
+      clientName: 'Maple Court Residence',
+      locationName: 'Mumbai',
+      invoiceNo: null,
+      invoiceFilename: null,
+      glassInputFilename: null,
+      glassInputRevision: 0,
+      glassInputUploadedAt: null,
+      ordered: 0,
+      received: 0,
+      broken: 0,
+      status: 'glass_input_pending',
+      updatedAt: '2026-10-05T10:00:00.000Z',
+      items: [],
+    },
+    {
+      orderRecordId: 'demo-glass-order-2403',
+      orderId: 'DEMO-GL-2403',
+      clientName: 'Hilltop Bungalows',
+      locationName: 'Pune',
+      invoiceNo: 'INV-DEMO-2403',
+      invoiceFilename: 'INV-DEMO-2403.pdf',
+      glassInputFilename: 'hilltop-glass-order.xlsx',
+      glassInputRevision: 1,
+      glassInputUploadedAt: '2026-10-04T10:00:00.000Z',
+      ordered: 8,
+      received: 8,
+      broken: 0,
+      status: 'received',
+      updatedAt: '2026-10-04T10:00:00.000Z',
+      items: [
+        { id: 'demo-glass-item-3', villaNo: 'B-2', windowNo: '3', glassType: '8mm Toughened Glass', widthMm: 1028, heightMm: 1304, ordered: 8, received: 8, broken: 0 },
+      ],
+    },
+  ];
+
+  return <section className="overflow-hidden rounded-2xl border border-dashed border-primary/30 bg-primary/[0.025]" data-testid="glass-demo-preview">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 px-4 py-3">
+      <div className="flex items-center gap-2"><FileSpreadsheet size={15} className="text-primary" /><div><h2 className="text-sm font-bold">Development sample register</h2><p className="text-[10px] text-muted-foreground">Illustrative orders only · never saved</p></div></div>
+      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">Synthetic demo data</span>
     </div>
-    <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-border/60 pt-3 text-xs">
-      <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Window</p><p className="mt-1 font-semibold">{item.windowNo} · {item.windowType}</p></div>
-      <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Area</p><p className="mt-1 font-mono">{item.sqFt.toFixed(2)} sq ft</p></div>
-      <div className="col-span-2 flex items-start gap-2"><MapPin size={13} className="mt-0.5 shrink-0 text-primary" /><span>{item.locationName} <span className="font-mono text-muted-foreground">({item.locationCode})</span></span></div>
-      <div className="col-span-2 font-mono text-[10px] text-muted-foreground">{item.widthMm} × {item.heightMm} mm</div>
+    <div className="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-3">
+      {demoOrders.map((order) => <article key={order.orderRecordId} className="rounded-xl border border-border/70 bg-card p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0"><p className="font-mono text-xs font-bold text-primary">{order.orderId}</p><p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p></div>
+          <StatusBadge status={order.status} id={order.orderRecordId} />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-3 text-xs">
+          <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice No.</p><p className="mt-1 truncate font-medium">{order.invoiceNo ?? 'Invoice Upload Pending'}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ordered · Received · Broken</p><p className="mt-1 font-mono font-semibold">{order.ordered} · {order.received} · {order.broken}</p></div>
+        </div>
+        {order.items.length ? <ul className="mt-3 space-y-1.5 border-t border-border/60 pt-3 text-[11px]">
+          {order.items.map((item) => <li key={item.id} className="leading-5">
+            <span className="font-semibold">{item.villaNo} · {item.windowNo}</span>
+            <span className="text-muted-foreground"> · {item.glassType} · {item.widthMm} × {item.heightMm} mm · {item.ordered} ordered, {item.received} received, {item.broken} broken</span>
+          </li>)}
+        </ul> : <p className="mt-3 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">No workbook uploaded for this sample order.</p>}
+      </article>)}
     </div>
-    {canEdit && <div className="mt-4 border-t border-border/60 pt-3">
-      <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground" htmlFor={`glass-status-${item.windowId}`}>Glass status</label>
-      <select id={`glass-status-${item.windowId}`} value={item.glassStatus} disabled={busy} onChange={(event) => onChange(item, event.target.value as GlassStatus)} className="h-9 w-full rounded-lg border border-input bg-background px-2.5 text-xs font-semibold disabled:cursor-wait disabled:opacity-60" data-testid={`select-glass-status-${item.windowId}`}>
-        {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </div>}
-  </article>;
+  </section>;
 }
 
 export default function GlassTrackingPage({ user }: { user: User }) {
@@ -109,110 +155,127 @@ export default function GlassTrackingPage({ user }: { user: User }) {
   const canView = user.roleId === 'master-admin' || permission === 'view' || permission === 'edit';
   const canEdit = user.roleId === 'master-admin' || permission === 'edit';
   const trackingQuery = useGetGlassTracking({ query: { queryKey: getGetGlassTrackingQueryKey(), enabled: canView } });
-  const updateWindow = useUpdateOrderWindow();
+  const updateQuantities = useUpdateGlassTrackingQuantities();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
   const [sort, setSort] = useState<SortValue>('updated');
   const [view, setView] = useState<ViewMode>('list');
-  const windows = trackingQuery.data || [];
-  const locations = useMemo(() => [...new Map(windows.map((item) => [item.locationCode, item.locationName])).entries()]
-    .sort((a, b) => a[1].localeCompare(b[1])), [windows]);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const orders = trackingQuery.data || [];
+  const locations = useMemo(() => [...new Set(orders.map((order) => order.locationName))]
+    .sort((a, b) => a.localeCompare(b)), [orders]);
 
-  const filteredWindows = useMemo(() => {
+  const filteredOrders = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
-    const result = windows.filter((item) => {
-      const matchesSearch = !needle || [item.orderId, item.clientName, item.locationName, item.locationCode, item.windowNo, item.windowType]
-        .some((value) => value.toLocaleLowerCase().includes(needle));
-      return matchesSearch
-        && (statusFilter === 'all' || item.glassStatus === statusFilter)
-        && (locationFilter === 'all' || item.locationCode === locationFilter);
+    const result = orders.filter((order) => {
+      return (!needle || orderSearchText(order).includes(needle))
+        && (statusFilter === 'all' || order.status === statusFilter)
+        && (locationFilter === 'all' || order.locationName === locationFilter);
     });
+    const statusOrder: Record<GlassStatus, number> = {
+      glass_input_pending: 0,
+      pending: 1,
+      partial: 2,
+      received: 3,
+    };
     return result.sort((a, b) => {
       if (sort === 'order') return a.orderId.localeCompare(b.orderId, undefined, { numeric: true, sensitivity: 'base' });
       if (sort === 'client') return a.clientName.localeCompare(b.clientName, undefined, { sensitivity: 'base' });
-      if (sort === 'window') return a.windowNo.localeCompare(b.windowNo, undefined, { numeric: true, sensitivity: 'base' });
-      if (sort === 'status') {
-        const statusOrder: Record<GlassStatus, number> = {
-          [OrderGlassStatus.pending]: 0,
-          [OrderGlassStatus.partial]: 1,
-          [OrderGlassStatus.received]: 2,
-        };
-        return statusOrder[a.glassStatus] - statusOrder[b.glassStatus];
-      }
-      if (sort === 'area') return b.sqFt - a.sqFt;
+      if (sort === 'status') return statusOrder[a.status] - statusOrder[b.status];
+      if (sort === 'ordered') return b.ordered - a.ordered;
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-  }, [windows, search, statusFilter, locationFilter, sort]);
+  }, [orders, search, statusFilter, locationFilter, sort]);
 
-  const counts = useMemo(() => ({
-    pending: windows.filter((item) => item.glassStatus === OrderGlassStatus.pending).length,
-    partial: windows.filter((item) => item.glassStatus === OrderGlassStatus.partial).length,
-    received: windows.filter((item) => item.glassStatus === OrderGlassStatus.received).length,
-  }), [windows]);
+  const counts: Record<GlassStatus, number> = {
+    glass_input_pending: orders.filter((order) => order.status === 'glass_input_pending').length,
+    pending: orders.filter((order) => order.status === 'pending').length,
+    partial: orders.filter((order) => order.status === 'partial').length,
+    received: orders.filter((order) => order.status === 'received').length,
+  };
 
-  const changeStatus = (item: GlassTrackingWindow, glassStatus: GlassStatus) => {
-    if (!canEdit || glassStatus === item.glassStatus) return;
-    updateWindow.mutate({ id: item.orderRecordId, windowId: item.windowId, data: { glassStatus } }, {
+  const saveQuantities = (order: GlassTrackingOrder, items: Array<{ id: string; received: number; broken: number }>) => {
+    if (!canEdit) return;
+    updateQuantities.mutate({ id: order.orderRecordId, data: { items } }, {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getGetGlassTrackingQueryKey() });
-        void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(item.orderRecordId) });
-        void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(item.orderRecordId) });
-        toast({ title: 'Glass status updated', description: `${item.orderId} · window ${item.windowNo} marked ${statusLabel(glassStatus).toLowerCase()}.` });
+        toast({ title: 'Glass quantities updated', description: `${order.orderId} received and broken counts were saved.` });
       },
-      onError: () => toast({ title: 'Could not update glass status', description: 'The previous status is unchanged. Try again.', variant: 'destructive' }),
+      onError: () => toast({ title: 'Could not save glass quantities', description: 'No counts were changed. Check the quantities and try again.', variant: 'destructive' }),
     });
   };
 
   const clearFilters = () => { setSearch(''); setStatusFilter('all'); setLocationFilter('all'); };
   const hasFilters = Boolean(search || statusFilter !== 'all' || locationFilter !== 'all');
 
+  const editor = (order: GlassTrackingOrder) => <GlassQuantityEditor
+    orderId={order.orderId}
+    items={order.items}
+    canEdit={canEdit}
+    isSaving={updateQuantities.isPending && updateQuantities.variables?.id === order.orderRecordId}
+    onSave={(items) => saveQuantities(order, items)}
+  />;
+
   return <AppShell user={user} title="Glass Tracking" eyebrow="Module · glass tracking">
-    <div className="mx-auto w-full max-w-[1440px] space-y-5 pb-8">
-      <section className="order-hub-accent relative overflow-hidden rounded-2xl border border-primary/10 px-5 py-5 shadow-sm md:px-7 md:py-6">
-        <div className="absolute -right-8 -top-12 h-48 w-48 rounded-full border border-primary/15" />
+    <div className="glass-register mx-auto w-full max-w-[1440px] space-y-5 pb-8">
+      <section className="glass-hero relative isolate overflow-hidden rounded-2xl border border-primary/15 px-5 py-5 shadow-sm md:px-7 md:py-6">
+        <div className="glass-pane-mark pointer-events-none absolute -right-6 -top-8 hidden h-56 w-56 rotate-6 rounded-[1.8rem] border border-primary/20 opacity-80 sm:block" aria-hidden="true">
+          <div className="absolute inset-4 rounded-[1.2rem] border border-primary/20 bg-card/20" />
+          <div className="absolute bottom-4 left-1/2 top-4 w-px bg-primary/20" />
+          <div className="absolute left-4 right-4 top-1/2 h-px bg-primary/20" />
+        </div>
         <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> Framewise operations <span className="text-muted-foreground/70">/</span> procurement desk</div>
-            <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.05em] text-foreground md:text-[2.6rem]">Glass, accounted for.</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Track each opening from supplier delivery through receipt, against the order and its installation location.</p>
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> Procurement desk <span className="text-muted-foreground/70">/</span> glass register</div>
+            <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.05em] text-foreground md:text-[2.6rem]">Every pane, accounted for.</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">One register from client invoice to supplier workbook. Check each window line, then reconcile intact and broken pieces at dispatch.</p>
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-primary/15 bg-white/45 px-3.5 py-3">
-            <PackageCheck size={17} className="text-primary" />
-            <div><p className="font-display text-xl font-bold leading-none" data-testid="metric-glass-total">{trackingQuery.isLoading ? '—' : windows.length}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Window records</p></div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 rounded-xl border border-primary/15 bg-card/70 px-3.5 py-3 backdrop-blur-sm">
+              <PackageCheck size={17} className="text-primary" />
+              <div><p className="font-display text-xl font-bold leading-none glass-tabular" data-testid="metric-glass-total">{trackingQuery.isLoading ? '—' : orders.length}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Orders in register</p></div>
+            </div>
+            {canView && <GlassWorkbookImportDialog
+              orders={orders}
+              canEdit={canEdit}
+              onImported={() => { void queryClient.invalidateQueries({ queryKey: getGetGlassTrackingQueryKey() }); }}
+            />}
           </div>
         </div>
       </section>
 
-      {canView && <section aria-label="Glass status totals" className="grid grid-cols-3 gap-2 sm:gap-3">
-        {STATUS_OPTIONS.map((option, index) => {
-          const Icon = index === 0 ? Clock3 : index === 1 ? ArrowDownUp : Check;
+      {canView && <section aria-label="Glass status totals" className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        {STATUS_OPTIONS.map((option) => {
+          const Icon = option.icon;
           return <button key={option.value} type="button" onClick={() => setStatusFilter(statusFilter === option.value ? 'all' : option.value)} className={`rounded-xl border bg-card px-3 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:px-4 sm:py-4 ${statusFilter === option.value ? 'border-primary/40 ring-2 ring-primary/10' : 'border-border/80'}`} data-testid={`filter-glass-${option.value}`} aria-pressed={statusFilter === option.value}>
             <div className="flex items-center justify-between gap-2"><span className="truncate text-[9px] font-bold uppercase tracking-[0.11em] text-muted-foreground sm:text-[10px]">{option.label}</span><Icon size={15} className="shrink-0 text-primary/75" /></div>
             <div className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl" data-testid={`metric-glass-${option.value}`}>{trackingQuery.isLoading ? '—' : counts[option.value]}</div>
-            <div className="mt-1 hidden text-[10px] text-muted-foreground sm:block">{statusFilter === option.value ? 'Showing this stage' : 'Window records'}</div>
+            <div className="mt-1 hidden text-[10px] text-muted-foreground sm:block">{statusFilter === option.value ? 'Showing this stage' : 'Orders'}</div>
           </button>;
         })}
       </section>}
 
+      {canView && import.meta.env.DEV ? <DemoDataPreview /> : null}
+
       <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
         <div className="border-b border-border/75 p-4 md:p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div><div className="flex items-center gap-2"><span className="h-5 w-1 rounded-full bg-primary" /><h2 className="font-display text-lg font-bold tracking-tight">Glass register</h2><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground" data-testid="text-glass-count">{filteredWindows.length} / {windows.length}</span></div><p className="ml-3 mt-1 text-xs text-muted-foreground">Search by order, client, location, opening number, or window type.</p></div>
+            <div><div className="flex items-center gap-2"><span className="h-5 w-1 rounded-full bg-primary" /><h2 className="font-display text-lg font-bold tracking-tight">Glass register</h2><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground" data-testid="text-glass-count">{filteredOrders.length} / {orders.length}</span></div><p className="ml-3 mt-1 text-xs text-muted-foreground">All created Order IDs are listed, including orders without a glass workbook.</p></div>
             {canView && !canEdit && <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-900"><ShieldCheck size={13} /> View-only access</span>}
           </div>
           {canView && <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(200px,1fr)_170px_190px_auto]">
             <label className="relative block">
               <span className="sr-only">Search glass tracking</span><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search orders, clients, windows…" className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/10" data-testid="input-glass-search" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search orders, clients, glass types…" className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/10" data-testid="input-glass-search" />
             </label>
             <label className="sr-only" htmlFor="glass-location-filter">Filter by location</label>
             <select id="glass-location-filter" value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} className="h-10 rounded-lg border border-input bg-background px-3 text-xs" data-testid="select-glass-location">
-              <option value="all">All locations</option>{locations.map(([code, name]) => <option key={code} value={code}>{name} · {code}</option>)}
+              <option value="all">All locations</option>{locations.map((location) => <option key={location} value={location}>{location}</option>)}
             </select>
-            <label className="sr-only" htmlFor="glass-sort">Sort glass records</label>
+            <label className="sr-only" htmlFor="glass-sort">Sort glass orders</label>
             <select id="glass-sort" value={sort} onChange={(event) => setSort(event.target.value as SortValue)} className="h-10 rounded-lg border border-input bg-background px-3 text-xs" data-testid="select-glass-sort">
-              <option value="updated">Recently updated</option><option value="order">Order ID</option><option value="client">Client</option><option value="window">Window number</option><option value="status">Glass status</option><option value="area">Area · largest first</option>
+              <option value="updated">Recently updated</option><option value="order">Order ID</option><option value="client">Client</option><option value="status">Glass status</option><option value="ordered">Ordered quantity</option>
             </select>
             <div className="flex h-10 items-center rounded-lg border border-border/80 bg-muted/35 p-1" role="group" aria-label="Glass register view">
               <button type="button" onClick={() => setView('list')} aria-pressed={view === 'list'} aria-label="List view" className={`grid h-8 w-9 place-items-center rounded-md transition ${view === 'list' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`} data-testid="button-glass-list-view"><List size={15} /></button>
@@ -224,10 +287,49 @@ export default function GlassTrackingPage({ user }: { user: User }) {
           {!canView ? <div className="rounded-xl border border-dashed border-border p-8 text-center" data-testid="state-glass-no-access"><ShieldCheck size={22} className="mx-auto text-muted-foreground" /><p className="mt-3 text-sm font-semibold">Glass tracking access is not assigned</p><p className="mt-1 text-xs text-muted-foreground">Ask an administrator to enable this module for your role.</p></div>
             : trackingQuery.isLoading ? <LoadingState />
               : trackingQuery.isError ? <div className="rounded-xl border border-dashed border-border p-8 text-center" data-testid="state-glass-error"><p className="text-sm font-semibold">Glass tracking could not be loaded.</p><p className="mt-1 text-xs text-muted-foreground">Check your connection and try again.</p><button type="button" onClick={() => void trackingQuery.refetch()} className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90" data-testid="button-glass-retry"><RefreshCw size={13} /> Retry</button></div>
-                : windows.length === 0 ? <div className="rounded-xl border border-dashed border-border p-8 text-center" data-testid="state-glass-empty"><PackageCheck size={22} className="mx-auto text-muted-foreground" /><p className="mt-3 text-sm font-semibold">No glass records yet</p><p className="mt-1 text-xs text-muted-foreground">Active order windows will appear here when they are available for procurement.</p></div>
-                  : filteredWindows.length === 0 ? <div className="rounded-xl border border-dashed border-border p-8 text-center" data-testid="state-glass-no-results"><p className="text-sm font-semibold">No matching windows</p><p className="mt-1 text-xs text-muted-foreground">Adjust the search or filters to see more glass records.</p>{hasFilters && <button type="button" onClick={clearFilters} className="mt-3 text-xs font-bold text-primary hover:underline" data-testid="button-glass-clear-filters">Clear all filters</button>}</div>
-                    : view === 'list' ? <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-4 py-3">Order / client</th><th className="px-4 py-3">Location</th><th className="px-4 py-3">Window</th><th className="px-4 py-3">Area</th><th className="px-4 py-3">Glass status</th></tr></thead><tbody>{filteredWindows.map((item) => <GlassRow key={item.windowId} item={item} canEdit={canEdit} busy={updateWindow.isPending} onChange={changeStatus} />)}</tbody></table></div>
-                      : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{filteredWindows.map((item) => <GlassCard key={item.windowId} item={item} canEdit={canEdit} busy={updateWindow.isPending} onChange={changeStatus} />)}</div>}
+                : orders.length === 0 ? <div className="rounded-xl border border-dashed border-border p-8 text-center" data-testid="state-glass-empty"><PackageCheck size={22} className="mx-auto text-muted-foreground" /><p className="mt-3 text-sm font-semibold">No orders created yet</p><p className="mt-1 text-xs text-muted-foreground">Every created order will appear here. Create an order before importing its glass workbook.</p></div>
+                  : filteredOrders.length === 0 ? <div className="rounded-xl border border-dashed border-border p-8 text-center" data-testid="state-glass-no-results"><p className="text-sm font-semibold">No matching orders</p><p className="mt-1 text-xs text-muted-foreground">Adjust the search or filters to see more glass orders.</p>{hasFilters && <button type="button" onClick={clearFilters} className="mt-3 text-xs font-bold text-primary hover:underline" data-testid="button-glass-clear-filters">Clear all filters</button>}</div>
+             : view === 'list' ? <div className="overflow-x-auto"><table className="w-full min-w-[960px] text-left text-xs">
+                      <thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
+                        <th className="px-4 py-3">Order / client</th><th className="px-4 py-3">Invoice No.</th><th className="px-4 py-3 text-right">Ordered</th><th className="px-4 py-3 text-right">Received</th><th className="px-4 py-3 text-right">Broken</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Details</th>
+                      </tr></thead>
+                      <tbody>{filteredOrders.map((order) => {
+                        const expanded = expandedOrderId === order.orderRecordId;
+                        return <Fragment key={order.orderRecordId}>
+                          <tr className="glass-order-row border-b border-border/60 last:border-0" data-testid={`row-glass-order-${order.orderRecordId}`}>
+                            <td className="px-4 py-3">
+                              <p className="font-mono text-xs font-bold text-primary" data-testid={`text-glass-order-${order.orderRecordId}`}>{order.orderId}</p>
+                              <p className="mt-1 max-w-[250px] truncate text-xs font-semibold" title={order.clientName}>{order.clientName}</p>
+                              <p className="mt-1 max-w-[250px] truncate text-[10px] text-muted-foreground" title={order.glassInputFilename ?? undefined}>
+                                {order.glassInputFilename ? `Workbook rev. ${order.glassInputRevision} · ${order.glassInputFilename}` : 'Glass Input Pending'}
+                              </p>
+                              <p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p>
+                            </td>
+                            <td className="px-4 py-3"><span className={order.invoiceFilename || order.invoiceNo ? 'font-medium' : 'text-muted-foreground'} title={order.invoiceFilename ?? undefined}>{order.invoiceNo ?? invoiceFilenameStem(order.invoiceFilename) ?? 'Invoice Upload Pending'}</span></td>
+                            <td className="glass-tabular px-4 py-3 text-right font-mono font-semibold">{formatCount(order.ordered)}</td>
+                            <td className="glass-tabular px-4 py-3 text-right font-mono">{formatCount(order.received)}</td>
+                            <td className="glass-tabular px-4 py-3 text-right font-mono">{formatCount(order.broken)}</td>
+                            <td className="px-4 py-3"><StatusBadge status={order.status} id={order.orderRecordId} /></td>
+                            <td className="px-4 py-3 text-right"><button type="button" onClick={() => setExpandedOrderId(expanded ? null : order.orderRecordId)} aria-expanded={expanded} aria-label={`${expanded ? 'Hide' : 'Show'} glass details for ${order.orderId}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-[11px] font-semibold hover:bg-muted" data-testid={`button-glass-details-${order.orderRecordId}`}>{expanded ? 'Hide' : 'Details'}{expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button></td>
+                          </tr>
+                          {expanded && <tr className="border-b border-border/60 bg-muted/10"><td colSpan={7} className="p-3 sm:p-4">{editor(order)}</td></tr>}
+                        </Fragment>;
+                      })}</tbody>
+                    </table></div>
+                      : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{filteredOrders.map((order) => {
+                        const expanded = expandedOrderId === order.orderRecordId;
+                        return <article key={order.orderRecordId} className="glass-order-card rounded-xl border border-border/75 bg-card p-4 shadow-sm" data-testid={`card-glass-order-${order.orderRecordId}`}>
+                          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-mono text-xs font-bold text-primary">{order.orderId}</p><p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p><p className="mt-1 truncate text-[10px] text-muted-foreground">{order.locationName}</p></div><StatusBadge status={order.status} id={order.orderRecordId} /></div>
+                          <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-border/60 pt-3 text-xs">
+                            <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice No.</p><p className="mt-1 truncate font-semibold" title={order.invoiceFilename ?? undefined}>{order.invoiceNo ?? invoiceFilenameStem(order.invoiceFilename) ?? 'Invoice Upload Pending'}</p></div>
+                            <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Glass workbook</p><p className="mt-1 truncate font-semibold">{order.glassInputFilename ? `Revision ${order.glassInputRevision}` : 'Glass Input Pending'}</p></div>
+                            <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ordered</p><p className="mt-1 font-mono font-semibold">{formatCount(order.ordered)}</p></div>
+                            <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Received · Broken</p><p className="mt-1 font-mono font-semibold">{formatCount(order.received)} · {formatCount(order.broken)}</p></div>
+                          </div>
+                          <button type="button" onClick={() => setExpandedOrderId(expanded ? null : order.orderRecordId)} aria-expanded={expanded} className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-[11px] font-semibold hover:bg-muted" data-testid={`button-glass-details-${order.orderRecordId}`}>{expanded ? 'Hide window details' : 'View window details'}{expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button>
+                          {expanded && <div className="mt-3">{editor(order)}</div>}
+                        </article>;
+                      })}</div>}
         </div>
       </section>
     </div>

@@ -190,6 +190,51 @@ export interface OrderWindowDocument {
   glassStatus: GlassStatus; pendingReason: string | null; sqFt: number;
   createdBy: string; createdAt: Date; updatedBy: string; updatedAt: Date; archivedAt?: Date | null;
 }
+export interface GlassTrackingItemDocument {
+  id: string;
+  villaNo: string | null;
+  windowNo: string;
+  glassType: string;
+  widthMm: number;
+  heightMm: number;
+  ordered: number;
+  received: number;
+  broken: number;
+}
+export interface GlassTrackingOrderDocument {
+  _id: string;
+  orderRecordId: string;
+  importId: string;
+  workbookFilename: string;
+  revision: number;
+  items: GlassTrackingItemDocument[];
+  uploadedBy: string;
+  updatedBy: string;
+  uploadedAt: Date;
+  updatedAt: Date;
+}
+export interface GlassTrackingWorkbookImportDocument {
+  _id: string;
+  filename: string;
+  storagePath: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  uploadedAt: Date;
+  mappings: Array<{ clientLabel: string; orderRecordId: string }>;
+  sections: Array<{
+    clientLabel: string;
+    items: Array<{
+      id: string;
+      villaNo: string | null;
+      windowNo: string;
+      glassType: string;
+      widthMm: number;
+      heightMm: number;
+      ordered: number;
+    }>;
+  }>;
+}
 export type PaymentMethod = "cash" | "bank_transfer" | "upi" | "cheque" | "other";
 export type PaymentStatus = "received" | "void" | "bounced";
 export interface OrderPaymentDocument {
@@ -584,6 +629,8 @@ export function getCounters(db: Db): Collection<CounterDocument> {
   return db.collection<CounterDocument>("counters");
 }
 export function getOrderWindows(db: Db) { return db.collection<OrderWindowDocument>("order_windows"); }
+export function getGlassTrackingOrders(db: Db) { return db.collection<GlassTrackingOrderDocument>("glass_tracking_orders"); }
+export function getGlassTrackingWorkbookImports(db: Db) { return db.collection<GlassTrackingWorkbookImportDocument>("glass_tracking_workbook_imports"); }
 export function getOrderPayments(db: Db) { return db.collection<OrderPaymentDocument>("order_payments"); }
 export function getOrderRefunds(db: Db) { return db.collection<OrderRefundDocument>("order_refunds"); }
 export function getOrderPaymentFlags(db: Db) { return db.collection<OrderPaymentFlagDocument>("order_payment_flags"); }
@@ -996,6 +1043,8 @@ export async function initializeMongo(): Promise<void> {
   const orderMessageTemplates = getOrderMessageTemplates(db);
   const counters = getCounters(db);
   const orderWindows = getOrderWindows(db);
+  const glassTrackingOrders = getGlassTrackingOrders(db);
+  const glassTrackingWorkbookImports = getGlassTrackingWorkbookImports(db);
   const orderPayments = getOrderPayments(db);
   const paymentFlags = getOrderPaymentFlags(db);
   const orderDocumentMetadata = getOrderDocumentMetadata(db);
@@ -1054,6 +1103,8 @@ export async function initializeMongo(): Promise<void> {
     orders.createIndex({ locationCode: 1, createdAt: -1 }, { name: "orders_by_location_date" }),
     orderWindows.createIndex({ orderRecordId: 1, windowNo: 1 }, { unique: true, partialFilterExpression: { archivedAt: null }, name: "active_window_no_unique" }),
     orderWindows.createIndex({ orderRecordId: 1, updatedAt: -1 }, { name: "windows_by_order" }),
+    glassTrackingOrders.createIndex({ orderRecordId: 1 }, { unique: true, name: "glass_tracking_order_unique" }),
+    glassTrackingWorkbookImports.createIndex({ uploadedAt: -1 }, { name: "glass_tracking_imports_by_date" }),
     orderPayments.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "payments_by_order" }),
     paymentFlags.createIndex({ orderRecordId: 1, flaggedAt: -1 }, { name: "payment_flags_by_order_date" }),
     paymentFlags.createIndex({ status: 1, flaggedAt: -1 }, { name: "payment_flags_by_status_date" }),

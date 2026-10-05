@@ -787,6 +787,29 @@
 .confirmation-kicker { letter-spacing: .18em; }
 .confirmation-ledger { background-image: linear-gradient(90deg, hsl(var(--primary) / .06) 1px, transparent 1px); background-size: 44px 100%; }
 
+.glass-register {
+  background:
+    radial-gradient(ellipse at 91% 0%, hsl(var(--primary) / .075), transparent 32%),
+    linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
+}
+.glass-hero {
+  background:
+    linear-gradient(118deg, hsl(var(--card) / .96) 0%, hsl(var(--secondary) / .58) 64%, hsl(var(--primary) / .12) 100%);
+}
+.glass-pane-mark {
+  background:
+    linear-gradient(135deg, transparent 48%, hsl(var(--primary) / .12) 49%, hsl(var(--primary) / .12) 51%, transparent 52%),
+    linear-gradient(90deg, hsl(var(--primary) / .045) 1px, transparent 1px),
+    linear-gradient(hsl(var(--primary) / .045) 1px, transparent 1px);
+  background-size: 100% 100%, 22px 22px, 22px 22px;
+}
+.glass-order-row { transition: background-color 150ms ease; }
+.glass-order-row:hover { background-color: hsl(var(--primary) / .035); }
+.glass-order-card { transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
+.glass-order-card:hover { transform: translateY(-2px); border-color: hsl(var(--primary) / .28); box-shadow: 0 10px 24px hsl(var(--foreground) / .06); }
+.glass-spec-row:hover { background-color: hsl(var(--primary) / .035); }
+.glass-tabular { font-variant-numeric: tabular-nums; }
+
 @media (max-width: 767px) {
   .app-grid { background-size: 26px 26px; }
   input, select, textarea { max-width: 100%; }
