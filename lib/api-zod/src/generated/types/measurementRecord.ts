@@ -9,6 +9,9 @@ import type { MeasurementVersion } from './measurementVersion';
 
 export interface MeasurementRecord {
   id: string;
+  sheetId: string;
+  /** @nullable */
+  legacyId: string | null;
   clientName: string;
   /** @nullable */
   location: string | null;

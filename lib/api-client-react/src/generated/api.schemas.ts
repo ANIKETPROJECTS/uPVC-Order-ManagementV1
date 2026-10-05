@@ -1634,6 +1634,8 @@ export interface QuotationRateSubmission {
   orderId: string | null;
   /** @nullable */
   measurementRecordId: string | null;
+  /** @nullable */
+  measurementSheetId: string | null;
   clientName: string;
   /** @nullable */
   location: string | null;
@@ -1671,6 +1673,8 @@ export interface QuotationRateSubmissionLookup {
   orderId: string | null;
   /** @nullable */
   measurementRecordId: string | null;
+  /** @nullable */
+  measurementSheetId: string | null;
 }
 
 export type QuotationRateSubmissionLookupList = QuotationRateSubmissionLookup[];
@@ -1818,6 +1822,9 @@ export interface MeasurementReferenceUpdate {
 
 export interface MeasurementRecord {
   id: string;
+  sheetId: string;
+  /** @nullable */
+  legacyId: string | null;
   clientName: string;
   /** @nullable */
   location: string | null;
@@ -1837,6 +1844,7 @@ export type MeasurementRecordList = MeasurementRecord[];
 
 export interface MeasurementRecordLookup {
   id: string;
+  sheetId: string;
   clientName: string;
   /** @nullable */
   location: string | null;

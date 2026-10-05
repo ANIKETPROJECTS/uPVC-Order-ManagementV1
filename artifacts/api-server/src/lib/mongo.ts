@@ -521,9 +521,12 @@ export interface QuotationRateSubmissionDocument {
 
 export interface MeasurementRecordDocument {
   _id: string;
+  sheetId?: string;
+  legacyId?: string | null;
   clientName: string;
   clientNameLower: string;
   location: string | null;
+  legacyLocation?: string | null;
   orderRecordId: string | null;
   versionCount?: number;
   createdBy: string;
@@ -651,6 +654,162 @@ export function getMeasurementRecords(db: Db) { return db.collection<Measurement
 export function getMeasurementVersions(db: Db) { return db.collection<MeasurementVersionDocument>("measurement_versions"); }
 export function getMeasurementReferences(db: Db) { return db.collection<MeasurementReferenceDocument>("measurement_references"); }
 export function getMeasurementSheetsBucket(db: Db): any { return new GridFSBucket(db, { bucketName: "measurement_sheets" }); }
+
+const measurementSheetSequenceId = "measurementSheetSequence";
+const measurementSheetMigrationId = "measurementSheetIdFormatV1";
+
+function isValidDate(value: unknown): value is Date {
+  return value instanceof Date && Number.isFinite(value.getTime());
+}
+
+function measurementDateCode(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    timeZone: "Asia/Kolkata",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("day")}${part("month")}${part("year")}`;
+}
+
+function formatMeasurementSheetId(sequence: number, createdAt: Date): string {
+  return `MS-${String(sequence).padStart(3, "0")}-${measurementDateCode(createdAt)}`;
+}
+
+export async function allocateMeasurementSheetId(db: Db, createdAt: Date): Promise<string> {
+  const counter = await getCounters(db).findOneAndUpdate(
+    { _id: measurementSheetSequenceId },
+    { $inc: { value: 1 }, $set: { updatedAt: new Date() } },
+    { upsert: true, returnDocument: "after" },
+  );
+  if (!counter || !Number.isSafeInteger(counter.value) || counter.value < 1) {
+    throw new Error("Could not allocate a unique measurement sheet number.");
+  }
+  return formatMeasurementSheetId(counter.value, createdAt);
+}
+
+interface MeasurementMigrationDocument {
+  _id: string;
+  state: "pending" | "running" | "complete";
+  owner?: string;
+  leaseUntil: Date;
+  updatedAt: Date;
+}
+
+async function migrateMeasurementSheetIds(db: Db, now: Date): Promise<void> {
+  const migrations = db.collection<MeasurementMigrationDocument>("system_migrations");
+  const counters = getCounters(db);
+  const records = getMeasurementRecords(db);
+  try {
+    await migrations.updateOne(
+      { _id: measurementSheetMigrationId },
+      { $setOnInsert: { state: "pending", leaseUntil: new Date(0), updatedAt: now } },
+      { upsert: true },
+    );
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000)) {
+      throw error;
+    }
+  }
+
+  const owner = randomUUID();
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    const current = await migrations.findOne({ _id: measurementSheetMigrationId });
+    if (current?.state === "complete") return;
+    const leaseNow = new Date();
+    const lease = await migrations.findOneAndUpdate(
+      {
+        _id: measurementSheetMigrationId,
+        state: { $ne: "complete" },
+        $or: [{ leaseUntil: { $lte: leaseNow } }, { owner }],
+      },
+      {
+        $set: {
+          state: "running",
+          owner,
+          leaseUntil: new Date(leaseNow.getTime() + 60_000),
+          updatedAt: leaseNow,
+        },
+      },
+      { returnDocument: "after" },
+    );
+    if (lease?.owner !== owner) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      continue;
+    }
+
+    try {
+      const counter = await counters.findOne({ _id: measurementSheetSequenceId });
+      const startingSequence = counter?.value ?? 0;
+      const existingRecords = await records.find({}).toArray();
+      existingRecords.sort((left, right) => {
+        const leftDate = isValidDate(left.createdAt) ? left.createdAt : isValidDate(left.updatedAt) ? left.updatedAt : now;
+        const rightDate = isValidDate(right.createdAt) ? right.createdAt : isValidDate(right.updatedAt) ? right.updatedAt : now;
+        return leftDate.getTime() - rightDate.getTime() || left._id.localeCompare(right._id);
+      });
+      const updates = existingRecords.map((record, index) => {
+        const createdAt = isValidDate(record.createdAt)
+          ? record.createdAt
+          : isValidDate(record.updatedAt)
+            ? record.updatedAt
+            : now;
+        const updatedAt = isValidDate(record.updatedAt) ? record.updatedAt : createdAt;
+        const legacyLocation = record.legacyLocation ?? record.location ?? null;
+        return {
+          updateOne: {
+            filter: { _id: record._id },
+            update: {
+              $set: {
+                sheetId: formatMeasurementSheetId(startingSequence + index + 1, createdAt),
+                legacyId: record.legacyId || `MS-${record._id.toUpperCase()}`,
+                location: null,
+                ...(!isValidDate(record.createdAt) ? { createdAt } : {}),
+                ...(legacyLocation ? { legacyLocation } : {}),
+                updatedAt,
+              },
+            },
+          },
+        };
+      });
+
+      for (let offset = 0; offset < updates.length; offset += 500) {
+        await records.bulkWrite(updates.slice(offset, offset + 500));
+        const heartbeat = new Date();
+        await migrations.updateOne(
+          { _id: measurementSheetMigrationId, owner },
+          { $set: { leaseUntil: new Date(heartbeat.getTime() + 60_000), updatedAt: heartbeat } },
+        );
+      }
+
+      const finalSequence = startingSequence + existingRecords.length;
+      await counters.updateOne(
+        { _id: measurementSheetSequenceId },
+        { $max: { value: finalSequence }, $set: { updatedAt: now } },
+        { upsert: true },
+      );
+      await migrations.updateOne(
+        { _id: measurementSheetMigrationId, owner },
+        { $set: { state: "complete", leaseUntil: new Date(0), updatedAt: new Date() }, $unset: { owner: "" } },
+      );
+      if (existingRecords.length > 0) {
+        logger.info(
+          { migratedMeasurementRecords: existingRecords.length, lastSequence: finalSequence },
+          "Migrated measurement sheet IDs to the IST sequence format",
+        );
+      }
+      return;
+    } catch (error) {
+      await migrations.updateOne(
+        { _id: measurementSheetMigrationId, owner },
+        { $set: { state: "pending", leaseUntil: new Date(0), updatedAt: new Date() }, $unset: { owner: "" } },
+      );
+      throw error;
+    }
+  }
+  throw new Error("Timed out waiting for the measurement ID migration to finish.");
+}
 
 async function migrateOrderIds(db: Db, now: Date): Promise<void> {
   const counters = getCounters(db);
@@ -1054,6 +1213,7 @@ export async function initializeMongo(): Promise<void> {
   const appNotifications = getAppNotifications(db);
   const pushSubscriptions = getPushSubscriptions(db);
   const quotationRateSubmissions = getQuotationRateSubmissions(db);
+  const measurementRecords = getMeasurementRecords(db);
   const measurementReferences = getMeasurementReferences(db);
 
   const measurementReferencesExists = await db
@@ -1132,6 +1292,15 @@ export async function initializeMongo(): Promise<void> {
       { kind: 1, nameLower: 1 },
       { unique: true, name: "measurement_reference_kind_name_unique" },
     ),
+    measurementRecords.createIndex(
+      { sheetId: 1 },
+      {
+        unique: true,
+        name: "measurement_sheet_id_unique",
+        partialFilterExpression: { sheetId: { $type: "string" } },
+      },
+    ),
+    measurementRecords.createIndex({ updatedAt: -1 }, { name: "measurement_records_by_updated_at" }),
     quotationRateSubmissions.createIndex(
       { measurementRecordId: 1 },
       {
@@ -1763,6 +1932,7 @@ export async function initializeMongo(): Promise<void> {
   );
 
   await migrateOrderIds(db, now);
+  await migrateMeasurementSheetIds(db, now);
 
   logger.info({ database: db.databaseName }, "Connected to MongoDB");
 }

@@ -5,7 +5,7 @@
 - [Scoped workspace themes](workspace-theme-scope.md) — theme choice affects the sidebar and selected hero panels; workspace content remains light.
 - [Manual WhatsApp reminders](manual-whatsapp-reminders.md) — open a drafted message for an employee to send; never use Meta APIs or WhatsApp credentials.
 - [Measurement sheet labels](measurement-sheet-labels.md) — keep optional user-facing sheet names separate from original filenames, with legacy filename fallback.
-- [Measurement Sheet IDs](measurement-sheet-ids.md) — display the existing UUID with an `MS-` prefix; keep raw UUIDs for direct Rate Approval links.
+- [Measurement Sheet IDs](measurement-sheet-ids.md) — allocate global serial IDs from IST creation dates; keep raw UUIDs for links and legacy labels searchable.
 - [Measurement register layout](measurement-register-layout.md) — keep register cards compact; open record details separately and reserve file opening for document View actions.
 - [Quotation request lifecycle](quotation-request-lifecycle.md) — edits and deletes are allowed in every status; edits require a fresh approval cycle.
 - [Quotation-linked confirmations](quotation-linked-confirmations.md) — associate new confirmations with the linked request; keep historical order-only files unassigned.

@@ -69,6 +69,15 @@ const measurementSheetDraft = (file: File, name = '', replacesVersionNumber?: nu
 });
 const acceptedExtensions = ['pdf', 'xlsx', 'csv'];
 const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+const lastUpdatedLabel = (value: string) => new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: true,
+  timeZone: 'Asia/Kolkata',
+}).format(new Date(value));
 const sizeLabel = (size: number) => size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1024 / 1024).toFixed(2)} MiB`;
 const extensionOf = (filename: string) => filename.split('.').pop()?.toLowerCase() || '';
 type MeasurementLayout = 'list' | 'grid';
@@ -125,7 +134,9 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
     const query = recordSearch.trim().toLocaleLowerCase();
     const filtered = records.filter((record) => {
       const searchable = [
-        measurementSheetIdLabel(record.id),
+        record.sheetId,
+        record.legacyId || '',
+        measurementSheetIdLabel(record.id, record.sheetId),
         record.quotationRequestId || '',
         record.clientName,
         record.location || '',
@@ -325,7 +336,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
     });
   };
   const removeRecord = (record: MeasurementRecord) => {
-    const sheetId = measurementSheetIdLabel(record.id);
+    const sheetId = measurementSheetIdLabel(record.id, record.sheetId);
     const fileCount = record.versions.length;
     if (!window.confirm(`Delete measurement sheet ${sheetId} for ${record.clientName}? This permanently removes the record and all ${fileCount} retained file${fileCount === 1 ? '' : 's'}. Its quotation request will be unlinked.`)) return;
     deleteRecord.mutate({ recordId: record.id }, {
@@ -424,7 +435,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                       <label className="relative min-w-0">
                         <span className="sr-only">Search measurement records and files</span>
                         <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input value={recordSearch} onChange={(event) => setRecordSearch(event.target.value)} className="pl-9" placeholder="Client, site, order or file name" data-testid="input-search-measurements" />
+                        <Input value={recordSearch} onChange={(event) => setRecordSearch(event.target.value)} className="pl-9" placeholder="Sheet ID, legacy ID, client, location or file" data-testid="input-search-measurements" />
                       </label>
                       <Select value={fileFilter} onValueChange={(value) => setFileFilter(value as MeasurementFileFilter)}>
                         <SelectTrigger aria-label="Filter by sheet type" data-testid="select-measurement-file-filter"><SelectValue /></SelectTrigger>
@@ -455,8 +466,8 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                       <Select value={sortBy} onValueChange={(value) => setSortBy(value as MeasurementSort)}>
                         <SelectTrigger aria-label="Sort measurement records" data-testid="select-measurement-sort"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="recent">Recently updated</SelectItem>
-                          <SelectItem value="oldest">Oldest updated</SelectItem>
+                          <SelectItem value="recent">Last updated (newest)</SelectItem>
+                          <SelectItem value="oldest">Last updated (oldest)</SelectItem>
                           <SelectItem value="client">Client A–Z</SelectItem>
                         </SelectContent>
                       </Select>
@@ -481,7 +492,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 space-y-1">
                             <p className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">Measurement Sheet ID</p>
-                            <code className="block break-all font-mono text-xs font-semibold text-primary" title={record.id} data-testid={`text-measurement-sheet-id-${record.id}`}>{measurementSheetIdLabel(record.id)}</code>
+                            <code className="block break-all font-mono text-xs font-semibold text-primary" title={record.sheetId} data-testid={`text-measurement-sheet-id-${record.id}`}>{measurementSheetIdLabel(record.id, record.sheetId)}</code>
                             {record.quotationRequestId && <p className="text-[10px] text-muted-foreground">Rate Approval request <code className="font-mono font-semibold text-foreground" data-testid={`text-measurement-quotation-id-${record.id}`}>{record.quotationRequestId}</code></p>}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -541,7 +552,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                           />}
                         </div>}
                         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5">
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground"><span className="inline-flex items-center gap-1.5 font-semibold text-foreground"><FileText size={14} className="text-primary" /> {visibleVersions.length} {visibleVersions.length === 1 ? 'version' : 'versions'}{fileFilter !== 'all' && fileFilter !== 'none' ? ' shown' : ''}</span><span className="inline-flex items-center gap-1.5"><MapPin size={13} /> {record.location || 'Location not specified'}</span><span>Updated {dateLabel(record.updatedAt)}</span></div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground"><span className="inline-flex items-center gap-1.5 font-semibold text-foreground"><FileText size={14} className="text-primary" /> {visibleVersions.length} {visibleVersions.length === 1 ? 'version' : 'versions'}{fileFilter !== 'all' && fileFilter !== 'none' ? ' shown' : ''}</span><span className="inline-flex items-center gap-1.5"><MapPin size={13} /> {record.location || 'Location not specified'}</span><span>Last updated {lastUpdatedLabel(record.updatedAt)}</span></div>
                           {canEdit && <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold transition-colors hover:bg-muted ${uploadingBatch ? 'pointer-events-none opacity-50' : ''}`} data-testid={`label-add-measurement-version-${record.id}`}><Upload size={14} /> Add sheets
                             <input type="file" multiple className="sr-only" disabled={uploadingBatch} accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-testid={`input-add-measurement-version-${record.id}`} onChange={(event) => {
                               addVersionFiles(record.id, Array.from(event.currentTarget.files || []));
@@ -588,11 +599,12 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                             </div>
                           </li>)}
                         </ol> : <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground" data-testid={`state-measurement-versions-empty-${record.id}`}>No sheet uploaded yet. Add the first version when it is ready.</div>}
-                        </div> : <div id={`measurement-details-${record.id}`} className={`grid gap-2 border-t border-border/50 pt-3 ${layout === 'grid' ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-4'}`} data-testid={`summary-measurement-record-${record.id}`}>
+                        </div> : <div id={`measurement-details-${record.id}`} className={`grid gap-2 border-t border-border/50 pt-3 ${layout === 'grid' ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-5'}`} data-testid={`summary-measurement-record-${record.id}`}>
                           <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Client</p><p className="truncate text-xs font-semibold">{record.clientName}</p></div>
                           <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Location</p><p className="truncate text-xs">{record.location || 'No location'}</p></div>
                           <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Assigned order</p><p className="truncate text-xs">{record.orderId || 'No order assigned'}</p></div>
-                          <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Sheet versions</p><p className="truncate text-xs">{record.versions.length} · Updated {dateLabel(record.updatedAt)}</p></div>
+                          <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Sheet versions</p><p className="truncate text-xs">{record.versions.length}</p></div>
+                          <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Last updated</p><p className="text-xs">{lastUpdatedLabel(record.updatedAt)}</p></div>
                         </div>}
                       </article>;
                     })}

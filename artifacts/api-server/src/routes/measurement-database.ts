@@ -31,6 +31,7 @@ import { Router, type Request, type RequestHandler } from "express";
 import {
   getMeasurementRecords,
   getMeasurementReferences,
+  allocateMeasurementSheetId,
   getMongoClient,
   getMeasurementSheetsBucket,
   getMeasurementVersions,
@@ -243,6 +244,9 @@ router.delete("/measurement-references/:referenceId", async (req, res): Promise<
 
 async function recordResponse(record: MeasurementRecordDocument) {
   const db = await getMongoDb();
+  if (!record.sheetId) {
+    throw new Error(`Measurement sheet ID is missing for record ${record._id}.`);
+  }
   const [versions, order, quotation] = await Promise.all([
     getMeasurementVersions(db).find({ recordId: record._id }).sort({ versionNumber: -1 }).toArray(),
     record.orderRecordId ? getOrders(db).findOne({ _id: record.orderRecordId }) : Promise.resolve(null),
@@ -250,6 +254,8 @@ async function recordResponse(record: MeasurementRecordDocument) {
   ]);
   return {
     id: record._id,
+    sheetId: record.sheetId,
+    legacyId: record.legacyId ?? null,
     clientName: record.clientName,
     location: record.location,
     orderRecordId: record.orderRecordId,
@@ -282,12 +288,16 @@ router.get("/measurement-records/lookup", async (req, res): Promise<void> => {
   const clientSearch = rawQuery.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const idSearch = rawQuery.replace(/^MS-/i, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const searchConditions: Record<string, unknown>[] = [{ clientNameLower: { $regex: clientSearch } }];
-  if (rawQuery) searchConditions.push({ location: { $regex: clientSearch, $options: "i" } });
+  if (rawQuery) {
+    searchConditions.push({ location: { $regex: clientSearch, $options: "i" } });
+    searchConditions.push({ sheetId: { $regex: clientSearch, $options: "i" } });
+    searchConditions.push({ legacyId: { $regex: clientSearch, $options: "i" } });
+  }
   if (idSearch) searchConditions.push({ _id: { $regex: idSearch, $options: "i" } });
   const db = await getMongoDb();
   const cursor = getMeasurementRecords(db)
     .find(rawQuery ? { $or: searchConditions } : {}, {
-      projection: { _id: 1, clientName: 1, location: 1, orderRecordId: 1, updatedAt: 1 },
+      projection: { _id: 1, sheetId: 1, clientName: 1, location: 1, orderRecordId: 1, updatedAt: 1 },
     })
     .sort({ updatedAt: -1 });
   if (rawQuery) cursor.limit(20);
@@ -303,13 +313,19 @@ router.get("/measurement-records/lookup", async (req, res): Promise<void> => {
     ? await getOrders(db).find({ _id: { $in: linkedOrderRecords } }, { projection: { _id: 1, orderId: 1 } }).toArray()
     : [];
   const orderIdByRecord = new Map(linkedOrders.map((item) => [item._id, item.orderId]));
-  const response = records.map((record) => ({
-    id: record._id,
-    clientName: record.clientName,
-    location: record.location,
-    orderId: record.orderRecordId ? orderIdByRecord.get(record.orderRecordId) ?? null : null,
-    quotationRequestId: quotationIdByRecord.get(record._id) ?? null,
-  }));
+  const response = records.map((record) => {
+    if (!record.sheetId) {
+      throw new Error(`Measurement sheet ID is missing for record ${record._id}.`);
+    }
+    return {
+      id: record._id,
+      sheetId: record.sheetId,
+      clientName: record.clientName,
+      location: record.location,
+      orderId: record.orderRecordId ? orderIdByRecord.get(record.orderRecordId) ?? null : null,
+      quotationRequestId: quotationIdByRecord.get(record._id) ?? null,
+    };
+  });
   res.json(SearchMeasurementRecordsResponse.parse(response));
 });
 
@@ -332,6 +348,7 @@ router.post("/measurement-records", async (req, res): Promise<void> => {
   const now = new Date();
   const record: MeasurementRecordDocument = {
     _id: randomUUID(),
+    sheetId: await allocateMeasurementSheetId(db, now),
     clientName: parsed.data.clientName.trim(),
     clientNameLower: parsed.data.clientName.trim().toLowerCase(),
     location: parsed.data.location?.trim() || null,

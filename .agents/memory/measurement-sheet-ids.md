@@ -3,8 +3,8 @@ name: Measurement Sheet IDs
 description: Stable user-facing identifiers for measurement records and their Rate Approval links.
 ---
 
-Use each measurement record's existing UUID as its permanent ID, displayed as `MS-` plus the uppercase UUID. Persist links to Rate Approval requests using the unchanged UUID; do not introduce a second ID field.
+Display measurement IDs as `MS-{sequence padded to at least 3 digits}-{DDMMYY}`, using the record's creation date in Asia/Kolkata. Allocate sequence numbers globally and never reuse them after deletion. Keep the raw UUID as the permanent internal key for relationships and routes; retain the former `MS-{UUID}` label as a searchable legacy ID.
 
-**Why:** The existing record ID is already unique and permanent, so a display prefix provides a recognizable sheet ID without a migration or a second source of truth.
+**Why:** Staff need short, chronological sheet IDs while existing internal links must remain stable through the format change.
 
-**How to apply:** Keep raw UUIDs in API/database relations, show the `MS-` form in the UI, and allow sheet searches with or without the prefix.
+**How to apply:** Use an atomic server-side counter for new sheets. Migrate old sheets in creation-time order, derive each date from its creation timestamp in IST, and search both current and legacy IDs.

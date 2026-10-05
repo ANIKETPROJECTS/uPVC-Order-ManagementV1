@@ -130,6 +130,7 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
         item.glassType,
         item.orderId ?? '',
         item.measurementRecordId ?? '',
+        item.measurementSheetId ?? '',
         item.submittedByName,
         item.decidedByName ?? '',
         statusLabels[item.status],
@@ -238,7 +239,7 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
     setLinkOrderRecordId(submission.orderRecordId || '');
     setLinkMeasurementSheet(Boolean(submission.measurementRecordId));
     setLinkMeasurementId(submission.measurementRecordId || null);
-    setLinkMeasurementLabel(submission.measurementRecordId ? measurementSheetIdLabel(submission.measurementRecordId) : '');
+    setLinkMeasurementLabel(submission.measurementRecordId ? measurementSheetIdLabel(submission.measurementRecordId, submission.measurementSheetId) : '');
   };
 
   const saveOrderLink = () => {
@@ -261,7 +262,7 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
         toast({
           title: 'Quotation request links saved',
           description: linkMeasurementSheet
-            ? `${measurementSheetIdLabel(linkMeasurementId || '')} is linked directly to ${linkingSubmission.id}.`
+            ? `${linkMeasurementLabel.split(' · ')[0] || measurementSheetIdLabel(linkMeasurementId || '')} is linked directly to ${linkingSubmission.id}.`
             : linkingSubmission.measurementRecordId
               ? 'The order link is saved and the measurement sheet link is removed.'
               : 'The order link is saved.',
@@ -418,7 +419,7 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
                                      <Download size={compact ? 12 : 13} /> <span className="truncate">{submission.pdfNeedsRefresh ? `Previous PDF · ${submission.pdfFilename}` : 'Download Eva PDF'}</span>
                                   </a>
                                 : <span className="text-[10px] text-muted-foreground">PDF not attached yet</span>}
-                              {submission.measurementRecordId && <span className="text-[10px] text-muted-foreground">Measurement sheet {measurementSheetIdLabel(submission.measurementRecordId)}</span>}
+                              {submission.measurementRecordId && <span className="text-[10px] text-muted-foreground">Measurement sheet {measurementSheetIdLabel(submission.measurementRecordId, submission.measurementSheetId)}</span>}
                             </div>
 
                              <div className={`${compact ? 'mt-1.5 gap-1.5' : 'mt-3 gap-2'} flex flex-wrap items-center`} data-testid={`assigned-request-actions-${submission.id}`}>
@@ -504,7 +505,7 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
                 selectedId={linkMeasurementId}
                 selectedLabel={linkMeasurementLabel}
                 currentQuotationRequestId={linkingSubmission?.id || ''}
-                onSelect={(item) => { setLinkMeasurementId(item.id); setLinkMeasurementLabel(`${measurementSheetIdLabel(item.id)} · ${item.clientName}`); }}
+                onSelect={(item) => { setLinkMeasurementId(item.id); setLinkMeasurementLabel(`${measurementSheetIdLabel(item.id, item.sheetId)} · ${item.clientName}`); }}
               />}
             </div>}
           </div>

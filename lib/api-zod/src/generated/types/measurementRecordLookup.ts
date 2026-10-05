@@ -8,6 +8,7 @@
 
 export interface MeasurementRecordLookup {
   id: string;
+  sheetId: string;
   clientName: string;
   /** @nullable */
   location: string | null;

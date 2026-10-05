@@ -4919,6 +4919,8 @@ components:
           type: ["string", "null"]
         measurementRecordId:
           type: ["string", "null"]
+        measurementSheetId:
+          type: ["string", "null"]
         clientName:
           type: string
         location:
@@ -4963,7 +4965,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderRecordId, orderId, measurementRecordId, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
+      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
     QuotationRateSubmissionRevision:
       type: object
       properties:
@@ -5016,7 +5018,9 @@ components:
           type: ["string", "null"]
         measurementRecordId:
           type: ["string", "null"]
-      required: [id, clientName, status, orderId, measurementRecordId]
+        measurementSheetId:
+          type: ["string", "null"]
+      required: [id, clientName, status, orderId, measurementRecordId, measurementSheetId]
     QuotationRateSubmissionLookupList:
       type: array
       items:
@@ -5137,6 +5141,10 @@ components:
       properties:
         id:
           type: string
+        sheetId:
+          type: string
+        legacyId:
+          type: ["string", "null"]
         clientName:
           type: string
         location:
@@ -5159,7 +5167,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, clientName, location, orderRecordId, orderId, quotationRequestId, versions, createdBy, createdAt, updatedAt]
+      required: [id, sheetId, legacyId, clientName, location, orderRecordId, orderId, quotationRequestId, versions, createdBy, createdAt, updatedAt]
     MeasurementRecordList:
       type: array
       items:
@@ -5169,6 +5177,8 @@ components:
       properties:
         id:
           type: string
+        sheetId:
+          type: string
         clientName:
           type: string
         location:
@@ -5177,7 +5187,7 @@ components:
           type: ["string", "null"]
         quotationRequestId:
           type: ["string", "null"]
-      required: [id, clientName, location, orderId, quotationRequestId]
+      required: [id, sheetId, clientName, location, orderId, quotationRequestId]
     MeasurementRecordLookupList:
       type: array
       items:

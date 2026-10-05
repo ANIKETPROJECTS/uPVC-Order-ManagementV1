@@ -2720,6 +2720,7 @@ export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -2788,6 +2789,7 @@ export const CreateQuotationRateSubmissionResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -2863,6 +2865,7 @@ export const UpdateQuotationRateSubmissionResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -2932,7 +2935,8 @@ export const SearchQuotationRateSubmissionsResponseItem = zod.object({
   "clientName": zod.string(),
   "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
   "orderId": zod.string().nullable(),
-  "measurementRecordId": zod.string().nullable()
+  "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable()
 })
 export const SearchQuotationRateSubmissionsResponse = zod.array(SearchQuotationRateSubmissionsResponseItem)
 
@@ -2954,6 +2958,7 @@ export const LinkQuotationRateSubmissionOrderResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -3009,6 +3014,7 @@ export const UploadQuotationRateSubmissionPdfResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -3078,6 +3084,7 @@ export const DecideQuotationRateSubmissionResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "windowQty": zod.number().int(),
@@ -3127,6 +3134,8 @@ export const listMeasurementRecordsResponseVersionsItemReferenceNameMax = 160;
 
 export const ListMeasurementRecordsResponseItem = zod.object({
   "id": zod.string(),
+  "sheetId": zod.string(),
+  "legacyId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "orderRecordId": zod.string().nullable(),
@@ -3177,6 +3186,8 @@ export const createMeasurementRecordResponseVersionsItemReferenceNameMax = 160;
 
 export const CreateMeasurementRecordResponse = zod.object({
   "id": zod.string(),
+  "sheetId": zod.string(),
+  "legacyId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "orderRecordId": zod.string().nullable(),
@@ -3291,6 +3302,7 @@ export const SearchMeasurementRecordsQueryParams = zod.object({
 
 export const SearchMeasurementRecordsResponseItem = zod.object({
   "id": zod.string(),
+  "sheetId": zod.string(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "orderId": zod.string().nullable(),
@@ -3327,6 +3339,8 @@ export const updateMeasurementRecordResponseVersionsItemReferenceNameMax = 160;
 
 export const UpdateMeasurementRecordResponse = zod.object({
   "id": zod.string(),
+  "sheetId": zod.string(),
+  "legacyId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
   "orderRecordId": zod.string().nullable(),

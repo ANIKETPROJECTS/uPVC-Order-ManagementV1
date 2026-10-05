@@ -16,6 +16,8 @@ export interface QuotationRateSubmission {
   orderId: string | null;
   /** @nullable */
   measurementRecordId: string | null;
+  /** @nullable */
+  measurementSheetId: string | null;
   clientName: string;
   /** @nullable */
   location: string | null;

@@ -79,12 +79,13 @@ function canApprove(actor: Actor): boolean {
   return actor.masterAdmin || actor.permissions["rate-approval"] === "edit";
 }
 
-function response(item: QuotationRateSubmissionDocument) {
+function response(item: QuotationRateSubmissionDocument, measurementSheetId: string | null) {
   return {
     id: item._id,
     orderRecordId: item.orderRecordId ?? null,
     orderId: item.orderId ?? null,
     measurementRecordId: item.measurementRecordId ?? null,
+    measurementSheetId,
     clientName: item.clientName,
     location: item.location,
     windowQty: item.windowQty,
@@ -108,6 +109,25 @@ function response(item: QuotationRateSubmissionDocument) {
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
   };
+}
+
+async function responseList(items: QuotationRateSubmissionDocument[]) {
+  const recordIds = Array.from(new Set(items.flatMap((item) => item.measurementRecordId ? [item.measurementRecordId] : [])));
+  const records = recordIds.length
+    ? await getMeasurementRecords(await getMongoDb())
+        .find({ _id: { $in: recordIds } }, { projection: { _id: 1, sheetId: 1 } })
+        .toArray()
+    : [];
+  const sheetIdByRecord = new Map(records.map((record) => [record._id, record.sheetId ?? null]));
+  return items.map((item) =>
+    response(item, item.measurementRecordId ? sheetIdByRecord.get(item.measurementRecordId) ?? null : null),
+  );
+}
+
+async function responseOne(item: QuotationRateSubmissionDocument) {
+  const [result] = await responseList([item]);
+  if (!result) throw new Error("Could not serialize the quotation rate submission.");
+  return result;
 }
 
 async function cleanupQuotationRatePdf(
@@ -159,7 +179,7 @@ router.get("/quotation-rate-submissions", async (req, res): Promise<void> => {
     .find(filter)
     .sort({ createdAt: -1 })
     .toArray();
-  res.json(ListQuotationRateSubmissionsResponse.parse(items.map(response)));
+  res.json(ListQuotationRateSubmissionsResponse.parse(await responseList(items)));
 });
 
 router.get("/quotation-rate-submissions/lookup", async (req, res): Promise<void> => {
@@ -184,19 +204,28 @@ router.get("/quotation-rate-submissions/lookup", async (req, res): Promise<void>
         ],
       }
     : {};
-  const cursor = getQuotationRateSubmissions(await getMongoDb())
+  const db = await getMongoDb();
+  const cursor = getQuotationRateSubmissions(db)
     .find(filter, {
       projection: { _id: 1, clientName: 1, clientNameLower: 1, status: 1, orderId: 1, measurementRecordId: 1, createdAt: 1 },
     })
     .sort({ createdAt: -1 });
   if (queryText) cursor.limit(20);
   const items = await cursor.toArray();
+  const measurementIds = Array.from(new Set(items.flatMap((item) => item.measurementRecordId ? [item.measurementRecordId] : [])));
+  const linkedMeasurements = measurementIds.length
+    ? await getMeasurementRecords(db)
+        .find({ _id: { $in: measurementIds } }, { projection: { _id: 1, sheetId: 1 } })
+        .toArray()
+    : [];
+  const sheetIdByRecord = new Map(linkedMeasurements.map((record) => [record._id, record.sheetId ?? null]));
   res.json(SearchQuotationRateSubmissionsResponse.parse(items.map((item) => ({
     id: item._id,
     clientName: item.clientName,
     status: item.status,
     orderId: item.orderId ?? null,
     measurementRecordId: item.measurementRecordId ?? null,
+    measurementSheetId: item.measurementRecordId ? sheetIdByRecord.get(item.measurementRecordId) ?? null : null,
   }))));
 });
 
@@ -264,7 +293,7 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     updatedAt: now,
   };
   await getQuotationRateSubmissions(db).insertOne(item);
-  res.status(201).json(CreateQuotationRateSubmissionResponse.parse(response(item)));
+  res.status(201).json(CreateQuotationRateSubmissionResponse.parse(await responseOne(item)));
 });
 
 router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Promise<void> => {
@@ -336,7 +365,7 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
     res.status(409).json({ error: "This request changed while you were editing it. Refresh and try again." });
     return;
   }
-  res.json(UpdateQuotationRateSubmissionResponse.parse(response(updated)));
+  res.json(UpdateQuotationRateSubmissionResponse.parse(await responseOne(updated)));
 });
 
 router.delete("/quotation-rate-submissions/:submissionId", async (req, res): Promise<void> => {
@@ -484,7 +513,7 @@ router.patch(
       res.status(409).json({ error: "The link could not be saved. Refresh and try again." });
       return;
     }
-    res.json(LinkQuotationRateSubmissionOrderResponse.parse(response(updated)));
+    res.json(LinkQuotationRateSubmissionOrderResponse.parse(await responseOne(updated)));
   },
 );
 
@@ -559,7 +588,7 @@ router.post(
         return;
       }
       await cleanupQuotationRatePdf(db, item, req);
-      res.json(UploadQuotationRateSubmissionPdfResponse.parse(response(updated)));
+      res.json(UploadQuotationRateSubmissionPdfResponse.parse(await responseOne(updated)));
     });
   },
 );
@@ -663,7 +692,7 @@ router.post("/quotation-rate-submissions/:submissionId/decision", async (req, re
     res.status(409).json({ error: "This submission is no longer waiting for a decision." });
     return;
   }
-  res.json(DecideQuotationRateSubmissionResponse.parse(response(updated)));
+  res.json(DecideQuotationRateSubmissionResponse.parse(await responseOne(updated)));
 });
 
 function readRawFile(

@@ -37,6 +37,15 @@ const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', {
   hour: '2-digit',
   minute: '2-digit',
 }).format(new Date(value));
+const lastUpdatedLabel = (value: string) => new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: true,
+  timeZone: 'Asia/Kolkata',
+}).format(new Date(value));
 
 const sizeLabel = (size: number) => size < 1024 * 1024
   ? `${Math.max(1, Math.round(size / 1024))} KB`
@@ -182,8 +191,9 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Measurement Sheet ID</p>
                     <code className="mt-1 block break-all font-mono text-sm font-semibold text-primary" data-testid="text-detail-measurement-sheet-id">
-                      {measurementSheetIdLabel(record.id)}
+                      {measurementSheetIdLabel(record.id, record.sheetId)}
                     </code>
+                    {record.legacyId && <p className="mt-1 break-all text-[10px] text-muted-foreground">Legacy ID: {record.legacyId}</p>}
                     <CardTitle className="mt-3 font-display text-2xl">{record.clientName}</CardTitle>
                     <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin size={14} /> {record.location || 'Location not specified'}</p>
                   </div>
@@ -197,7 +207,7 @@ export default function MeasurementRecordDetailPage({ user }: { user: User }) {
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Location</p><p className="mt-1 text-sm">{record.location || 'Not specified'}</p></div>
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Assigned order</p><p className="mt-1 text-sm">{record.orderId || 'No order assigned'}</p></div>
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Created</p><p className="mt-1 text-sm">{dateLabel(record.createdAt)}</p></div>
-                <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Last updated</p><p className="mt-1 text-sm">{dateLabel(record.updatedAt)}</p></div>
+                <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Last updated</p><p className="mt-1 text-sm">{lastUpdatedLabel(record.updatedAt)}</p></div>
               </CardContent>
             </Card>
 

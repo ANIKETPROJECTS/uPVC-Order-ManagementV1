@@ -703,7 +703,7 @@ function RateApprovalDesk({ user }: { user: User }) {
     setLinkOrderRecordId(submission.orderRecordId || '');
     setLinkMeasurementSheet(Boolean(submission.measurementRecordId));
     setLinkMeasurementId(submission.measurementRecordId || null);
-    setLinkMeasurementLabel(submission.measurementRecordId ? measurementSheetIdLabel(submission.measurementRecordId) : '');
+    setLinkMeasurementLabel(submission.measurementRecordId ? measurementSheetIdLabel(submission.measurementRecordId, submission.measurementSheetId) : '');
   };
   const saveOrderLink = () => {
     if (!linkingSubmission || !linkOrderRecordId) {
@@ -722,7 +722,7 @@ function RateApprovalDesk({ user }: { user: User }) {
         void queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
         setLinkingSubmission(null);
-        toast({ title: 'Quotation request links saved', description: linkMeasurementSheet ? `${measurementSheetIdLabel(linkMeasurementId || '')} is linked directly to ${linkingSubmission.id}.` : linkingSubmission.measurementRecordId ? 'The order link is saved and the measurement sheet link is removed.' : 'The order link is saved.' });
+        toast({ title: 'Quotation request links saved', description: linkMeasurementSheet ? `${linkMeasurementLabel.split(' · ')[0] || measurementSheetIdLabel(linkMeasurementId || '')} is linked directly to ${linkingSubmission.id}.` : linkingSubmission.measurementRecordId ? 'The order link is saved and the measurement sheet link is removed.' : 'The order link is saved.' });
       },
       onError: () => toast({ title: 'Could not link the quotation', description: 'The order links were not changed. Refresh and try again.', variant: 'destructive' }),
     });
@@ -849,7 +849,7 @@ function RateApprovalDesk({ user }: { user: User }) {
                           <td className="max-w-[220px] px-4 py-3">
                             <p className="truncate font-semibold">{submission.clientName}</p>
                             {submission.orderId && <p className="mt-1 text-[10px] font-semibold text-primary" data-testid={`text-rate-order-id-${submission.id}`}>{submission.orderId}</p>}
-                            {submission.measurementRecordId && <p className="mt-1 text-[10px] text-muted-foreground">Measurement Sheet ID <code className="font-mono font-semibold text-foreground" data-testid={`text-rate-measurement-sheet-id-${submission.id}`}>{measurementSheetIdLabel(submission.measurementRecordId)}</code></p>}
+                            {submission.measurementRecordId && <p className="mt-1 text-[10px] text-muted-foreground">Measurement Sheet ID <code className="font-mono font-semibold text-foreground" data-testid={`text-rate-measurement-sheet-id-${submission.id}`}>{measurementSheetIdLabel(submission.measurementRecordId, submission.measurementSheetId)}</code></p>}
                             <p className="mt-1 text-[10px] text-muted-foreground">Submitted by {submission.submittedByName}</p>
                             {submission.pdfFilename && <div className="mt-2">
                               <a href={getDownloadQuotationRateSubmissionPdfUrl(submission.id)} download={submission.pdfFilename} className="inline-flex max-w-full items-center gap-1.5 truncate text-[10px] font-semibold text-primary hover:underline" data-testid={`link-download-rate-pdf-${submission.id}`}><Download size={12} /> {submission.pdfNeedsRefresh ? `Previous PDF · ${submission.pdfFilename}` : submission.pdfFilename}</a>
@@ -911,7 +911,7 @@ function RateApprovalDesk({ user }: { user: User }) {
                 selectedId={linkMeasurementId}
                 selectedLabel={linkMeasurementLabel}
                 currentQuotationRequestId={linkingSubmission?.id || ''}
-                onSelect={(item) => { setLinkMeasurementId(item.id); setLinkMeasurementLabel(`${measurementSheetIdLabel(item.id)} · ${item.clientName}`); }}
+                onSelect={(item) => { setLinkMeasurementId(item.id); setLinkMeasurementLabel(`${measurementSheetIdLabel(item.id, item.sheetId)} · ${item.clientName}`); }}
               />}
             </div>}
           </div>

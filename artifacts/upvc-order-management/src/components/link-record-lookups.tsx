@@ -12,7 +12,8 @@ import type {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export const measurementSheetIdLabel = (id: string) => `MS-${id.toUpperCase()}`;
+export const measurementSheetIdLabel = (id: string, sheetId?: string | null) =>
+  sheetId || `MS-${id.toUpperCase()}`;
 
 export function QuotationRequestLookup({
   selectedId,
@@ -69,7 +70,7 @@ export function QuotationRequestLookup({
             >
               <span className="flex max-w-[28rem] items-center justify-between gap-4">
                 <span className="truncate"><strong>{item.id}</strong><span className="ml-2">{item.clientName}</span></span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">{item.measurementRecordId ? `Linked to ${measurementSheetIdLabel(item.measurementRecordId)}` : item.status.replaceAll('_', ' ')}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">{item.measurementRecordId ? `Linked to ${measurementSheetIdLabel(item.measurementRecordId, item.measurementSheetId)}` : item.status.replaceAll('_', ' ')}</span>
               </span>
             </SelectItem>
           ))}
@@ -133,7 +134,7 @@ export function MeasurementSheetLookup({
               data-testid={`option-measurement-sheet-${item.id}`}
             >
               <span className="flex max-w-[28rem] items-center justify-between gap-4">
-                <span className="truncate"><strong>{measurementSheetIdLabel(item.id)}</strong><span className="ml-2">{item.clientName}</span>{item.location && <span className="ml-2 text-muted-foreground">{item.location}</span>}</span>
+                <span className="truncate"><strong>{measurementSheetIdLabel(item.id, item.sheetId)}</strong><span className="ml-2">{item.clientName}</span>{item.location && <span className="ml-2 text-muted-foreground">{item.location}</span>}</span>
                 <span className="shrink-0 text-[10px] text-muted-foreground">{item.quotationRequestId ? `Linked to ${item.quotationRequestId}` : item.orderId || 'No order'}</span>
               </span>
             </SelectItem>
