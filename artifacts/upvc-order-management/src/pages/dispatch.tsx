@@ -40,7 +40,7 @@ type ViewMode = 'list' | 'grid';
 const STATUS_OPTIONS: { value: StatusValue; label: string; tone: string; dot: string }[] = [
   { value: DispatchStatus.pending_dispatch, label: 'Pending Dispatch', tone: 'bg-amber-100 text-amber-900 ring-amber-200', dot: 'bg-amber-500' },
   { value: DispatchStatus.dispatched, label: 'Dispatched', tone: 'bg-teal-100 text-teal-900 ring-teal-200', dot: 'bg-teal-600' },
-  { value: DispatchStatus.delivered, label: 'Delivered', tone: 'bg-emerald-100 text-emerald-900 ring-emerald-200', dot: 'bg-emerald-600' },
+  { value: DispatchStatus.delivered, label: 'Installed', tone: 'bg-emerald-100 text-emerald-900 ring-emerald-200', dot: 'bg-emerald-600' },
 ];
 
 const DISPATCH_REGISTER_COLUMNS = 'lg:grid-cols-[minmax(130px,1.25fr)_minmax(85px,.85fr)_minmax(130px,1.05fr)_minmax(95px,.9fr)_minmax(132px,1.1fr)_minmax(130px,1fr)]';
