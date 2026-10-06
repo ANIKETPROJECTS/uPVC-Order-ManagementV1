@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import {
@@ -15,7 +15,6 @@ import type { InstallationTeam, InstallationTeamInput, User } from '@workspace/a
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 
 type DraftSubteam = { id?: string; name: string; memberIds: string[] };
@@ -34,44 +33,57 @@ const errorMessage = (error: unknown) => {
   return 'Please review the team and try again.';
 };
 
-function MemberPicker({ members, selected, onChange, label, disabled = false }: {
-  members: Member[]; selected: string[]; onChange: (ids: string[]) => void; label: string; disabled?: boolean;
+function MemberPicker({ members, selected, onChange, label }: {
+  members: Member[]; selected: string[]; onChange: (ids: string[]) => void; label: string;
 }) {
-  return <div className="grid gap-2 sm:grid-cols-2" data-testid={`picker-${label}`}>
-    {members.length === 0
-      ? <p className="col-span-full rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs text-muted-foreground">No eligible Installation users are available.</p>
-      : members.map((member) => {
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const visibleMembers = members.filter((member) =>
+    `${member.name} ${member.username} ${member.roleName}`.toLowerCase().includes(query),
+  );
+  const toggleMember = (id: string) => onChange(
+    selected.includes(id) ? selected.filter((memberId) => memberId !== id) : [...selected, id],
+  );
+
+  return <div className="space-y-3" data-testid={`picker-${label}`}>
+    <label className="relative block">
+      <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+      <Input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name, username, or role…" aria-label={`Search ${label}`} className="h-10 pl-9 text-xs" data-testid={`input-search-${label}`} />
+    </label>
+    {selected.length > 0 && <div className="flex flex-wrap gap-1.5" aria-label={`Selected ${label}`}>
+      {selected.map((id) => {
+        const name = members.find((member) => member.id === id)?.name || 'Unavailable member';
+        return <button key={id} type="button" onClick={() => toggleMember(id)} className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[.06] px-2.5 py-1 text-[11px] font-semibold text-primary transition hover:border-primary/45" aria-label={`Remove ${name} from ${label}`} data-testid={`remove-selected-${label}-${id}`}>
+          {name}<X size={12} />
+        </button>;
+      })}
+    </div>}
+    {visibleMembers.length === 0
+      ? <p className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs text-muted-foreground">{members.length ? 'No eligible users match this search.' : 'No eligible Installation users are available.'}</p>
+      : <div className="grid gap-2 sm:grid-cols-2" aria-label={`${label} users`}>
+        {visibleMembers.map((member) => {
         const checked = selected.includes(member.id);
         return <label key={member.id} className={`flex items-center gap-3 rounded-xl border p-3 transition-colors ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${checked ? 'border-primary/35 bg-primary/[.045]' : 'border-border bg-background hover:border-primary/25'}`}>
-          <input type="checkbox" checked={checked} disabled={disabled} onChange={() => onChange(checked ? selected.filter((id) => id !== member.id) : [...selected, member.id])} className="size-4 accent-[hsl(var(--primary))]" data-testid={`checkbox-${label}-${member.id}`} />
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary font-display text-xs font-bold text-secondary-foreground">{member.name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span>
-          <span className="min-w-0"><span className="block truncate text-xs font-semibold">{member.name}</span><span className="block truncate text-[10px] text-muted-foreground">@{member.username} · {member.roleName}</span></span>
-          {checked && <Check size={15} className="ml-auto shrink-0 text-primary" />}
-        </label>;
-      })}
+            <input type="checkbox" checked={checked} onChange={() => toggleMember(member.id)} className="size-4 accent-[hsl(var(--primary))]" data-testid={`checkbox-${label}-${member.id}`} />
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary font-display text-xs font-bold text-secondary-foreground">{member.name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span>
+            <span className="min-w-0"><span className="block truncate text-xs font-semibold">{member.name}</span><span className="block truncate text-[10px] text-muted-foreground">@{member.username} · {member.roleName}</span></span>
+            {checked && <Check size={15} className="ml-auto shrink-0 text-primary" />}
+          </label>;
+        })}
+      </div>}
   </div>;
 }
 
-function TeamEditor({ open, team, users, pending, canEdit, onClose, onSave }: {
-  open: boolean; team: InstallationTeam | null; users: Member[]; pending: boolean; canEdit: boolean;
+function TeamEditor({ team, users, pending, onClose, onSave }: {
+  team: InstallationTeam | null; users: Member[]; pending: boolean;
   onClose: () => void; onSave: (id: string | null, input: InstallationTeamInput) => void;
 }) {
-  const [name, setName] = useState('');
-  const [memberIds, setMemberIds] = useState<string[]>([]);
-  const [subteams, setSubteams] = useState<DraftSubteam[]>([]);
+  const [name, setName] = useState(team?.name || '');
+  const [memberIds, setMemberIds] = useState<string[]>(() => team?.memberIds || []);
+  const [subteams, setSubteams] = useState<DraftSubteam[]>(() => team?.subteams.map((item) => ({ id: item.id, name: item.name, memberIds: [...item.memberIds] })) || []);
   const [newSubteamName, setNewSubteamName] = useState('');
   const [newSubteamMembers, setNewSubteamMembers] = useState<string[]>([]);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!open) return;
-    setName(team?.name || '');
-    setMemberIds(team?.memberIds || []);
-    setSubteams(team?.subteams.map((item) => ({ id: item.id, name: item.name, memberIds: [...item.memberIds] })) || []);
-    setNewSubteamName('');
-    setNewSubteamMembers([]);
-    setError('');
-  }, [open, team]);
 
   const parentMembers = users.filter((member) => memberIds.includes(member.id));
   const changeParents = (ids: string[]) => {
@@ -98,34 +110,40 @@ function TeamEditor({ open, team, users, pending, canEdit, onClose, onSave }: {
     onSave(team?.id || null, { name: name.trim(), memberIds, subteams: subteams.map((item) => ({ ...item, name: item.name.trim() })) });
   };
 
-  return <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
-    <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto">
-      <DialogHeader><DialogTitle className="font-display text-xl">{team ? 'Edit installation team' : 'Create installation team'}</DialogTitle><DialogDescription>Build a reliable field crew. Subdivision membership is always kept within the parent team.</DialogDescription></DialogHeader>
-      <div className="space-y-6">
-        {!canEdit && <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">Your Installation access is view-only.</p>}
-        <label className="block space-y-2"><span className="text-xs font-bold">Team name</span><Input value={name} onChange={(event) => setName(event.target.value)} disabled={!canEdit} maxLength={120} placeholder="e.g. North field crew" data-testid="input-installation-team-name" /></label>
-        <section className="space-y-3"><div className="flex items-end justify-between"><div><h3 className="text-sm font-bold">Parent team members</h3><p className="mt-1 text-xs text-muted-foreground">Choose from eligible existing Installation users.</p></div><span className="font-mono text-xs text-primary">{memberIds.length} selected</span></div>
-          <MemberPicker members={users} selected={memberIds} onChange={changeParents} disabled={!canEdit} label="parent-members" />
+  return <section className="scroll-mt-4 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm" data-testid="panel-installation-team-editor">
+    <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border/75 bg-muted/15 px-4 py-4 md:px-6">
+      <div><p className="text-[10px] font-bold uppercase tracking-[.15em] text-primary">{team ? 'Team changes' : 'New field crew'}</p><h2 className="mt-1 font-display text-xl font-bold tracking-tight">{team ? 'Edit installation team' : 'Create installation team'}</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Select the existing Installation users who will work together. Subdivision membership stays within the parent team.</p></div>
+      <Button type="button" variant="outline" onClick={onClose} data-testid="button-close-installation-team-editor">Cancel</Button>
+    </header>
+    <div className="space-y-5 p-4 md:p-6">
+      <label className="block max-w-xl space-y-2"><span className="text-xs font-bold">Team name</span><Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="e.g. North field crew" data-testid="input-installation-team-name" /></label>
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
+        <section className="min-w-0 space-y-3 rounded-2xl border border-border/75 bg-background/60 p-4">
+          <div className="flex flex-wrap items-end justify-between gap-2"><div><h3 className="text-sm font-bold">Parent team members</h3><p className="mt-1 text-xs text-muted-foreground">Search and select eligible users from the existing user list.</p></div><span className="rounded-full bg-secondary px-2.5 py-1 font-mono text-[11px] font-semibold text-secondary-foreground">{memberIds.length} selected</span></div>
+          <MemberPicker members={users} selected={memberIds} onChange={changeParents} label="parent-members" />
         </section>
-        <section className="space-y-4 rounded-2xl border border-border bg-muted/25 p-4">
-          <div className="flex items-center justify-between"><div><h3 className="text-sm font-bold">Subdivisions</h3><p className="mt-1 text-xs text-muted-foreground">Optional smaller crews inside this team.</p></div><span className="rounded-full bg-background px-2.5 py-1 font-mono text-[11px]">{subteams.length}</span></div>
+        <section className="min-w-0 space-y-4 rounded-2xl border border-border/75 bg-muted/20 p-4">
+          <div className="flex items-center justify-between gap-2"><div><h3 className="text-sm font-bold">Subdivisions</h3><p className="mt-1 text-xs text-muted-foreground">Optional crews for teams working at different sites.</p></div><span className="rounded-full bg-background px-2.5 py-1 font-mono text-[11px]">{subteams.length}</span></div>
           {subteams.map((subteam, index) => <div key={subteam.id || `${subteam.name}-${index}`} className="space-y-3 rounded-xl border border-border bg-card p-3" data-testid={`row-installation-subteam-${index}`}>
-            <div className="flex gap-2"><Input value={subteam.name} disabled={!canEdit} onChange={(event) => setSubteams((items) => items.map((item, at) => at === index ? { ...item, name: event.target.value } : item))} aria-label={`Subdivision ${index + 1} name`} data-testid={`input-installation-subteam-name-${index}`} />
-              {canEdit && <Button type="button" variant="ghost" size="icon" aria-label="Remove subdivision" onClick={() => setSubteams((items) => items.filter((_, at) => at !== index))} data-testid={`button-remove-subteam-${index}`}><X size={16} /></Button>}
+            <div className="flex gap-2"><Input value={subteam.name} onChange={(event) => setSubteams((items) => items.map((item, at) => at === index ? { ...item, name: event.target.value } : item))} aria-label={`Subdivision ${index + 1} name`} data-testid={`input-installation-subteam-name-${index}`} />
+              <Button type="button" variant="ghost" size="icon" aria-label="Remove subdivision" onClick={() => setSubteams((items) => items.filter((_, at) => at !== index))} data-testid={`button-remove-subteam-${index}`}><X size={16} /></Button>
             </div>
-            <MemberPicker members={parentMembers} selected={subteam.memberIds} onChange={(ids) => setSubteams((items) => items.map((item, at) => at === index ? { ...item, memberIds: ids } : item))} disabled={!canEdit} label={`subteam-${index}`} />
+            <MemberPicker members={parentMembers} selected={subteam.memberIds} onChange={(ids) => setSubteams((items) => items.map((item, at) => at === index ? { ...item, memberIds: ids } : item))} label={`subteam-${index}`} />
           </div>)}
-          {canEdit && <div className="space-y-3 rounded-xl border border-dashed border-primary/30 bg-background/75 p-3">
-            <Input value={newSubteamName} onChange={(event) => setNewSubteamName(event.target.value)} placeholder="Subdivision name" data-testid="input-installation-subteam-name" />
+          <div className="space-y-3 rounded-xl border border-dashed border-primary/30 bg-background/75 p-3">
+            <Input value={newSubteamName} onChange={(event) => setNewSubteamName(event.target.value)} placeholder="Subdivision name" aria-label="New subdivision name" data-testid="input-installation-subteam-name" />
             <MemberPicker members={parentMembers} selected={newSubteamMembers} onChange={setNewSubteamMembers} label="new-subteam" />
             <Button type="button" variant="outline" size="sm" onClick={addSubteam} data-testid="button-add-installation-subteam"><Plus size={14} /> Add subdivision</Button>
-          </div>}
+          </div>
         </section>
-        {error && <p className="rounded-lg bg-destructive/5 px-3 py-2 text-xs text-destructive" data-testid="text-team-form-error">{error}</p>}
-        <DialogFooter><Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel-installation-team">Cancel</Button>{canEdit && <Button type="button" disabled={pending} onClick={submit} data-testid="button-save-installation-team">{pending ? 'Saving…' : team ? 'Save team' : 'Create team'}</Button>}</DialogFooter>
       </div>
-    </DialogContent>
-  </Dialog>;
+      {error && <p className="rounded-lg bg-destructive/5 px-3 py-2 text-xs text-destructive" data-testid="text-team-form-error">{error}</p>}
+    </div>
+    <footer className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-border/75 bg-card/95 px-4 py-3 backdrop-blur md:px-6">
+      <p className="text-[11px] text-muted-foreground">Changes are used by the Installation order scheduler.</p>
+      <div className="flex gap-2"><Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel-installation-team">Cancel</Button><Button type="button" disabled={pending} onClick={submit} data-testid="button-save-installation-team">{pending ? 'Saving…' : team ? 'Save team' : 'Create team'}</Button></div>
+    </footer>
+  </section>;
 }
 
 export default function InstallationTeamsPage({ user }: { user: User }) {
