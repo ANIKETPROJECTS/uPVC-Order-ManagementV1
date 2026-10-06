@@ -4,10 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { z } from 'zod';
+import { QRCodeCanvas } from 'qrcode.react';
 import {
   ArrowRight, ArrowUpDown, CalendarDays, Check, CircleAlert, ClipboardCheck,
-  Copy, LayoutGrid, List, MapPin, MessageSquareText, RefreshCw, Search,
-  ShieldCheck, Wrench,
+  Copy, Download, LayoutGrid, List, MapPin, MessageSquareText, QrCode,
+  RefreshCw, Search, ShieldCheck, Wrench,
 } from 'lucide-react';
 import {
   getGetOrderQueryKey, getListDispatchOrdersQueryKey, getListInstallationOrdersQueryKey,
@@ -18,6 +19,7 @@ import {
 } from '@workspace/api-client-react';
 import type { InstallationOrder, InstallationTeam, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
+import { getInstallationStatusUrl } from '@/lib/order-qr';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -181,6 +183,8 @@ export default function InstallationPage({ user }: { user: User }) {
   const [showInstalled, setShowInstalled] = useState(false);
   const [resultOrder, setResultOrder] = useState<InstallationOrder | null>(null);
   const [assignmentOrder, setAssignmentOrder] = useState<InstallationOrder | null>(null);
+  const [qrOrder, setQrOrder] = useState<InstallationOrder | null>(null);
+  const qrContainerRef = useRef<HTMLDivElement>(null);
   const ordersQuery = useListInstallationOrders({ query: { enabled: canView, queryKey: getListInstallationOrdersQueryKey() } });
   const teamsQuery = useListInstallationTeams({ query: { enabled: canView && canEdit, queryKey: getListInstallationTeamsQueryKey() } });
   const usersQuery = useListInstallationUsers({ query: { enabled: canView && canEdit, queryKey: getListInstallationUsersQueryKey() } });
@@ -193,7 +197,22 @@ export default function InstallationPage({ user }: { user: User }) {
   const directoryReady = (teamsQuery.isSuccess || teamsQuery.isError) && (usersQuery.isSuccess || usersQuery.isError);
   const directoryError = teamsQuery.isError || usersQuery.isError;
   const requestedOrderId = new URLSearchParams(window.location.search).get('order');
+  const requestedStatusUpdate = new URLSearchParams(window.location.search).get('updateStatus') === '1';
   const focusedOrder = requestedOrderId ? orders.find((order) => order.id === requestedOrderId) : undefined;
+  useEffect(() => {
+    if (!requestedStatusUpdate || !requestedOrderId || !canEdit || !ordersQuery.isSuccess) return;
+    const target = orders.find((order) => order.id === requestedOrderId);
+    if (!target) return;
+    setResultOrder(target);
+    const params = new URLSearchParams(window.location.search);
+    params.delete('updateStatus');
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
+    );
+  }, [requestedStatusUpdate, requestedOrderId, canEdit, ordersQuery.isSuccess, orders]);
   const visibleOrders = useMemo(() => {
     const needle = search.trim().toLowerCase();
     const filtered = orders.filter((o) => {
@@ -255,10 +274,20 @@ export default function InstallationPage({ user }: { user: User }) {
       onError: () => toast({ title: 'Team could not be unassigned', description: 'Refresh and try again.', variant: 'destructive' }),
     });
   };
-  const copyAssignmentLink = async (order: InstallationOrder) => {
-    const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/installation?order=${encodeURIComponent(order.id)}`;
+  const copyInstallationLink = async (order: InstallationOrder, updateStatus = false) => {
+    const url = updateStatus
+      ? getInstallationStatusUrl(order.id)
+      : `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/installation?order=${encodeURIComponent(order.id)}`;
     try { await navigator.clipboard.writeText(url); toast({ title: 'Assignment link copied', description: 'The link contains only the order record ID.' }); }
     catch { toast({ title: 'Could not copy link', description: 'Clipboard access is unavailable in this browser.', variant: 'destructive' }); }
+  };
+  const downloadInstallationQr = () => {
+    const canvas = qrContainerRef.current?.querySelector('canvas');
+    if (!canvas || !qrOrder) return;
+    const anchor = document.createElement('a');
+    anchor.href = canvas.toDataURL('image/png');
+    anchor.download = `${qrOrder.orderId.replace(/[^a-zA-Z0-9._-]/g, '-')}-installation-status-qr.png`;
+    anchor.click();
   };
 
   return <AppShell user={user} title="Installation" eyebrow="Fulfillment · post-delivery tracking">
@@ -274,14 +303,17 @@ export default function InstallationPage({ user }: { user: User }) {
       {canView && requestedOrderId && <section className="overflow-hidden rounded-xl border border-primary/25 bg-card shadow-sm" aria-label="Focused installation assignment" data-testid="panel-focused-installation-assignment">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 bg-primary/[.035] px-4 py-3 sm:px-5">
           <div><p className="text-[9px] font-bold uppercase tracking-[.16em] text-primary">Shared assignment detail</p><h2 className="mt-1 font-display text-base font-bold">Installation record</h2><p className="mt-0.5 text-[10px] text-muted-foreground">Details are loaded from the protected Installation register.</p></div>
-          {focusedOrder?.teamId && <Button type="button" size="sm" variant="outline" onClick={() => void copyAssignmentLink(focusedOrder)} data-testid="button-copy-focused-installation-link"><Copy size={14} /> Copy assignment link</Button>}
+          {focusedOrder?.teamId && <>
+            {focusedOrder.installationStatus !== 'installed' && <Button type="button" size="sm" variant="outline" onClick={() => setQrOrder(focusedOrder)} data-testid="button-show-focused-installation-qr"><QrCode size={14} /> Status QR</Button>}
+            <Button type="button" size="sm" variant="outline" onClick={() => void copyInstallationLink(focusedOrder)} data-testid="button-copy-focused-installation-link"><Copy size={14} /> Copy assignment link</Button>
+          </>}
         </div>
         <div className="p-4 sm:p-5">
           {ordersQuery.isLoading ? <div className="space-y-2" data-testid="state-focused-installation-loading"><div className="h-5 w-40 animate-pulse rounded bg-muted" /><div className="h-4 w-64 animate-pulse rounded bg-muted" /><div className="h-4 w-48 animate-pulse rounded bg-muted" /></div>
             : ordersQuery.isError ? <div className="flex flex-wrap items-center justify-between gap-3" data-testid="state-focused-installation-error"><p className="text-sm font-semibold">Assignment details could not be loaded.</p><Button type="button" size="sm" variant="outline" onClick={() => void ordersQuery.refetch()} data-testid="button-retry-focused-installation"><RefreshCw size={13} /> Retry</Button></div>
               : !focusedOrder ? <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4" data-testid="state-focused-installation-not-found"><p className="text-sm font-semibold">Installation order not found</p><p className="mt-1 text-xs text-muted-foreground">This record is not present in the delivered-order installation register.</p></div>
                 : <div data-testid={`detail-focused-installation-${focusedOrder.id}`}>
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="font-mono text-lg font-bold tracking-tight" data-testid={`text-focused-order-id-${focusedOrder.id}`}>{focusedOrder.orderId}</p><span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${focusedOrder.teamId ? 'bg-primary/10 text-primary' : 'bg-amber-100 text-amber-900'}`} data-testid={`status-focused-assignment-${focusedOrder.id}`}>{focusedOrder.teamId ? 'Assigned' : 'Not assigned'}</span></div>
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="font-mono text-lg font-bold tracking-tight" data-testid={`text-focused-order-id-${focusedOrder.id}`}>{focusedOrder.orderId}</p><span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${focusedOrder.teamId ? 'bg-primary/10 text-primary' : 'bg-amber-100 text-amber-900'}`} data-testid={`status-focused-assignment-${focusedOrder.id}`}>{focusedOrder.teamId ? 'Assigned' : 'Not assigned'}</span><span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${focusedOrder.installationStatus === 'installed' ? 'bg-emerald-100 text-emerald-800' : focusedOrder.installationStatus === 'issue' ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'}`} data-testid={`status-focused-installation-${focusedOrder.id}`}>{statusName(focusedOrder.installationStatus)}</span></div>
                   <p className="mt-1 text-sm font-semibold" data-testid={`text-focused-client-${focusedOrder.id}`}>{focusedOrder.clientName}</p>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Site</p><p className="mt-1 text-xs font-semibold" data-testid={`text-focused-location-${focusedOrder.id}`}>{focusedOrder.locationName}</p></div>
@@ -290,6 +322,7 @@ export default function InstallationPage({ user }: { user: User }) {
                     <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Scheduled date</p><p className="mt-1 text-xs font-semibold" data-testid={`text-focused-date-${focusedOrder.id}`}>{formatDate(focusedOrder.scheduledDate)}</p></div>
                   </div>
                   <div className="mt-4 border-t border-border/70 pt-3"><p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Selected members</p><p className="mt-1 text-xs font-semibold" data-testid={`text-focused-members-${focusedOrder.id}`}>{focusedOrder.assignedMembers.length ? focusedOrder.assignedMembers.map((member) => member.name).join(', ') : 'No members selected'}</p></div>
+                   {canEdit && <div className="mt-4 flex justify-end"><Button type="button" size="sm" onClick={() => setResultOrder(focusedOrder)} data-testid={`button-focused-update-installation-${focusedOrder.id}`}>{focusedOrder.installationStatus === 'installed' ? 'Edit installation date' : 'Update installation status'}<ArrowRight size={13} /></Button></div>}
                 </div>}
         </div>
       </section>}
@@ -352,7 +385,8 @@ export default function InstallationPage({ user }: { user: User }) {
               <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 md:border-0 md:bg-transparent md:px-0"><div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-muted-foreground">Visit date</p><p className="mt-0.5 text-xs font-bold tabular-nums">{formatDate(order.scheduledDate)}</p></div><CalendarDays size={15} className="ml-auto text-primary md:hidden" /></div>
               <div className={`flex flex-wrap items-center gap-2 ${view === 'grid' ? 'mt-auto border-t border-border/70 pt-3' : 'md:justify-end'}`}>
                 {canEdit && order.installationStatus !== 'installed' && <Button type="button" size="sm" variant={order.teamId ? 'outline' : 'default'} className="h-9 text-[11px]" disabled={assignmentMutation.isPending || unassignMutation.isPending} onClick={() => setAssignmentOrder(order)} data-testid={`button-assign-installation-${order.id}`}>{order.teamId ? 'Change schedule' : 'Assign team'}<ArrowRight size={13} /></Button>}
-                {canView && order.teamId && <Button type="button" size="sm" variant="outline" className="h-9 px-2.5" onClick={() => void copyAssignmentLink(order)} aria-label={`Copy installation link for ${order.orderId}`} data-testid={`button-copy-installation-link-${order.id}`}><Copy size={14} /><span className="sr-only">Copy link</span></Button>}
+                {canView && order.teamId && order.installationStatus !== 'installed' && <Button type="button" size="sm" variant="outline" className="h-9 px-2.5" onClick={() => setQrOrder(order)} aria-label={`Show installation status QR for ${order.orderId}`} title="Show installation status QR" data-testid={`button-show-installation-qr-${order.id}`}><QrCode size={14} /><span className="sr-only">Status QR</span></Button>}
+                {canView && order.teamId && <Button type="button" size="sm" variant="outline" className="h-9 px-2.5" onClick={() => void copyInstallationLink(order)} aria-label={`Copy installation link for ${order.orderId}`} data-testid={`button-copy-installation-link-${order.id}`}><Copy size={14} /><span className="sr-only">Copy link</span></Button>}
                 {canEdit && order.installationStatus !== 'installed' && (order.installationStatus === 'issue' || order.teamId && order.scheduledDate && dateReached(order.scheduledDate)) && <Button type="button" size="sm" className="h-9 text-[11px]" onClick={() => setResultOrder(order)} disabled={resultMutation.isPending} data-testid={`button-update-installation-${order.id}`}>{order.installationStatus === 'issue' ? 'Record result' : 'Mark installed'}<Check size={13} /></Button>}
                 {canEdit && order.installationStatus !== 'installed' && order.installationStatus !== 'issue' && <span className="max-w-36 text-right text-[10px] leading-4 text-muted-foreground" data-testid={`text-mark-installed-locked-${order.id}`}>{order.teamId ? 'Completion opens on visit date' : 'Assign a team before marking installed'}</span>}
                 {canEdit && order.installationStatus === 'installed' && <Button type="button" size="sm" variant="outline" className="h-9 text-[11px]" onClick={() => setResultOrder(order)} data-testid={`button-update-installation-${order.id}`}>Edit date</Button>}
@@ -368,5 +402,28 @@ export default function InstallationPage({ user }: { user: User }) {
     </main>
     <ResultDialog order={resultOrder} canEdit={canEdit} pending={resultMutation.isPending} onClose={() => { setResultOrder(null); resultMutation.reset(); }} onSave={saveResult} />
     <AssignmentDialog order={assignmentOrder} teams={teams} users={users} directoryReady={directoryReady} directoryError={directoryError} pending={assignmentMutation.isPending} unassignPending={unassignMutation.isPending} onClose={() => { setAssignmentOrder(null); assignmentMutation.reset(); unassignMutation.reset(); }} onSave={saveAssignment} onUnassign={unassignTeam} onRetryDirectory={() => { void teamsQuery.refetch(); void usersQuery.refetch(); }} />
+    <Dialog open={Boolean(qrOrder)} onOpenChange={(open) => { if (!open) setQrOrder(null); }}>
+      <DialogContent className="max-w-md" data-testid="dialog-installation-status-qr">
+        <DialogHeader><DialogTitle>Installation status QR</DialogTitle><DialogDescription>{qrOrder ? `Scan to open the status update for ${qrOrder.orderId}. Sign-in and Installation edit access are required to save changes.` : 'Scan to open an installation status update.'}</DialogDescription></DialogHeader>
+        {qrOrder && <div className="flex flex-col items-center gap-4 rounded-xl border border-border/70 bg-muted/15 p-4">
+          <div ref={qrContainerRef} className="rounded-xl border border-border bg-white p-3" data-testid="installation-status-qr-code">
+            <QRCodeCanvas value={getInstallationStatusUrl(qrOrder.id)} size={220} level="H" includeMargin aria-label={`Installation status QR for ${qrOrder.orderId}`} />
+          </div>
+          <div className="w-full space-y-1 text-center">
+            <p className="font-mono text-sm font-bold">{qrOrder.orderId}</p>
+            <p className="text-xs font-semibold">{qrOrder.clientName} · {qrOrder.locationName}</p>
+            <p className="text-[11px] text-muted-foreground">{qrOrder.windowQty} windows · {qrOrder.teamName}{qrOrder.subteamName ? ` / ${qrOrder.subteamName}` : ''} · Visit {formatDate(qrOrder.scheduledDate)}</p>
+            <p className="text-[11px] font-semibold text-primary">Current status: {statusName(qrOrder.installationStatus)}</p>
+          </div>
+        </div>}
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+          <Button type="button" variant="outline" onClick={() => setQrOrder(null)} data-testid="button-close-installation-qr">Close</Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {qrOrder && <Button type="button" variant="outline" onClick={() => void copyInstallationLink(qrOrder, true)} data-testid="button-copy-installation-status-link"><Copy size={14} />Copy update link</Button>}
+            <Button type="button" onClick={downloadInstallationQr} disabled={!qrOrder} data-testid="button-download-installation-status-qr"><Download size={14} />Download QR</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </AppShell>;
 }

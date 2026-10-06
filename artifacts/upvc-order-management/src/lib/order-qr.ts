@@ -4,6 +4,12 @@ export function getOrderStatusUrl(orderRecordId: string): string {
   return new URL(path, window.location.origin).toString();
 }
 
+export function getInstallationStatusUrl(orderRecordId: string): string {
+  const basePath = import.meta.env.BASE_URL.replace(/\/+$/, '');
+  const path = `${basePath}/installation?order=${encodeURIComponent(orderRecordId)}&updateStatus=1`;
+  return new URL(path, window.location.origin).toString();
+}
+
 export function getDispatchScanUrl(orderRecordId: string): string {
   const basePath = import.meta.env.BASE_URL.replace(/\/+$/, '');
   const path = `${basePath}/dispatch?scanOrderId=${encodeURIComponent(orderRecordId)}`;
