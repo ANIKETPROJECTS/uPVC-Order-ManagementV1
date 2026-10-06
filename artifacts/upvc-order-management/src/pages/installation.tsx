@@ -278,7 +278,15 @@ export default function InstallationPage({ user }: { user: User }) {
     const url = updateStatus
       ? getInstallationStatusUrl(order.id)
       : `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/installation?order=${encodeURIComponent(order.id)}`;
-    try { await navigator.clipboard.writeText(url); toast({ title: 'Assignment link copied', description: 'The link contains only the order record ID.' }); }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: updateStatus ? 'Status update link copied' : 'Assignment link copied',
+        description: updateStatus
+          ? 'Sign-in and Installation edit access are required to save a status change.'
+          : 'The link contains only the order record ID.',
+      });
+    }
     catch { toast({ title: 'Could not copy link', description: 'Clipboard access is unavailable in this browser.', variant: 'destructive' }); }
   };
   const downloadInstallationQr = () => {
