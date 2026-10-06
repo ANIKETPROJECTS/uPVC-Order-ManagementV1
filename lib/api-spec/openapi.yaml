@@ -914,6 +914,152 @@ paths:
           description: Order not found
         "409":
           description: Order is no longer delivered or cannot be updated
+  /installation/users:
+    get:
+      operationId: listInstallationUsers
+      tags: [installation]
+      summary: List active users eligible for installation teams
+      responses:
+        "200":
+          description: Active users with Installation access
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationTeamMemberList"
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
+  /installation/teams:
+    get:
+      operationId: listInstallationTeams
+      tags: [installation]
+      summary: List installation teams and subdivisions
+      responses:
+        "200":
+          description: Installation teams
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationTeamList"
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation view access required
+    post:
+      operationId: createInstallationTeam
+      tags: [installation]
+      summary: Create an installation team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallationTeamInput"
+      responses:
+        "201":
+          description: Created installation team
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationTeam"
+        "400":
+          description: Invalid team data
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
+        "409":
+          description: Team name already exists
+  /installation/teams/{id}:
+    patch:
+      operationId: updateInstallationTeam
+      tags: [installation]
+      summary: Update an installation team and its subdivisions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallationTeamInput"
+      responses:
+        "200":
+          description: Updated installation team
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationTeam"
+        "400":
+          description: Invalid team data
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
+        "404":
+          description: Team not found
+        "409":
+          description: Team or subdivision is in use
+    delete:
+      operationId: deleteInstallationTeam
+      tags: [installation]
+      summary: Delete an installation team
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Installation team deleted
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
+        "404":
+          description: Team not found
+        "409":
+          description: Team has scheduled orders and cannot be deleted
+  /installation/orders/{id}/assignment:
+    patch:
+      operationId: assignInstallationOrder
+      tags: [installation]
+      summary: Assign or reschedule an installation team and its members
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallationAssignmentUpdate"
+      responses:
+        "200":
+          description: Updated installation assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationOrder"
+        "400":
+          description: Invalid team, subdivision, members, or schedule
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
+        "404":
+          description: Order or team not found
+        "409":
+          description: Order is not eligible for assignment
   /orders/{id}/grievances:
     get:
       operationId: listOrderGrievances
@@ -3189,10 +3335,28 @@ components:
           format: date
         issueReason:
           type: ["string", "null"]
+        windowQty:
+          type: integer
+          minimum: 0
+        teamId:
+          type: ["string", "null"]
+        teamName:
+          type: ["string", "null"]
+        subteamId:
+          type: ["string", "null"]
+        subteamName:
+          type: ["string", "null"]
+        scheduledDate:
+          type: ["string", "null"]
+          format: date
+        assignedMembers:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstallationAssignedMember"
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, installationStatus, installationDate, issueReason, updatedAt]
+      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, installationStatus, installationDate, issueReason, windowQty, teamId, teamName, subteamId, subteamName, scheduledDate, assignedMembers, updatedAt]
     InstallationOrderUpdate:
       type: object
       properties:
@@ -3210,6 +3374,116 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/InstallationOrder"
+    InstallationAssignedMember:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required: [id, name]
+    InstallationTeamMember:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        username:
+          type: string
+        roleName:
+          type: string
+      required: [id, name, username, roleName]
+    InstallationTeamMemberList:
+      type: array
+      items:
+        $ref: "#/components/schemas/InstallationTeamMember"
+    InstallationSubteam:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        memberIds:
+          type: array
+          items:
+            type: string
+      required: [id, name, memberIds]
+    InstallationSubteamInput:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        memberIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+      required: [name, memberIds]
+    InstallationTeam:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        memberIds:
+          type: array
+          items:
+            type: string
+        subteams:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstallationSubteam"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, memberIds, subteams, createdAt, updatedAt]
+    InstallationTeamList:
+      type: array
+      items:
+        $ref: "#/components/schemas/InstallationTeam"
+    InstallationTeamInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        memberIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        subteams:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstallationSubteamInput"
+      required: [name, memberIds, subteams]
+    InstallationAssignmentUpdate:
+      type: object
+      properties:
+        teamId:
+          type: string
+        subteamId:
+          type: ["string", "null"]
+        scheduledDate:
+          type: string
+          format: date
+        memberIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+      required: [teamId, subteamId, scheduledDate, memberIds]
     OrderGrievance:
       type: object
       properties:

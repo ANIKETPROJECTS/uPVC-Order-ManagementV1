@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DispatchStatus } from './dispatchStatus';
+import type { InstallationAssignedMember } from './installationAssignedMember';
 import type { InstallationStatus } from './installationStatus';
 import type { OrderStatus } from './orderStatus';
 
@@ -21,5 +22,18 @@ export interface InstallationOrder {
   installationDate: Date | null;
   /** @nullable */
   issueReason: string | null;
+  /** @minimum 0 */
+  windowQty: number;
+  /** @nullable */
+  teamId: string | null;
+  /** @nullable */
+  teamName: string | null;
+  /** @nullable */
+  subteamId: string | null;
+  /** @nullable */
+  subteamName: string | null;
+  /** @nullable */
+  scheduledDate: Date | null;
+  assignedMembers: InstallationAssignedMember[];
   updatedAt: Date;
 }

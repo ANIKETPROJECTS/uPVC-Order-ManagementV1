@@ -1311,6 +1311,10 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
 /**
  * @summary List delivered orders and their installation state
  */
+export const listInstallationOrdersResponseWindowQtyMin = 0;
+
+
+
 export const ListInstallationOrdersResponseItem = zod.object({
   "id": zod.string(),
   "orderId": zod.string(),
@@ -1321,6 +1325,16 @@ export const ListInstallationOrdersResponseItem = zod.object({
   "installationStatus": zod.enum(['pending', 'issue', 'installed']),
   "installationDate": zod.coerce.date().nullable(),
   "issueReason": zod.string().nullable(),
+  "windowQty": zod.number().int().min(listInstallationOrdersResponseWindowQtyMin),
+  "teamId": zod.string().nullable(),
+  "teamName": zod.string().nullable(),
+  "subteamId": zod.string().nullable(),
+  "subteamName": zod.string().nullable(),
+  "scheduledDate": zod.coerce.date().nullable(),
+  "assignedMembers": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string()
+})),
   "updatedAt": zod.coerce.date()
 })
 export const ListInstallationOrdersResponse = zod.array(ListInstallationOrdersResponseItem)
@@ -1343,6 +1357,10 @@ export const UpdateInstallationOrderBody = zod.object({
   "issueReason": zod.string().max(updateInstallationOrderBodyIssueReasonMax).optional()
 })
 
+export const updateInstallationOrderResponseWindowQtyMin = 0;
+
+
+
 export const UpdateInstallationOrderResponse = zod.object({
   "id": zod.string(),
   "orderId": zod.string(),
@@ -1353,6 +1371,175 @@ export const UpdateInstallationOrderResponse = zod.object({
   "installationStatus": zod.enum(['pending', 'issue', 'installed']),
   "installationDate": zod.coerce.date().nullable(),
   "issueReason": zod.string().nullable(),
+  "windowQty": zod.number().int().min(updateInstallationOrderResponseWindowQtyMin),
+  "teamId": zod.string().nullable(),
+  "teamName": zod.string().nullable(),
+  "subteamId": zod.string().nullable(),
+  "subteamName": zod.string().nullable(),
+  "scheduledDate": zod.coerce.date().nullable(),
+  "assignedMembers": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string()
+})),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List active users eligible for installation teams
+ */
+export const ListInstallationUsersResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "roleName": zod.string()
+})
+export const ListInstallationUsersResponse = zod.array(ListInstallationUsersResponseItem)
+
+
+/**
+ * @summary List installation teams and subdivisions
+ */
+export const ListInstallationTeamsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "memberIds": zod.array(zod.string()),
+  "subteams": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "memberIds": zod.array(zod.string())
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListInstallationTeamsResponse = zod.array(ListInstallationTeamsResponseItem)
+
+
+/**
+ * @summary Create an installation team
+ */
+export const createInstallationTeamBodyNameMax = 120;
+
+
+export const createInstallationTeamBodySubteamsItemNameMax = 120;
+
+
+
+
+export const CreateInstallationTeamBody = zod.object({
+  "name": zod.string().min(1).max(createInstallationTeamBodyNameMax),
+  "memberIds": zod.array(zod.string()).min(1),
+  "subteams": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "name": zod.string().min(1).max(createInstallationTeamBodySubteamsItemNameMax),
+  "memberIds": zod.array(zod.string()).min(1)
+}))
+})
+
+export const CreateInstallationTeamResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "memberIds": zod.array(zod.string()),
+  "subteams": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "memberIds": zod.array(zod.string())
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update an installation team and its subdivisions
+ */
+export const UpdateInstallationTeamParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateInstallationTeamBodyNameMax = 120;
+
+
+export const updateInstallationTeamBodySubteamsItemNameMax = 120;
+
+
+
+
+export const UpdateInstallationTeamBody = zod.object({
+  "name": zod.string().min(1).max(updateInstallationTeamBodyNameMax),
+  "memberIds": zod.array(zod.string()).min(1),
+  "subteams": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "name": zod.string().min(1).max(updateInstallationTeamBodySubteamsItemNameMax),
+  "memberIds": zod.array(zod.string()).min(1)
+}))
+})
+
+export const UpdateInstallationTeamResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "memberIds": zod.array(zod.string()),
+  "subteams": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "memberIds": zod.array(zod.string())
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete an installation team
+ */
+export const DeleteInstallationTeamParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteInstallationTeamResponse = zod.void()
+
+
+/**
+ * @summary Assign or reschedule an installation team and its members
+ */
+export const AssignInstallationOrderParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+
+
+export const AssignInstallationOrderBody = zod.object({
+  "teamId": zod.string(),
+  "subteamId": zod.string().nullable(),
+  "scheduledDate": zod.coerce.date(),
+  "memberIds": zod.array(zod.string()).min(1)
+})
+
+export const assignInstallationOrderResponseWindowQtyMin = 0;
+
+
+
+export const AssignInstallationOrderResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "installationStatus": zod.enum(['pending', 'issue', 'installed']),
+  "installationDate": zod.coerce.date().nullable(),
+  "issueReason": zod.string().nullable(),
+  "windowQty": zod.number().int().min(assignInstallationOrderResponseWindowQtyMin),
+  "teamId": zod.string().nullable(),
+  "teamName": zod.string().nullable(),
+  "subteamId": zod.string().nullable(),
+  "subteamName": zod.string().nullable(),
+  "scheduledDate": zod.coerce.date().nullable(),
+  "assignedMembers": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string()
+})),
   "updatedAt": zod.coerce.date()
 })
 

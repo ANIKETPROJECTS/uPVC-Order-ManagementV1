@@ -9,55 +9,36 @@ import {
   UpdateInstallationOrderBody,
   UpdateInstallationOrderParams,
   UpdateInstallationOrderResponse,
+  AssignInstallationOrderBody,
+  AssignInstallationOrderParams,
+  AssignInstallationOrderResponse,
 } from "@workspace/api-zod";
-import { Router, type Request, type Response } from "express";
+import { Router } from "express";
 import {
+  getInstallationTeams,
   getInstallations,
   getMongoClient,
   getMongoDb,
   getOrderActivity,
   getOrderGrievances,
+  getOrderWindows,
   getOrders,
-  getPublicUser,
-  getUsers,
   type InstallationDocument,
+  type InstallationTeamDocument,
   type OrderDocument,
   type OrderGrievanceDocument,
 } from "../lib/mongo";
+import { getActor, resolveEligibleInstallationMembers } from "./installation-access";
 
 const router = Router();
 
-type Actor = { id: string; name: string; masterAdmin: boolean };
-
-async function getActor(
-  req: Request,
-  res: Response,
-  module: "installation" | "order-hub",
-  required: "view" | "edit",
-): Promise<Actor | null> {
-  const db = await getMongoDb();
-  const user = req.session.userId
-    ? await getUsers(db).findOne({ _id: req.session.userId, status: "active" })
-    : null;
-  if (!user) {
-    res.status(401).json({ error: "Sign in to continue." });
-    return null;
-  }
-
-  const publicUser = await getPublicUser(user, db);
-  const permission = publicUser.permissions[module] ?? "none";
-  if (
-    publicUser.roleId !== "master-admin" &&
-    permission !== "edit" &&
-    (required === "edit" || permission !== "view")
-  ) {
-    res.status(403).json({ error: `${module === "installation" ? "Installation" : "Order"} ${required} access is required.` });
-    return null;
-  }
-  return { id: user._id, name: user.name, masterAdmin: publicUser.roleId === "master-admin" };
-}
-
-function installationResponse(order: OrderDocument, installation?: InstallationDocument) {
+function installationResponse(
+  order: OrderDocument,
+  installation?: InstallationDocument,
+  windowQty = 0,
+  team?: InstallationTeamDocument | null,
+) {
+  const subteam = team?.subteams.find((candidate) => candidate._id === installation?.subteamId);
   return {
     id: order._id,
     orderId: order.orderId,
@@ -70,8 +51,28 @@ function installationResponse(order: OrderDocument, installation?: InstallationD
       ? new Date(`${installation.installationDate}T00:00:00.000Z`)
       : null,
     issueReason: installation?.issueReason ?? null,
+    windowQty,
+    teamId: installation?.teamId ?? null,
+    teamName: team?.name ?? installation?.teamNameSnapshot ?? null,
+    subteamId: installation?.subteamId ?? null,
+    subteamName: subteam?.name ?? installation?.subteamNameSnapshot ?? null,
+    scheduledDate: installation?.scheduledDate
+      ? new Date(`${installation.scheduledDate}T00:00:00.000Z`)
+      : null,
+    assignedMembers: installation?.assignedMembers ?? [],
     updatedAt: installation?.updatedAt ?? order.updatedAt,
   };
+}
+
+function istDateKey(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function grievanceResponse(item: OrderGrievanceDocument) {
@@ -106,10 +107,149 @@ router.get("/installation/orders", async (req, res): Promise<void> => {
   const installations = await getInstallations(db)
     .find({ _id: { $in: orders.map((order) => order._id) } })
     .toArray();
+  const teams = await getInstallationTeams(db).find().toArray();
+  const windows = await getOrderWindows(db).find({
+    orderRecordId: { $in: orders.map((order) => order._id) },
+    archivedAt: { $exists: false },
+  }).toArray();
   const installationsByOrder = new Map(installations.map((item) => [item.orderRecordId, item]));
+  const teamsById = new Map(teams.map((team) => [team._id, team]));
+  const windowQtyByOrder = new Map<string, number>();
+  for (const window of windows) {
+    windowQtyByOrder.set(window.orderRecordId, (windowQtyByOrder.get(window.orderRecordId) ?? 0) + 1);
+  }
   res.json(ListInstallationOrdersResponse.parse(orders.map((order) =>
-    installationResponse(order, installationsByOrder.get(order._id)),
+    installationResponse(
+      order,
+      installationsByOrder.get(order._id),
+      windowQtyByOrder.get(order._id) ?? 0,
+      teamsById.get(installationsByOrder.get(order._id)?.teamId ?? "") ?? null,
+    ),
   )));
+});
+
+router.patch("/installation/orders/:id/assignment", async (req, res): Promise<void> => {
+  const params = AssignInstallationOrderParams.safeParse(req.params);
+  const body = AssignInstallationOrderBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: !params.success ? params.error.message : body.success ? "" : body.error.message });
+    return;
+  }
+  const actor = await getActor(req, res, "installation", "edit");
+  if (!actor) return;
+
+  const db = await getMongoDb();
+  const session = (await getMongoClient()).startSession();
+  const scheduledDate = body.data.scheduledDate.toISOString().slice(0, 10);
+  let updatedOrder: OrderDocument | null = null;
+  let updatedInstallation: InstallationDocument | null = null;
+  let assignedTeam: InstallationTeamDocument | null = null;
+  try {
+    await session.withTransaction(async () => {
+      const order = await getOrders(db).findOne(
+        { _id: params.data.id, dispatchStatus: "delivered" },
+        { session },
+      );
+      if (!order) {
+        const existing = await getOrders(db).findOne({ _id: params.data.id }, { session });
+        if (!existing) throw new InstallationConflict("Order not found.");
+        throw new InstallationConflict("Only delivered orders can be scheduled in Installation.");
+      }
+      if (order.status === "installed") {
+        throw new InstallationConflict("Installed orders cannot be reassigned.");
+      }
+
+      const team = await getInstallationTeams(db).findOne({ _id: body.data.teamId }, { session });
+      if (!team) throw new InstallationConflict("Installation team not found.");
+      const subteam = body.data.subteamId
+        ? team.subteams.find((candidate) => candidate._id === body.data.subteamId)
+        : null;
+      if (body.data.subteamId && !subteam) {
+        throw new InstallationConflict("This subdivision is no longer part of the selected team. Refresh and try again.");
+      }
+      const eligibleMemberIds = new Set(subteam?.memberIds ?? team.memberIds);
+      if (body.data.memberIds.some((memberId) => !eligibleMemberIds.has(memberId))) {
+        throw new InstallationConflict("Choose members from the selected team or subdivision.");
+      }
+      const assignedMembers = await resolveEligibleInstallationMembers(db, body.data.memberIds);
+      if (!assignedMembers?.length) {
+        throw new InstallationConflict("Choose active users who have Installation access.");
+      }
+
+      const existingInstallation = await getInstallations(db).findOne({ _id: order._id }, { session });
+      if (existingInstallation?.installationStatus === "installed") {
+        throw new InstallationConflict("Installed orders cannot be reassigned.");
+      }
+      const now = new Date();
+      const result = await getInstallations(db).findOneAndUpdate(
+        { _id: order._id },
+        {
+          $set: {
+            orderRecordId: order._id,
+            teamId: team._id,
+            teamNameSnapshot: team.name,
+            subteamId: subteam?._id ?? null,
+            subteamNameSnapshot: subteam?.name ?? null,
+            scheduledDate,
+            assignedMembers,
+            updatedBy: actor.id,
+            updatedAt: now,
+          },
+          $setOnInsert: {
+            installationStatus: "pending",
+            installationDate: null,
+            issueReason: null,
+            createdAt: now,
+          },
+        },
+        { returnDocument: "after", upsert: true, session },
+      );
+      if (!result) throw new InstallationConflict("The installation assignment could not be saved.");
+
+      const changes = [
+        `Team ${team.name}${subteam ? ` · ${subteam.name}` : ""}`,
+        `scheduled ${scheduledDate}`,
+        `members ${assignedMembers.map((member) => member.name).join(", ")}`,
+      ];
+      await getOrderActivity(db).insertOne({
+        _id: randomUUID(),
+        orderRecordId: order._id,
+        actorId: actor.id,
+        actorName: actor.name,
+        action: "installation_assignment",
+        summary: `${order.orderId} installation assignment: ${changes.join("; ")}.`,
+        createdAt: now,
+      }, { session });
+
+      updatedOrder = order;
+      updatedInstallation = result;
+      assignedTeam = team;
+    });
+  } catch (error) {
+    if (error instanceof InstallationConflict) {
+      res.status(error.message === "Order not found." || error.message === "Installation team not found." ? 404 : 409)
+        .json({ error: error.message });
+      return;
+    }
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  const savedOrder = updatedOrder as OrderDocument | null;
+  const savedInstallation = updatedInstallation as InstallationDocument | null;
+  const savedTeam = assignedTeam as InstallationTeamDocument | null;
+  if (!savedOrder || !savedInstallation) {
+    res.status(409).json({ error: "The installation assignment could not be saved." });
+    return;
+  }
+  const windowQty = await getOrderWindows(db).countDocuments({
+    orderRecordId: savedOrder._id,
+    archivedAt: { $exists: false },
+  });
+  res.json(AssignInstallationOrderResponse.parse(
+    installationResponse(savedOrder, savedInstallation, windowQty, savedTeam),
+  ));
 });
 
 router.patch("/installation/orders/:id", async (req, res): Promise<void> => {
@@ -154,6 +294,19 @@ router.patch("/installation/orders/:id", async (req, res): Promise<void> => {
       }
 
       if (body.data.installationStatus === "installed") {
+        if (order.status !== "installed") {
+          const assignment = await getInstallations(db).findOne({ _id: order._id }, { session });
+          const scheduledDate = assignment?.scheduledDate ?? null;
+          if (!assignment?.teamId || !scheduledDate) {
+            throw new InstallationConflict("Assign an installation team and schedule date before marking this order installed.");
+          }
+          if (scheduledDate > istDateKey(now)) {
+            throw new InstallationConflict("This order cannot be marked installed before its scheduled installation date.");
+          }
+          if (installationDate < scheduledDate) {
+            throw new InstallationConflict("The installation date cannot be earlier than the scheduled date.");
+          }
+        }
         const result = await orders.findOneAndUpdate(
           { _id: order._id, dispatchStatus: "delivered" },
           { $set: { status: "installed", updatedAt: now, updatedBy: actor.id } },
@@ -205,11 +358,24 @@ router.patch("/installation/orders/:id", async (req, res): Promise<void> => {
     await session.endSession();
   }
 
-  if (!updatedOrder || !updatedInstallation) {
+  const savedOrder = updatedOrder as OrderDocument | null;
+  const savedInstallation = updatedInstallation as InstallationDocument | null;
+  if (!savedOrder || !savedInstallation) {
     res.status(409).json({ error: "The installation update could not be saved." });
     return;
   }
-  res.json(UpdateInstallationOrderResponse.parse(installationResponse(updatedOrder, updatedInstallation)));
+  const [team, windowQty] = await Promise.all([
+    savedInstallation.teamId
+      ? getInstallationTeams(db).findOne({ _id: savedInstallation.teamId })
+      : Promise.resolve(null),
+    getOrderWindows(db).countDocuments({
+      orderRecordId: savedOrder._id,
+      archivedAt: { $exists: false },
+    }),
+  ]);
+  res.json(UpdateInstallationOrderResponse.parse(
+    installationResponse(savedOrder, savedInstallation, windowQty, team),
+  ));
 });
 
 router.get("/orders/:id/grievances", async (req, res): Promise<void> => {

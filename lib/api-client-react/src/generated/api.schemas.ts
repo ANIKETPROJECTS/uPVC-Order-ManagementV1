@@ -329,6 +329,11 @@ export const InstallationStatus = {
   installed: 'installed',
 } as const;
 
+export interface InstallationAssignedMember {
+  id: string;
+  name: string;
+}
+
 export interface InstallationOrder {
   id: string;
   orderId: string;
@@ -341,6 +346,19 @@ export interface InstallationOrder {
   installationDate: string | null;
   /** @nullable */
   issueReason: string | null;
+  /** @minimum 0 */
+  windowQty: number;
+  /** @nullable */
+  teamId: string | null;
+  /** @nullable */
+  teamName: string | null;
+  /** @nullable */
+  subteamId: string | null;
+  /** @nullable */
+  subteamName: string | null;
+  /** @nullable */
+  scheduledDate: string | null;
+  assignedMembers: InstallationAssignedMember[];
   updatedAt: string;
 }
 
@@ -360,6 +378,63 @@ export interface InstallationOrderUpdate {
 }
 
 export type InstallationOrderList = InstallationOrder[];
+
+export interface InstallationTeamMember {
+  id: string;
+  name: string;
+  username: string;
+  roleName: string;
+}
+
+export type InstallationTeamMemberList = InstallationTeamMember[];
+
+export interface InstallationSubteam {
+  id: string;
+  name: string;
+  memberIds: string[];
+}
+
+export interface InstallationSubteamInput {
+  id?: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  /** @minItems 1 */
+  memberIds: string[];
+}
+
+export interface InstallationTeam {
+  id: string;
+  name: string;
+  memberIds: string[];
+  subteams: InstallationSubteam[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type InstallationTeamList = InstallationTeam[];
+
+export interface InstallationTeamInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  /** @minItems 1 */
+  memberIds: string[];
+  subteams: InstallationSubteamInput[];
+}
+
+export interface InstallationAssignmentUpdate {
+  teamId: string;
+  /** @nullable */
+  subteamId: string | null;
+  scheduledDate: string;
+  /** @minItems 1 */
+  memberIds: string[];
+}
 
 export type OrderGrievanceStatus = typeof OrderGrievanceStatus[keyof typeof OrderGrievanceStatus];
 

@@ -46,9 +46,14 @@ import type {
   GlassTrackingQuantitiesInput,
   GlassWorkbookPreview,
   HealthStatus,
+  InstallationAssignmentUpdate,
   InstallationOrder,
   InstallationOrderList,
   InstallationOrderUpdate,
+  InstallationTeam,
+  InstallationTeamInput,
+  InstallationTeamList,
+  InstallationTeamMemberList,
   ListClientsParams,
   ListOrderLocationsParams,
   ListOrdersParams,
@@ -3536,6 +3541,500 @@ export const useUpdateInstallationOrder = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateInstallationOrderMutationOptions(options));
+    }
+
+export const getListInstallationUsersUrl = () => {
+
+
+
+
+  return `/api/installation/users`
+}
+
+/**
+ * @summary List active users eligible for installation teams
+ */
+export const listInstallationUsers = async ( options?: Parameters<typeof customFetch>[1]): Promise<InstallationTeamMemberList> => {
+
+  return customFetch<InstallationTeamMemberList>(getListInstallationUsersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInstallationUsersQueryKey = () => {
+    return [
+    `/api/installation/users`
+    ] as const;
+    }
+
+
+export const getListInstallationUsersQueryOptions = <TData = Awaited<ReturnType<typeof listInstallationUsers>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstallationUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInstallationUsersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInstallationUsers>>> = ({ signal }) => listInstallationUsers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInstallationUsers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInstallationUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listInstallationUsers>>>
+export type ListInstallationUsersQueryError = ErrorType<void>
+
+
+/**
+ * @summary List active users eligible for installation teams
+ */
+
+export function useListInstallationUsers<TData = Awaited<ReturnType<typeof listInstallationUsers>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstallationUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInstallationUsersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListInstallationTeamsUrl = () => {
+
+
+
+
+  return `/api/installation/teams`
+}
+
+/**
+ * @summary List installation teams and subdivisions
+ */
+export const listInstallationTeams = async ( options?: Parameters<typeof customFetch>[1]): Promise<InstallationTeamList> => {
+
+  return customFetch<InstallationTeamList>(getListInstallationTeamsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInstallationTeamsQueryKey = () => {
+    return [
+    `/api/installation/teams`
+    ] as const;
+    }
+
+
+export const getListInstallationTeamsQueryOptions = <TData = Awaited<ReturnType<typeof listInstallationTeams>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstallationTeams>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInstallationTeamsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInstallationTeams>>> = ({ signal }) => listInstallationTeams({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInstallationTeams>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInstallationTeamsQueryResult = NonNullable<Awaited<ReturnType<typeof listInstallationTeams>>>
+export type ListInstallationTeamsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List installation teams and subdivisions
+ */
+
+export function useListInstallationTeams<TData = Awaited<ReturnType<typeof listInstallationTeams>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstallationTeams>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInstallationTeamsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateInstallationTeamUrl = () => {
+
+
+
+
+  return `/api/installation/teams`
+}
+
+/**
+ * @summary Create an installation team
+ */
+export const createInstallationTeam = async (installationTeamInput: InstallationTeamInput, options?: Parameters<typeof customFetch>[1]): Promise<InstallationTeam> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InstallationTeam>(getCreateInstallationTeamUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(installationTeamInput)
+  }
+);}
+
+
+
+
+
+export const getCreateInstallationTeamMutationKey = () => ['createInstallationTeam'] as const;
+
+export const getCreateInstallationTeamMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInstallationTeam>>, TError,CreateInstallationTeamMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createInstallationTeam>>, TError,CreateInstallationTeamMutationVariables, TContext> => {
+
+const mutationKey = getCreateInstallationTeamMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInstallationTeam>>, CreateInstallationTeamMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createInstallationTeam(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateInstallationTeamMutationResult = NonNullable<Awaited<ReturnType<typeof createInstallationTeam>>>
+    export type CreateInstallationTeamMutationBody = BodyType<InstallationTeamInput>
+    export type CreateInstallationTeamMutationError = ErrorType<void>
+    export type CreateInstallationTeamMutationVariables = {data: BodyType<InstallationTeamInput>}
+
+    /**
+ * @summary Create an installation team
+ */
+export const useCreateInstallationTeam = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInstallationTeam>>, TError,CreateInstallationTeamMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createInstallationTeam>>,
+        TError,
+        CreateInstallationTeamMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateInstallationTeamMutationOptions(options));
+    }
+
+export const getUpdateInstallationTeamUrl = (id: string,) => {
+
+
+
+
+  return `/api/installation/teams/${id}`
+}
+
+/**
+ * @summary Update an installation team and its subdivisions
+ */
+export const updateInstallationTeam = async (id: string,
+    installationTeamInput: InstallationTeamInput, options?: Parameters<typeof customFetch>[1]): Promise<InstallationTeam> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InstallationTeam>(getUpdateInstallationTeamUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(installationTeamInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateInstallationTeamMutationKey = () => ['updateInstallationTeam'] as const;
+
+export const getUpdateInstallationTeamMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstallationTeam>>, TError,UpdateInstallationTeamMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInstallationTeam>>, TError,UpdateInstallationTeamMutationVariables, TContext> => {
+
+const mutationKey = getUpdateInstallationTeamMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstallationTeam>>, UpdateInstallationTeamMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateInstallationTeam(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInstallationTeamMutationResult = NonNullable<Awaited<ReturnType<typeof updateInstallationTeam>>>
+    export type UpdateInstallationTeamMutationBody = BodyType<InstallationTeamInput>
+    export type UpdateInstallationTeamMutationError = ErrorType<void>
+    export type UpdateInstallationTeamMutationVariables = {id: string;data: BodyType<InstallationTeamInput>}
+
+    /**
+ * @summary Update an installation team and its subdivisions
+ */
+export const useUpdateInstallationTeam = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstallationTeam>>, TError,UpdateInstallationTeamMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInstallationTeam>>,
+        TError,
+        UpdateInstallationTeamMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateInstallationTeamMutationOptions(options));
+    }
+
+export const getDeleteInstallationTeamUrl = (id: string,) => {
+
+
+
+
+  return `/api/installation/teams/${id}`
+}
+
+/**
+ * @summary Delete an installation team
+ */
+export const deleteInstallationTeam = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteInstallationTeamUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteInstallationTeamMutationKey = () => ['deleteInstallationTeam'] as const;
+
+export const getDeleteInstallationTeamMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInstallationTeam>>, TError,DeleteInstallationTeamMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteInstallationTeam>>, TError,DeleteInstallationTeamMutationVariables, TContext> => {
+
+const mutationKey = getDeleteInstallationTeamMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteInstallationTeam>>, DeleteInstallationTeamMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteInstallationTeam(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteInstallationTeamMutationResult = NonNullable<Awaited<ReturnType<typeof deleteInstallationTeam>>>
+
+    export type DeleteInstallationTeamMutationError = ErrorType<void>
+    export type DeleteInstallationTeamMutationVariables = {id: string}
+
+    /**
+ * @summary Delete an installation team
+ */
+export const useDeleteInstallationTeam = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInstallationTeam>>, TError,DeleteInstallationTeamMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteInstallationTeam>>,
+        TError,
+        DeleteInstallationTeamMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteInstallationTeamMutationOptions(options));
+    }
+
+export const getAssignInstallationOrderUrl = (id: string,) => {
+
+
+
+
+  return `/api/installation/orders/${id}/assignment`
+}
+
+/**
+ * @summary Assign or reschedule an installation team and its members
+ */
+export const assignInstallationOrder = async (id: string,
+    installationAssignmentUpdate: InstallationAssignmentUpdate, options?: Parameters<typeof customFetch>[1]): Promise<InstallationOrder> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InstallationOrder>(getAssignInstallationOrderUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(installationAssignmentUpdate)
+  }
+);}
+
+
+
+
+
+export const getAssignInstallationOrderMutationKey = () => ['assignInstallationOrder'] as const;
+
+export const getAssignInstallationOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignInstallationOrder>>, TError,AssignInstallationOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof assignInstallationOrder>>, TError,AssignInstallationOrderMutationVariables, TContext> => {
+
+const mutationKey = getAssignInstallationOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignInstallationOrder>>, AssignInstallationOrderMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  assignInstallationOrder(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignInstallationOrderMutationResult = NonNullable<Awaited<ReturnType<typeof assignInstallationOrder>>>
+    export type AssignInstallationOrderMutationBody = BodyType<InstallationAssignmentUpdate>
+    export type AssignInstallationOrderMutationError = ErrorType<void>
+    export type AssignInstallationOrderMutationVariables = {id: string;data: BodyType<InstallationAssignmentUpdate>}
+
+    /**
+ * @summary Assign or reschedule an installation team and its members
+ */
+export const useAssignInstallationOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignInstallationOrder>>, TError,AssignInstallationOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof assignInstallationOrder>>,
+        TError,
+        AssignInstallationOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAssignInstallationOrderMutationOptions(options));
     }
 
 export const getListOrderGrievancesUrl = (id: string,) => {

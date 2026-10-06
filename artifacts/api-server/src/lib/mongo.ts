@@ -321,12 +321,39 @@ export interface OrderActivityDocument {
   _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
 }
 export type InstallationStatus = "pending" | "issue" | "installed";
+export interface InstallationAssignedMemberDocument {
+  id: string;
+  name: string;
+}
+export interface InstallationSubteamDocument {
+  _id: string;
+  name: string;
+  nameLower: string;
+  memberIds: string[];
+}
+export interface InstallationTeamDocument {
+  _id: string;
+  name: string;
+  nameLower: string;
+  memberIds: string[];
+  subteams: InstallationSubteamDocument[];
+  createdBy: string;
+  createdAt: Date;
+  updatedBy: string;
+  updatedAt: Date;
+}
 export interface InstallationDocument {
   _id: string;
   orderRecordId: string;
   installationStatus: InstallationStatus;
   installationDate: string | null;
   issueReason: string | null;
+  teamId?: string | null;
+  teamNameSnapshot?: string | null;
+  subteamId?: string | null;
+  subteamNameSnapshot?: string | null;
+  scheduledDate?: string | null;
+  assignedMembers?: InstallationAssignedMemberDocument[];
   updatedBy: string;
   updatedAt: Date;
   createdAt: Date;
@@ -660,6 +687,7 @@ export function getOrderDocumentCategories(db: Db) { return db.collection<OrderD
 export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }
 export function getOrderActivity(db: Db) { return db.collection<OrderActivityDocument>("order_activity"); }
 export function getInstallations(db: Db) { return db.collection<InstallationDocument>("installations"); }
+export function getInstallationTeams(db: Db) { return db.collection<InstallationTeamDocument>("installation_teams"); }
 export function getOrderGrievances(db: Db) { return db.collection<OrderGrievanceDocument>("order_grievances"); }
 export function getWindowProfiles(db: Db) { return db.collection<WindowProfileDocument>("window_profiles"); }
 export function getQuotations(db: Db) { return db.collection<QuotationDocument>("quotations"); }
