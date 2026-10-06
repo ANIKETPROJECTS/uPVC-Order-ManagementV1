@@ -8,6 +8,8 @@ import {
   CreateOrderLocationBody,
   CreateOrderLocationResponse,
   CreateOrderResponse,
+  DeleteOrderParams,
+  DeleteOrderResponse,
   GetOrderParams,
   GetOrderResponse,
   ListClientsQueryParams,
@@ -185,6 +187,7 @@ function orderResponse(order: OrderDocument) {
     locationCode: order.locationCode,
     locationName: order.locationName,
     status: order.status,
+    isActive: order.isActive !== false,
     notes: order.notes,
     orderValue: order.orderValue ?? null,
     createdBy: order.createdBy,
@@ -503,6 +506,7 @@ router.get("/orders", async (req, res): Promise<void> => {
     return;
   }
   const filter: Filter<OrderDocument> = {};
+  if (!parsed.data.includeInactive) filter.isActive = { $ne: false };
   if (parsed.data.status) filter.status = parsed.data.status as OrderStatus;
   if (parsed.data.clientId) filter.clientId = parsed.data.clientId;
   if (parsed.data.locationCode) {
@@ -641,6 +645,7 @@ router.post(
       lots,
       nextLotSequence: client.type === "Project" ? 2 : 1,
       status: "quotation_stage",
+      isActive: true,
       dispatchStatus: "pending_dispatch",
       notes: parsed.data.notes?.trim() || null,
       orderValue: null,
@@ -701,8 +706,13 @@ router.patch(
       inputError(req, res, parsed.error);
       return;
     }
-    if (parsed.data.status === undefined && parsed.data.notes === undefined) {
-      res.status(400).json({ error: "Provide an order status or notes update." });
+    if (
+      parsed.data.status === undefined &&
+      parsed.data.notes === undefined &&
+      parsed.data.locationCode === undefined &&
+      parsed.data.isActive === undefined
+    ) {
+      res.status(400).json({ error: "Provide an order status, notes, or active-state update." });
       return;
     }
     const actorId = req.session.userId;
@@ -718,11 +728,33 @@ router.patch(
     if (parsed.data.status !== undefined) {
       updates.status = parsed.data.status as OrderStatus;
     }
+    if (parsed.data.isActive !== undefined) {
+      updates.isActive = parsed.data.isActive;
+    }
     if (parsed.data.notes !== undefined) {
       updates.notes = parsed.data.notes?.trim() || null;
     }
     const db = await getMongoDb();
     const before = await getOrders(db).findOne({ _id: params.data.id });
+    if (!before) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (parsed.data.locationCode !== undefined) {
+      const locationCode = normalizeLocationCode(parsed.data.locationCode);
+      if (locationCode !== normalizeLocationCode(before.locationCode)) {
+        const location = await getOrderLocations(db).findOne({
+          codeUpper: locationCode,
+          isActive: true,
+        });
+        if (!location) {
+          res.status(404).json({ error: "Choose an active order location." });
+          return;
+        }
+        updates.locationCode = normalizeLocationCode(location.code);
+        updates.locationName = location.name;
+      }
+    }
     const result = await getOrders(db).updateOne(
       { _id: params.data.id },
       { $set: updates },
@@ -737,11 +769,89 @@ router.patch(
       return;
     }
     const actor = await getUsers(db).findOne({ _id: actorId });
-    if (before && actor && (before.status !== order.status || before.notes !== order.notes)) {
-      const changes = [before.status !== order.status ? `status to ${order.status}` : "", before.notes !== order.notes ? "internal notes" : ""].filter(Boolean).join(" and ");
-      await getOrderActivity(db).insertOne({ _id: randomUUID(), orderRecordId: order._id, actorId, actorName: actor.name, action: "order.updated", summary: `Updated ${changes}.`, createdAt: new Date() });
+    const activeStateChanged =
+      before &&
+      (before.isActive !== false) !== (order.isActive !== false);
+    if (
+      before &&
+      actor &&
+      (before.locationCode !== order.locationCode ||
+        before.status !== order.status ||
+        before.notes !== order.notes ||
+        activeStateChanged)
+    ) {
+      const changes = [
+        before.locationCode !== order.locationCode
+          ? `location to ${order.locationCode} · ${order.locationName}`
+          : "",
+        before.status !== order.status ? `status to ${order.status}` : "",
+        before.notes !== order.notes ? "internal notes" : "",
+        (before.isActive !== false) !== (order.isActive !== false)
+          ? order.isActive === false ? "archived the order" : "restored the order"
+          : "",
+      ].filter(Boolean).join(" and ");
+      await getOrderActivity(db).insertOne({
+        _id: randomUUID(),
+        orderRecordId: order._id,
+        actorId,
+        actorName: actor.name,
+        action: activeStateChanged
+          ? order.isActive === false ? "order.archived" : "order.restored"
+          : "order.updated",
+        summary: `Updated ${changes}.`,
+        createdAt: new Date(),
+      });
     }
     res.json(UpdateOrderResponse.parse(orderResponse(order)));
+  },
+);
+
+router.delete(
+  "/orders/:id",
+  requireOrderHubPermission("edit"),
+  async (req, res): Promise<void> => {
+    const params = DeleteOrderParams.safeParse(req.params);
+    if (!params.success) {
+      inputError(req, res, params.error);
+      return;
+    }
+    const actorId = req.session.userId;
+    if (!actorId) {
+      res.status(401).json({ error: "Sign in to continue." });
+      return;
+    }
+
+    const db = await getMongoDb();
+    const before = await getOrders(db).findOne({ _id: params.data.id });
+    if (!before) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    if (before.isActive !== false) {
+      const now = new Date();
+      await getOrders(db).updateOne(
+        { _id: params.data.id },
+        { $set: { isActive: false, updatedAt: now, updatedBy: actorId } },
+      );
+      const actor = await getUsers(db).findOne({ _id: actorId });
+      if (actor) {
+        await getOrderActivity(db).insertOne({
+          _id: randomUUID(),
+          orderRecordId: before._id,
+          actorId,
+          actorName: actor.name,
+          action: "order.archived",
+          summary: `Archived ${before.orderId} from the active register; linked history was retained.`,
+          createdAt: now,
+        });
+      }
+    }
+    const order = await getOrders(db).findOne({ _id: params.data.id });
+    if (!order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    res.json(DeleteOrderResponse.parse(orderResponse(order)));
   },
 );
 

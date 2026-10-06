@@ -68,6 +68,7 @@ import {
   useListOrderDocumentCategories,
   useListOrderDocuments,
   useListOrderGrievances,
+  useListOrderLocations,
   useListOrderMessageTemplates,
   useListOrderPaymentFlags,
   useListOrderPayments,
@@ -89,6 +90,7 @@ import type {
   OrderDocumentCategory,
   OrderDocumentCategoryConfig,
   OrderGrievance,
+  OrderLocation,
   PaymentFlag,
   OrderPayment,
   OrderWindow,
@@ -208,23 +210,37 @@ function SummaryStat({ label, value, detail, testId }: { label: string; value: s
   return <div className="rounded-xl border border-border/70 bg-background/45 p-4"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">{label}</p><p className="mt-2 font-display text-xl font-bold tracking-[-0.03em]" data-testid={testId}>{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{detail}</p></div>;
 }
 
-const detailSchema = z.object({ status: z.string(), notes: z.string().max(2000).nullable().optional() });
+const detailSchema = z.object({
+  locationCode: z.string().min(2).max(5),
+  status: z.string(),
+  notes: z.string().max(2000).nullable().optional(),
+});
 
 function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: string }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const canEdit = hasPermission(user, 'order-hub');
   const update = useUpdateOrder();
-  const [editing, setEditing] = useState(false);
-  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { status: order.status, notes: order.notes || '' } });
+  const locations = useListOrderLocations({ includeInactive: false });
+  const [editing, setEditing] = useState(
+    () => new URLSearchParams(window.location.search).get('edit') === 'true',
+  );
+  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { locationCode: order.locationCode, status: order.status, notes: order.notes || '' } });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('edit')) {
+      url.searchParams.delete('edit');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  }, []);
   const initializedForId = useRef<string | null>(null);
   useEffect(() => {
     if (initializedForId.current !== order.id) {
       initializedForId.current = order.id;
-      form.reset({ status: order.status, notes: order.notes || '' });
+      form.reset({ locationCode: order.locationCode, status: order.status, notes: order.notes || '' });
     }
-  }, [form, order.id, order.notes, order.status]);
-  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { status: values.status as Status, notes: values.notes || null } }, {
+  }, [form, order.id, order.locationCode, order.notes, order.status]);
+  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationCode: values.locationCode, status: values.status as Status, notes: values.notes || null } }, {
     onSuccess: (updated) => {
       queryClient.setQueryData(getGetOrderQueryKey(id), updated);
       void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
@@ -244,7 +260,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
         {canEdit && (
           <Button variant="outline" size="sm" onClick={() => {
             setEditing((value) => !value);
-            form.reset({ status: order.status, notes: order.notes || '' });
+            form.reset({ locationCode: order.locationCode, status: order.status, notes: order.notes || '' });
           }} data-testid="button-toggle-order-edit">
             <Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}
           </Button>
@@ -254,6 +270,21 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
         {editing && canEdit ? (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(save)} className="space-y-4" data-testid="form-order-detail">
+              <FormField control={form.control} name="locationCode" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Order location</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl><SelectTrigger data-testid="select-order-location"><SelectValue placeholder="Choose a location" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {(locations.data || []).map((location: OrderLocation) => <SelectItem key={location.id} value={location.code}>{location.code} · {location.name}</SelectItem>)}
+                      {!(locations.data || []).some((location: OrderLocation) => location.code === order.locationCode) && (
+                        <SelectItem value={order.locationCode}>{order.locationCode} · {order.locationName} (inactive)</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <FormField control={form.control} name="status" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Lifecycle status</FormLabel>

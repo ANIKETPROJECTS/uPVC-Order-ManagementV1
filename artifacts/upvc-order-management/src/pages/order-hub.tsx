@@ -17,9 +17,11 @@ import {
   MapPin,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Settings2,
   ShieldCheck,
+  Trash2,
   UserRound,
   UsersRound,
   X,
@@ -34,16 +36,18 @@ import {
   useCreateClient,
   useCreateOrder,
   useCreateOrderLocation,
+  useDeleteOrder,
   useListClients,
   useListOrderLocations,
   useListOrders,
   useListOrderMessageTemplates,
   useListQuotations,
   useUpdateClient,
+  useUpdateOrder,
   useUpdateOrderMessageTemplate,
   useUpdateOrderLocation,
 } from '@workspace/api-client-react';
-import type { Client, OrderLocation, OrderMessageTemplate, Quotation, User } from '@workspace/api-client-react';
+import type { Client, Order, OrderLocation, OrderMessageTemplate, Quotation, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,6 +73,69 @@ const statusLabel = (status: string) => STATUS_OPTIONS.find((item) => item.value
 const statusTone = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.tone || 'bg-muted text-muted-foreground';
 const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
 const shortDate = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' }).format(new Date(value));
+
+function OrderRowActions({
+  order,
+  canEdit,
+  pending,
+  onArchive,
+  onRestore,
+}: {
+  order: Order;
+  canEdit: boolean;
+  pending: boolean;
+  onArchive: (order: Order) => void;
+  onRestore: (order: Order) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      <Link
+        href={`/order-hub/${order.id}`}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/10"
+        data-testid={`button-open-order-${order.id}`}
+      >
+        View <ArrowRight size={13} />
+      </Link>
+      {canEdit && (
+        <>
+          {order.isActive && (
+            <Link
+              href={`/order-hub/${order.id}?edit=true`}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-foreground hover:bg-muted"
+              data-testid={`button-edit-order-${order.id}`}
+            >
+              <Edit3 size={12} /> Edit
+            </Link>
+          )}
+          {order.isActive ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => onArchive(order)}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              aria-label={`Delete ${order.orderId}`}
+              data-testid={`button-delete-order-${order.id}`}
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => onRestore(order)}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/10 disabled:opacity-50"
+              aria-label={`Restore ${order.orderId}`}
+              data-testid={`button-restore-order-${order.id}`}
+            >
+              <RotateCcw size={12} /> Restore
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const orderIdPreview = (type: Client['type'], quoteNo: string | undefined) => {
   if (!type || !quoteNo) return null;
   const match = /^QT-(\d+)$/i.exec(quoteNo.trim());
@@ -418,13 +485,16 @@ export default function OrderHubPage({ user }: { user: User }) {
   const [showInactive, setShowInactive] = useState(false);
 
   const clientParams = useMemo(() => ({ includeInactive: showInactive, q: undefined }), [showInactive]);
-  const orderParams = useMemo(() => ({ q: search || undefined, status: status === 'all' ? undefined : status as Status, clientId: clientId === 'all' ? undefined : clientId, locationCode: locationCode === 'all' ? undefined : locationCode, from: from || undefined, to: to || undefined }), [search, status, clientId, locationCode, from, to]);
+  const orderParams = useMemo(() => ({ q: search || undefined, status: status === 'all' ? undefined : status as Status, clientId: clientId === 'all' ? undefined : clientId, locationCode: locationCode === 'all' ? undefined : locationCode, from: from || undefined, to: to || undefined, includeInactive: showInactive }), [search, status, clientId, locationCode, from, to, showInactive]);
   const clients = useListClients(clientParams, { query: { queryKey: getListClientsQueryKey(clientParams) } });
   const locations = useListOrderLocations({ includeInactive: showInactive }, { query: { queryKey: getListOrderLocationsQueryKey({ includeInactive: showInactive }) } });
   const orders = useListOrders(orderParams, { query: { queryKey: getListOrdersQueryKey(orderParams) } });
   const templates = useListOrderMessageTemplates({ query: { queryKey: getListOrderMessageTemplatesQueryKey() } });
   const updateClient = useUpdateClient();
   const updateLocation = useUpdateOrderLocation();
+  const deleteOrder = useDeleteOrder();
+  const updateOrder = useUpdateOrder();
+  const orderActionsPending = deleteOrder.isPending || updateOrder.isPending;
   const clientList = clients.data || [];
   const locationList = locations.data || [];
   const orderList = orders.data || [];
@@ -437,6 +507,25 @@ export default function OrderHubPage({ user }: { user: User }) {
     if (!window.confirm(`Deactivate ${location.code} · ${location.name}?`)) return;
     updateLocation.mutate({ locationId: location.id, data: { isActive: false } }, { onSuccess: () => { void queryClient.invalidateQueries({ queryKey: getListOrderLocationsQueryKey() }); toast({ title: 'Location deactivated' }); } });
   };
+  const archiveOrder = (order: Order) => {
+    if (!window.confirm(`Delete ${order.orderId} from the active register? Its linked payment, production, installation, and document history will be kept. You can restore it with “Include inactive”.`)) return;
+    deleteOrder.mutate({ id: order.id }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+        toast({ title: 'Order deleted', description: 'It was removed from the active register. Linked history is preserved.' });
+      },
+      onError: () => toast({ title: 'Order could not be deleted', description: 'Please try again.' }),
+    });
+  };
+  const restoreOrder = (order: Order) => {
+    updateOrder.mutate({ id: order.id, data: { isActive: true } }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+        toast({ title: 'Order restored', description: `${order.orderId} is back in the active register.` });
+      },
+      onError: () => toast({ title: 'Order could not be restored', description: 'Please try again.' }),
+    });
+  };
   const clearFilters = () => { setSearch(''); setStatus('all'); setClientId('all'); setLocationCode('all'); setFrom(''); setTo(''); };
 
   return <AppShell user={user} title="Order hub" eyebrow="Module 2 · central register"><div className="space-y-6">
@@ -444,7 +533,112 @@ export default function OrderHubPage({ user }: { user: User }) {
 
     <section className="grid gap-4 sm:grid-cols-3"><Card className="animate-enter-up delay-1 border-border/80"><CardContent className="p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Order register</p><ClipboardList size={16} className="text-primary" /></div><p className="mt-3 font-display text-3xl font-bold" data-testid="metric-orders-visible">{orderList.length}</p><p className="mt-1 text-xs text-muted-foreground">matching current filters</p></CardContent></Card><Card className="animate-enter-up delay-2 border-border/80"><CardContent className="p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">In production</p><Settings2 size={16} className="text-accent-foreground" /></div><p className="mt-3 font-display text-3xl font-bold" data-testid="metric-orders-production">{orderList.filter((item) => item.status === OrderStatus.in_production).length}</p><p className="mt-1 text-xs text-muted-foreground">active factory handoffs</p></CardContent></Card><Card className="animate-enter-up delay-3 border-border/80"><CardContent className="p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Installed</p><Check size={17} className="text-primary" /></div><p className="mt-3 font-display text-3xl font-bold" data-testid="metric-orders-installed">{orderList.filter((item) => item.status === OrderStatus.installed).length}</p><p className="mt-1 text-xs text-muted-foreground">closed lifecycle records</p></CardContent></Card></section>
 
-     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5 md:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><SectionHeading eyebrow="Central register" title="Orders" detail="Search by order ID, lot ID, client, phone, or address." action={canEdit ? <Button onClick={() => setOrderOpen(true)} data-testid="button-create-order"><Plus size={15} /> Create order</Button> : undefined} /><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary" /> Live query</div></div><div className="mt-5 grid gap-2 md:grid-cols-[minmax(220px,1.4fr)_repeat(2,minmax(150px,0.7fr))]"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order register" className="pl-9" data-testid="input-search-orders" /></div><Select value={status} onValueChange={setStatus}><SelectTrigger data-testid="select-filter-status"><SelectValue placeholder="Any status" /></SelectTrigger><SelectContent><SelectItem value="all">Any status</SelectItem>{STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><Select value={locationCode} onValueChange={setLocationCode}><SelectTrigger data-testid="select-filter-location"><SelectValue placeholder="Any location" /></SelectTrigger><SelectContent><SelectItem value="all">Any location</SelectItem>{locationList.filter((item) => item.isActive).map((item) => <SelectItem key={item.code} value={item.code}>{item.code} · {item.name}</SelectItem>)}</SelectContent></Select></div><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]"><Select value={clientId} onValueChange={setClientId}><SelectTrigger data-testid="select-filter-client"><SelectValue placeholder="Any client" /></SelectTrigger><SelectContent><SelectItem value="all">Any client</SelectItem>{clientList.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="From date" data-testid="input-filter-from" /><Input type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="To date" data-testid="input-filter-to" /></div><Button variant="ghost" onClick={clearFilters} className="text-xs" data-testid="button-clear-order-filters"><X size={14} /> Clear</Button><label className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-border px-3 py-1 text-[11px] text-muted-foreground"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="accent-primary" data-testid="checkbox-show-inactive" /> Include inactive</label></div><div className="mt-5 overflow-hidden rounded-xl border border-border/80">{orders.isLoading ? <div className="p-4"><StatePanel type="loading" /></div> : orders.isError ? <div className="p-4"><StatePanel type="error" onRetry={() => void orders.refetch()} /></div> : orderList.length === 0 ? <div className="p-4"><StatePanel type="empty" /></div> : <><div className="divide-y divide-border/70 md:hidden">{orderList.map((order) => <Link key={order.id} href={`/order-hub/${order.id}`} className="block p-4 transition-colors hover:bg-primary/[0.025]" data-testid={`card-order-${order.id}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="break-all font-mono text-[11px] font-bold text-primary">{order.orderId}</p>{order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}<p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-mobile-${order.id}`}>{statusLabel(order.status)}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-[10px]"><div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p></div><div><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div></div><div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3 text-[10px] text-muted-foreground"><span>{order.clientPhone || 'No phone recorded'}</span><span className="inline-flex items-center gap-1 font-bold text-primary">Open <ArrowRight size={13} /></span></div></Link>)}</div><table className="hidden w-full min-w-[760px] text-left text-xs md:table"><thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><tr><th className="px-4 py-3 font-bold">Order</th><th className="px-4 py-3 font-bold">Client</th><th className="px-4 py-3 font-bold">Location</th><th className="px-4 py-3 font-bold">Status</th><th className="px-4 py-3 font-bold">Created</th><th className="px-4 py-3 text-right font-bold">Open</th></tr></thead><tbody className="divide-y divide-border/70">{orderList.map((order) => <tr key={order.id} className="group hover:bg-primary/[0.025]" data-testid={`row-order-${order.id}`}><td className="px-4 py-3.5"><Link href={`/order-hub/${order.id}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-order-${order.id}`}>{order.orderId}</Link><p className="mt-1 text-[10px] text-muted-foreground">Sequence {String(order.sequenceNo).padStart(3, '0')}</p>{order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}</td><td className="px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td><td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p></td><td className="px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td><td className="px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td><td className="px-4 py-3.5 text-right"><Link href={`/order-hub/${order.id}`} className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/10" data-testid={`button-open-order-${order.id}`}>View <ArrowRight size={13} /></Link></td></tr>)}</tbody></table></>}</div></section>
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <SectionHeading
+          eyebrow="Central register"
+          title="Orders"
+          detail="Search by order ID, lot ID, client, phone, or address."
+          action={canEdit ? <Button onClick={() => setOrderOpen(true)} data-testid="button-create-order"><Plus size={15} /> Create order</Button> : undefined}
+        />
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary" /> Live query</div>
+      </div>
+      <div className="mt-5 grid gap-2 md:grid-cols-[minmax(220px,1.4fr)_repeat(2,minmax(150px,0.7fr))]">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order register" className="pl-9" data-testid="input-search-orders" />
+        </div>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger data-testid="select-filter-status"><SelectValue placeholder="Any status" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">Any status</SelectItem>{STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={locationCode} onValueChange={setLocationCode}>
+          <SelectTrigger data-testid="select-filter-location"><SelectValue placeholder="Any location" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">Any location</SelectItem>{locationList.filter((item) => item.isActive).map((item) => <SelectItem key={item.code} value={item.code}>{item.code} · {item.name}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+        <Select value={clientId} onValueChange={setClientId}>
+          <SelectTrigger data-testid="select-filter-client"><SelectValue placeholder="Any client" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">Any client</SelectItem>{clientList.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent>
+        </Select>
+        <div className="grid grid-cols-2 gap-2">
+          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="From date" data-testid="input-filter-from" />
+          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="To date" data-testid="input-filter-to" />
+        </div>
+        <Button variant="ghost" onClick={clearFilters} className="text-xs" data-testid="button-clear-order-filters"><X size={14} /> Clear</Button>
+        <label className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-border px-3 py-1 text-[11px] text-muted-foreground">
+          <input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="accent-primary" data-testid="checkbox-show-inactive" />
+          Include inactive
+        </label>
+      </div>
+      <div className="mt-5 overflow-hidden rounded-xl border border-border/80">
+        {orders.isLoading ? (
+          <div className="p-4"><StatePanel type="loading" /></div>
+        ) : orders.isError ? (
+          <div className="p-4"><StatePanel type="error" onRetry={() => void orders.refetch()} /></div>
+        ) : orderList.length === 0 ? (
+          <div className="p-4"><StatePanel type="empty" /></div>
+        ) : (
+          <>
+            <div className="divide-y divide-border/70 md:hidden">
+              {orderList.map((order) => (
+                <article key={order.id} className="space-y-3 p-4 transition-colors hover:bg-primary/[0.025]" data-testid={`card-order-${order.id}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-all font-mono text-[11px] font-bold text-primary">{order.orderId}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {!order.isActive && <span className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold text-muted-foreground">Inactive</span>}
+                        {order.needsReview && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}
+                      </div>
+                      <p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-mobile-${order.id}`}>{statusLabel(order.status)}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-[10px]">
+                    <div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p></div>
+                    <div><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
+                    <span className="text-[10px] text-muted-foreground">{order.clientPhone || 'No phone recorded'}</span>
+                    <OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} />
+                  </div>
+                </article>
+              ))}
+            </div>
+            <table className="hidden w-full min-w-[900px] text-left text-xs md:table">
+              <thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-bold">Order</th>
+                  <th className="px-4 py-3 font-bold">Client</th>
+                  <th className="px-4 py-3 font-bold">Location</th>
+                  <th className="px-4 py-3 font-bold">Status</th>
+                  <th className="px-4 py-3 font-bold">Created</th>
+                  <th className="px-4 py-3 text-right font-bold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/70">
+                {orderList.map((order) => (
+                  <tr key={order.id} className="group hover:bg-primary/[0.025]" data-testid={`row-order-${order.id}`}>
+                    <td className="px-4 py-3.5">
+                      <Link href={`/order-hub/${order.id}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-order-${order.id}`}>{order.orderId}</Link>
+                      <p className="mt-1 text-[10px] text-muted-foreground">Sequence {String(order.sequenceNo).padStart(3, '0')}</p>
+                      {!order.isActive && <span className="mt-1 inline-flex rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold text-muted-foreground">Inactive</span>}
+                      {order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}
+                    </td>
+                    <td className="px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td>
+                    <td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p></td>
+                    <td className="px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
+                    <td className="px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td>
+                    <td className="px-4 py-3.5"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+    </section>
 
     <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
       <Card>

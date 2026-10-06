@@ -3057,7 +3057,7 @@ export const getUpdateOrderUrl = (id: string,) => {
 }
 
 /**
- * @summary Update an order's lifecycle status or notes
+ * @summary Update an order's location, lifecycle status, notes, or active state
  */
 export const updateOrder = async (id: string,
     orderUpdate: OrderUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
@@ -3124,7 +3124,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateOrderMutationVariables = {id: string;data: BodyType<OrderUpdate>}
 
     /**
- * @summary Update an order's lifecycle status or notes
+ * @summary Update an order's location, lifecycle status, notes, or active state
  */
 export const useUpdateOrder = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrder>>, TError,UpdateOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -3135,6 +3135,80 @@ export const useUpdateOrder = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateOrderMutationOptions(options));
+    }
+
+export const getDeleteOrderUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}`
+}
+
+/**
+ * @summary Archive an order while preserving its linked history
+ */
+export const deleteOrder = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+  return customFetch<Order>(getDeleteOrderUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteOrderMutationKey = () => ['deleteOrder'] as const;
+
+export const getDeleteOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOrder>>, TError,DeleteOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteOrder>>, TError,DeleteOrderMutationVariables, TContext> => {
+
+const mutationKey = getDeleteOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteOrder>>, DeleteOrderMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteOrder(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteOrderMutationResult = NonNullable<Awaited<ReturnType<typeof deleteOrder>>>
+
+    export type DeleteOrderMutationError = ErrorType<void>
+    export type DeleteOrderMutationVariables = {id: string}
+
+    /**
+ * @summary Archive an order while preserving its linked history
+ */
+export const useDeleteOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOrder>>, TError,DeleteOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteOrder>>,
+        TError,
+        DeleteOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteOrderMutationOptions(options));
     }
 
 export const getAddOrderLotUrl = (id: string,) => {

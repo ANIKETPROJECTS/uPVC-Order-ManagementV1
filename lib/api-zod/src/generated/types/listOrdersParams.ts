@@ -17,4 +17,5 @@ clientId?: string;
 locationCode?: string;
 from?: Date;
 to?: Date;
+includeInactive?: boolean;
 };

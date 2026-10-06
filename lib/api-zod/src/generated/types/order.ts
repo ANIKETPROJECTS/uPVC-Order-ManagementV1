@@ -34,6 +34,7 @@ export interface Order {
   locationCode: string;
   locationName: string;
   status: OrderStatus;
+  isActive: boolean;
   /** @nullable */
   notes: string | null;
   /** @nullable */

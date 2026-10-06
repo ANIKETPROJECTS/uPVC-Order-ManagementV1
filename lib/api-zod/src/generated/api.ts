@@ -1036,7 +1036,8 @@ export const ListOrdersQueryParams = zod.object({
   "clientId": zod.coerce.string().optional(),
   "locationCode": zod.coerce.string().optional(),
   "from": zod.date().optional(),
-  "to": zod.date().optional()
+  "to": zod.date().optional(),
+  "includeInactive": zod.coerce.boolean().optional()
 })
 
 
@@ -1066,6 +1067,7 @@ export const ListOrdersResponseItem = zod.object({
   "locationCode": zod.string(),
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
@@ -1122,6 +1124,7 @@ export const CreateOrderResponse = zod.object({
   "locationCode": zod.string(),
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
@@ -1165,6 +1168,7 @@ export const GetOrderResponse = zod.object({
   "locationCode": zod.string(),
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
@@ -1175,11 +1179,14 @@ export const GetOrderResponse = zod.object({
 
 
 /**
- * @summary Update an order's lifecycle status or notes
+ * @summary Update an order's location, lifecycle status, notes, or active state
  */
 export const UpdateOrderParams = zod.object({
   "id": zod.coerce.string()
 })
+
+export const updateOrderBodyLocationCodeMin = 2;
+export const updateOrderBodyLocationCodeMax = 5;
 
 export const updateOrderBodyNotesMax = 2000;
 
@@ -1187,6 +1194,8 @@ export const updateOrderBodyNotesMax = 2000;
 
 export const UpdateOrderBody = zod.object({
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
+  "locationCode": zod.string().min(updateOrderBodyLocationCodeMin).max(updateOrderBodyLocationCodeMax).optional(),
+  "isActive": zod.boolean().optional(),
   "notes": zod.string().max(updateOrderBodyNotesMax).nullish()
 })
 
@@ -1217,6 +1226,51 @@ export const UpdateOrderResponse = zod.object({
   "locationCode": zod.string(),
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
+  "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Archive an order while preserving its linked history
+ */
+export const DeleteOrderParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+
+
+export const DeleteOrderResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
@@ -1260,6 +1314,7 @@ export const AddOrderLotResponse = zod.object({
   "locationCode": zod.string(),
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),
@@ -4653,6 +4708,7 @@ export const UpdateOrderBillingResponse = zod.object({
   "locationCode": zod.string(),
   "locationName": zod.string(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
   "createdBy": zod.string(),

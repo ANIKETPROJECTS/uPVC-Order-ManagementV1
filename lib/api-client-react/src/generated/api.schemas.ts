@@ -498,6 +498,7 @@ export interface Order {
   locationCode: string;
   locationName: string;
   status: OrderStatus;
+  isActive: boolean;
   /** @nullable */
   notes: string | null;
   /** @nullable */
@@ -528,6 +529,12 @@ export interface OrderInput {
 
 export interface OrderUpdate {
   status?: OrderStatus;
+  /**
+     * @minLength 2
+     * @maxLength 5
+     */
+  locationCode?: string;
+  isActive?: boolean;
   /**
      * @maxLength 2000
      * @nullable
@@ -2070,6 +2077,7 @@ clientId?: string;
 locationCode?: string;
 from?: string;
 to?: string;
+includeInactive?: boolean;
 };
 
 export type SearchQuotationRateSubmissionsParams = {

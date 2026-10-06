@@ -192,6 +192,7 @@ export interface OrderDocument {
   lots?: OrderLotDocument[];
   nextLotSequence?: number;
   status: OrderStatus;
+  isActive?: boolean;
   dispatchStatus?: DispatchStatus;
   notes: string | null;
   orderValue?: number | null;

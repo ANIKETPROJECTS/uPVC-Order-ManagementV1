@@ -10,6 +10,12 @@ import type { OrderStatus } from './orderStatus';
 export interface OrderUpdate {
   status?: OrderStatus;
   /**
+     * @minLength 2
+     * @maxLength 5
+     */
+  locationCode?: string;
+  isActive?: boolean;
+  /**
      * @maxLength 2000
      * @nullable
      */
