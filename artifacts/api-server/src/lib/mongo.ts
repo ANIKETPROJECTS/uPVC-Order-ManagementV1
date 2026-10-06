@@ -224,13 +224,13 @@ export interface GlassTrackingItemDocument {
 export interface GlassTrackingOrderDocument {
   _id: string;
   orderRecordId: string;
-  importId: string;
-  workbookFilename: string;
+  importId: string | null;
+  workbookFilename: string | null;
   revision: number;
   items: GlassTrackingItemDocument[];
   uploadedBy: string;
   updatedBy: string;
-  uploadedAt: Date;
+  uploadedAt: Date | null;
   updatedAt: Date;
 }
 export interface GlassTrackingWorkbookImportDocument {

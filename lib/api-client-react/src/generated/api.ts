@@ -44,6 +44,7 @@ import type {
   GlassTrackingOrder,
   GlassTrackingOrderList,
   GlassTrackingQuantitiesInput,
+  GlassTrackingUpdate,
   GlassWorkbookPreview,
   HealthStatus,
   InstallationAssignmentUpdate,
@@ -9522,6 +9523,169 @@ export const useUpdateGlassTrackingQuantities = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateGlassTrackingQuantitiesMutationOptions(options));
+    }
+
+export const getUpdateGlassTrackingUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/glass-tracking`
+}
+
+/**
+ * @summary Edit the window and glass details in an order's glass tracking record
+ */
+export const updateGlassTracking = async (id: string,
+    glassTrackingUpdate: GlassTrackingUpdate, options?: Parameters<typeof customFetch>[1]): Promise<GlassTrackingOrder> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<GlassTrackingOrder>(getUpdateGlassTrackingUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(glassTrackingUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateGlassTrackingMutationKey = () => ['updateGlassTracking'] as const;
+
+export const getUpdateGlassTrackingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateGlassTracking>>, TError,UpdateGlassTrackingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateGlassTracking>>, TError,UpdateGlassTrackingMutationVariables, TContext> => {
+
+const mutationKey = getUpdateGlassTrackingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateGlassTracking>>, UpdateGlassTrackingMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateGlassTracking(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateGlassTrackingMutationResult = NonNullable<Awaited<ReturnType<typeof updateGlassTracking>>>
+    export type UpdateGlassTrackingMutationBody = BodyType<GlassTrackingUpdate>
+    export type UpdateGlassTrackingMutationError = ErrorType<void>
+    export type UpdateGlassTrackingMutationVariables = {id: string;data: BodyType<GlassTrackingUpdate>}
+
+    /**
+ * @summary Edit the window and glass details in an order's glass tracking record
+ */
+export const useUpdateGlassTracking = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateGlassTracking>>, TError,UpdateGlassTrackingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateGlassTracking>>,
+        TError,
+        UpdateGlassTrackingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateGlassTrackingMutationOptions(options));
+    }
+
+export const getDeleteGlassTrackingUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/glass-tracking`
+}
+
+/**
+ * @summary Remove an order's active glass tracking record without deleting the order or workbook import history
+ */
+export const deleteGlassTracking = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteGlassTrackingUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteGlassTrackingMutationKey = () => ['deleteGlassTracking'] as const;
+
+export const getDeleteGlassTrackingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGlassTracking>>, TError,DeleteGlassTrackingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteGlassTracking>>, TError,DeleteGlassTrackingMutationVariables, TContext> => {
+
+const mutationKey = getDeleteGlassTrackingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteGlassTracking>>, DeleteGlassTrackingMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteGlassTracking(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteGlassTrackingMutationResult = NonNullable<Awaited<ReturnType<typeof deleteGlassTracking>>>
+
+    export type DeleteGlassTrackingMutationError = ErrorType<void>
+    export type DeleteGlassTrackingMutationVariables = {id: string}
+
+    /**
+ * @summary Remove an order's active glass tracking record without deleting the order or workbook import history
+ */
+export const useDeleteGlassTracking = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGlassTracking>>, TError,DeleteGlassTrackingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteGlassTracking>>,
+        TError,
+        DeleteGlassTrackingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteGlassTrackingMutationOptions(options));
     }
 
 export const getListOrderWindowsUrl = (id: string,) => {

@@ -9,6 +9,7 @@ import {
   CreateOrderPaymentFlagBody, CreateOrderPaymentFlagParams, CreateOrderPaymentFlagResponse,
   CreateOrderWindowBody, CreateOrderWindowParams, CreateOrderWindowResponse, DownloadOrderDocumentParams,
   DeleteOrderDocumentCategoryParams,
+  DeleteGlassTrackingParams,
   GetBalancePaymentRegisterResponse,
   GetBalancePaymentTransactionsParams,
   GetBalancePaymentTransactionsResponse,
@@ -28,6 +29,7 @@ import {
   PreviewGlassOrderWorkbookParams, PreviewGlassOrderWorkbookResponse,
   ReplaceOrderDocumentParams, ReplaceOrderDocumentResponse,
   UpdateGlassTrackingQuantitiesBody, UpdateGlassTrackingQuantitiesParams, UpdateGlassTrackingQuantitiesResponse,
+  UpdateGlassTrackingBody, UpdateGlassTrackingParams, UpdateGlassTrackingResponse,
   UpdateOrderDocumentCategoryBody, UpdateOrderDocumentCategoryParams, UpdateOrderDocumentCategoryResponse,
   UpdateOrderWindowParams, UpdateOrderWindowResponse, UpdatePaymentFlagBody, UpdatePaymentFlagParams, UpdatePaymentFlagResponse, VoidOrderPaymentBody, VoidOrderPaymentParams, VoidOrderPaymentResponse,
   UploadOrderDocumentParams, UploadOrderDocumentResponse, UploadQuotationConfirmationDocumentParams,
@@ -259,7 +261,7 @@ function glassTrackingOrderResponse(
     invoiceFilename,
     glassInputFilename: tracking?.workbookFilename ?? null,
     glassInputRevision: tracking?.revision ?? 0,
-    glassInputUploadedAt: tracking?.uploadedAt.toISOString() ?? null,
+    glassInputUploadedAt: tracking?.uploadedAt?.toISOString() ?? null,
     ordered,
     received,
     broken,
@@ -535,6 +537,100 @@ router.patch("/orders/:id/glass-tracking/quantities", async (req, res): Promise<
   res.json(UpdateGlassTrackingQuantitiesResponse.parse(
     glassTrackingOrderResponse(order, { ...tracking, items, updatedBy: actor.id, updatedAt }, invoice),
   ));
+});
+
+router.patch("/orders/:id/glass-tracking", async (req, res): Promise<void> => {
+  const p = UpdateGlassTrackingParams.safeParse(req.params);
+  const body = UpdateGlassTrackingBody.safeParse(req.body);
+  if (!p.success) {
+    res.status(400).json({ error: p.error.message });
+    return;
+  }
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const actor = await context(req, res, "glass-procurement", true);
+  if (!actor) return;
+  const order = await orderExists(p.data.id, res);
+  if (!order) return;
+
+  const db = await getMongoDb();
+  const collection = getGlassTrackingOrders(db);
+  const existing = await collection.findOne({ orderRecordId: order._id });
+  const existingItemIds = new Set((existing?.items ?? []).map((item) => item.id));
+  const submittedIds = body.data.items.flatMap((item) => item.id ? [item.id] : []);
+  if (new Set(submittedIds).size !== submittedIds.length) {
+    res.status(400).json({ error: "Each glass item can appear only once in an update." });
+    return;
+  }
+  if (submittedIds.some((id) => !existingItemIds.has(id))) {
+    res.status(400).json({ error: "One or more glass items no longer belong to this order. Refresh and try again." });
+    return;
+  }
+
+  const items: GlassTrackingItemDocument[] = body.data.items.map((item) => ({
+    id: item.id ?? randomUUID(),
+    villaNo: item.villaNo?.trim() || null,
+    windowNo: item.windowNo.trim(),
+    glassType: item.glassType.trim(),
+    widthMm: item.widthMm,
+    heightMm: item.heightMm,
+    ordered: item.ordered,
+    received: item.received,
+    broken: item.broken,
+  }));
+  const exceedingItem = items.find((item) => item.received + item.broken > item.ordered);
+  if (exceedingItem) {
+    res.status(409).json({
+      error: `Received and broken pieces cannot exceed the ordered quantity for ${exceedingItem.glassType}, window ${exceedingItem.windowNo}.`,
+    });
+    return;
+  }
+
+  const now = new Date();
+  const next: GlassTrackingOrderDocument = {
+    _id: existing?._id ?? order._id,
+    orderRecordId: order._id,
+    importId: existing?.importId ?? null,
+    workbookFilename: existing?.workbookFilename ?? null,
+    revision: existing?.revision ?? 0,
+    items,
+    uploadedBy: existing?.uploadedBy ?? actor.id,
+    updatedBy: actor.id,
+    uploadedAt: existing?.uploadedAt ?? null,
+    updatedAt: now,
+  };
+  await collection.replaceOne({ orderRecordId: order._id }, next, { upsert: true });
+  await event(order._id, actor, "glass.details.updated", `Updated glass tracking details for ${order.orderId}.`);
+
+  const invoice = await getOrderDocumentMetadata(db).findOne({
+    orderRecordId: order._id,
+    category: "invoice",
+    archivedAt: { $exists: false },
+  }, { sort: { uploadedAt: -1 } });
+  res.json(UpdateGlassTrackingResponse.parse(glassTrackingOrderResponse(order, next, invoice)));
+});
+
+router.delete("/orders/:id/glass-tracking", async (req, res): Promise<void> => {
+  const p = DeleteGlassTrackingParams.safeParse(req.params);
+  if (!p.success) {
+    res.status(400).json({ error: p.error.message });
+    return;
+  }
+  const actor = await context(req, res, "glass-procurement", true);
+  if (!actor) return;
+  const order = await orderExists(p.data.id, res);
+  if (!order) return;
+
+  const collection = getGlassTrackingOrders(await getMongoDb());
+  const result = await collection.deleteOne({ orderRecordId: order._id });
+  if (result.deletedCount === 0) {
+    res.status(404).json({ error: "No glass tracking record exists for this order." });
+    return;
+  }
+  await event(order._id, actor, "glass.tracking.deleted", `Removed glass tracking details for ${order.orderId}; the order and workbook import history were retained.`);
+  res.sendStatus(204);
 });
 
 router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {

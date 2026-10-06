@@ -758,6 +758,61 @@ export interface GlassTrackingQuantitiesInput {
   items: GlassTrackingQuantityInputList;
 }
 
+export interface GlassTrackingItemUpdate {
+  /** @maxLength 100 */
+  id?: string;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  villaNo: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  windowNo: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  glassType: string;
+  /**
+     * @maximum 10000
+     * @exclusiveMinimum 0
+     */
+  widthMm: number;
+  /**
+     * @maximum 10000
+     * @exclusiveMinimum 0
+     */
+  heightMm: number;
+  /**
+     * @minimum 1
+     * @maximum 100000
+     */
+  ordered: number;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  received: number;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  broken: number;
+}
+
+/**
+ * @minItems 1
+ * @maxItems 500
+ */
+export type GlassTrackingItemUpdateList = GlassTrackingItemUpdate[];
+
+export interface GlassTrackingUpdate {
+  items: GlassTrackingItemUpdateList;
+}
+
 export type OrderPaymentMethod = typeof OrderPaymentMethod[keyof typeof OrderPaymentMethod];
 
 

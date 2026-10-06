@@ -62,7 +62,7 @@ export function GlassQuantityEditor({
     return <div className="rounded-xl border border-dashed border-primary/25 bg-primary/[0.025] p-5 text-xs text-muted-foreground">
       <div className="flex items-start gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Save size={15} /></span>
-        <div><p className="font-semibold text-foreground">No window lines in this order</p><p className="mt-1 leading-5">Import a glass-order workbook to add per-window glass types and ordered quantities for <span className="font-mono font-semibold text-primary">{orderId}</span>.</p></div>
+        <div><p className="font-semibold text-foreground">No window lines in this order</p><p className="mt-1 leading-5">Import a glass-order workbook or use Edit to add per-window glass types and ordered quantities for <span className="font-mono font-semibold text-primary">{orderId}</span>.</p></div>
       </div>
     </div>;
   }

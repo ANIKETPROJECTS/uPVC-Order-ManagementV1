@@ -1,9 +1,10 @@
 import { Fragment, useMemo, useState } from 'react';
-import { ArrowDownUp, Check, ChevronDown, ChevronUp, Clock3, FileSpreadsheet, LayoutGrid, List, PackageCheck, RefreshCw, Search, ShieldCheck, UploadCloud } from 'lucide-react';
-import { getGetGlassTrackingQueryKey, useGetGlassTracking, useUpdateGlassTrackingQuantities } from '@workspace/api-client-react';
+import { ArrowDownUp, Check, ChevronDown, ChevronUp, Clock3, FileSpreadsheet, LayoutGrid, List, PackageCheck, Pencil, RefreshCw, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
+import { getGetGlassTrackingQueryKey, useDeleteGlassTracking, useGetGlassTracking, useUpdateGlassTracking, useUpdateGlassTrackingQuantities } from '@workspace/api-client-react';
 import type { GlassTrackingOrder, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { GlassQuantityEditor } from '@/components/glass-quantity-editor';
+import { GlassTrackingItemEditor } from '@/components/glass-tracking-item-editor';
 import { GlassWorkbookImportDialog } from '@/components/glass-workbook-import-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -156,12 +157,15 @@ export default function GlassTrackingPage({ user }: { user: User }) {
   const canEdit = user.roleId === 'master-admin' || permission === 'edit';
   const trackingQuery = useGetGlassTracking({ query: { queryKey: getGetGlassTrackingQueryKey(), enabled: canView } });
   const updateQuantities = useUpdateGlassTrackingQuantities();
+  const updateDetails = useUpdateGlassTracking();
+  const deleteTracking = useDeleteGlassTracking();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
   const [sort, setSort] = useState<SortValue>('updated');
   const [view, setView] = useState<ViewMode>('list');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const orders = trackingQuery.data || [];
   const locations = useMemo(() => [...new Set(orders.map((order) => order.locationName))]
     .sort((a, b) => a.localeCompare(b)), [orders]);
@@ -203,6 +207,45 @@ export default function GlassTrackingPage({ user }: { user: User }) {
         toast({ title: 'Glass quantities updated', description: `${order.orderId} received and broken counts were saved.` });
       },
       onError: () => toast({ title: 'Could not save glass quantities', description: 'No counts were changed. Check the quantities and try again.', variant: 'destructive' }),
+    });
+  };
+
+  const saveDetails = (order: GlassTrackingOrder, items: Array<{
+    id?: string;
+    villaNo: string | null;
+    windowNo: string;
+    glassType: string;
+    widthMm: number;
+    heightMm: number;
+    ordered: number;
+    received: number;
+    broken: number;
+  }>) => {
+    if (!canEdit) return;
+    updateDetails.mutate({ id: order.orderRecordId, data: { items } }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getGetGlassTrackingQueryKey() });
+        setEditingOrderId(null);
+        toast({ title: 'Glass tracking updated', description: `${order.orderId} details were saved.` });
+      },
+      onError: () => toast({ title: 'Could not update glass tracking', description: 'No details were changed. Check the line values and try again.', variant: 'destructive' }),
+    });
+  };
+
+  const removeTracking = (order: GlassTrackingOrder) => {
+    if (!canEdit || (!order.glassInputFilename && order.items.length === 0)) return;
+    const confirmed = window.confirm(
+      `Delete glass tracking data for ${order.orderId}? The order will remain in the register as pending, and the imported workbook history will be retained. Manually edited lines will be removed.`,
+    );
+    if (!confirmed) return;
+    deleteTracking.mutate({ id: order.orderRecordId }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getGetGlassTrackingQueryKey() });
+        setEditingOrderId(null);
+        setExpandedOrderId(null);
+        toast({ title: 'Glass tracking deleted', description: `${order.orderId} remains in the register as pending.` });
+      },
+      onError: () => toast({ title: 'Could not delete glass tracking', description: 'The tracking record was not removed. Refresh and try again.', variant: 'destructive' }),
     });
   };
 
@@ -291,7 +334,7 @@ export default function GlassTrackingPage({ user }: { user: User }) {
                   : filteredOrders.length === 0 ? <div className="rounded-xl border border-dashed border-border p-8 text-center" data-testid="state-glass-no-results"><p className="text-sm font-semibold">No matching orders</p><p className="mt-1 text-xs text-muted-foreground">Adjust the search or filters to see more glass orders.</p>{hasFilters && <button type="button" onClick={clearFilters} className="mt-3 text-xs font-bold text-primary hover:underline" data-testid="button-glass-clear-filters">Clear all filters</button>}</div>
              : view === 'list' ? <div className="overflow-x-auto"><table className="w-full min-w-[960px] text-left text-xs">
                       <thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
-                        <th className="px-4 py-3">Order / client</th><th className="px-4 py-3">Invoice No.</th><th className="px-4 py-3 text-right">Ordered</th><th className="px-4 py-3 text-right">Received</th><th className="px-4 py-3 text-right">Broken</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Details</th>
+                        <th className="px-4 py-3">Order / client</th><th className="px-4 py-3">Invoice No.</th><th className="px-4 py-3 text-right">Ordered</th><th className="px-4 py-3 text-right">Received</th><th className="px-4 py-3 text-right">Broken</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th>
                       </tr></thead>
                       <tbody>{filteredOrders.map((order) => {
                         const expanded = expandedOrderId === order.orderRecordId;
@@ -301,7 +344,7 @@ export default function GlassTrackingPage({ user }: { user: User }) {
                               <p className="font-mono text-xs font-bold text-primary" data-testid={`text-glass-order-${order.orderRecordId}`}>{order.orderId}</p>
                               <p className="mt-1 max-w-[250px] truncate text-xs font-semibold" title={order.clientName}>{order.clientName}</p>
                               <p className="mt-1 max-w-[250px] truncate text-[10px] text-muted-foreground" title={order.glassInputFilename ?? undefined}>
-                                {order.glassInputFilename ? `Workbook rev. ${order.glassInputRevision} · ${order.glassInputFilename}` : 'Glass Input Pending'}
+                                {order.glassInputFilename ? `Workbook rev. ${order.glassInputRevision} · ${order.glassInputFilename}` : order.items.length ? 'Manual glass details' : 'Glass Input Pending'}
                               </p>
                               <p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p>
                             </td>
@@ -310,9 +353,16 @@ export default function GlassTrackingPage({ user }: { user: User }) {
                             <td className="glass-tabular px-4 py-3 text-right font-mono">{formatCount(order.received)}</td>
                             <td className="glass-tabular px-4 py-3 text-right font-mono">{formatCount(order.broken)}</td>
                             <td className="px-4 py-3"><StatusBadge status={order.status} id={order.orderRecordId} /></td>
-                            <td className="px-4 py-3 text-right"><button type="button" onClick={() => setExpandedOrderId(expanded ? null : order.orderRecordId)} aria-expanded={expanded} aria-label={`${expanded ? 'Hide' : 'Show'} glass details for ${order.orderId}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-[11px] font-semibold hover:bg-muted" data-testid={`button-glass-details-${order.orderRecordId}`}>{expanded ? 'Hide' : 'Details'}{expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button></td>
+                            <td className="px-4 py-3">
+                              <div className="flex justify-end gap-1.5">
+                                <button type="button" onClick={() => { setEditingOrderId(null); setExpandedOrderId(expanded ? null : order.orderRecordId); }} aria-expanded={expanded} aria-label={`${expanded ? 'Hide' : 'Show'} glass details for ${order.orderId}`} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-semibold hover:bg-muted" data-testid={`button-glass-details-${order.orderRecordId}`}>{expanded ? 'Hide' : 'Details'}{expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button>
+                                {canEdit && <button type="button" onClick={() => { setExpandedOrderId(null); setEditingOrderId(editingOrderId === order.orderRecordId ? null : order.orderRecordId); }} aria-expanded={editingOrderId === order.orderRecordId} aria-label={`${editingOrderId === order.orderRecordId ? 'Close edit' : 'Edit'} glass tracking for ${order.orderId}`} className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/20 px-2 text-[11px] font-semibold text-primary hover:bg-primary/5" data-testid={`button-glass-edit-${order.orderRecordId}`}><Pencil size={12} /> Edit</button>}
+                                {canEdit && (order.glassInputFilename || order.items.length > 0) && <button type="button" onClick={() => removeTracking(order)} disabled={deleteTracking.isPending} aria-label={`Delete glass tracking for ${order.orderId}`} className="inline-flex h-8 items-center gap-1 rounded-lg border border-destructive/20 px-2 text-[11px] font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-50" data-testid={`button-glass-delete-${order.orderRecordId}`}><Trash2 size={12} /> Delete</button>}
+                              </div>
+                            </td>
                           </tr>
                           {expanded && <tr className="border-b border-border/60 bg-muted/10"><td colSpan={7} className="p-3 sm:p-4">{editor(order)}</td></tr>}
+                          {editingOrderId === order.orderRecordId && <tr className="border-b border-border/60 bg-muted/10"><td colSpan={7} className="p-3 sm:p-4"><GlassTrackingItemEditor key={order.orderRecordId} orderId={order.orderId} items={order.items} isSaving={updateDetails.isPending && updateDetails.variables?.id === order.orderRecordId} onSave={(items) => saveDetails(order, items)} onCancel={() => setEditingOrderId(null)} /></td></tr>}
                         </Fragment>;
                       })}</tbody>
                     </table></div>
@@ -322,12 +372,17 @@ export default function GlassTrackingPage({ user }: { user: User }) {
                           <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-mono text-xs font-bold text-primary">{order.orderId}</p><p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p><p className="mt-1 truncate text-[10px] text-muted-foreground">{order.locationName}</p></div><StatusBadge status={order.status} id={order.orderRecordId} /></div>
                           <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-border/60 pt-3 text-xs">
                             <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice No.</p><p className="mt-1 truncate font-semibold" title={order.invoiceFilename ?? undefined}>{order.invoiceNo ?? invoiceFilenameStem(order.invoiceFilename) ?? 'Invoice Upload Pending'}</p></div>
-                            <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Glass workbook</p><p className="mt-1 truncate font-semibold">{order.glassInputFilename ? `Revision ${order.glassInputRevision}` : 'Glass Input Pending'}</p></div>
+                            <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Glass details</p><p className="mt-1 truncate font-semibold">{order.glassInputFilename ? `Workbook revision ${order.glassInputRevision}` : order.items.length ? 'Manual entry' : 'Glass Input Pending'}</p></div>
                             <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ordered</p><p className="mt-1 font-mono font-semibold">{formatCount(order.ordered)}</p></div>
                             <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Received · Broken</p><p className="mt-1 font-mono font-semibold">{formatCount(order.received)} · {formatCount(order.broken)}</p></div>
                           </div>
-                          <button type="button" onClick={() => setExpandedOrderId(expanded ? null : order.orderRecordId)} aria-expanded={expanded} className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-[11px] font-semibold hover:bg-muted" data-testid={`button-glass-details-${order.orderRecordId}`}>{expanded ? 'Hide window details' : 'View window details'}{expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button type="button" onClick={() => { setEditingOrderId(null); setExpandedOrderId(expanded ? null : order.orderRecordId); }} aria-expanded={expanded} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-[11px] font-semibold hover:bg-muted" data-testid={`button-glass-details-${order.orderRecordId}`}>{expanded ? 'Hide window details' : 'View window details'}{expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button>
+                            {canEdit && <button type="button" onClick={() => { setExpandedOrderId(null); setEditingOrderId(editingOrderId === order.orderRecordId ? null : order.orderRecordId); }} aria-expanded={editingOrderId === order.orderRecordId} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/20 px-2.5 text-[11px] font-semibold text-primary hover:bg-primary/5" data-testid={`button-glass-edit-${order.orderRecordId}`}><Pencil size={12} /> {editingOrderId === order.orderRecordId ? 'Close editor' : 'Edit'}</button>}
+                            {canEdit && (order.glassInputFilename || order.items.length > 0) && <button type="button" onClick={() => removeTracking(order)} disabled={deleteTracking.isPending} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-destructive/20 px-2.5 text-[11px] font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-50" data-testid={`button-glass-delete-${order.orderRecordId}`}><Trash2 size={12} /> Delete</button>}
+                          </div>
                           {expanded && <div className="mt-3">{editor(order)}</div>}
+                          {editingOrderId === order.orderRecordId && <div className="mt-3"><GlassTrackingItemEditor key={order.orderRecordId} orderId={order.orderId} items={order.items} isSaving={updateDetails.isPending && updateDetails.variables?.id === order.orderRecordId} onSave={(items) => saveDetails(order, items)} onCancel={() => setEditingOrderId(null)} /></div>}
                         </article>;
                       })}</div>}
         </div>

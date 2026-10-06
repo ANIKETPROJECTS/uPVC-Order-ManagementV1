@@ -4065,6 +4065,108 @@ export const UpdateGlassTrackingQuantitiesResponse = zod.object({
 
 
 /**
+ * @summary Edit the window and glass details in an order's glass tracking record
+ */
+export const UpdateGlassTrackingParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateGlassTrackingBodyItemsItemIdMax = 100;
+
+export const updateGlassTrackingBodyItemsItemVillaNoMax = 100;
+
+export const updateGlassTrackingBodyItemsItemWindowNoMax = 40;
+
+export const updateGlassTrackingBodyItemsItemGlassTypeMax = 120;
+
+export const updateGlassTrackingBodyItemsItemWidthMmExclusiveMin = 0;
+export const updateGlassTrackingBodyItemsItemWidthMmMax = 10000;
+
+export const updateGlassTrackingBodyItemsItemHeightMmExclusiveMin = 0;
+export const updateGlassTrackingBodyItemsItemHeightMmMax = 10000;
+
+export const updateGlassTrackingBodyItemsItemOrderedMax = 100000;
+
+export const updateGlassTrackingBodyItemsItemReceivedMin = 0;
+export const updateGlassTrackingBodyItemsItemReceivedMax = 100000;
+
+export const updateGlassTrackingBodyItemsItemBrokenMin = 0;
+export const updateGlassTrackingBodyItemsItemBrokenMax = 100000;
+
+export const updateGlassTrackingBodyItemsMax = 500;
+
+
+
+export const UpdateGlassTrackingBody = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string().max(updateGlassTrackingBodyItemsItemIdMax).optional(),
+  "villaNo": zod.string().max(updateGlassTrackingBodyItemsItemVillaNoMax).nullable(),
+  "windowNo": zod.string().min(1).max(updateGlassTrackingBodyItemsItemWindowNoMax),
+  "glassType": zod.string().min(1).max(updateGlassTrackingBodyItemsItemGlassTypeMax),
+  "widthMm": zod.number().gt(updateGlassTrackingBodyItemsItemWidthMmExclusiveMin).max(updateGlassTrackingBodyItemsItemWidthMmMax),
+  "heightMm": zod.number().gt(updateGlassTrackingBodyItemsItemHeightMmExclusiveMin).max(updateGlassTrackingBodyItemsItemHeightMmMax),
+  "ordered": zod.number().int().min(1).max(updateGlassTrackingBodyItemsItemOrderedMax),
+  "received": zod.number().int().min(updateGlassTrackingBodyItemsItemReceivedMin).max(updateGlassTrackingBodyItemsItemReceivedMax),
+  "broken": zod.number().int().min(updateGlassTrackingBodyItemsItemBrokenMin).max(updateGlassTrackingBodyItemsItemBrokenMax)
+})).min(1).max(updateGlassTrackingBodyItemsMax)
+})
+
+export const updateGlassTrackingResponseGlassInputRevisionMin = 0;
+
+export const updateGlassTrackingResponseOrderedMin = 0;
+
+export const updateGlassTrackingResponseReceivedMin = 0;
+
+export const updateGlassTrackingResponseBrokenMin = 0;
+
+export const updateGlassTrackingResponseItemsItemOrderedMin = 0;
+
+export const updateGlassTrackingResponseItemsItemReceivedMin = 0;
+
+export const updateGlassTrackingResponseItemsItemBrokenMin = 0;
+
+
+
+export const UpdateGlassTrackingResponse = zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "invoiceNo": zod.string().nullable(),
+  "invoiceFilename": zod.string().nullable(),
+  "glassInputFilename": zod.string().nullable(),
+  "glassInputRevision": zod.number().int().min(updateGlassTrackingResponseGlassInputRevisionMin),
+  "glassInputUploadedAt": zod.coerce.date().nullable(),
+  "ordered": zod.number().int().min(updateGlassTrackingResponseOrderedMin),
+  "received": zod.number().int().min(updateGlassTrackingResponseReceivedMin),
+  "broken": zod.number().int().min(updateGlassTrackingResponseBrokenMin),
+  "status": zod.enum(['glass_input_pending', 'pending', 'partial', 'received']),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "villaNo": zod.string().nullable(),
+  "windowNo": zod.string(),
+  "glassType": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "ordered": zod.number().int().min(updateGlassTrackingResponseItemsItemOrderedMin),
+  "received": zod.number().int().min(updateGlassTrackingResponseItemsItemReceivedMin),
+  "broken": zod.number().int().min(updateGlassTrackingResponseItemsItemBrokenMin)
+})),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Remove an order's active glass tracking record without deleting the order or workbook import history
+ */
+export const DeleteGlassTrackingParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteGlassTrackingResponse = zod.void()
+
+
+/**
  * @summary List window records for an order
  */
 export const ListOrderWindowsParams = zod.object({
