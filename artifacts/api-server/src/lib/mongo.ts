@@ -704,6 +704,7 @@ export function getMeasurementSheetsBucket(db: Db): any { return new GridFSBucke
 
 const measurementSheetSequenceId = "measurementSheetSequence";
 const measurementSheetMigrationId = "measurementSheetIdFormatV1";
+const measurementSheetFullYearMigrationId = "measurementSheetIdFormatV2";
 
 function isValidDate(value: unknown): value is Date {
   return value instanceof Date && Number.isFinite(value.getTime());
@@ -713,7 +714,7 @@ function measurementDateCode(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "2-digit",
-    year: "2-digit",
+    year: "numeric",
     timeZone: "Asia/Kolkata",
   }).formatToParts(date);
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
@@ -856,6 +857,101 @@ async function migrateMeasurementSheetIds(db: Db, now: Date): Promise<void> {
     }
   }
   throw new Error("Timed out waiting for the measurement ID migration to finish.");
+}
+
+async function migrateMeasurementSheetIdsToFullYear(db: Db, now: Date): Promise<void> {
+  const migrations = db.collection<MeasurementMigrationDocument>("system_migrations");
+  const records = getMeasurementRecords(db);
+  try {
+    await migrations.updateOne(
+      { _id: measurementSheetFullYearMigrationId },
+      { $setOnInsert: { state: "pending", leaseUntil: new Date(0), updatedAt: now } },
+      { upsert: true },
+    );
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000)) {
+      throw error;
+    }
+  }
+
+  const owner = randomUUID();
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    const current = await migrations.findOne({ _id: measurementSheetFullYearMigrationId });
+    if (current?.state === "complete") return;
+    const leaseNow = new Date();
+    const lease = await migrations.findOneAndUpdate(
+      {
+        _id: measurementSheetFullYearMigrationId,
+        state: { $ne: "complete" },
+        $or: [{ leaseUntil: { $lte: leaseNow } }, { owner }],
+      },
+      {
+        $set: {
+          state: "running",
+          owner,
+          leaseUntil: new Date(leaseNow.getTime() + 60_000),
+          updatedAt: leaseNow,
+        },
+      },
+      { returnDocument: "after" },
+    );
+    if (lease?.owner !== owner) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      continue;
+    }
+
+    try {
+      const existingRecords = await records.find({ sheetId: /^MS-\d+-\d{6}$/ }).toArray();
+      const updates = existingRecords.map((record) => {
+        const match = /^MS-(\d+)-\d{6}$/.exec(record.sheetId || "");
+        if (!match) return null;
+        const sequence = Number(match[1]);
+        if (!Number.isSafeInteger(sequence) || sequence < 1) {
+          throw new Error(`Invalid measurement sheet sequence for record ${record._id}.`);
+        }
+        const createdAt = isValidDate(record.createdAt)
+          ? record.createdAt
+          : isValidDate(record.updatedAt)
+            ? record.updatedAt
+            : now;
+        return {
+          updateOne: {
+            filter: { _id: record._id, sheetId: record.sheetId },
+            update: { $set: { sheetId: formatMeasurementSheetId(sequence, createdAt) } },
+          },
+        };
+      }).filter((update): update is NonNullable<typeof update> => update !== null);
+
+      for (let offset = 0; offset < updates.length; offset += 500) {
+        await records.bulkWrite(updates.slice(offset, offset + 500));
+        const heartbeat = new Date();
+        await migrations.updateOne(
+          { _id: measurementSheetFullYearMigrationId, owner },
+          { $set: { leaseUntil: new Date(heartbeat.getTime() + 60_000), updatedAt: heartbeat } },
+        );
+      }
+
+      await migrations.updateOne(
+        { _id: measurementSheetFullYearMigrationId, owner },
+        { $set: { state: "complete", leaseUntil: new Date(0), updatedAt: new Date() }, $unset: { owner: "" } },
+      );
+      if (updates.length > 0) {
+        logger.info(
+          { migratedMeasurementRecords: updates.length },
+          "Migrated measurement sheet IDs to the four-digit year format",
+        );
+      }
+      return;
+    } catch (error) {
+      await migrations.updateOne(
+        { _id: measurementSheetFullYearMigrationId, owner },
+        { $set: { state: "pending", leaseUntil: new Date(0), updatedAt: new Date() }, $unset: { owner: "" } },
+      );
+      throw error;
+    }
+  }
+  throw new Error("Timed out waiting for the full-year measurement ID migration to finish.");
 }
 
 async function migrateOrderIds(db: Db, now: Date): Promise<void> {
@@ -2138,6 +2234,7 @@ export async function initializeMongo(): Promise<void> {
   await migrateQuotationOrderIds(db, now);
   await migrateOrderIds(db, now);
   await migrateMeasurementSheetIds(db, now);
+  await migrateMeasurementSheetIdsToFullYear(db, now);
 
   logger.info({ database: db.databaseName }, "Connected to MongoDB");
 }
