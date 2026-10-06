@@ -1945,122 +1945,31 @@ export async function initializeMongo(): Promise<void> {
   }
 
   if (process.env.NODE_ENV !== "production") {
-    const sampleClientId = "sample-payment-progress-client";
-    const sampleLocationId = "sample-payment-progress-location";
-    const existingSampleClient = await clients.findOne({ _id: sampleClientId });
-    let sampleClientPrefix = existingSampleClient?.prefix ?? "SMP";
-    if (!existingSampleClient) {
-      let suffix = 1;
-      while (await clients.findOne({ prefixUpper: sampleClientPrefix })) {
-        sampleClientPrefix = `SMP${suffix}`;
-        suffix += 1;
-      }
-    }
-    await clients.updateOne(
-      { _id: sampleClientId },
-      {
-        $setOnInsert: {
-          _id: sampleClientId,
-          name: "Payment Progress Samples",
-          nameLower: "payment progress samples",
-          phone: "",
-          address: "Development sample records",
-          gstin: null,
-          prefix: sampleClientPrefix,
-          prefixUpper: sampleClientPrefix.toUpperCase(),
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-      },
-      { upsert: true },
-    );
-    const existingSampleLocation = await locations.findOne({ _id: sampleLocationId });
-    let sampleLocationCode = existingSampleLocation?.code ?? "PAYTEST";
-    if (!existingSampleLocation) {
-      let suffix = 1;
-      while (await locations.findOne({ codeUpper: sampleLocationCode.toUpperCase() })) {
-        sampleLocationCode = `PAYTEST${suffix}`;
-        suffix += 1;
-      }
-    }
-    await locations.updateOne(
-      { _id: sampleLocationId },
-      {
-        $setOnInsert: {
-          _id: sampleLocationId,
-          code: sampleLocationCode,
-          codeUpper: sampleLocationCode.toUpperCase(),
-          name: "Payment Progress Demo",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-      },
-      { upsert: true },
-    );
-
     const progressSamples = [
-      { key: "under-30", orderId: "PAY-DEMO-LOW", label: "Under 30%", orderValue: 100000, paid: 20000 },
-      { key: "between-30-and-99", orderId: "PAY-DEMO-MID", label: "Between 30% and 99%", orderValue: 100000, paid: 65000 },
-      { key: "at-100", orderId: "PAY-DEMO-FULL", label: "100%", orderValue: 100000, paid: 100000 },
+      { key: "under-30", orderRecordId: "sample-payment-progress-under-30", paidShare: 0.2 },
+      { key: "between-30-and-99", orderRecordId: "sample-payment-progress-between-30-and-99", paidShare: 0.65 },
+      { key: "at-100", orderRecordId: "sample-payment-progress-at-100", paidShare: 1 },
     ];
-    const currentCounter = await counters.findOne({ _id: "orderSequence" });
-    const highestOrder = await orders.find().sort({ sequenceNo: -1 }).limit(1).next();
-    let nextSequenceNo = Math.max(currentCounter?.value ?? 0, highestOrder?.sequenceNo ?? 0);
-    const sampleCreatedAt = new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000);
-
     for (const sample of progressSamples) {
-      const orderRecordId = `sample-payment-progress-${sample.key}`;
-      let order = await orders.findOne({ _id: orderRecordId });
-      if (!order) {
-        nextSequenceNo += 1;
-        let orderId = sample.orderId;
-        if (await orders.findOne({ orderId })) {
-          orderId = `SAMPLE-${sample.orderId}`;
-          if (await orders.findOne({ orderId })) {
-            orderId = `${sample.orderId}-${nextSequenceNo}`;
-          }
-        }
-        order = {
-          _id: orderRecordId,
-          orderId,
-          sequenceNo: nextSequenceNo,
-          clientId: sampleClientId,
-          clientName: `Payment Progress Sample — ${sample.label}`,
-          clientPrefix: sampleClientPrefix,
-          clientPhone: null,
-          clientAddress: "Development sample records",
-          clientGstin: null,
-          locationCode: sampleLocationCode,
-          locationName: "Payment Progress Demo",
-          status: "confirmed",
-          notes: "Development sample order for payment progress testing.",
-          orderValue: sample.orderValue,
-          createdBy: "Sample data",
-          createdAt: sampleCreatedAt,
-          updatedBy: null,
-          updatedAt: sampleCreatedAt,
-        };
-        await orders.insertOne(order);
-      }
-
-      const paymentId = `${orderRecordId}-receipt`;
+      const order = await orders.findOne({ _id: sample.orderRecordId, quotationId: { $exists: true } });
+      if (!order || !order.orderValue || order.orderValue <= 0) continue;
+      const paymentId = `${sample.orderRecordId}-receipt`;
+      const paidAt = new Date(order.createdAt.getTime() + 24 * 60 * 60 * 1000);
       await orderPayments.updateOne(
         { _id: paymentId },
         {
           $setOnInsert: {
             _id: paymentId,
-            orderRecordId,
-            amount: sample.paid,
+            orderRecordId: order._id,
+            amount: Math.round(order.orderValue * sample.paidShare * 100) / 100,
             method: "bank_transfer",
-            reference: `SAMPLE-${sample.key}`,
-            notes: "Development sample receipt for payment progress testing.",
-            paidAt: sampleCreatedAt,
+            reference: `DEMO-${sample.key.toUpperCase()}`,
+            notes: "Development sample receipt linked to its quotation-backed order.",
+            paidAt,
             status: "received",
             voidReason: null,
-            createdBy: "Sample data",
-            createdAt: sampleCreatedAt,
+            createdBy: order.createdBy,
+            createdAt: paidAt,
           },
         },
         { upsert: true },

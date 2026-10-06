@@ -363,7 +363,7 @@ async function buildQuotationValues(
 }
 
 function quotationNumber(sequenceNo: number): string {
-  return `THE-QT-${String(sequenceNo).padStart(8, "0")}`;
+  return `QT-${String(sequenceNo).padStart(7, "0")}`;
 }
 
 router.get("/window-profiles", async (req, res): Promise<void> => {
