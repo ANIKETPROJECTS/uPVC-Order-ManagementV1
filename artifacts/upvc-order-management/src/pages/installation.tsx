@@ -6,17 +6,17 @@ import { Link } from 'wouter';
 import { z } from 'zod';
 import {
   ArrowRight, CalendarDays, Check, CircleAlert, ClipboardCheck,
-  Copy, MapPin, MessageSquareText, Plus, RefreshCw, Search, ShieldCheck,
-  Users, Wrench, X,
+  Copy, MapPin, MessageSquareText, RefreshCw, Search, ShieldCheck,
+  Wrench,
 } from 'lucide-react';
 import {
   getGetOrderQueryKey, getListDispatchOrdersQueryKey, getListInstallationOrdersQueryKey,
   getListInstallationTeamsQueryKey, getListInstallationUsersQueryKey, getListOrderActivityQueryKey,
-  useAssignInstallationOrder, useCreateInstallationTeam, useDeleteInstallationTeam,
+  useAssignInstallationOrder,
   useListInstallationOrders, useListInstallationTeams, useListInstallationUsers,
-  useUpdateInstallationOrder, useUpdateInstallationTeam,
+  useUpdateInstallationOrder,
 } from '@workspace/api-client-react';
-import type { InstallationOrder, InstallationTeam, InstallationTeamInput, User } from '@workspace/api-client-react';
+import type { InstallationOrder, InstallationTeam, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,7 +35,6 @@ const resultSchema = z.object({
   if (v.installationStatus === 'issue' && !v.issueReason.trim()) c.addIssue({ code: z.ZodIssueCode.custom, path: ['issueReason'], message: 'Add a reason for the issue.' });
 });
 type ResultValues = z.infer<typeof resultSchema>;
-type DraftSubteam = { id?: string; name: string; memberIds: string[] };
 type StatusFilter = 'all' | 'pending' | 'issue' | 'installed';
 
 const istDateKey = (date = new Date()) => {
@@ -62,19 +61,18 @@ const canViewOrders = (user: User) => user.roleId === 'master-admin' || ['edit',
 const readable = (v: string) => v.replaceAll('_', ' ');
 const statusName = (s: InstallationOrder['installationStatus']) => s === 'installed' ? 'Installed' : s === 'issue' ? 'Issue reported' : 'Awaiting installation';
 
-function MemberPicker({ members, selected, onChange, disabled, testId }: {
+function MemberPicker({ members, selected, onChange, testId }: {
   members: { id: string; name: string; username?: string; roleName?: string }[];
   selected: string[];
   onChange: (ids: string[]) => void;
-  disabled?: boolean;
   testId: string;
 }) {
   return <div className="grid gap-1.5 sm:grid-cols-2" data-testid={testId}>
-    {members.length === 0 ? <p className="col-span-full rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">No eligible members are available.</p> : members.map((m) => {
-      const checked = selected.includes(m.id);
-      return <label key={m.id} className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition ${checked ? 'border-primary/35 bg-primary/[.045]' : 'border-border bg-background'} ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/25'}`}>
-        <input type="checkbox" checked={checked} disabled={disabled} onChange={() => onChange(checked ? selected.filter((id) => id !== m.id) : [...selected, m.id])} className="mt-0.5 accent-[hsl(var(--primary))]" data-testid={`checkbox-${testId}-${m.id}`} />
-        <span className="min-w-0"><span className="block truncate text-xs font-semibold">{m.name}</span><span className="block truncate text-[10px] text-muted-foreground">{m.username ? `@${m.username}` : m.roleName || ''}</span></span>
+    {members.length === 0 ? <p className="col-span-full rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">No eligible members are available.</p> : members.map((member) => {
+      const checked = selected.includes(member.id);
+      return <label key={member.id} className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition ${checked ? 'border-primary/35 bg-primary/[.045]' : 'border-border bg-background hover:border-primary/25'}`}>
+        <input type="checkbox" checked={checked} onChange={() => onChange(checked ? selected.filter((id) => id !== member.id) : [...selected, member.id])} className="mt-0.5 accent-[hsl(var(--primary))]" data-testid={`checkbox-${testId}-${member.id}`} />
+        <span className="min-w-0"><span className="block truncate text-xs font-semibold">{member.name}</span><span className="block truncate text-[10px] text-muted-foreground">{member.username ? `@${member.username}` : member.roleName || ''}</span></span>
       </label>;
     })}
   </div>;
@@ -114,52 +112,6 @@ function ResultDialog({ order, canEdit, pending, onClose, onSave }: {
       </form></Form>}
     </DialogContent>
   </Dialog>;
-}
-
-function TeamDialog({ open, team, users, pending, onClose, onSave }: {
-  open: boolean; team: InstallationTeam | null; users: { id: string; name: string; username: string; roleName: string }[];
-  pending: boolean; onClose: () => void; onSave: (id: string | null, input: InstallationTeamInput) => void;
-}) {
-  const [name, setName] = useState('');
-  const [memberIds, setMemberIds] = useState<string[]>([]);
-  const [subteams, setSubteams] = useState<DraftSubteam[]>([]);
-  const [subName, setSubName] = useState('');
-  const [subMembers, setSubMembers] = useState<string[]>([]);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!open) return;
-    setName(team?.name || '');
-    setMemberIds(team?.memberIds || []);
-    setSubteams(team?.subteams.map((s) => ({ id: s.id, name: s.name, memberIds: [...s.memberIds] })) || []);
-    setSubName(''); setSubMembers([]); setError('');
-  }, [open, team]);
-  const parentMembers = users.filter((u) => memberIds.includes(u.id));
-  const addSubteam = () => {
-    if (!subName.trim() || !subMembers.length) { setError('Add a subdivision name and at least one member.'); return; }
-    setSubteams((all) => [...all, { name: subName.trim(), memberIds: subMembers }]);
-    setSubName(''); setSubMembers([]); setError('');
-  };
-  return <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}><DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
-    <DialogHeader><DialogTitle>{team ? 'Edit installation team' : 'Create installation team'}</DialogTitle><DialogDescription>Choose eligible users for the parent team, then assign subdivision members from that selection.</DialogDescription></DialogHeader>
-    <div className="space-y-5">
-      <label className="block space-y-1.5"><span className="text-xs font-semibold">Team name</span><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="For example, North field crew" data-testid="input-installation-team-name" /></label>
-      <section className="space-y-2"><div><h3 className="text-xs font-bold">Parent team members</h3><p className="text-[10px] text-muted-foreground">Eligible Installation users.</p></div>
-        <MemberPicker members={users} selected={memberIds} onChange={(ids) => { setMemberIds(ids); setSubteams((prev) => prev.map((s) => ({ ...s, memberIds: s.memberIds.filter((id) => ids.includes(id)) }))); setSubMembers((prev) => prev.filter((id) => ids.includes(id))); }} testId="team-parent-members" />
-      </section>
-      <section className="space-y-3 rounded-xl border border-border bg-muted/20 p-3 sm:p-4">
-        <div className="flex items-center justify-between"><div><h3 className="text-xs font-bold">Subdivisions</h3><p className="text-[10px] text-muted-foreground">Optional crew groupings.</p></div><span className="rounded-full bg-background px-2 py-1 font-mono text-[10px]">{subteams.length}</span></div>
-        {subteams.map((s, i) => <div key={s.id || `${s.name}-${i}`} className="space-y-3 rounded-lg border border-border bg-background p-3" data-testid={`row-installation-subteam-${i}`}>
-          <div className="flex items-center gap-2"><Input value={s.name} onChange={(e) => setSubteams((prev) => prev.map((item, index) => index === i ? { ...item, name: e.target.value } : item))} maxLength={120} aria-label={`Subdivision ${i + 1} name`} data-testid={`input-installation-subteam-name-${i}`} /><Button type="button" variant="ghost" size="sm" onClick={() => setSubteams((prev) => prev.filter((_, index) => index !== i))} data-testid={`button-remove-subteam-${i}`}><X size={14} /><span className="sr-only">Remove subdivision</span></Button></div>
-          <MemberPicker members={parentMembers} selected={s.memberIds} onChange={(ids) => setSubteams((prev) => prev.map((item, index) => index === i ? { ...item, memberIds: ids } : item))} testId={`team-subteam-members-${i}`} />
-        </div>)}
-        <label className="block space-y-1.5"><span className="text-xs font-semibold">Subdivision name</span><Input value={subName} onChange={(e) => setSubName(e.target.value)} placeholder="For example, East crew" data-testid="input-installation-subteam-name" /></label>
-        <div className="space-y-1.5"><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Subdivision members</p><MemberPicker members={parentMembers} selected={subMembers} onChange={setSubMembers} testId="team-subteam-members" /></div>
-        <Button type="button" variant="outline" size="sm" onClick={addSubteam} data-testid="button-add-installation-subteam"><Plus size={14} /> Add subdivision</Button>
-      </section>
-      {error && <p className="text-xs text-destructive" data-testid="text-team-form-error">{error}</p>}
-      <DialogFooter><Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel-installation-team">Cancel</Button><Button type="button" disabled={pending || !name.trim() || memberIds.length === 0} onClick={() => { if (!name.trim() || !memberIds.length) { setError('Enter a team name and select at least one member.'); return; } if (subteams.some((s) => !s.name.trim() || s.memberIds.length === 0)) { setError('Each subdivision needs a name and at least one selected parent-team member.'); return; } onSave(team?.id || null, { name: name.trim(), memberIds, subteams: subteams.map((s) => ({ ...s, name: s.name.trim() })) }); }} data-testid="button-save-installation-team">{pending ? 'Saving…' : team ? 'Save team' : 'Create team'}</Button></DialogFooter>
-    </div>
-  </DialogContent></Dialog>;
 }
 
 function AssignmentDialog({ order, teams, users, pending, onClose, onSave }: {
@@ -204,16 +156,11 @@ export default function InstallationPage({ user }: { user: User }) {
   const [showInstalled, setShowInstalled] = useState(false);
   const [resultOrder, setResultOrder] = useState<InstallationOrder | null>(null);
   const [assignmentOrder, setAssignmentOrder] = useState<InstallationOrder | null>(null);
-  const [teamDialog, setTeamDialog] = useState(false);
-  const [editingTeam, setEditingTeam] = useState<InstallationTeam | null>(null);
   const ordersQuery = useListInstallationOrders({ query: { enabled: canView, queryKey: getListInstallationOrdersQueryKey() } });
   const teamsQuery = useListInstallationTeams({ query: { enabled: canView && canEdit, queryKey: getListInstallationTeamsQueryKey() } });
   const usersQuery = useListInstallationUsers({ query: { enabled: canView && canEdit, queryKey: getListInstallationUsersQueryKey() } });
   const resultMutation = useUpdateInstallationOrder();
   const assignmentMutation = useAssignInstallationOrder();
-  const createTeam = useCreateInstallationTeam();
-  const updateTeam = useUpdateInstallationTeam();
-  const deleteTeam = useDeleteInstallationTeam();
   const orders = ordersQuery.data || [];
   const teams = teamsQuery.data || [];
   const users = usersQuery.data || [];
@@ -252,21 +199,6 @@ export default function InstallationPage({ user }: { user: User }) {
     assignmentMutation.mutate({ id: order.id, data }, {
       onSuccess: () => { setAssignmentOrder(null); invalidateOrders(); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(order.id) }); toast({ title: 'Installation schedule saved', description: `${order.orderId} · ${formatDate(data.scheduledDate)}` }); },
       onError: () => toast({ title: 'Schedule could not be saved', description: 'Refresh and try again.', variant: 'destructive' }),
-    });
-  };
-  const saveTeam = (id: string | null, data: InstallationTeamInput) => {
-    const mutationOptions = {
-      onSuccess: () => { setTeamDialog(false); setEditingTeam(null); void queryClient.invalidateQueries({ queryKey: getListInstallationTeamsQueryKey() }); void queryClient.invalidateQueries({ queryKey: getListInstallationOrdersQueryKey() }); toast({ title: id ? 'Team updated' : 'Team created' }); },
-      onError: () => toast({ title: 'Team could not be saved', description: 'Check the team details and try again.', variant: 'destructive' as const }),
-    };
-    if (id) updateTeam.mutate({ id, data }, mutationOptions);
-    else createTeam.mutate({ data }, mutationOptions);
-  };
-  const removeTeam = (team: InstallationTeam) => {
-    if (!window.confirm(`Delete ${team.name}?`)) return;
-    deleteTeam.mutate({ id: team.id }, {
-      onSuccess: () => { void queryClient.invalidateQueries({ queryKey: getListInstallationTeamsQueryKey() }); void queryClient.invalidateQueries({ queryKey: getListInstallationOrdersQueryKey() }); toast({ title: 'Team deleted', description: team.name }); },
-      onError: () => toast({ title: 'Team could not be deleted', description: 'Refresh and try again.', variant: 'destructive' }),
     });
   };
   const copyAssignmentLink = async (order: InstallationOrder) => {
@@ -318,20 +250,12 @@ export default function InstallationPage({ user }: { user: User }) {
       <Card className="overflow-hidden border-border/80 shadow-sm">
         <div className="flex flex-col justify-between gap-3 border-b border-border/75 p-4 sm:flex-row sm:items-center md:p-5">
           <div><div className="flex items-center gap-2"><span className="h-5 w-1 rounded-full bg-primary" /><h2 className="font-display text-lg font-bold tracking-tight">Installation register</h2><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground" data-testid="text-installation-count">{visibleOrders.length} / {orders.length}</span></div><p className="ml-3 mt-1 text-xs text-muted-foreground">Delivered orders · {showInstalled ? 'Previously installed' : 'Open installation work'}</p></div>
-          <div className="flex flex-wrap items-center gap-2">{!canEdit && <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-900"><ShieldCheck size={13} /> View-only</span>}{canEdit && <Button type="button" variant="outline" size="sm" onClick={() => { setEditingTeam(null); setTeamDialog(true); }} data-testid="button-create-installation-team"><Users size={14} /> Manage teams</Button>}</div>
+           <div className="flex flex-wrap items-center gap-2">{!canEdit && <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-900"><ShieldCheck size={13} /> View-only</span>}{canEdit && <Link href="/installation/teams" className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-bold transition hover:border-primary/35 hover:text-primary" data-testid="link-manage-installation-teams">Manage teams <ArrowRight size={13} /></Link>}</div>
         </div>
         <div className="flex flex-col gap-3 border-b border-border/60 p-3 sm:flex-row sm:items-center">
           <label className="relative block w-full sm:max-w-md"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find order, client, location, or team" aria-label="Search installation orders" className="h-10 pl-9 text-xs" data-testid="input-installation-search" /></label>
           <button type="button" onClick={() => { setShowInstalled((v) => !v); setFilter('all'); }} aria-pressed={showInstalled} className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold ${showInstalled ? 'border-primary/40 bg-primary/5 text-primary' : 'border-border bg-background'}`} data-testid="tab-previously-installed">{showInstalled ? <Check size={14} /> : <ClipboardCheck size={14} />}Previously installed</button>
         </div>
-        {canEdit && <section className="border-b border-border/60 bg-muted/20 px-4 py-3" data-testid="panel-installation-teams">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Installation teams</p><p className="mt-0.5 text-xs text-muted-foreground">{teamsQuery.isLoading ? 'Loading teams…' : teamsQuery.isError ? 'Team list unavailable' : `${teams.length} configured`}{' · '}{usersQuery.isLoading ? 'Loading eligible users…' : usersQuery.isError ? 'Eligible users unavailable' : `${users.length} eligible users`}</p>
-            {usersQuery.isError && <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => void usersQuery.refetch()} data-testid="button-retry-installation-users"><RefreshCw size={13} /> Retry eligible users</Button>}
-          </div>
-            {teamsQuery.isError && <Button type="button" size="sm" variant="outline" onClick={() => void teamsQuery.refetch()} data-testid="button-retry-installation-teams"><RefreshCw size={13} /> Retry teams</Button>}
-            <div className="flex flex-wrap gap-2">{teams.map((team) => <span key={team.id} className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold" data-testid={`chip-installation-team-${team.id}`}>{team.name}<button type="button" className="ml-1 text-primary underline underline-offset-2" onClick={() => { setEditingTeam(team); setTeamDialog(true); }} data-testid={`button-edit-installation-team-${team.id}`}>Edit</button><button type="button" className="ml-1 text-destructive underline underline-offset-2 disabled:opacity-50" onClick={() => removeTeam(team)} disabled={deleteTeam.isPending} data-testid={`button-delete-installation-team-${team.id}`}>Delete</button></span>)}</div>
-          </div>
-        </section>}
         <CardContent className="space-y-3 p-3 sm:p-4">
           {ordersQuery.isLoading ? <div className="space-y-3" aria-label="Loading installation orders" data-testid="state-installation-loading">{[0, 1, 2].map((n) => <div key={n} className="h-36 animate-pulse rounded-xl border border-border/70 bg-card/70" />)}</div>
             : ordersQuery.isError ? <div className="grid min-h-56 place-items-center rounded-xl border border-destructive/20 bg-destructive/[.035] p-6 text-center" data-testid="state-installation-error"><div><CircleAlert size={24} className="mx-auto text-destructive" /><h3 className="mt-3 font-display text-sm font-bold">Installation records unavailable</h3><p className="mt-1 text-xs text-muted-foreground">Delivered orders could not be loaded.</p><Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => void ordersQuery.refetch()} data-testid="button-retry-installation"><RefreshCw size={13} /> Try again</Button></div></div>
@@ -362,6 +286,5 @@ export default function InstallationPage({ user }: { user: User }) {
     </main>
     <ResultDialog order={resultOrder} canEdit={canEdit} pending={resultMutation.isPending} onClose={() => { setResultOrder(null); resultMutation.reset(); }} onSave={saveResult} />
     <AssignmentDialog order={assignmentOrder} teams={teams} users={users} pending={assignmentMutation.isPending} onClose={() => { setAssignmentOrder(null); assignmentMutation.reset(); }} onSave={saveAssignment} />
-    <TeamDialog open={teamDialog} team={editingTeam} users={users} pending={createTeam.isPending || updateTeam.isPending} onClose={() => { setTeamDialog(false); setEditingTeam(null); }} onSave={saveTeam} />
   </AppShell>;
 }
