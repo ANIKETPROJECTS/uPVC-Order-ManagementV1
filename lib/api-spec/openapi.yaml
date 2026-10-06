@@ -1027,6 +1027,29 @@ paths:
         "409":
           description: Team has scheduled orders and cannot be deleted
   /installation/orders/{id}/assignment:
+    delete:
+      operationId: unassignInstallationOrder
+      tags: [installation]
+      summary: Remove the assigned team and members from an active installation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Installation team unassigned
+        "400":
+          description: Invalid order identifier
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
+        "404":
+          description: Order not found
+        "409":
+          description: Order is not eligible for unassignment
     patch:
       operationId: assignInstallationOrder
       tags: [installation]

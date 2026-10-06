@@ -12,6 +12,7 @@
 - [Orval parameter collisions](orval-parameter-collisions.md) — adding query fields can duplicate generated `*Params` exports; separate preview operations avoid the collision.
 - [OpenAPI codegen and Vite restarts](openapi-codegen-vite-race.md) — restart Vite after clean Orval generation; HMR can race with temporarily removed client files.
 - [Installation and grievances](installation-grievances.md) — delivered orders enter Installation; post-install grievances stay in each order’s own tab.
+- [Installation assignment defaults](installation-assignment-defaults.md) — preselect eligible group members; unassign teams without clearing the visit date or active order.
 - [Installation team editor](installation-team-editor.md) — keep team forms on-page with searchable member lists; rosters are expected to outgrow a popup.
 - [Flagged payment audits](payment-flag-audits.md) — keep flags ledger-independent; Paid excludes void/bounced receipts, and `createdAt` is the canonical displayed flag time.
 - [Payment follow-up vs. full history](payment-follow-up-vs-history.md) — follow-up lists only outstanding balances; the separate Balance Payment register owns all-time transaction history.

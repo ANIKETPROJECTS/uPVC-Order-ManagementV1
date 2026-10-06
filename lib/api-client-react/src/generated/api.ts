@@ -3948,6 +3948,80 @@ export const useDeleteInstallationTeam = <TError = ErrorType<void>,
       return useMutation(getDeleteInstallationTeamMutationOptions(options));
     }
 
+export const getUnassignInstallationOrderUrl = (id: string,) => {
+
+
+
+
+  return `/api/installation/orders/${id}/assignment`
+}
+
+/**
+ * @summary Remove the assigned team and members from an active installation
+ */
+export const unassignInstallationOrder = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getUnassignInstallationOrderUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnassignInstallationOrderMutationKey = () => ['unassignInstallationOrder'] as const;
+
+export const getUnassignInstallationOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unassignInstallationOrder>>, TError,UnassignInstallationOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unassignInstallationOrder>>, TError,UnassignInstallationOrderMutationVariables, TContext> => {
+
+const mutationKey = getUnassignInstallationOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unassignInstallationOrder>>, UnassignInstallationOrderMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  unassignInstallationOrder(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnassignInstallationOrderMutationResult = NonNullable<Awaited<ReturnType<typeof unassignInstallationOrder>>>
+
+    export type UnassignInstallationOrderMutationError = ErrorType<void>
+    export type UnassignInstallationOrderMutationVariables = {id: string}
+
+    /**
+ * @summary Remove the assigned team and members from an active installation
+ */
+export const useUnassignInstallationOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unassignInstallationOrder>>, TError,UnassignInstallationOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unassignInstallationOrder>>,
+        TError,
+        UnassignInstallationOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUnassignInstallationOrderMutationOptions(options));
+    }
+
 export const getAssignInstallationOrderUrl = (id: string,) => {
 
 

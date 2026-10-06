@@ -1500,6 +1500,16 @@ export const DeleteInstallationTeamResponse = zod.void()
 
 
 /**
+ * @summary Remove the assigned team and members from an active installation
+ */
+export const UnassignInstallationOrderParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UnassignInstallationOrderResponse = zod.void()
+
+
+/**
  * @summary Assign or reschedule an installation team and its members
  */
 export const AssignInstallationOrderParams = zod.object({

@@ -12,6 +12,7 @@ import {
   AssignInstallationOrderBody,
   AssignInstallationOrderParams,
   AssignInstallationOrderResponse,
+  UnassignInstallationOrderParams,
 } from "@workspace/api-zod";
 import { Router } from "express";
 import {
@@ -250,6 +251,94 @@ router.patch("/installation/orders/:id/assignment", async (req, res): Promise<vo
   res.json(AssignInstallationOrderResponse.parse(
     installationResponse(savedOrder, savedInstallation, windowQty, savedTeam),
   ));
+});
+
+router.delete("/installation/orders/:id/assignment", async (req, res): Promise<void> => {
+  const params = UnassignInstallationOrderParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const actor = await getActor(req, res, "installation", "edit");
+  if (!actor) return;
+
+  const db = await getMongoDb();
+  const session = (await getMongoClient()).startSession();
+  try {
+    await session.withTransaction(async () => {
+      const orders = getOrders(db);
+      const order = await orders.findOne(
+        { _id: params.data.id, dispatchStatus: "delivered" },
+        { session },
+      );
+      if (!order) {
+        const existing = await orders.findOne({ _id: params.data.id }, { session });
+        if (!existing) throw new InstallationConflict("Order not found.");
+        throw new InstallationConflict("Only delivered orders can be unassigned from Installation.");
+      }
+      if (order.status === "installed") {
+        throw new InstallationConflict("Installed orders cannot be unassigned.");
+      }
+
+      const installations = getInstallations(db);
+      const installation = await installations.findOne({ _id: order._id }, { session });
+      if (!installation?.teamId) return;
+      if (installation.installationStatus === "installed") {
+        throw new InstallationConflict("Installed orders cannot be unassigned.");
+      }
+
+      const team = await getInstallationTeams(db).findOne({ _id: installation.teamId }, { session });
+      const teamName = team?.name ?? installation.teamNameSnapshot ?? "installation team";
+      const subteamName = team?.subteams.find((candidate) => candidate._id === installation.subteamId)?.name
+        ?? installation.subteamNameSnapshot
+        ?? null;
+      const scheduledDate = installation.scheduledDate ?? null;
+      const assignedMemberCount = installation.assignedMembers?.length ?? 0;
+      const now = new Date();
+      const result = await installations.updateOne(
+        {
+          _id: order._id,
+          teamId: installation.teamId,
+          installationStatus: { $ne: "installed" },
+        },
+        {
+          $set: {
+            teamId: null,
+            teamNameSnapshot: null,
+            subteamId: null,
+            subteamNameSnapshot: null,
+            assignedMembers: [],
+            updatedBy: actor.id,
+            updatedAt: now,
+          },
+        },
+        { session },
+      );
+      if (result.modifiedCount !== 1) {
+        throw new InstallationConflict("The installation assignment changed before it could be unassigned.");
+      }
+
+      await getOrderActivity(db).insertOne({
+        _id: randomUUID(),
+        orderRecordId: order._id,
+        actorId: actor.id,
+        actorName: actor.name,
+        action: "installation_assignment",
+        summary: `${order.orderId} was unassigned from ${teamName}${subteamName ? ` · ${subteamName}` : ""}; ${assignedMemberCount} member${assignedMemberCount === 1 ? "" : "s"} cleared.${scheduledDate ? ` Scheduled date ${scheduledDate} retained.` : ""}`,
+        createdAt: now,
+      }, { session });
+    });
+  } catch (error) {
+    if (error instanceof InstallationConflict) {
+      res.status(error.message === "Order not found." ? 404 : 409).json({ error: error.message });
+      return;
+    }
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  res.status(204).send();
 });
 
 router.patch("/installation/orders/:id", async (req, res): Promise<void> => {
