@@ -2464,6 +2464,55 @@ paths:
           description: Order not found
         "409":
           description: Received and broken quantities exceed the ordered quantity
+  /orders/{id}/glass-tracking:
+    patch:
+      operationId: updateGlassTracking
+      tags: [orders]
+      summary: Edit the window and glass details in an order's glass tracking record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GlassTrackingUpdate"
+      responses:
+        "200":
+          description: Updated glass tracking record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlassTrackingOrder"
+        "400":
+          description: Invalid glass tracking details
+        "403":
+          description: Glass tracking edit access is required
+        "404":
+          description: Order not found
+        "409":
+          description: Glass quantities conflict with the ordered count
+    delete:
+      operationId: deleteGlassTracking
+      tags: [orders]
+      summary: Remove an order's active glass tracking record without deleting the order or workbook import history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Glass tracking record removed; the order remains in the register as pending
+        "403":
+          description: Glass tracking edit access is required
+        "404":
+          description: Order or glass tracking record not found
   /orders/{id}/windows:
     get:
       operationId: listOrderWindows
@@ -3978,6 +4027,56 @@ components:
       properties:
         items:
           $ref: "#/components/schemas/GlassTrackingQuantityInputList"
+      required: [items]
+    GlassTrackingItemUpdate:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        villaNo:
+          type: ["string", "null"]
+          maxLength: 100
+        windowNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        glassType:
+          type: string
+          minLength: 1
+          maxLength: 120
+        widthMm:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 10000
+        heightMm:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 10000
+        ordered:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        received:
+          type: integer
+          minimum: 0
+          maximum: 100000
+        broken:
+          type: integer
+          minimum: 0
+          maximum: 100000
+      required: [villaNo, windowNo, glassType, widthMm, heightMm, ordered, received, broken]
+    GlassTrackingItemUpdateList:
+      type: array
+      items:
+        $ref: "#/components/schemas/GlassTrackingItemUpdate"
+      minItems: 1
+      maxItems: 500
+    GlassTrackingUpdate:
+      type: object
+      properties:
+        items:
+          $ref: "#/components/schemas/GlassTrackingItemUpdateList"
       required: [items]
     OrderPaymentMethod:
       type: string
