@@ -1536,6 +1536,11 @@ export async function initializeMongo(): Promise<void> {
     { $setOnInsert: { _id: "quotation-rate-sequence", value: 999, updatedAt: now } },
     { upsert: true },
   );
+  await getCounters(db).updateOne(
+    { _id: "quotation-request-sequence" },
+    { $setOnInsert: { _id: "quotation-request-sequence", value: 0, updatedAt: now } },
+    { upsert: true },
+  );
 
   for (const role of seedRoles) {
     await roles.updateOne(

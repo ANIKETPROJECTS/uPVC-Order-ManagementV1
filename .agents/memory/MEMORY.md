@@ -2,6 +2,7 @@
 - [Communication deletion](communication-deletion.md) — hide chats per user; delete individual messages for everyone; new activity restores hidden threads.
 - [pnpm workspace installs](pnpm-dependency-installs.md) — the package helper targets the workspace root; use the filtered pnpm package command for app-only dependencies.
 - [Quotation profile snapshots](quotation-snapshots.md) — keep saved proposal details stable when the reusable profile catalogue changes.
+- [Quotation request IDs](quotation-request-ids.md) — new requests use a global QTR sequence and India-local creation date; keep legacy IDs stable.
 - [Scoped workspace themes](workspace-theme-scope.md) — theme choice affects the sidebar and selected hero panels; workspace content remains light.
 - [Manual WhatsApp reminders](manual-whatsapp-reminders.md) — open a drafted message for an employee to send; never use Meta APIs or WhatsApp credentials.
 - [Measurement sheet labels](measurement-sheet-labels.md) — keep optional user-facing sheet names separate from original filenames, with legacy filename fallback.

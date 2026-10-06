@@ -823,7 +823,7 @@ function RateApprovalDesk({ user }: { user: User }) {
         <Card className="border-border/80" data-testid="card-rate-queue">
           <CardHeader className="border-b border-border/70 pb-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Live workflow</p><CardTitle className="mt-1 font-display text-lg">Quotation requests</CardTitle><p className="mt-1 text-xs text-muted-foreground">Temporary IDs, approval history, order links, and Eva PDFs stay together.</p></div>
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Live workflow</p><CardTitle className="mt-1 font-display text-lg">Quotation requests</CardTitle><p className="mt-1 text-xs text-muted-foreground">QTR IDs, approval history, order links, and Eva PDFs stay together.</p></div>
               <div className="flex flex-wrap items-center gap-2">
                 {canSubmit && <Button size="sm" variant="outline" onClick={() => setPane('create')} data-testid="button-new-rate-request"><FilePlus2 size={13} /> New request</Button>}
                 <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">{pending.length} to review</span>
@@ -884,7 +884,7 @@ function RateApprovalDesk({ user }: { user: User }) {
         </Card>
         </TabsContent>
       </Tabs>
-      <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-desk-note"><MapPin size={15} className="mt-0.5 shrink-0 text-primary" /><p>Rate requests receive a temporary RA ID, and the server calculates Average (SqFt / Qty). Linking an order is optional and can be done later.</p></div>
+      <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-desk-note"><MapPin size={15} className="mt-0.5 shrink-0 text-primary" /><p>Quotation request IDs use QTR-001-DDMMYYYY format. The server calculates Average (SqFt / Qty). Linking an order is optional and can be done later.</p></div>
       <Dialog open={Boolean(linkingSubmission)} onOpenChange={(open) => { if (!open) setLinkingSubmission(null); }}>
         <DialogContent className="max-w-none sm:max-h-[90vh] sm:w-[min(90vw,52rem)] sm:max-w-none" data-testid="dialog-link-quotation-order">
           <DialogHeader>

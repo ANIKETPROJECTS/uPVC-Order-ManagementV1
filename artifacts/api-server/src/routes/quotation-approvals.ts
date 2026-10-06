@@ -46,6 +46,21 @@ class LinkConflict extends Error {}
 const isDuplicateKeyError = (error: unknown) =>
   Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000);
 
+function quotationRequestDateCode(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("day")}${part("month")}${part("year")}`;
+}
+
+function formatQuotationRequestId(sequence: number, createdAt: Date): string {
+  return `QTR-${String(sequence).padStart(3, "0")}-${quotationRequestDateCode(createdAt)}`;
+}
+
 type Actor = {
   id: string;
   name: string;
@@ -252,21 +267,21 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
   const { clientName, location, windowQty, totalSqFt, glassType } = parsed.data;
   const counters = getCounters(db);
   await counters.updateOne(
-    { _id: "quotation-rate-sequence" },
-    { $setOnInsert: { _id: "quotation-rate-sequence", value: 999, updatedAt: now } },
+    { _id: "quotation-request-sequence" },
+    { $setOnInsert: { _id: "quotation-request-sequence", value: 0, updatedAt: now } },
     { upsert: true },
   );
   const counter = await counters.findOneAndUpdate(
-    { _id: "quotation-rate-sequence" },
+    { _id: "quotation-request-sequence" },
     { $inc: { value: 1 }, $set: { updatedAt: now } },
     { returnDocument: "after" },
   );
   if (!counter) {
-    res.status(503).json({ error: "A temporary quotation ID could not be allocated." });
+    res.status(503).json({ error: "A quotation request ID could not be allocated." });
     return;
   }
   const item: QuotationRateSubmissionDocument = {
-    _id: `RA-${counter.value}`,
+    _id: formatQuotationRequestId(counter.value, now),
     orderRecordId: null,
     orderId: null,
     measurementRecordId: null,

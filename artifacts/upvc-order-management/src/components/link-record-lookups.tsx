@@ -40,7 +40,7 @@ export function QuotationRequestLookup({
         className="min-w-0 w-full"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search by RA ID or client name"
+        placeholder="Search by quotation request ID or client"
         aria-label="Search quotation requests by ID or client"
         data-testid="input-search-quotation-request"
       />
