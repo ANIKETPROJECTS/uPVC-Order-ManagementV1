@@ -3,7 +3,7 @@
 // Replace the dummy values below before starting PM2.
 // Generate a session secret with: openssl rand -hex 32
 const MONGODB_URI =
-  'mongodb+srv://raneaniket23_db_user:rSSscd98WASScFoO@windowsoftwarevishesh.lae0r4v.mongodb.net/?appName=windowsoftwarevishesh';
+  'mongodb://admin:Admin%40123@66.116.248.143:27017/upvc_order_management?authSource=admin';
 const SESSION_SECRET = 'hO92ZjFjQSkakUnW0waymD8CRqhkDrn0a156IqLs4cZLiPP0RDhXUUNtHGlkO9jKrN13NVIBTe5Uc1OX3bMY3w==';
 
 function assertConfigured(name, value) {
