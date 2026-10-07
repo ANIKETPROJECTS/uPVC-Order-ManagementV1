@@ -1,0 +1,62 @@
+The Operations Dashboard is working. Now refine layout, make it less scrollable, and make EVERYTHING data-driven and dynamic. First read the current dashboard components, filter state hook, the dashboard API/aggregation code, the stage/status enums, and the theme setup. Reuse them. No new libraries.
+
+========================================
+A. THEME
+========================================
+- Light mode is the DEFAULT for every user. Do not follow the OS prefers-color-scheme on first load. Dark mode only when the user toggles it manually (persist that choice per user).
+
+========================================
+B. FILTER BAR (NOT sticky)
+========================================
+- Remove sticky/fixed positioning from the search + filter bar. It sits right below the hero, in normal flow, and scrolls away with the page. Nothing should overlap or clip content while scrolling.
+- Keep the page header (title/bell/approvals/profile) as it is.
+- Keep: Search (⌘K), Date range, Stage, Client, More filters, Reset, active-filter chips, URL persistence. Make the bar compact (single row, small paddings; the chips row only appears when a non-default filter is active, the default "Last 30 days" chip alone should not create an extra row).
+
+========================================
+C. COMPACT LAYOUT (reduce scrolling)
+========================================
+Use a 12-column responsive grid, tighter gaps (16px) and smaller card padding (16–20px).
+1. Hero: reduce height to ~160px. Keep headline, live IST clock with seconds + full date, Refresh / Auto-refresh / Print / Theme. REMOVE the 3 mini-stat tiles (they duplicate the KPI cards).
+2. Filter bar.
+3. KPI row: 5 cards in ONE row on desktop (xl: 5 cols, lg: 3+2 where the last row stretches to fill, md: 2 cols with the last card spanning full width, mobile: 1 col). Never leave an empty gap beside a card. Cards: Orders, Order Value, Windows Ready (ready/total + % + mini progress), Outstanding Balance, Installed Orders. Each with gradient icon tile, sparkline (monotone, smooth, no spikes), and ▲/▼ vs previous period when Compare is ON.
+4. Charts row: Trend (8 cols) + Orders by Stage donut (4 cols), equal heights, reduced chart height (~260px).
+5. Pipeline: ALL stages in ONE row on desktop (auto-fit grid, min 150px), single-line chips, count + ₹ value + share bar. Horizontal scroll NOT allowed; wrap only on tablet/mobile.
+6. Row: Needs Attention (4 cols) + Live Activity (4 cols) + Installer Capacity (4 cols) on xl; 2 cols on lg; stack on mobile.
+7. Row: Recent Orders (8 cols) + Top Clients (4 cols).
+8. Row of secondary cards (Dispatch queue, Payment follow-through, Installation schedule, Measurement uploads, Quotation approvals, Glass status) in an auto-fit 3-column grid; render a card ONLY if it has data. If none, show one slim strip "Nothing else needs follow-up".
+9. Footer snapshot line.
+Cap lists to 5–6 rows with a "View all ↗" link instead of long scroll. Internal scroll areas only for Live Activity (max-height ~320px).
+
+========================================
+D. FIXES
+========================================
+- Trend chart: if all order values in range are 0, hide the secondary ₹ axis and the value series, and show a small note "Order value appears once rates are approved". Use monotone cubic interpolation so lines never dip below 0. Y axis min = 0. Axis labels never clipped.
+- Recent Orders: stage chip is single-line (white-space: nowrap, shorter label e.g. "Quotation"), windows ready/total + progress bar, value in ₹ Indian format; if value is missing show "Rate pending" in muted text instead of "–". Fulfillment column: show dispatch/payment status as two small coloured chips.
+- Needs Attention: show only rows with count > 0, sorted by severity (red → orange → amber), each with coloured icon tile, count, ₹ amount if relevant, arrow link with filters pre-applied. If everything is zero show a single green "All clear" state listing the checks performed in one line.
+- Live Activity: must not be empty when orders exist. Feed from a unified activity/audit source: order created, quotation submitted/approved, order confirmed, rate approved, stage changes, measurement sheet uploaded, QR scanned/window ready, glass flagged/broken, dispatched, installation scheduled/completed, payment received, reminder sent. If an audit log doesn't exist for some of these, add a lightweight `activity_events` table (id, type, order_id, actor_id, message, meta JSON, created_at) and write events from the existing services. Backfill from existing order created_at/updated_at so current orders show up.
+- Installer Capacity: derive from real installation assignments + the team/installer users. Capacity field per installer (configurable, default 5/day) editable by Master Admin. If no installers exist, show a compact empty state with a link to the place where installation team members are configured.
+- Sparklines: use at least 7 buckets, smoothed.
+
+========================================
+E. EVERYTHING DYNAMIC (very important)
+========================================
+No hardcoded stages, statuses, colours-by-name, locations, clients, installers or counts anywhere in the dashboard.
+1. Stages, statuses, payment states, glass states: read from the same enums/config tables the rest of the app uses. If a new stage or status is added in the software later, it must automatically appear in the pipeline, donut, filters, chips and legend (assign colours from a palette by index if no colour is configured).
+2. Filter options (clients, locations, installers, assignments, glass vendors) come from the database, only values that exist.
+3. Widget registry: build the dashboard from a registry of widgets { id, title, permission, endpoint, defaultVisible, defaultOrder, size }. New modules can register a widget without editing the page layout.
+4. Master Admin can customise: show/hide widgets and reorder them (simple "Customize" drawer), saved per user (and optionally as a company default). Provide "Reset to default".
+5. Role-based: widgets and money values hidden for roles without access; Master/Super Admin see all.
+6. Every widget refetches on: filter change, date change, manual refresh, auto-refresh tick, and window focus. Use one shared query key set so they update together. Show "Updated hh:mm:ss".
+7. "Priority & reports" view: every KPI, chart, pipeline stage, attention row and table row must deep-link to the relevant module page with the same filters pre-applied. Add an "Export" menu in the hero (Dashboard summary as PDF/print and CSV of current Recent Orders + Attention list) so the Master Admin can take reports directly from the dashboard (the standalone Reports section has been removed).
+8. Add widgets automatically when data exists in modules not yet shown (Quotation approvals, Measurement sheets, Glass tracking, Payments collected vs pending, Dispatch, QR production progress, Overdue items) — as per the widget registry, hidden when empty.
+
+========================================
+F. QUALITY
+========================================
+- Error boundary + skeleton + empty state for every widget; one failing widget must not break the page.
+- Responsive with no horizontal scroll; light and dark both clean.
+- The clock isolated so the page doesn't re-render every second.
+- No mock/seed values in UI.
+
+DELIVERABLES: files changed, new tables/migrations (if any), list of widgets in the registry with their permissions, and a test checklist:
+(1) light mode on first load even if OS is dark; (2) filter bar scrolls away and never overlaps; (3) KPI row has no gaps at xl/lg/md/mobile; (4) pipeline is one row on desktop; (5) add a new stage/status in DB → appears everywhere without code change; (6) create a new order → shows in Recent Orders, Live Activity, KPIs, trend after refresh; (7) date/filter change updates every widget; (8) Master Admin can hide/reorder widgets and it persists; (9) export works.
