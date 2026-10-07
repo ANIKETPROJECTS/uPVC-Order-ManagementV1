@@ -129,6 +129,34 @@
     linear-gradient(115deg, #07101e 0%, #0b1b32 58%, #0b4a46 100%);
 }
 
+@keyframes dashboard-row-flash {
+  0%, 100% { background-color: transparent; }
+  25% { background-color: rgb(20 184 166 / .16); }
+  100% { background-color: transparent; }
+}
+
+.dashboard-row-flash {
+  animation: dashboard-row-flash 1.2s ease-out;
+}
+
+@media print {
+  .dashboard-filterbar,
+  .dashboard-page .print\:hidden,
+  .dashboard-page button[data-testid^="button-export"] {
+    display: none !important;
+  }
+  .dashboard-page {
+    background: #fff !important;
+    color: #0b1b3a !important;
+    padding: 0 !important;
+  }
+  .dashboard-card,
+  .dashboard-hero {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}
+
 @theme inline {
   --font-sans: var(--app-font-sans);
   --font-display: var(--app-font-display);

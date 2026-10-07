@@ -7,7 +7,7 @@ import { Route, Router as WouterRouter, Switch } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import DashboardPage from '@/pages/dashboard';
+import DashboardPage from '@/pages/dashboard-redesign';
 import LoginPage from '@/pages/login';
 import NotFound from '@/pages/not-found';
 import RolesPage from '@/pages/roles';

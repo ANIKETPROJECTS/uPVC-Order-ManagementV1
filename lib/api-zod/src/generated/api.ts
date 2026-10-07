@@ -20,6 +20,10 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get the current signed-in user
  */
+export const getAuthSessionResponseUserOneInstallationCapacityMax = 50;
+
+
+
 export const GetAuthSessionResponse = zod.object({
   "authenticated": zod.boolean(),
   "user": zod.union([zod.object({
@@ -31,6 +35,7 @@ export const GetAuthSessionResponse = zod.object({
   "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
+  "installationCapacity": zod.number().int().min(1).max(getAuthSessionResponseUserOneInstallationCapacityMax),
   "status": zod.enum(['active', 'inactive']),
   "lastLogin": zod.coerce.date().nullable(),
   "permissions": zod.record(zod.string(), zod.enum(['none', 'view', 'edit'])),
@@ -51,6 +56,10 @@ export const LoginBody = zod.object({
   "password": zod.string().min(1)
 })
 
+export const loginResponseInstallationCapacityMax = 50;
+
+
+
 export const LoginResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -60,6 +69,7 @@ export const LoginResponse = zod.object({
   "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
+  "installationCapacity": zod.number().int().min(1).max(loginResponseInstallationCapacityMax),
   "status": zod.enum(['active', 'inactive']),
   "lastLogin": zod.coerce.date().nullable(),
   "permissions": zod.record(zod.string(), zod.enum(['none', 'view', 'edit'])),
@@ -98,6 +108,10 @@ export const ListUsersQueryParams = zod.object({
   "q": zod.coerce.string().optional()
 })
 
+export const listUsersResponseInstallationCapacityMax = 50;
+
+
+
 export const ListUsersResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -107,6 +121,7 @@ export const ListUsersResponseItem = zod.object({
   "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
+  "installationCapacity": zod.number().int().min(1).max(listUsersResponseInstallationCapacityMax),
   "status": zod.enum(['active', 'inactive']),
   "lastLogin": zod.coerce.date().nullable(),
   "permissions": zod.record(zod.string(), zod.enum(['none', 'view', 'edit'])),
@@ -123,6 +138,8 @@ export const createUserBodyUsernameMin = 3;
 
 export const createUserBodyAvatarUrlMax = 180000;
 
+export const createUserBodyInstallationCapacityMax = 50;
+
 export const createUserBodyPasswordMin = 8;
 
 
@@ -134,9 +151,14 @@ export const CreateUserBody = zod.object({
   "phone": zod.string().nullish(),
   "avatarUrl": zod.string().max(createUserBodyAvatarUrlMax).nullish(),
   "roleId": zod.string(),
+  "installationCapacity": zod.number().int().min(1).max(createUserBodyInstallationCapacityMax).optional(),
   "password": zod.string().min(createUserBodyPasswordMin),
   "permissionOverrides": zod.record(zod.string(), zod.enum(['none', 'view', 'edit'])).nullish()
 })
+
+export const createUserResponseInstallationCapacityMax = 50;
+
+
 
 export const CreateUserResponse = zod.object({
   "id": zod.string(),
@@ -147,6 +169,7 @@ export const CreateUserResponse = zod.object({
   "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
+  "installationCapacity": zod.number().int().min(1).max(createUserResponseInstallationCapacityMax),
   "status": zod.enum(['active', 'inactive']),
   "lastLogin": zod.coerce.date().nullable(),
   "permissions": zod.record(zod.string(), zod.enum(['none', 'view', 'edit'])),
@@ -166,6 +189,8 @@ export const updateUserBodyUsernameMin = 3;
 
 export const updateUserBodyAvatarUrlMax = 180000;
 
+export const updateUserBodyInstallationCapacityMax = 50;
+
 export const updateUserBodyPasswordMin = 8;
 
 
@@ -177,10 +202,15 @@ export const UpdateUserBody = zod.object({
   "phone": zod.string().nullish(),
   "avatarUrl": zod.string().max(updateUserBodyAvatarUrlMax).nullish(),
   "roleId": zod.string().optional(),
+  "installationCapacity": zod.number().int().min(1).max(updateUserBodyInstallationCapacityMax).optional(),
   "password": zod.string().min(updateUserBodyPasswordMin).optional(),
   "status": zod.enum(['active', 'inactive']).optional(),
   "permissionOverrides": zod.record(zod.string(), zod.enum(['none', 'view', 'edit'])).nullish()
 })
+
+export const updateUserResponseInstallationCapacityMax = 50;
+
+
 
 export const UpdateUserResponse = zod.object({
   "id": zod.string(),
@@ -191,6 +221,7 @@ export const UpdateUserResponse = zod.object({
   "avatarUrl": zod.string().nullable(),
   "roleId": zod.string(),
   "roleName": zod.string(),
+  "installationCapacity": zod.number().int().min(1).max(updateUserResponseInstallationCapacityMax),
   "status": zod.enum(['active', 'inactive']),
   "lastLogin": zod.coerce.date().nullable(),
   "permissions": zod.record(zod.string(), zod.enum(['none', 'view', 'edit'])),
@@ -429,6 +460,14 @@ export const GetOperationsDashboardResponse = zod.object({
   "subteamName": zod.string().nullable(),
   "assignedMembers": zod.array(zod.string()),
   "status": zod.enum(['pending', 'issue', 'installed'])
+})),
+  "installerCapacity": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "assigned": zod.number().int(),
+  "capacity": zod.number().int(),
+  "peakDay": zod.coerce.date().nullable(),
+  "scheduledCount": zod.number().int()
 })),
   "recentMeasurements": zod.array(zod.object({
   "id": zod.string(),

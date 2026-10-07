@@ -665,7 +665,7 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
         sectionErrors,
         () => getUsers(db)
           .find({ _id: { $in: teamMemberIds }, status: "active" })
-          .project({ _id: 1, name: 1, installationCapacity: 1 })
+          .project<Pick<UserDocument, "_id" | "name" | "installationCapacity">>({ _id: 1, name: 1, installationCapacity: 1 })
           .sort({ name: 1 })
           .toArray(),
         [],

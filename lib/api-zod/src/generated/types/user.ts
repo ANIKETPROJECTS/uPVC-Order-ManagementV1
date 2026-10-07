@@ -21,6 +21,11 @@ export interface User {
   avatarUrl: string | null;
   roleId: string;
   roleName: string;
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  installationCapacity: number;
   status: UserStatus;
   /** @nullable */
   lastLogin: Date | null;

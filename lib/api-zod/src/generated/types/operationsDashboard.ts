@@ -10,6 +10,7 @@ import type { DashboardAttentionItem } from './dashboardAttentionItem';
 import type { DashboardDispatchOrder } from './dashboardDispatchOrder';
 import type { DashboardFilterOptions } from './dashboardFilterOptions';
 import type { DashboardInstallationScheduleItem } from './dashboardInstallationScheduleItem';
+import type { DashboardInstallerCapacity } from './dashboardInstallerCapacity';
 import type { DashboardMeasurementUpload } from './dashboardMeasurementUpload';
 import type { DashboardOperationsPermissions } from './dashboardOperationsPermissions';
 import type { DashboardOperationsSummary } from './dashboardOperationsSummary';
@@ -32,6 +33,7 @@ export interface OperationsDashboard {
   recentOrders: DashboardRecentOrder[];
   dispatchQueue: DashboardDispatchOrder[];
   installationSchedule: DashboardInstallationScheduleItem[];
+  installerCapacity: DashboardInstallerCapacity[];
   recentMeasurements: DashboardMeasurementUpload[];
   topClients: DashboardTopClient[];
   reminderCandidates: DashboardReminderCandidate[];

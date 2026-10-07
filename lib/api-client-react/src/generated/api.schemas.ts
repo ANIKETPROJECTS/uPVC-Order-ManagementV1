@@ -54,6 +54,11 @@ export interface User {
   avatarUrl: string | null;
   roleId: string;
   roleName: string;
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  installationCapacity: number;
   status: UserStatus;
   /** @nullable */
   lastLogin: string | null;
@@ -94,6 +99,11 @@ export interface UserInput {
      */
   avatarUrl?: string | null;
   roleId: string;
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  installationCapacity?: number;
   /** @minLength 8 */
   password: string;
   /** @nullable */
@@ -128,6 +138,11 @@ export interface UserUpdate {
      */
   avatarUrl?: string | null;
   roleId?: string;
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  installationCapacity?: number;
   /** @minLength 8 */
   password?: string;
   status?: UserUpdateStatus;
@@ -1361,6 +1376,16 @@ export interface DashboardInstallationScheduleItem {
   status: DashboardInstallationScheduleItemStatus;
 }
 
+export interface DashboardInstallerCapacity {
+  id: string;
+  name: string;
+  assigned: number;
+  capacity: number;
+  /** @nullable */
+  peakDay: string | null;
+  scheduledCount: number;
+}
+
 export interface DashboardMeasurementUpload {
   id: string;
   /** @nullable */
@@ -1424,6 +1449,7 @@ export interface OperationsDashboard {
   recentOrders: DashboardRecentOrder[];
   dispatchQueue: DashboardDispatchOrder[];
   installationSchedule: DashboardInstallationScheduleItem[];
+  installerCapacity: DashboardInstallerCapacity[];
   recentMeasurements: DashboardMeasurementUpload[];
   topClients: DashboardTopClient[];
   reminderCandidates: DashboardReminderCandidate[];

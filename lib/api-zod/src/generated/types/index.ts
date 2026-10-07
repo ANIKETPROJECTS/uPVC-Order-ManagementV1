@@ -39,6 +39,7 @@ export * from './dashboardFilterOption';
 export * from './dashboardFilterOptions';
 export * from './dashboardInstallationScheduleItem';
 export * from './dashboardInstallationScheduleItemStatus';
+export * from './dashboardInstallerCapacity';
 export * from './dashboardLiveActivity';
 export * from './dashboardLiveActivityList';
 export * from './dashboardMeasurementUpload';

@@ -23,6 +23,11 @@ export interface UserUpdate {
      */
   avatarUrl?: string | null;
   roleId?: string;
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  installationCapacity?: number;
   /** @minLength 8 */
   password?: string;
   status?: UserUpdateStatus;

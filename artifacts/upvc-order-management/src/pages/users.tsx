@@ -23,6 +23,7 @@ import {
 import {
   getGetAuthSessionQueryKey,
   getGetAdminSummaryQueryKey,
+  getGetOperationsDashboardQueryKey,
   getListRolesQueryKey,
   getListUsersQueryKey,
   useCreateUser,
@@ -149,6 +150,7 @@ export default function UsersPage({ user }: { user: User }) {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: getListUsersQueryKey(params) });
     void queryClient.invalidateQueries({ queryKey: getGetAdminSummaryQueryKey() });
+    void queryClient.invalidateQueries({ queryKey: getGetOperationsDashboardQueryKey() });
   };
 
   const openCreate = () => {
