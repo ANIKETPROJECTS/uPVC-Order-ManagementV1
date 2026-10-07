@@ -512,9 +512,9 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
            {!collapsed && <div className="mt-7 rounded-xl border border-sidebar-border bg-sidebar-accent/60 p-3"><p className="text-xs font-semibold text-sidebar-foreground">Modules 1 & 2 active</p><p className="mt-1 text-[11px] leading-relaxed text-sidebar-foreground/55">Access control and the central order register are ready for your team.</p></div>}
         </div>
         <div className="border-t border-sidebar-border p-3">
-          <div className={`mb-2 flex items-center gap-3 rounded-lg px-2 py-2 ${collapsed ? 'justify-center' : ''}`}>
+          <div title={collapsed ? `${user.name} · ${user.roleName}` : undefined} className={`mb-2 flex items-center gap-3 rounded-lg px-2 py-2 ${collapsed ? 'justify-center' : ''}`}>
             <UserAvatar name={user.name} src={user.avatarUrl} size="sm" className="bg-sidebar-accent text-sidebar-foreground" />
-            {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{user.name}</p><p className="truncate text-[10px] text-sidebar-foreground/50">{user.roleName}</p></div>}
+            {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{user.name}</p><p className="truncate text-[10px] text-sidebar-muted">{user.roleName}</p></div>}
           </div>
           <button
             type="button"

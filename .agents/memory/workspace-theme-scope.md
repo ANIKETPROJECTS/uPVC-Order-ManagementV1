@@ -3,8 +3,8 @@ name: Scoped workspace themes
 description: Appearance behavior for the uPVC Order Management workspace.
 ---
 
-The appearance setting changes the sidebar, selected hero panels, and the Operations dashboard surface. Other main workspace content stays light in both theme choices. Desktop navigation groups use adjacent flyouts; mobile keeps the inline expandable list.
+Light is the default appearance. The sidebar, navigation, flyouts, and mobile drawer use a fixed dark palette on every route and theme; the top header and main workspace content follow the saved light/dark choice. The dashboard keeps its scoped dark surface. Desktop navigation groups use adjacent flyouts; mobile keeps the inline expandable list.
 
-**Why:** The user asked for a dashboard-local dark navy treatment while keeping the earlier rule that other workspace content stays light.
+**Why:** The user explicitly asked for navigation to stay dark across every section and theme while the main content and top header respond to the appearance toggle.
 
-**How to apply:** Keep global workspace surface tokens light. Scope the dark navy dashboard surfaces and theme-specific dashboard tokens to the dashboard wrapper; do not darken other page content. Preserve the desktop/mobile navigation split.
+**How to apply:** Keep sidebar tokens independent of light/dark content tokens and never override them in `.dark`. Use theme-aware tokens for main surfaces, preserve the dashboard hero treatment, and retain the desktop/mobile navigation split.

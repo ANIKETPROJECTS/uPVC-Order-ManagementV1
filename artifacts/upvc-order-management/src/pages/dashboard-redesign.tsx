@@ -46,20 +46,20 @@ type DashboardWidgetDefinition = {
   defaultVisible: boolean;
   defaultOrder: number;
   size: 'full' | 'wide' | 'compact';
-  group: 'charts' | 'operations' | 'register' | 'follow-ups';
+  group: 'summary' | 'charts' | 'pipeline' | 'priority' | 'field' | 'dispatch' | 'follow-ups';
 };
 type DashboardWidgetPreferences = { order: string[]; hidden: string[] };
 const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
-  { id: 'kpis', title: 'Key figures', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 0, size: 'full', group: 'charts' },
+  { id: 'kpis', title: 'Key figures', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 0, size: 'full', group: 'summary' },
   { id: 'trend', title: 'Order trends', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 1, size: 'wide', group: 'charts' },
   { id: 'stage-mix', title: 'Stage distribution', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 2, size: 'compact', group: 'charts' },
-  { id: 'pipeline', title: 'Order pipeline', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 3, size: 'full', group: 'operations' },
-  { id: 'attention', title: 'Needs attention', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 4, size: 'compact', group: 'operations' },
-  { id: 'activity', title: 'Live activity', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 5, size: 'compact', group: 'operations' },
-  { id: 'capacity', title: 'Installer capacity', permission: 'installation', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 6, size: 'compact', group: 'operations' },
-  { id: 'recent-orders', title: 'Recent orders', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 7, size: 'wide', group: 'register' },
-  { id: 'top-clients', title: 'Top clients', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 8, size: 'compact', group: 'register' },
-  { id: 'dispatch', title: 'Dispatch queue', permission: 'dispatch', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 9, size: 'compact', group: 'follow-ups' },
+  { id: 'pipeline', title: 'Order pipeline', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 3, size: 'full', group: 'pipeline' },
+  { id: 'attention', title: 'Needs attention', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 4, size: 'wide', group: 'priority' },
+  { id: 'activity', title: 'Live activity', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 5, size: 'wide', group: 'priority' },
+  { id: 'recent-orders', title: 'Recent orders', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 6, size: 'wide', group: 'field' },
+  { id: 'capacity', title: 'Installer capacity', permission: 'installation', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 7, size: 'compact', group: 'field' },
+  { id: 'dispatch', title: 'Dispatch queue', permission: 'dispatch', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 8, size: 'wide', group: 'dispatch' },
+  { id: 'top-clients', title: 'Top clients', permission: 'orders', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 9, size: 'wide', group: 'dispatch' },
   { id: 'payments', title: 'Payment follow-through', permission: 'finance', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 10, size: 'compact', group: 'follow-ups' },
   { id: 'installation', title: 'Installation schedule', permission: 'installation', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 11, size: 'compact', group: 'follow-ups' },
   { id: 'measurements', title: 'Measurement uploads', permission: 'measurements', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 12, size: 'compact', group: 'follow-ups' },
@@ -67,9 +67,12 @@ const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   { id: 'glass', title: 'Glass status', permission: 'glass', endpoint: '/api/dashboard/operations', defaultVisible: true, defaultOrder: 14, size: 'compact', group: 'follow-ups' },
 ];
 const widgetGroupLabels: Record<DashboardWidgetDefinition['group'], string> = {
-  charts: 'Summary and charts',
-  operations: 'Operations',
-  register: 'Orders and clients',
+  summary: 'Key figures',
+  charts: 'Charts',
+  pipeline: 'Order pipeline',
+  priority: 'Priority and activity',
+  field: 'Orders and field team',
+  dispatch: 'Dispatch and clients',
   'follow-ups': 'Additional follow-up',
 };
 const stagePalette = ['#0F766E', '#2563EB', '#7C3AED', '#16A34A', '#D97706', '#DB2777', '#475569', '#0891B2'];
@@ -382,15 +385,15 @@ function MetricCard({ label, value, format, note, icon: Icon, tint, spark, compa
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">{label}</p>
+          <p className="line-clamp-2 min-h-6 whitespace-normal break-words text-[9px] font-bold uppercase leading-[1.25] tracking-[.08em] text-muted-foreground">{label}</p>
           <p className="mt-3 truncate text-[25px] font-semibold leading-none tracking-[-.04em] tabular-nums sm:text-[28px]">
             <AnimatedValue value={value} format={format} />
           </p>
         </div>
         <span className="grid size-10 shrink-0 place-items-center rounded-xl" style={{ backgroundColor: `${tint}18`, color: tint }}><Icon size={18} /></span>
       </div>
-      <div className="mt-4 flex min-h-7 items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[10px] leading-4 text-muted-foreground">{comparison || note}</span>
+      <div className="mt-3 flex min-h-9 items-start justify-between gap-2">
+        <span className="min-w-0 flex-1 whitespace-normal text-[9px] leading-4 text-muted-foreground">{comparison || note}</span>
         <Sparkline values={spark} color={tint} />
       </div>
     </>
@@ -429,14 +432,16 @@ function LiveClock({ lastRefresh, refreshSeconds }: { lastRefresh: number | null
     ? `Data refreshed ${relativeTime(new Date(lastRefresh))}`
     : 'Waiting for first data refresh';
   return (
-    <div className="min-w-[210px] rounded-2xl border border-white/15 bg-white/[.08] px-4 py-3 text-white/90">
-      <div className="flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[.14em] text-white/65">
-        <span className={`size-1.5 rounded-full ${refreshSeconds ? 'animate-pulse bg-emerald-300' : 'bg-amber-300'}`} />
+    <div className="w-full min-w-0 rounded-xl border border-white/15 bg-white/[.08] px-3 py-2 text-white/90">
+      <div className="flex min-w-0 items-center gap-2 text-[9px] font-semibold uppercase tracking-[.12em] text-white/70">
+        <span className={`size-1.5 shrink-0 rounded-full ${refreshSeconds ? 'animate-pulse bg-emerald-300' : 'bg-amber-300'}`} />
         India Standard Time
       </div>
-      <time className="mt-1 block font-mono text-[22px] font-semibold tabular-nums tracking-tight" dateTime={now.toISOString()}>{time}</time>
-      <p className="mt-0.5 text-[10px] text-white/65">{date}</p>
-      <p className="mt-2 border-t border-white/15 pt-2 text-[9px] text-white/65">{refreshSeconds ? `Live · refreshes every ${refreshSeconds}s` : 'Auto-refresh is off'} · {refreshText}</p>
+      <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline justify-between gap-x-3">
+        <time className="font-mono text-[17px] font-semibold tabular-nums tracking-tight" dateTime={now.toISOString()}>{time}</time>
+        <p className="whitespace-nowrap text-[9px] text-white/70">{date}</p>
+      </div>
+      <p className="mt-1 truncate border-t border-white/15 pt-1 text-[8px] text-white/65">{refreshSeconds ? `Live · refreshes every ${refreshSeconds}s` : 'Auto-refresh is off'} · {refreshText}</p>
     </div>
   );
 }
@@ -454,9 +459,9 @@ function ExportMenu({ title, onCsv, onPng }: { title: string; onCsv: () => void;
   );
 }
 function StatusPill({ status, label, color }: { status: string; label?: string; color?: string }) {
-  return <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/80 px-2.5 py-1 text-[10px] font-semibold capitalize">
+  return <span className="inline-flex w-max max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-secondary/80 px-2.5 py-1 text-[10px] font-semibold capitalize">
     <i className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: color || stagePalette[0] }} />
-    <span className="truncate">{label || status.replaceAll('_', ' ')}</span>
+    <span className="whitespace-nowrap">{label || status.replaceAll('_', ' ')}</span>
   </span>;
 }
 function ActionIcon({ action }: { action: string }) {
@@ -666,16 +671,14 @@ export default function DashboardRedesign({ user }: { user: User }) {
     permissions?.finance && errorFor('finance'),
   ].find(Boolean) || null;
   const secondaryHasData = Boolean(
-    (isWidgetVisible('dispatch') && permissions?.dispatch && data?.dispatchQueue.length)
-    || (isWidgetVisible('payments') && permissions?.finance && (data?.reminderCandidates.length || (data?.summary.outstandingBalance ?? 0) > 0))
+    (isWidgetVisible('payments') && permissions?.finance && (data?.reminderCandidates.length || (data?.summary.outstandingBalance ?? 0) > 0))
     || (isWidgetVisible('installation') && permissions?.installation && data?.installationSchedule.length)
     || (isWidgetVisible('measurements') && permissions?.measurements && data?.recentMeasurements.length)
     || (isWidgetVisible('approvals') && permissions?.approvals && approvalItems.length)
     || (isWidgetVisible('glass') && permissions?.glass && glassItems.length),
   );
   const secondaryHasError = Boolean(
-    (isWidgetVisible('dispatch') && permissions?.dispatch && errorFor('dispatch'))
-    || (isWidgetVisible('payments') && permissions?.finance && errorFor('finance'))
+    (isWidgetVisible('payments') && permissions?.finance && errorFor('finance'))
     || (isWidgetVisible('installation') && permissions?.installation && errorFor('installation'))
     || (isWidgetVisible('measurements') && permissions?.measurements && errorFor('measurements'))
     || (isWidgetVisible('approvals') && permissions?.approvals && errorFor('approvals'))
@@ -750,28 +753,30 @@ export default function DashboardRedesign({ user }: { user: User }) {
             <header className="dashboard-hero relative col-span-12 overflow-hidden rounded-[24px] px-5 py-4 shadow-lg md:px-7 md:py-5">
               <div className="pointer-events-none absolute -right-12 -top-20 size-72 rounded-full border border-white/10" />
               <div className="pointer-events-none absolute right-16 top-10 size-28 rounded-full border border-white/10" />
-              <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="relative flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.2em] text-teal-200"><span className="size-1.5 rounded-full bg-teal-300" />Live Order Overview</p>
-                  <h2 className="mt-1.5 max-w-3xl text-[25px] font-semibold leading-tight tracking-[-.045em] md:text-[32px]">Every order, one clear view</h2>
-                  <p className="mt-1.5 max-w-2xl text-xs leading-5 text-white/70">Track orders, readiness, payments and field work for {dateLabel(filters.from)} – {dateLabel(filters.to)}.</p>
+                  <p className="flex items-center gap-2 whitespace-nowrap text-[9px] font-bold uppercase tracking-[.2em] text-teal-200"><span className="size-1.5 shrink-0 rounded-full bg-teal-300" />Live Order Overview</p>
+                  <h2 className="mt-1.5 line-clamp-2 max-w-3xl text-[25px] font-semibold leading-tight tracking-[-.045em] md:text-[32px] xl:line-clamp-1 xl:whitespace-nowrap">Every order, one clear view</h2>
+                  <p className="mt-1.5 max-w-full truncate whitespace-nowrap text-xs leading-5 text-white/70">Track orders, readiness, payments and field work for {dateLabel(filters.from)} – {dateLabel(filters.to)}.</p>
                 </div>
-                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch xl:justify-end">
+                <div className="flex min-w-0 flex-col gap-2 xl:w-[490px] xl:shrink-0 xl:items-end">
                   <MemoizedLiveClock lastRefresh={updatedAt || null} refreshSeconds={refreshSeconds} />
-                  <div className="flex flex-wrap items-center gap-2 sm:content-start sm:justify-end print:hidden">
-                    {user.roleId === 'master-admin' && <button type="button" disabled={widgetPreferencesQuery.isLoading} onClick={() => setWidgetDrawerOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-50" data-testid="button-customize-dashboard"><SlidersHorizontal size={14} />Customize</button>}
-                    <button type="button" onClick={refresh} disabled={query.isFetching} className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-60" data-testid="button-refresh-dashboard">
-                      <RefreshCw size={14} className={query.isFetching ? 'animate-spin' : ''} />Refresh
+                  <div className="flex w-full min-w-0 flex-nowrap items-center gap-1.5 print:hidden xl:justify-end">
+                    {user.roleId === 'master-admin' && <button type="button" title="Customize dashboard" aria-label="Customize dashboard" disabled={widgetPreferencesQuery.isLoading} onClick={() => setWidgetDrawerOpen(true)} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-50 sm:px-3" data-testid="button-customize-dashboard"><SlidersHorizontal size={14} /><span className="hidden sm:inline">Customize</span></button>}
+                    <button type="button" title="Refresh dashboard" aria-label="Refresh dashboard" onClick={refresh} disabled={query.isFetching} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-3" data-testid="button-refresh-dashboard">
+                      <RefreshCw size={14} className={query.isFetching ? 'animate-spin' : ''} /><span className="hidden sm:inline">Refresh</span>
                     </button>
-                    <label className="relative inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-2.5 text-white">
+                    <label title="Automatic refresh interval" className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2 text-white">
                       <span className="sr-only">Auto-refresh interval</span>
-                      <select value={refreshSeconds} onChange={(event) => setRefreshSeconds(Number(event.target.value))} className="h-full appearance-none bg-transparent pr-5 text-[11px] font-semibold outline-none [&>option]:text-foreground" aria-label="Auto-refresh interval" data-testid="select-dashboard-auto-refresh">
-                        <option value={0}>Auto: Off</option><option value={30}>Auto: 30s</option><option value={60}>Auto: 60s</option>
+                      <Clock3 size={14} aria-hidden="true" />
+                      <span className="hidden text-[10px] font-semibold sm:inline">Auto:</span>
+                      <select value={refreshSeconds} onChange={(event) => setRefreshSeconds(Number(event.target.value))} className="h-full max-w-[48px] appearance-none bg-transparent pr-3 text-[10px] font-semibold outline-none sm:max-w-none sm:text-[11px] sm:pr-5 [&>option]:text-foreground" aria-label="Auto-refresh interval" data-testid="select-dashboard-auto-refresh">
+                        <option value={0}>Off</option><option value={30}>30s</option><option value={60}>60s</option>
                       </select>
-                      <ChevronDown size={12} className="pointer-events-none absolute right-2.5" />
+                      <ChevronDown size={11} className="pointer-events-none absolute right-1.5" />
                     </label>
                     <div className="relative">
-                      <button type="button" aria-expanded={exportMenuOpen} onClick={() => setExportMenuOpen((open) => !open)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-50" disabled={!data} data-testid="button-export-dashboard"><Download size={14} />Export<ChevronDown size={12} /></button>
+                      <button type="button" title="Export dashboard" aria-label="Export dashboard" aria-expanded={exportMenuOpen} onClick={() => setExportMenuOpen((open) => !open)} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-50 sm:px-3" disabled={!data} data-testid="button-export-dashboard"><Download size={14} /><span className="hidden sm:inline">Export</span><ChevronDown size={12} className="hidden sm:block" /></button>
                       {exportMenuOpen && <div className="absolute right-0 top-10 z-40 w-52 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl" role="menu">
                         <button type="button" onClick={() => { window.print(); setExportMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-muted" role="menuitem"><Printer size={13} className="mr-2 inline" />Print / Save as PDF</button>
                         <button type="button" onClick={() => { exportDashboardCsv(); setExportMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-muted" role="menuitem"><Download size={13} className="mr-2 inline" />Download orders + attention CSV</button>
@@ -818,11 +823,11 @@ export default function DashboardRedesign({ user }: { user: User }) {
 
           <DashboardWidgetBoundary name="Dashboard filters" onRetry={refresh}>
             <section className="dashboard-filterbar col-span-12 rounded-2xl border border-border/80 bg-card/95 p-3 shadow-sm sm:p-3.5" aria-label="Dashboard filters">
-              <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.6fr)_160px_minmax(150px,1fr)_minmax(150px,1fr)_auto]">
+                  <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(280px,1.8fr)_160px_minmax(150px,1fr)_minmax(150px,1fr)_auto]">
                 <label className="relative block min-w-0">
                   <span className="sr-only">Search dashboard records</span>
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input ref={searchInputRef} aria-label="Search orders and clients" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search orders, clients or locations" className="h-9 w-full rounded-xl border border-input bg-background pl-9 pr-14 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" data-testid="input-dashboard-search" />
+                  <input ref={searchInputRef} aria-label="Search orders, clients, locations" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search orders, clients, locations" className="h-9 w-full rounded-xl border border-input bg-background pl-9 pr-14 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" data-testid="input-dashboard-search" />
                   <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">⌘K</kbd>
                 </label>
                 <label className="relative min-w-0">
@@ -924,7 +929,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
             </DashboardWidgetBoundary>}
 
             {(permissions?.orders || permissions?.finance) && (isWidgetVisible('trend') || (permissions?.orders && isWidgetVisible('stage-mix'))) && <div className="dashboard-chart-row grid min-w-0 grid-cols-12 gap-4">
-              {(isWidgetVisible('trend')) && <DashboardWidgetBoundary name="Order and value trend" onRetry={refresh}>
+              {(isWidgetVisible('trend')) && <DashboardWidgetBoundary name="Order and value trend" widgetId="trend" onRetry={refresh}>
                 <section className="dashboard-card min-w-0 rounded-[20px] border border-border/80 bg-card p-4 shadow-sm md:p-5" data-dashboard-widget="trend" style={{ order: widgetOrder('trend') }}>
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -963,7 +968,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
                 </section>
               </DashboardWidgetBoundary>}
 
-              {permissions?.orders && isWidgetVisible('stage-mix') && <DashboardWidgetBoundary name="Order-stage distribution" onRetry={refresh}>
+              {permissions?.orders && isWidgetVisible('stage-mix') && <DashboardWidgetBoundary name="Order-stage distribution" widgetId="stage-mix" onRetry={refresh}>
                 <section className="dashboard-card min-w-0 rounded-[20px] border border-border/80 bg-card p-4 shadow-sm md:p-5" data-dashboard-widget="stage-mix" style={{ order: widgetOrder('stage-mix') }}>
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
@@ -1017,7 +1022,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
             </DashboardWidgetBoundary>}
 
             {(canViewAnyDashboard) && <div className="dashboard-operations-row grid min-w-0 grid-cols-12 gap-4">
-              {isWidgetVisible('attention') && <DashboardWidgetBoundary name="Needs attention" onRetry={refresh}>
+              {isWidgetVisible('attention') && <DashboardWidgetBoundary name="Needs attention" widgetId="attention" onRetry={refresh}>
                 <section className="dashboard-card h-full min-w-0 rounded-[20px] border border-border/80 bg-card p-4 shadow-sm md:p-5" data-dashboard-widget="attention" style={{ order: widgetOrder('attention') }}>
                   <SectionHeading eyebrow="Priority work" title="Needs attention" icon={AlertCircle} action={<span className={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${activeAttention.some((item) => item.count > 0 && item.severity !== 'success') ? 'bg-orange-500/10 text-orange-700 dark:text-orange-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'}`}>{activeAttention.filter((item) => item.count > 0 && item.severity !== 'success').length} active</span>} />
                   {loading || attentionError ? <SectionState loading={loading} error={attentionError} empty={false} retry={refresh} /> : visibleAttention.length ? <div className="space-y-2">
@@ -1039,7 +1044,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
                 </section>
               </DashboardWidgetBoundary>}
 
-              {permissions?.orders && isWidgetVisible('activity') && <DashboardWidgetBoundary name="Live activity" onRetry={refresh}>
+              {permissions?.orders && isWidgetVisible('activity') && <DashboardWidgetBoundary name="Live activity" widgetId="activity" onRetry={refresh}>
                 <section className="dashboard-card h-full min-w-0 rounded-[20px] border border-border/80 bg-card p-4 shadow-sm md:p-5" data-dashboard-widget="activity" style={{ order: widgetOrder('activity') }}>
                   <SectionHeading eyebrow="Live activity" title="Latest changes" icon={Activity} action={<span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-2.5 py-1 text-[9px] font-semibold text-emerald-700 dark:text-emerald-300"><i className={`size-1.5 rounded-full ${refreshSeconds ? 'animate-pulse bg-emerald-500' : 'bg-amber-500'}`} />{refreshSeconds ? 'Live' : 'Paused'}</span>} />
                   {loading || errorFor('activity') ? <SectionState loading={loading} error={errorFor('activity')} empty={false} retry={refresh} /> : activity.length ? <div className="max-h-[320px] space-y-1 overflow-y-auto pr-1">
@@ -1052,7 +1057,48 @@ export default function DashboardRedesign({ user }: { user: User }) {
                 </section>
               </DashboardWidgetBoundary>}
 
-              {permissions?.installation && isWidgetVisible('capacity') && <DashboardWidgetBoundary name="Installer capacity" onRetry={refresh}>
+            </div>}
+
+            {((permissions?.orders && isWidgetVisible('recent-orders')) || (permissions?.installation && isWidgetVisible('capacity'))) && <div className="dashboard-field-row grid min-w-0 grid-cols-12 gap-4">
+              {permissions?.orders && isWidgetVisible('recent-orders') && <DashboardWidgetBoundary name="Recent orders" widgetId="recent-orders" onRetry={refresh}>
+                <section className="dashboard-card min-w-0 rounded-[20px] border border-border/80 bg-card p-4 shadow-sm md:p-5" data-dashboard-widget="recent-orders" style={{ order: widgetOrder('recent-orders') }}>
+                  <SectionHeading eyebrow="Order register" title="Recent orders" icon={Layers3} action={<Link href={ordersHref} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold text-primary hover:bg-primary/[.06]" data-testid="link-dashboard-all-orders">View all <ArrowUpRight size={13} /></Link>} />
+                  {loading || errorFor('orders') ? <SectionState loading={loading} error={errorFor('orders')} empty={false} retry={refresh} /> : recentOrders.length ? <>
+                    <div className="space-y-2 xl:hidden">
+                      {recentOrders.slice(0, 8).map((order) => <button type="button" key={order.id} onClick={() => setLocation(makeDashboardHref(`/order-hub/${encodeURIComponent(order.id)}`, filters))} className={`w-full min-w-0 rounded-xl border border-border/70 bg-background p-3 text-left transition hover:border-primary/30 ${flashedRows.includes(order.id) ? 'dashboard-row-flash' : ''}`} data-testid={`card-dashboard-order-${order.id}`}>
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials(order.clientName)}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-[11px] font-bold text-primary">{order.orderId}</span><StatusPill status={order.status} label={statusLabel(order.status)} color={stageColor(order.status, data?.pipeline)} /></span>
+                            <span className="mt-1 block truncate text-xs font-semibold">{order.clientName}</span>
+                            <span className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-muted-foreground"><MapPin size={10} />{order.locationName}</span>
+                            <span className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                              <span>Windows {formatNumber(order.readyWindows)}/{formatNumber(order.totalWindows)}</span>
+                              {permissions.finance && <span className={`font-mono font-semibold ${order.orderValue == null ? 'text-muted-foreground' : 'text-foreground'}`}>{order.orderValue == null ? 'Rate pending' : compactCurrency(order.orderValue)}</span>}
+                              <span>{dateLabel(order.createdAt)}</span>
+                            </span>
+                          </span>
+                        </div>
+                      </button>)}
+                    </div>
+                    <div className="hidden xl:block">
+                      <table className="w-full table-fixed text-left">
+                        <thead><tr className="border-b border-border text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground"><th className="w-[34%] pb-2 pr-2">Order / client</th><th className="w-[22%] pb-2 pr-2">Stage</th><th className="w-[14%] pb-2 pr-2">Windows</th><th className="w-[18%] pb-2 pr-2">Fulfillment</th>{permissions.finance && <th className="w-[12%] pb-2 text-right">Value</th>}</tr></thead>
+                        <tbody className="divide-y divide-border/60">
+                          {recentOrders.slice(0, 8).map((order) => <tr key={order.id} tabIndex={0} onClick={() => setLocation(makeDashboardHref(`/order-hub/${encodeURIComponent(order.id)}`, filters))} onKeyDown={(event) => { if (event.key === 'Enter') setLocation(makeDashboardHref(`/order-hub/${encodeURIComponent(order.id)}`, filters)); }} className={`cursor-pointer transition hover:bg-primary/[.025] ${flashedRows.includes(order.id) ? 'dashboard-row-flash' : ''}`} data-testid={`row-dashboard-order-${order.id}`}>
+                            <td className="py-3 pr-2"><div className="flex min-w-0 items-center gap-2"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">{initials(order.clientName)}</span><span className="min-w-0"><span className="block truncate font-mono text-[10px] font-semibold text-primary">{order.orderId}</span><span className="mt-0.5 block truncate text-xs font-medium">{order.clientName}</span><span className="mt-0.5 block truncate text-[9px] text-muted-foreground">{order.locationName} · {dateLabel(order.createdAt)}</span></span></div></td>
+                            <td className="py-3 pr-2"><StatusPill status={order.status} label={statusLabel(order.status)} color={stageColor(order.status, data?.pipeline)} /></td>
+                            <td className="py-3 pr-2"><span className="font-mono text-[10px]">{formatNumber(order.readyWindows)}<span className="text-muted-foreground"> / {formatNumber(order.totalWindows)}</span></span><div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${order.totalWindows ? Math.min(100, (order.readyWindows / order.totalWindows) * 100) : 0}%` }} /></div></td>
+                            <td className="py-3 pr-2"><span className="block truncate text-[9px] capitalize text-muted-foreground">{order.dispatchStatus?.replaceAll('_', ' ') ?? 'Dispatch —'}</span><span className="mt-1 block truncate text-[9px] capitalize">{order.installationStatus ?? 'Installation —'}</span></td>
+                            {permissions.finance && <td className="py-3 text-right font-mono text-[10px]">{order.orderValue == null ? <span className="font-sans text-[9px] text-muted-foreground">Rate pending</span> : compactCurrency(order.orderValue)}</td>}
+                          </tr>)}
+                        </tbody>
+                      </table>
+                    </div>
+                  </> : <SectionState loading={false} error={null} empty retry={refresh} emptyTitle="No recent orders" />}
+                </section>
+              </DashboardWidgetBoundary>}
+              {permissions?.installation && isWidgetVisible('capacity') && <DashboardWidgetBoundary name="Installer capacity" widgetId="capacity" onRetry={refresh}>
                 <section className="dashboard-card h-full min-w-0 rounded-[20px] border border-border/80 bg-card p-4 shadow-sm md:p-5" data-dashboard-widget="capacity" style={{ order: widgetOrder('capacity') }}>
                   <SectionHeading eyebrow="Field team" title="Installer capacity" icon={Wrench} action={<Link href={makeDashboardHref('/installation', filters)} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold text-primary hover:bg-primary/[.06]" data-testid="link-dashboard-installation">Installation <ArrowUpRight size={13} /></Link>} />
                   <p className="-mt-2 mb-3 text-[10px] text-muted-foreground">Peak scheduled orders per day in the selected range · sorted by load.</p>
@@ -1076,60 +1122,20 @@ export default function DashboardRedesign({ user }: { user: User }) {
               </DashboardWidgetBoundary>}
             </div>}
 
-            {(permissions?.orders && (isWidgetVisible('recent-orders') || isWidgetVisible('top-clients'))) && <div className="dashboard-register-row grid min-w-0 grid-cols-12 gap-4">
-              {permissions?.orders && isWidgetVisible('recent-orders') && <DashboardWidgetBoundary name="Recent orders" onRetry={refresh}>
-                <section className="dashboard-card min-w-0 rounded-[20px] border border-border/80 bg-card p-4 shadow-sm md:p-5" data-dashboard-widget="recent-orders" style={{ order: widgetOrder('recent-orders') }}>
-                  <SectionHeading eyebrow="Order register" title="Recent orders" icon={Layers3} action={<Link href={ordersHref} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold text-primary hover:bg-primary/[.06]" data-testid="link-dashboard-all-orders">View all <ArrowUpRight size={13} /></Link>} />
-                  {loading || errorFor('orders') ? <SectionState loading={loading} error={errorFor('orders')} empty={false} retry={refresh} /> : recentOrders.length ? <>
-                    <div className="space-y-2 xl:hidden">
-                      {recentOrders.slice(0, 8).map((order) => <button type="button" key={order.id} onClick={() => setLocation(makeDashboardHref(`/order-hub/${encodeURIComponent(order.id)}`, filters))} className={`w-full min-w-0 rounded-xl border border-border/70 bg-background p-3 text-left transition hover:border-primary/30 ${flashedRows.includes(order.id) ? 'dashboard-row-flash' : ''}`} data-testid={`card-dashboard-order-${order.id}`}>
-                        <div className="flex min-w-0 items-start gap-3">
-                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials(order.clientName)}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-[11px] font-bold text-primary">{order.orderId}</span><StatusPill status={order.status} label={statusLabel(order.status)} color={stageColor(order.status, data?.pipeline)} /></span>
-                            <span className="mt-1 block truncate text-xs font-semibold">{order.clientName}</span>
-                            <span className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-muted-foreground"><MapPin size={10} />{order.locationName}</span>
-                            <span className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
-                              <span>Windows {formatNumber(order.readyWindows)}/{formatNumber(order.totalWindows)}</span>
-                              {permissions.finance && <span className="font-mono font-semibold text-foreground">{order.orderValue == null ? 'Rate pending' : compactCurrency(order.orderValue)}</span>}
-                              <span>{dateLabel(order.createdAt)}</span>
-                            </span>
-                          </span>
-                        </div>
-                      </button>)}
-                    </div>
-                    <div className="hidden xl:block">
-                      <table className="w-full table-fixed text-left">
-                        <thead><tr className="border-b border-border text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground"><th className="w-[38%] pb-2 pr-3">Order / client</th><th className="w-[18%] pb-2 pr-3">Stage</th><th className="w-[14%] pb-2 pr-3">Windows</th><th className="w-[18%] pb-2 pr-3">Fulfillment</th>{permissions.finance && <th className="w-[12%] pb-2 text-right">Value</th>}</tr></thead>
-                        <tbody className="divide-y divide-border/60">
-                          {recentOrders.slice(0, 8).map((order) => <tr key={order.id} tabIndex={0} onClick={() => setLocation(makeDashboardHref(`/order-hub/${encodeURIComponent(order.id)}`, filters))} onKeyDown={(event) => { if (event.key === 'Enter') setLocation(makeDashboardHref(`/order-hub/${encodeURIComponent(order.id)}`, filters)); }} className={`cursor-pointer transition hover:bg-primary/[.025] ${flashedRows.includes(order.id) ? 'dashboard-row-flash' : ''}`} data-testid={`row-dashboard-order-${order.id}`}>
-                            <td className="py-3 pr-3"><div className="flex min-w-0 items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">{initials(order.clientName)}</span><span className="min-w-0"><span className="block truncate font-mono text-[10px] font-semibold text-primary">{order.orderId}</span><span className="mt-0.5 block truncate text-xs font-medium">{order.clientName}</span><span className="mt-0.5 block truncate text-[9px] text-muted-foreground">{order.locationName} · {dateLabel(order.createdAt)}</span></span></div></td>
-                            <td className="py-3 pr-3"><StatusPill status={order.status} label={statusLabel(order.status)} color={stageColor(order.status, data?.pipeline)} /></td>
-                            <td className="py-3 pr-3"><span className="font-mono text-[10px]">{formatNumber(order.readyWindows)}<span className="text-muted-foreground"> / {formatNumber(order.totalWindows)}</span></span><div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${order.totalWindows ? Math.min(100, (order.readyWindows / order.totalWindows) * 100) : 0}%` }} /></div></td>
-                            <td className="py-3 pr-3"><span className="block truncate text-[9px] capitalize text-muted-foreground">{order.dispatchStatus?.replaceAll('_', ' ') ?? 'Dispatch —'}</span><span className="mt-1 block truncate text-[9px] capitalize">{order.installationStatus ?? 'Installation —'}</span></td>
-                            {permissions.finance && <td className="py-3 text-right font-mono text-[10px]">{compactCurrency(order.orderValue)}</td>}
-                          </tr>)}
-                        </tbody>
-                      </table>
-                    </div>
-                  </> : <SectionState loading={false} error={null} empty retry={refresh} emptyTitle="No recent orders" />}
-                </section>
-              </DashboardWidgetBoundary>}
-              {permissions?.orders && isWidgetVisible('top-clients') && ((data?.topClients.length ?? 0) > 0 || errorFor('orders')) && <DashboardWidgetBoundary name="Top clients" onRetry={refresh}>
-                <CompactPanel dataWidgetId="top-clients" style={{ order: widgetOrder('top-clients') }} title="Top clients" eyebrow="Relationships" icon={Users} count={formatNumber(data?.topClients.length)} href={ordersHref} hrefLabel="Open orders">
-                  {loading || errorFor('orders') ? <SectionState loading={loading} error={errorFor('orders')} empty={false} retry={refresh} /> : data?.topClients.length ? <div className="space-y-0.5">{data.topClients.slice(0, 4).map((client, index) => <button type="button" key={client.clientId} onClick={() => setFilter('clientId', client.clientId)} className="flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-primary/[.04]" data-testid={`button-top-client-${client.clientId}`}><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary font-mono text-[9px] font-bold text-secondary-foreground">{String(index + 1).padStart(2, '0')}</span><span className="min-w-0 flex-1 truncate text-[10px] font-semibold">{client.clientName}</span><span className="shrink-0 text-right"><span className="block font-mono text-[10px] font-semibold">{formatNumber(client.orderCount)} orders</span>{permissions.finance && <span className="text-[9px] text-muted-foreground">{compactCurrency(client.orderValue)}</span>}</span></button>)}</div> : <SectionState loading={false} error={null} empty retry={refresh} />}
+            {((permissions?.dispatch && isWidgetVisible('dispatch')) || (permissions?.orders && isWidgetVisible('top-clients'))) && <div className="dashboard-dispatch-row grid min-w-0 grid-cols-12 gap-4">
+              {permissions?.dispatch && isWidgetVisible('dispatch') && <DashboardWidgetBoundary name="Dispatch queue" widgetId="dispatch" onRetry={refresh}>
+                <CompactPanel dataWidgetId="dispatch" style={{ order: widgetOrder('dispatch') }} title="Dispatch queue" eyebrow="Dispatch" icon={Truck} count={formatNumber(data?.dispatchQueue.length)} href={makeDashboardHref('/dispatch', filters)} hrefLabel="Open dispatch">
+                  {loading || errorFor('dispatch') || errorFor('orders') ? <SectionState loading={loading} error={errorFor('dispatch') || errorFor('orders')} empty={false} retry={refresh} /> : data?.dispatchQueue.length ? <div className="space-y-1">{data.dispatchQueue.slice(0, 4).map((order) => <button type="button" key={order.id} onClick={() => setLocation(makeDashboardHref('/dispatch', filters))} className="flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-primary/[.04]" data-testid={`button-dispatch-order-${order.id}`}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground"><Truck size={14} /></span><span className="min-w-0 flex-1"><span className="block truncate font-mono text-[10px] font-semibold text-primary">{order.orderId}</span><span className="mt-0.5 block truncate text-[10px]">{order.clientName} · {order.locationName}</span></span><span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-1 text-[9px] font-semibold capitalize text-amber-700 dark:text-amber-300">{order.dispatchStatus.replaceAll('_', ' ')}</span></button>)}</div> : <SectionState loading={false} error={null} empty retry={refresh} emptyTitle="No dispatch orders in view" emptyDetail="Orders needing dispatch will appear here." />}
                 </CompactPanel>
               </DashboardWidgetBoundary>}
-
+              {permissions?.orders && isWidgetVisible('top-clients') && <DashboardWidgetBoundary name="Top clients" widgetId="top-clients" onRetry={refresh}>
+                <CompactPanel dataWidgetId="top-clients" style={{ order: widgetOrder('top-clients') }} title="Top clients" eyebrow="Relationships" icon={Users} count={formatNumber(data?.topClients.length)} href={ordersHref} hrefLabel="Open orders">
+                  {loading || errorFor('orders') ? <SectionState loading={loading} error={errorFor('orders')} empty={false} retry={refresh} /> : data?.topClients.length ? <div className="space-y-0.5">{data.topClients.slice(0, 4).map((client, index) => <button type="button" key={client.clientId} onClick={() => setFilter('clientId', client.clientId)} className="flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-primary/[.04]" data-testid={`button-top-client-${client.clientId}`}><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary font-mono text-[9px] font-bold text-secondary-foreground">{String(index + 1).padStart(2, '0')}</span><span className="min-w-0 flex-1 truncate text-[10px] font-semibold">{client.clientName}</span><span className="shrink-0 text-right"><span className="block font-mono text-[10px] font-semibold">{formatNumber(client.orderCount)} orders</span>{permissions.finance && <span className="text-[9px] text-muted-foreground">{compactCurrency(client.orderValue)}</span>}</span></button>)}</div> : <SectionState loading={false} error={null} empty retry={refresh} emptyTitle="No top clients in view" emptyDetail="Clients with orders in this range will appear here." />}
+                </CompactPanel>
+              </DashboardWidgetBoundary>}
             </div>}
 
             {secondaryHasData || secondaryHasError ? <section className="dashboard-secondary-grid grid min-w-0 gap-4" aria-label="Additional operational activity">
-              {isWidgetVisible('dispatch') && permissions?.dispatch && ((data?.dispatchQueue.length ?? 0) > 0 || errorFor('dispatch')) && <DashboardWidgetBoundary name="Dispatch queue" onRetry={refresh}>
-                <CompactPanel dataWidgetId="dispatch" style={{ order: widgetOrder('dispatch') }} title="Dispatch queue" eyebrow="Dispatch" icon={Truck} count={formatNumber(data?.dispatchQueue.length)} href={makeDashboardHref('/dispatch', filters)} hrefLabel="Open dispatch">
-                  {loading || errorFor('dispatch') || errorFor('orders') ? <SectionState loading={loading} error={errorFor('dispatch') || errorFor('orders')} empty={false} retry={refresh} /> : data?.dispatchQueue.length ? <div className="space-y-1">{data.dispatchQueue.slice(0, 4).map((order) => <button type="button" key={order.id} onClick={() => setLocation(makeDashboardHref('/dispatch', filters))} className="flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-primary/[.04]" data-testid={`button-dispatch-order-${order.id}`}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground"><Truck size={14} /></span><span className="min-w-0 flex-1"><span className="block truncate font-mono text-[10px] font-semibold text-primary">{order.orderId}</span><span className="mt-0.5 block truncate text-[10px]">{order.clientName} · {order.locationName}</span></span><span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-1 text-[9px] font-semibold capitalize text-amber-700 dark:text-amber-300">{order.dispatchStatus.replaceAll('_', ' ')}</span></button>)}</div> : <SectionState loading={false} error={null} empty retry={refresh} />}
-                </CompactPanel>
-              </DashboardWidgetBoundary>}
-
               {isWidgetVisible('payments') && permissions?.finance && (((data?.summary.outstandingBalance ?? 0) > 0) || (data?.reminderCandidates.length ?? 0) > 0 || errorFor('finance')) && <DashboardWidgetBoundary name="Payment follow-through" onRetry={refresh}>
                 <CompactPanel dataWidgetId="payments" style={{ order: widgetOrder('payments') }} title="Payment follow-through" eyebrow="Accounts" icon={CircleDollarSign} count={compactCurrency(data?.summary.outstandingBalance)} href={makeDashboardHref('/payments', filters)} hrefLabel="Open payments">
                   {loading || errorFor('finance') || errorFor('orders') ? <SectionState loading={loading} error={errorFor('finance') || errorFor('orders')} empty={false} retry={refresh} /> : reminders.length ? <div className="space-y-1.5">

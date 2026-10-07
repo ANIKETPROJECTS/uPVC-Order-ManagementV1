@@ -320,6 +320,7 @@
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-sidebar: var(--sidebar-bg);
   --color-sidebar-foreground: var(--sidebar-text);
+  --color-sidebar-muted: var(--sidebar-text-muted);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-primary: var(--sidebar-active-bg);
   --color-sidebar-primary-foreground: var(--sidebar-active-text);
