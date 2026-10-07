@@ -750,9 +750,11 @@ export default function DashboardRedesign({ user }: { user: User }) {
       <div className="dashboard-page -mx-5 -my-6 min-h-[calc(100dvh-76px)] px-5 py-6 md:-mx-8 md:-my-8 md:px-8 md:py-8">
         <div className="dashboard-layout mx-auto max-w-[1600px] pb-8">
           <DashboardWidgetBoundary name="Dashboard overview" onRetry={refresh}>
-            <header className="dashboard-hero relative col-span-12 overflow-hidden rounded-[24px] px-5 py-4 shadow-lg md:px-7 md:py-5">
-              <div className="pointer-events-none absolute -right-12 -top-20 size-72 rounded-full border border-white/10" />
-              <div className="pointer-events-none absolute right-16 top-10 size-28 rounded-full border border-white/10" />
+            <header className="dashboard-hero relative z-20 col-span-12 rounded-[24px] px-5 py-4 shadow-lg md:px-7 md:py-5">
+              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+                <div className="absolute -right-12 -top-20 size-72 rounded-full border border-white/10" />
+                <div className="absolute right-16 top-10 size-28 rounded-full border border-white/10" />
+              </div>
               <div className="relative flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 whitespace-nowrap text-[9px] font-bold uppercase tracking-[.2em] text-teal-200"><span className="size-1.5 shrink-0 rounded-full bg-teal-300" />Live Order Overview</p>
