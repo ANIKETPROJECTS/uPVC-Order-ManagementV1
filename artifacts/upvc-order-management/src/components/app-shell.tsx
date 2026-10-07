@@ -302,6 +302,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
             key={module.key}
             className={`${itemClass} cursor-not-allowed opacity-50`}
             aria-disabled="true"
+            title={collapsed ? `${module.short} — Coming Soon` : undefined}
             data-testid={`flyout-coming-soon-${module.key}`}
           >
             <SidebarSectionIcon name={iconName} size={34} className="shrink-0" />
@@ -334,7 +335,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
       <nav
         id={`nav-flyout-${desktopFlyoutGroup.id}`}
         aria-label={`${desktopFlyoutGroup.label} submenu`}
-        className="fixed z-[70] hidden w-[286px] overflow-y-auto overscroll-contain rounded-2xl border border-sidebar-border bg-sidebar p-3 text-sidebar-foreground shadow-2xl md:block"
+        className="fixed z-[70] hidden w-[286px] overflow-y-auto overscroll-contain rounded-2xl border border-sidebar-border bg-sidebar-flyout p-3 text-sidebar-foreground shadow-sidebar-flyout md:block"
         style={{ top: desktopFlyout.top, left: desktopFlyout.left, maxHeight: desktopFlyout.maxHeight }}
         onMouseEnter={clearFlyoutClose}
         onMouseLeave={scheduleFlyoutClose}
@@ -405,18 +406,18 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
           />
           {!collapsed && <div className="min-w-0"><p className="font-display text-sm font-bold tracking-tight">Framewise</p><p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">Order operations</p></div>}
         </div>
-        <div className="scrollbar-thin flex-1 overflow-y-auto px-3 py-5">
+        <div className="sidebar-scrollbar flex-1 overflow-y-auto px-3 py-5">
           <p className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40 ${collapsed ? 'text-center' : ''}`}>{collapsed ? '•••' : 'Workspace'}</p>
           <nav className="space-y-1" aria-label="Main navigation">
-            <Link href="/" onClick={() => setMobileOpen(false)} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-dashboard">
+            <Link href="/" onClick={() => setMobileOpen(false)} title={collapsed ? 'Dashboard' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-dashboard">
               <SidebarSectionIcon name="overview" size={40} className="shrink-0" />
               {!collapsed && <span className="flex-1">Dashboard</span>}
             </Link>
-            <Link href="/communication" onClick={() => setMobileOpen(false)} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/communication') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-communication">
+            <Link href="/communication" onClick={() => setMobileOpen(false)} title={collapsed ? 'Communication' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/communication') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-communication">
               <MessageSquareText size={24} className="mx-[2px] shrink-0" />
               {!collapsed && <span className="flex-1">Communication</span>}
             </Link>
-            {canOpenApprovalQueue && <Link href="/quotation-approvals" onClick={() => setMobileOpen(false)} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/quotation-approvals') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-quotation-approvals">
+            {canOpenApprovalQueue && <Link href="/quotation-approvals" onClick={() => setMobileOpen(false)} title={collapsed ? 'Quotation approvals' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/quotation-approvals') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-quotation-approvals">
               <Bell size={22} className="mx-[3px] shrink-0" />
               {!collapsed && <span className="flex-1">Quotation approvals</span>}
             </Link>}
@@ -512,7 +513,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
         </div>
         <div className="border-t border-sidebar-border p-3">
           <div className={`mb-2 flex items-center gap-3 rounded-lg px-2 py-2 ${collapsed ? 'justify-center' : ''}`}>
-            <UserAvatar name={user.name} src={user.avatarUrl} size="sm" className="bg-accent text-accent-foreground" />
+            <UserAvatar name={user.name} src={user.avatarUrl} size="sm" className="bg-sidebar-accent text-sidebar-foreground" />
             {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{user.name}</p><p className="truncate text-[10px] text-sidebar-foreground/50">{user.roleName}</p></div>}
           </div>
           <button
@@ -526,9 +527,9 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
             <Settings2 size={18} />
             {!collapsed && <span>Settings</span>}
           </button>
-          <button onClick={signOut} disabled={logout.isPending} className={`flex h-10 w-full items-center gap-2 rounded-lg px-3 text-xs text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:opacity-50 ${collapsed ? 'justify-center' : ''}`} data-testid="button-sign-out"><LogOut size={18} />{!collapsed && (logout.isPending ? 'Signing out…' : 'Sign out')}</button>
+          <button onClick={signOut} disabled={logout.isPending} title={collapsed ? 'Sign out' : undefined} aria-label={logout.isPending ? 'Signing out' : 'Sign out'} className={`flex h-10 w-full items-center gap-2 rounded-lg px-3 text-xs text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:opacity-50 ${collapsed ? 'justify-center' : ''}`} data-testid="button-sign-out"><LogOut size={18} />{!collapsed && (logout.isPending ? 'Signing out…' : 'Sign out')}</button>
         </div>
-        <button onClick={() => setCollapsed((value) => !value)} className="absolute -right-3 top-[82px] hidden h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm md:flex" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} data-testid="button-toggle-sidebar">{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button>
+        <button onClick={() => setCollapsed((value) => !value)} className="absolute -right-3 top-[82px] hidden h-7 w-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-accent text-sidebar-foreground shadow-sm transition hover:bg-sidebar-primary hover:text-sidebar-primary-foreground md:flex" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} data-testid="button-toggle-sidebar">{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button>
       </aside>
       {renderDesktopFlyout()}
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} canManageApprover={canManageApprover} />

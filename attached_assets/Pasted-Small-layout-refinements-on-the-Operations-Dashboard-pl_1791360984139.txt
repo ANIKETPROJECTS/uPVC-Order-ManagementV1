@@ -1,0 +1,75 @@
+Small layout refinements on the Operations Dashboard plus a global sidebar theme fix. Read the current dashboard page, hero component, sidebar/layout component, flyout/submenu components and theme tokens first. Reuse them. Do not change any data/API logic.
+
+========================================
+1. HERO BANNER (make it compact, 2-line right side)
+========================================
+- Target height: ~130-150px on desktop (currently far too tall). Reduce vertical padding to 20-24px.
+- Layout: two columns.
+  LEFT (flex-1, min-width 0): small pill "LIVE ORDER OVERVIEW" (single line, white-space: nowrap), headline "Every order, one clear view" on ONE line on desktop (font-size ~clamp(24px, 2.6vw, 34px)), wraps to max 2 lines on small screens, and one short subtext line below (e.g. "Track orders, readiness, payments and field work for 08 Sept 2026 – 07 Oct 2026."), truncated to a single line with ellipsis on desktop.
+  RIGHT (flex-shrink-0): a 2-row stack, right aligned:
+    Row 1: live clock card, made compact and horizontal: green dot + "INDIA STANDARD TIME" label, time with seconds (e.g. 01:36:13 pm) and date (Wednesday, 07 October 2026) side by side, then "Live · refreshes every 30s · Data refreshed Just now" as a small line. Reduce the clock card padding and font sizes.
+    Row 2: action buttons in one line: Customize, Refresh, Auto: 30s, Export, Theme toggle. Smaller height (36px), icon + label, gap 8px. On narrow screens, buttons collapse to icon-only.
+- On tablet/mobile the right block moves below the left block (still 2 rows).
+- Keep the dark navy → teal gradient and subtle circle decoration.
+
+========================================
+2. SIDEBAR ALWAYS DARK — GLOBAL, ALL PAGES, ALL SUB-SECTIONS
+========================================
+Scope: this applies to the ENTIRE software, not just the dashboard. Every page (Dashboard, Communication, Quotation approvals, Admin & reports → User access, Sales & Orders, Production, Finance, Measurement sheets, Orders, Payments, Dispatch, Installations, Settings, etc.) must show the same dark sidebar, exactly like my reference screenshot (dark navy-teal background, light text, teal active pill, coloured icon tiles, dark rounded flyouts).
+- The sidebar must stay dark in BOTH light and dark mode, expanded and collapsed, on desktop, tablet and the mobile drawer.
+- Define dedicated sidebar tokens that never change with the theme: --sidebar-bg (≈ #0F2A33 or the existing dark sidebar colour), --sidebar-bg-hover, --sidebar-text, --sidebar-text-muted, --sidebar-active-bg (teal tint), --sidebar-active-text, --sidebar-border, --sidebar-flyout-bg, --sidebar-flyout-shadow. Do NOT derive them from the light/dark theme variables, and do not let any global `.light` / `[data-theme=light]` / `prefers-color-scheme` rule override them.
+- Cover ALL sidebar parts with these tokens:
+  1. Logo/brand header (Framewise / Order Operations) with a dark-friendly logo background.
+  2. "WORKSPACE" label, top-level items (Dashboard / Overview, Communication, Quotation approvals).
+  3. Group items (ADMIN & REPORTS, SALES & ORDERS, PRODUCTION, FINANCE) with their chevrons, hover and active states.
+  4. EVERY flyout / submenu / popover that opens from a group (e.g. "Workspace section → Admin & reports → User access", and the equivalent flyouts of Sales & Orders, Production, Finance): dark rounded panel with section label, title, subtitle, and item rows with icon tiles, "SOON" badges, hover and selected states. Audit all submenu/flyout components so none still use light surface tokens.
+  5. Any expanded accordion/nested children inside the sidebar if they exist.
+  6. Bottom user block (avatar, name, role), Settings and Sign out.
+  7. Collapse/expand toggle button on the sidebar edge, scrollbar styling (dark thin scrollbar), and tooltips shown in collapsed (icon-only) mode.
+  8. Mobile drawer / overlay version of the sidebar.
+- Only the main content area and the top header follow the light/dark theme toggle. Light mode stays the default.
+- Do a repo-wide search for every place the sidebar or its flyouts consume theme colours (e.g. bg-white, bg-card, text-foreground, var(--surface), etc.) and replace them with the sidebar tokens, so there are no pages where the sidebar turns light.
+- REMOVE the "Reports (SOON)" item from the Admin & reports flyout (already agreed), keep "User access".
+
+========================================
+3. NEW SECTION LAYOUT (desktop, 12-col grid)
+========================================
+Order top to bottom:
+1. Hero
+2. Filter bar (not sticky)
+3. KPI row (5 cards)
+4. Charts row: Trend (8) + Orders by stage (4)
+5. Pipeline row (all stages in one row)
+6. Row A: Needs attention (6 cols) + Live activity (6 cols). Equal height, Live activity internal scroll max-height ~320px.
+7. Row B: Recent orders (8 cols) + Installer capacity (4 cols). Installer capacity sits to the RIGHT of Recent orders, equal height.
+8. Row C: Dispatch queue (6 cols) + Top clients (6 cols). Top clients sits to the RIGHT of Dispatch queue, equal height.
+9. Row D: remaining secondary cards (Payment follow-through, Installation schedule, Measurement uploads, Quotation approvals, Glass status, etc.) in an auto-fit grid, only rendered when they have data.
+10. Footer snapshot line.
+Tablet: 2 columns where possible, mobile: single column. Keep these placements stable even when a widget is hidden or empty: an empty widget shows a compact empty state, it must not shift other widgets into different positions. If a whole row's widgets are hidden through Customize, the remaining widget should span the full row.
+Update the widget registry defaultOrder and size values so Customize/reset-to-default reproduces this exact layout.
+
+========================================
+4. SMALL POLISH
+========================================
+- Recent orders: stage chip must be a single line without truncation ("Quotation", "In production"), reduce the column gap so the chip fits; show "Rate pending" in muted text where value is missing.
+- Needs attention card height should follow content; empty rows hidden as before.
+- KPI labels must not be cut ("WINDOWS RE...", "OUTSTANDING...", "INSTALLED O..."): allow labels to wrap to 2 lines or reduce font size/letter-spacing, and let the sub-caption wrap rather than truncate.
+- Search placeholder should not be cut off ("Search orders, clients o..."): give the search box a larger flex-basis (min ~280px) and shorten the placeholder to "Search orders, clients, locations".
+
+========================================
+5. QUALITY
+========================================
+No horizontal scroll, light and dark both clean, error boundary + skeleton per widget, clock isolated so the page does not re-render every second.
+
+DELIVERABLES: files changed + a test checklist:
+(1) hero height ~150px and right side is 2 rows;
+(2) sidebar is dark on EVERY page of the software (Dashboard, Communication, Quotation approvals, User access, Sales & Orders pages, Production pages, Finance pages, Measurement sheets, Settings) in light mode AND dark mode;
+(3) all flyouts/submenus (Admin & reports, Sales & Orders, Production, Finance) are dark with their items, hover and active states;
+(4) collapsed icon-only sidebar, its tooltips and the mobile drawer are dark;
+(5) toggling the theme changes only the content area and header, never the sidebar;
+(6) Reports item is gone from Admin & reports;
+(7) Needs attention and Live activity share a row;
+(8) Installer capacity is right of Recent orders;
+(9) Top clients is right of Dispatch queue;
+(10) no truncated KPI labels or search placeholder;
+(11) reset-to-default in Customize restores this layout.
