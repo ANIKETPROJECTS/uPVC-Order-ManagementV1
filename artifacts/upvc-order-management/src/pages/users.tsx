@@ -44,6 +44,7 @@ type UserForm = {
   email: string;
   phone: string;
   roleId: string;
+  installationCapacity: number;
   password: string;
   avatarUrl: string | null;
   avatarLink: string;
@@ -60,6 +61,7 @@ const blankForm = (roleId = ''): UserForm => ({
   email: '',
   phone: '',
   roleId,
+  installationCapacity: 5,
   password: '',
   avatarUrl: null,
   avatarLink: '',
@@ -104,6 +106,7 @@ export default function UsersPage({ user }: { user: User }) {
     }
     return selectedRole?.permissions[moduleKey] || 'none';
   };
+  const showInstallationCapacity = permissionForModule('installation') !== 'none';
   const setPermissionOverride = (moduleKey: string, value: PermissionValue) => {
     const rolePermission = selectedRole?.permissions[moduleKey] || 'none';
     setForm((current) => {
@@ -169,6 +172,7 @@ export default function UsersPage({ user }: { user: User }) {
       email: item.email || '',
       phone: item.phone || '',
       roleId: item.roleId,
+      installationCapacity: item.installationCapacity ?? 5,
       password: '',
       avatarUrl: isUploadedImage ? item.avatarUrl : null,
       avatarLink: item.avatarUrl && !isUploadedImage ? item.avatarUrl : '',
@@ -213,6 +217,7 @@ export default function UsersPage({ user }: { user: User }) {
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
       roleId: form.roleId,
+      installationCapacity: form.installationCapacity,
       avatarUrl,
       permissionOverrides: Object.keys(form.permissionOverrides).length ? form.permissionOverrides : null,
     };
@@ -655,6 +660,22 @@ export default function UsersPage({ user }: { user: User }) {
                     {roleList.map((role: Role) => <option key={role.id} value={role.id}>{role.name}</option>)}
                   </select>
                 </label>
+                {showInstallationCapacity && (
+                  <label>
+                    <span className="mb-1.5 block text-xs font-semibold">Daily installation capacity</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      step={1}
+                      value={form.installationCapacity}
+                      onChange={(event) => updateField('installationCapacity', Math.max(1, Math.min(50, Number(event.target.value) || 1)))}
+                      className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                      data-testid="input-user-installation-capacity"
+                    />
+                    <span className="mt-1 block text-[10px] leading-4 text-muted-foreground">Maximum scheduled installations per day. New installer profiles default to 5.</span>
+                  </label>
+                )}
                 <label>
                   <span className="mb-1.5 block text-xs font-semibold">{editing ? 'New password (optional)' : 'Temporary password'}</span>
                   <input type="password" value={form.password} onChange={(event) => updateField('password', event.target.value)} placeholder={editing ? 'Leave unchanged' : 'At least 8 characters'} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-primary" data-testid="input-user-password" />

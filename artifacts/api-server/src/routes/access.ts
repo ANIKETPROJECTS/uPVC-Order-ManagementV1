@@ -330,6 +330,7 @@ router.post("/users", async (req, res): Promise<void> => {
     phone: parsed.data.phone?.trim() || null,
     avatarUrl,
     roleId: role._id,
+    installationCapacity: parsed.data.installationCapacity ?? 5,
     status: "active",
     lastLogin: null,
     permissionOverrides: parsed.data.permissionOverrides ?? null,
@@ -419,6 +420,9 @@ router.patch("/users/:userId", async (req, res): Promise<void> => {
   if (parsed.data.phone !== undefined) update.phone = parsed.data.phone?.trim() || null;
   if (parsed.data.avatarUrl !== undefined) update.avatarUrl = avatarUrl ?? null;
   if (parsed.data.roleId !== undefined) update.roleId = parsed.data.roleId;
+  if (parsed.data.installationCapacity !== undefined) {
+    update.installationCapacity = parsed.data.installationCapacity;
+  }
   if (parsed.data.status !== undefined) update.status = parsed.data.status;
   if (parsed.data.permissionOverrides !== undefined) {
     update.permissionOverrides = parsed.data.permissionOverrides;

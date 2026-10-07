@@ -3172,6 +3172,10 @@ components:
           type: string
         roleName:
           type: string
+        installationCapacity:
+          type: integer
+          minimum: 1
+          maximum: 50
         status:
           type: string
           enum: [active, inactive]
@@ -3193,6 +3197,7 @@ components:
         - avatarUrl
         - roleId
         - roleName
+        - installationCapacity
         - status
         - lastLogin
         - permissions
@@ -3235,6 +3240,10 @@ components:
           maxLength: 180000
         roleId:
           type: string
+        installationCapacity:
+          type: integer
+          minimum: 1
+          maximum: 50
         password:
           type: string
           minLength: 8
@@ -3261,6 +3270,10 @@ components:
           maxLength: 180000
         roleId:
           type: string
+        installationCapacity:
+          type: integer
+          minimum: 1
+          maximum: 50
         password:
           type: string
           minLength: 8
@@ -4905,6 +4918,23 @@ components:
           type: string
           enum: [pending, issue, installed]
       required: [orderRecordId, orderId, clientName, locationName, scheduledDate, teamName, subteamName, assignedMembers, status]
+    DashboardInstallerCapacity:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        assigned:
+          type: integer
+        capacity:
+          type: integer
+        peakDay:
+          type: ["string", "null"]
+          format: date
+        scheduledCount:
+          type: integer
+      required: [id, name, assigned, capacity, peakDay, scheduledCount]
     DashboardMeasurementUpload:
       type: object
       properties:
@@ -5014,6 +5044,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DashboardInstallationScheduleItem"
+        installerCapacity:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardInstallerCapacity"
         recentMeasurements:
           type: array
           items:
@@ -5028,7 +5062,7 @@ components:
             $ref: "#/components/schemas/DashboardReminderCandidate"
         sectionErrors:
           $ref: "#/components/schemas/DashboardSectionErrors"
-      required: [updatedAt, permissions, filterOptions, summary, pipeline, trend, attention, activity, recentOrders, dispatchQueue, installationSchedule, recentMeasurements, topClients, reminderCandidates, sectionErrors]
+      required: [updatedAt, permissions, filterOptions, summary, pipeline, trend, attention, activity, recentOrders, dispatchQueue, installationSchedule, installerCapacity, recentMeasurements, topClients, reminderCandidates, sectionErrors]
     PaymentReminderOrder:
       type: object
       properties:

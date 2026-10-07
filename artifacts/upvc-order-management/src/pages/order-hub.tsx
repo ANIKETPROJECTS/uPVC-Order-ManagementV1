@@ -471,12 +471,12 @@ export default function OrderHubPage({ user }: { user: User }) {
   const isMasterAdmin = user.roleId === 'master-admin';
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<string>('all');
-  const [clientId, setClientId] = useState('all');
-  const [locationCode, setLocationCode] = useState('all');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('q') || '');
+  const [status, setStatus] = useState<string>(() => new URLSearchParams(window.location.search).get('status') || 'all');
+  const [clientId, setClientId] = useState(() => new URLSearchParams(window.location.search).get('clientId') || 'all');
+  const [locationCode, setLocationCode] = useState(() => new URLSearchParams(window.location.search).get('locationCode') || 'all');
+  const [from, setFrom] = useState(() => new URLSearchParams(window.location.search).get('from') || '');
+  const [to, setTo] = useState(() => new URLSearchParams(window.location.search).get('to') || '');
   const [clientOpen, setClientOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);

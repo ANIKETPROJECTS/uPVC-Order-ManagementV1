@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -62,6 +62,71 @@
   --hero-surface-start: #173b48;
   --hero-surface-middle: #123241;
   --hero-surface-end: #0d2938;
+}
+
+/* The operations dashboard uses its own cool, high-contrast surface palette. */
+.dashboard-page {
+  --background: 216 60% 97%;
+  --foreground: 220 68% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 68% 14%;
+  --border: 214 29% 88%;
+  --input: 214 25% 83%;
+  --ring: 172 83% 34%;
+  --primary: 172 83% 34%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 213 35% 93%;
+  --secondary-foreground: 220 53% 20%;
+  --muted: 214 33% 93%;
+  --muted-foreground: 215 17% 45%;
+  --accent: 24 93% 53%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 79% 57%;
+  --destructive-foreground: 0 0% 100%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 68% 14%;
+  --dashboard-font: 'Inter', 'DM Sans', sans-serif;
+  --app-font-sans: var(--dashboard-font);
+  --app-font-display: var(--dashboard-font);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--dashboard-font);
+}
+
+.dark .dashboard-page {
+  --background: 222 47% 8%;
+  --foreground: 210 40% 96%;
+  --card: 222 40% 11%;
+  --card-foreground: 210 40% 96%;
+  --border: 217 28% 22%;
+  --input: 217 28% 27%;
+  --ring: 172 72% 54%;
+  --primary: 172 72% 48%;
+  --primary-foreground: 222 47% 8%;
+  --secondary: 216 31% 18%;
+  --secondary-foreground: 210 40% 94%;
+  --muted: 217 30% 16%;
+  --muted-foreground: 215 18% 67%;
+  --accent: 24 93% 58%;
+  --accent-foreground: 222 47% 8%;
+  --destructive: 0 72% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --popover: 222 40% 12%;
+  --popover-foreground: 210 40% 96%;
+  background-color: hsl(var(--background));
+}
+
+.dashboard-page .dashboard-hero {
+  background:
+    radial-gradient(circle at 83% 8%, rgb(20 184 166 / .22), transparent 24%),
+    linear-gradient(115deg, #0b1b3a 0%, #0b2c47 58%, #0f766e 100%);
+  color: #f8fafc;
+}
+
+.dark .dashboard-page .dashboard-hero {
+  background:
+    radial-gradient(circle at 83% 8%, rgb(20 184 166 / .18), transparent 24%),
+    linear-gradient(115deg, #07101e 0%, #0b1b32 58%, #0b4a46 100%);
 }
 
 @theme inline {

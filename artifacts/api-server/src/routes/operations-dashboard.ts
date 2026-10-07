@@ -28,6 +28,7 @@ import {
   type PermissionMap,
   type QuotationDocument,
   type QuotationRateSubmissionDocument,
+  type UserDocument,
 } from "../lib/mongo";
 
 const router: IRouter = Router();
@@ -644,6 +645,7 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
     )
     : [];
   let installerOptions: Array<{ id: string; label: string }> = [];
+  let installerUsers: Array<Pick<UserDocument, "_id" | "name" | "installationCapacity">> = [];
   if (canViewInstallation) {
     const teams = await safeRead(
       req,
@@ -656,14 +658,14 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
       ...team.memberIds,
       ...team.subteams.flatMap((subteam) => subteam.memberIds),
     ]))];
-    const installerUsers = teamMemberIds.length
+    installerUsers = teamMemberIds.length
       ? await safeRead(
         req,
         "installation",
         sectionErrors,
         () => getUsers(db)
           .find({ _id: { $in: teamMemberIds }, status: "active" })
-          .project({ _id: 1, name: 1 })
+          .project({ _id: 1, name: 1, installationCapacity: 1 })
           .sort({ name: 1 })
           .toArray(),
         [],
@@ -1004,6 +1006,44 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
       }];
     });
 
+  const installerOrdersByDay = new Map<string, Map<string, Set<string>>>();
+  for (const installation of filteredScheduleRows) {
+    if (!installation.scheduledDate) continue;
+    for (const member of installation.assignedMembers ?? []) {
+      const byDay = installerOrdersByDay.get(member.id) ?? new Map<string, Set<string>>();
+      const ordersForDay = byDay.get(installation.scheduledDate) ?? new Set<string>();
+      ordersForDay.add(installation.orderRecordId);
+      byDay.set(installation.scheduledDate, ordersForDay);
+      installerOrdersByDay.set(member.id, byDay);
+    }
+  }
+  const installerCapacity = canViewInstallation
+    ? installerUsers.map((installer) => {
+      const days = installerOrdersByDay.get(installer._id) ?? new Map<string, Set<string>>();
+      let assigned = 0;
+      let peakDay: string | null = null;
+      const scheduledOrders = new Set<string>();
+      for (const [day, orders] of days) {
+        for (const orderRecordId of orders) scheduledOrders.add(orderRecordId);
+        if (orders.size > assigned || (orders.size === assigned && peakDay && day < peakDay)) {
+          assigned = orders.size;
+          peakDay = day;
+        }
+      }
+      return {
+        id: installer._id,
+        name: installer.name,
+        assigned,
+        capacity: installer.installationCapacity ?? 5,
+        peakDay,
+        scheduledCount: scheduledOrders.size,
+      };
+    }).sort((left, right) =>
+      (right.assigned / right.capacity) - (left.assigned / left.capacity)
+      || right.assigned - left.assigned
+      || left.name.localeCompare(right.name))
+    : [];
+
   const recentOrders = canViewOrders
     ? filteredCurrentOrders.slice(0, 8).map((order) => ({
       id: order._id,
@@ -1126,6 +1166,7 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
     recentOrders,
     dispatchQueue,
     installationSchedule: installationsForSchedule,
+    installerCapacity,
     recentMeasurements,
     topClients,
     reminderCandidates,

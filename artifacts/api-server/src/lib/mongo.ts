@@ -70,6 +70,7 @@ export interface UserDocument {
   phone: string | null;
   avatarUrl?: string | null;
   roleId: string;
+  installationCapacity?: number;
   status: UserStatus;
   lastLogin: Date | null;
   permissionOverrides: PermissionMap | null;
@@ -88,6 +89,7 @@ export interface PublicUser {
   avatarUrl: string | null;
   roleId: string;
   roleName: string;
+  installationCapacity: number;
   status: UserStatus;
   lastLogin: string | null;
   permissions: PermissionMap;
@@ -1225,6 +1227,7 @@ export async function getPublicUser(
     avatarUrl: user.avatarUrl ?? null,
     roleId: user.roleId,
     roleName: role?.name ?? "Unassigned",
+    installationCapacity: user.installationCapacity ?? 5,
     status: user.status,
     lastLogin: user.lastLogin?.toISOString() ?? null,
     permissions,
