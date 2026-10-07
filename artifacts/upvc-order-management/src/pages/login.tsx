@@ -7,8 +7,8 @@ import loginBackground from '@/assets/login-window-background.png';
 export default function LoginPage() {
   const queryClient = useQueryClient();
   const login = useLogin();
-  const [username, setUsername] = useState(import.meta.env.DEV ? 'admin' : '');
-  const [password, setPassword] = useState(import.meta.env.DEV ? 'Admin@12345' : '');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -84,7 +84,6 @@ export default function LoginPage() {
               {login.isError && <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-xs leading-5 text-destructive" data-testid="status-login-error">We couldn't sign you in. Check the username and password, then try again.</div>}
               <button type="submit" disabled={login.isPending || !username || !password} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60" data-testid="button-login">{login.isPending ? 'Checking access…' : <>Sign in <ArrowRight size={16} /></>}</button>
             </form>
-            {import.meta.env.DEV && <div className="mt-8 rounded-xl border border-border bg-muted/60 p-4" data-testid="note-demo-credentials"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Development-only note</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Seeded logins for role switching:</p><div className="mt-2 space-y-1 font-mono text-[11px] text-foreground"><p><span className="font-semibold">admin</span> / Admin@12345</p><p><span className="font-semibold">operator, manager, rate.approver, accounts, quotations</span> / Demo@12345</p></div></div>}
           </div>
         </div>
       </main>

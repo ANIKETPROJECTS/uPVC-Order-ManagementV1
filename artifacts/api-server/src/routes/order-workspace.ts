@@ -42,7 +42,6 @@ import {
   type OrderPaymentFlagDocument, type PaymentFlagActionDocument, type OrderRefundDocument,
 } from "../lib/mongo";
 import {
-  ensureDefaultOrderDocumentCategories,
   normalizeDocumentCategoryName,
   orderDocumentCategoryResponse,
 } from "../lib/order-document-categories";
@@ -1353,7 +1352,6 @@ router.get("/order-document-categories", async (req, res): Promise<void> => {
   const actor = await context(req, res, "order-hub");
   if (!actor) return;
   const db = await getMongoDb();
-  await ensureDefaultOrderDocumentCategories(db);
   const categories = await getOrderDocumentCategories(db).find({}).sort({ label: 1 }).toArray();
   res.json(ListOrderDocumentCategoriesResponse.parse(categories.map(orderDocumentCategoryResponse)));
 });
@@ -1366,7 +1364,6 @@ router.post("/order-document-categories", async (req, res): Promise<void> => {
   const label = normalizeDocumentCategoryName(body.data.name);
   if (!label) { res.status(400).json({ error: "Category name cannot be blank." }); return; }
   const db = await getMongoDb();
-  await ensureDefaultOrderDocumentCategories(db);
   const categories = getOrderDocumentCategories(db);
   const labelNormalized = label.toLocaleLowerCase();
   if (await categories.findOne({ labelNormalized })) {
@@ -1396,7 +1393,6 @@ router.patch("/order-document-categories/:categoryId", async (req, res): Promise
   const label = normalizeDocumentCategoryName(body.data.name);
   if (!label) { res.status(400).json({ error: "Category name cannot be blank." }); return; }
   const db = await getMongoDb();
-  await ensureDefaultOrderDocumentCategories(db);
   const categories = getOrderDocumentCategories(db);
   const current = await categories.findOne({ _id: p.data.categoryId });
   if (!current) { res.status(404).json({ error: "Document category not found." }); return; }
@@ -1420,7 +1416,6 @@ router.delete("/order-document-categories/:categoryId", async (req, res): Promis
   const actor = await context(req, res, "order-hub", true);
   if (!actor) return;
   const db = await getMongoDb();
-  await ensureDefaultOrderDocumentCategories(db);
   const categories = getOrderDocumentCategories(db);
   const category = await categories.findOne({ _id: p.data.categoryId });
   if (!category) { res.status(404).json({ error: "Document category not found." }); return; }
@@ -1437,7 +1432,6 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
   const p = UploadOrderDocumentParams.safeParse(req.params);
   if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
   const db = await getMongoDb();
-  await ensureDefaultOrderDocumentCategories(db);
   const category = await getOrderDocumentCategories(db).findOne({ _id: p.data.category });
   if (!category) { res.status(400).json({ error: "Choose an active document category." }); return; }
   const actor = await context(req, res, category.requiredModule, true);
@@ -1467,7 +1461,6 @@ router.post("/orders/:id/quotation-requests/:quotationRequestId/confirmation-doc
   const p = UploadQuotationConfirmationDocumentParams.safeParse(req.params);
   if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
   const db = await getMongoDb();
-  await ensureDefaultOrderDocumentCategories(db);
   const category = await getOrderDocumentCategories(db).findOne({ _id: "confirmation" });
   if (!category) {
     res.status(409).json({ error: "The confirmation document category is unavailable." });
@@ -1524,7 +1517,6 @@ router.delete("/orders/:id/documents/:documentId", async (req, res): Promise<voi
   const db = await getMongoDb();
   const meta = await getOrderDocumentMetadata(db).findOne({ _id: p.data.documentId, orderRecordId: p.data.id, archivedAt: { $exists: false } });
   if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
-  await ensureDefaultOrderDocumentCategories(db);
   const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
   if (!category) { res.status(409).json({ error: "The document category is no longer available." }); return; }
   if (!requireModuleEdit(actor, res, category.requiredModule)) return;
@@ -1580,7 +1572,6 @@ router.put("/orders/:id/documents/:documentId/content/:filename", async (req, re
     archivedAt: { $exists: false },
   });
   if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
-  await ensureDefaultOrderDocumentCategories(db);
   const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
   if (!category) { res.status(409).json({ error: "The document category is no longer available." }); return; }
   if (!requireModuleEdit(actor, res, category.requiredModule)) return;

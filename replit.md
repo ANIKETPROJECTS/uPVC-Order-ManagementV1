@@ -23,7 +23,7 @@ An internal order, quotation, and production tracking system for a uPVC windows 
 ## Where things live
 
 - `artifacts/upvc-order-management` — web application
-- `artifacts/api-server` — API routes, MongoDB connection, session handling, and seed data
+- `artifacts/api-server` — API routes, MongoDB connection, session handling, indexes, and migrations
 - `lib/api-spec/openapi.yaml` — API contract
 - `lib/api-client-react` and `lib/api-zod` — generated API client and validation schemas
 
@@ -40,7 +40,7 @@ The first release provides sign-in, role-specific dashboard shells, Master Admin
 
 ## Gotchas
 
-- Demo users are for development only; never expose seeded demo credentials in a production environment.
+- Do not add automatic database seeding. Existing MongoDB records must not be replaced or repopulated by startup code; provision initial users, roles, and business data explicitly.
 - Do not use PostgreSQL tooling or the removed relational DB scaffold.
 
 ## Pointers
