@@ -12,11 +12,13 @@ import quotationApprovalsRouter from "./quotation-approvals";
 import quotationWorkflowRouter from "./quotation-workflow";
 import quotationsRouter from "./quotations";
 import notificationsRouter from "./notifications";
+import operationsDashboardRouter from "./operations-dashboard";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(accessRouter);
+router.use(operationsDashboardRouter);
 router.use(chatRouter);
 router.use(dispatchRouter);
 router.use(installationRouter);

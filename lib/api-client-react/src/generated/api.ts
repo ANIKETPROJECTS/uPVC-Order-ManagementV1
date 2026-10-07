@@ -41,6 +41,7 @@ import type {
   DispatchOrder,
   DispatchOrderList,
   DispatchStatusUpdate,
+  GetOperationsDashboardParams,
   GlassTrackingOrder,
   GlassTrackingOrderList,
   GlassTrackingQuantitiesInput,
@@ -72,6 +73,7 @@ import type {
   MeasurementVersion,
   MeasurementVersionUpdate,
   NotificationCenter,
+  OperationsDashboard,
   Order,
   OrderActivityList,
   OrderBillingUpdate,
@@ -1299,6 +1301,90 @@ export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDashboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetOperationsDashboardUrl = (params: GetOperationsDashboardParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/operations?${stringifiedParams}` : `/api/dashboard/operations`
+}
+
+/**
+ * @summary Get permission-scoped operational dashboard data
+ */
+export const getOperationsDashboard = async (params: GetOperationsDashboardParams, options?: Parameters<typeof customFetch>[1]): Promise<OperationsDashboard> => {
+
+  return customFetch<OperationsDashboard>(getGetOperationsDashboardUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOperationsDashboardQueryKey = (params?: GetOperationsDashboardParams,) => {
+    return [
+    `/api/dashboard/operations`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOperationsDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getOperationsDashboard>>, TError = ErrorType<unknown>>(params: GetOperationsDashboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOperationsDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOperationsDashboardQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOperationsDashboard>>> = ({ signal }) => getOperationsDashboard(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOperationsDashboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOperationsDashboardQueryResult = NonNullable<Awaited<ReturnType<typeof getOperationsDashboard>>>
+export type GetOperationsDashboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get permission-scoped operational dashboard data
+ */
+
+export function useGetOperationsDashboard<TData = Awaited<ReturnType<typeof getOperationsDashboard>>, TError = ErrorType<unknown>>(
+ params: GetOperationsDashboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOperationsDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOperationsDashboardQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

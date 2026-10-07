@@ -280,6 +280,72 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /dashboard/operations:
+    get:
+      operationId: getOperationsDashboard
+      tags: [dashboard]
+      summary: Get permission-scoped operational dashboard data
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+        - name: stage
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrderStatus"
+        - name: clientId
+          in: query
+          schema:
+            type: string
+        - name: locationCode
+          in: query
+          schema:
+            type: string
+        - name: installerId
+          in: query
+          schema:
+            type: string
+        - name: paymentStatus
+          in: query
+          schema:
+            type: string
+            enum: [paid, partial, unpaid]
+        - name: assignment
+          in: query
+          schema:
+            type: string
+            enum: [assigned, unassigned]
+        - name: glassStatus
+          in: query
+          schema:
+            type: string
+            enum: [untracked, pending, partial, received, broken]
+        - name: compare
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Filtered dashboard sections and per-section errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationsDashboard"
   /payments/balance-register:
     get:
       operationId: getBalancePaymentRegister
@@ -4625,6 +4691,344 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/DashboardLiveActivity"
+    DashboardOperationsPermissions:
+      type: object
+      properties:
+        orders:
+          type: boolean
+        readiness:
+          type: boolean
+        finance:
+          type: boolean
+        dispatch:
+          type: boolean
+        installation:
+          type: boolean
+        approvals:
+          type: boolean
+        measurements:
+          type: boolean
+        glass:
+          type: boolean
+      required: [orders, readiness, finance, dispatch, installation, approvals, measurements, glass]
+    DashboardFilterOption:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+      required: [id, label]
+    DashboardFilterOptions:
+      type: object
+      properties:
+        clients:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardFilterOption"
+        locations:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardFilterOption"
+        installers:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardFilterOption"
+      required: [clients, locations, installers]
+    DashboardPeriodSnapshot:
+      type: object
+      properties:
+        activeOrders:
+          type: integer
+        orderValue:
+          type: ["number", "null"]
+        readyWindows:
+          type: integer
+        totalWindows:
+          type: integer
+        readyWindowPercent:
+          type: ["number", "null"]
+        installedOrders:
+          type: integer
+        outstandingBalance:
+          type: ["number", "null"]
+      required: [activeOrders, orderValue, readyWindows, totalWindows, readyWindowPercent, installedOrders, outstandingBalance]
+    DashboardOperationsSummary:
+      allOf:
+        - $ref: "#/components/schemas/DashboardPeriodSnapshot"
+        - type: object
+          properties:
+            previousPeriod:
+              anyOf:
+                - $ref: "#/components/schemas/DashboardPeriodSnapshot"
+                - type: "null"
+          required: [previousPeriod]
+    DashboardPipelineStage:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        label:
+          type: string
+        count:
+          type: integer
+        orderValue:
+          type: ["number", "null"]
+      required: [status, label, count, orderValue]
+    DashboardTrendPoint:
+      type: object
+      properties:
+        bucket:
+          type: string
+          format: date
+        label:
+          type: string
+        orderCount:
+          type: integer
+        orderValue:
+          type: ["number", "null"]
+        readyWindows:
+          type: integer
+        totalWindows:
+          type: integer
+        installedOrders:
+          type: integer
+        outstandingBalance:
+          type: ["number", "null"]
+      required: [bucket, label, orderCount, orderValue, readyWindows, totalWindows, installedOrders, outstandingBalance]
+    DashboardAttentionItem:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        count:
+          type: integer
+        amount:
+          type: ["number", "null"]
+        href:
+          type: string
+        severity:
+          type: string
+          enum: [critical, warning, info, success]
+      required: [id, title, description, count, amount, href, severity]
+    DashboardActivityItem:
+      type: object
+      properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        action:
+          type: string
+        summary:
+          type: string
+        actorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, orderRecordId, orderId, clientName, action, summary, actorName, createdAt]
+    DashboardRecentOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        createdAt:
+          type: string
+          format: date-time
+        orderValue:
+          type: ["number", "null"]
+        totalWindows:
+          type: integer
+        readyWindows:
+          type: integer
+        dispatchStatus:
+          type: ["string", "null"]
+          enum: [pending_dispatch, dispatched, delivered, null]
+        installationStatus:
+          type: ["string", "null"]
+          enum: [pending, issue, installed, null]
+      required: [id, orderId, clientName, locationName, status, createdAt, orderValue, totalWindows, readyWindows, dispatchStatus, installationStatus]
+    DashboardDispatchOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        dispatchStatus:
+          $ref: "#/components/schemas/DispatchStatus"
+      required: [id, orderId, clientName, locationName, dispatchStatus]
+    DashboardInstallationScheduleItem:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        scheduledDate:
+          type: string
+          format: date
+        teamName:
+          type: ["string", "null"]
+        subteamName:
+          type: ["string", "null"]
+        assignedMembers:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, issue, installed]
+      required: [orderRecordId, orderId, clientName, locationName, scheduledDate, teamName, subteamName, assignedMembers, status]
+    DashboardMeasurementUpload:
+      type: object
+      properties:
+        id:
+          type: string
+        sheetId:
+          type: ["string", "null"]
+        clientName:
+          type: string
+        location:
+          type: ["string", "null"]
+        filename:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+        orderRecordId:
+          type: ["string", "null"]
+      required: [id, sheetId, clientName, location, filename, uploadedAt, orderRecordId]
+    DashboardTopClient:
+      type: object
+      properties:
+        clientId:
+          type: string
+        clientName:
+          type: string
+        orderCount:
+          type: integer
+        orderValue:
+          type: ["number", "null"]
+      required: [clientId, clientName, orderCount, orderValue]
+    DashboardReminderCandidate:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        balance:
+          type: number
+        canOpenWhatsApp:
+          type: boolean
+      required: [orderRecordId, orderId, clientName, locationName, balance, canOpenWhatsApp]
+    DashboardSectionErrors:
+      type: object
+      properties:
+        orders:
+          type: ["string", "null"]
+        windows:
+          type: ["string", "null"]
+        finance:
+          type: ["string", "null"]
+        dispatch:
+          type: ["string", "null"]
+        installation:
+          type: ["string", "null"]
+        approvals:
+          type: ["string", "null"]
+        glass:
+          type: ["string", "null"]
+        measurements:
+          type: ["string", "null"]
+        activity:
+          type: ["string", "null"]
+      required: [orders, windows, finance, dispatch, installation, approvals, glass, measurements, activity]
+    OperationsDashboard:
+      type: object
+      properties:
+        updatedAt:
+          type: string
+          format: date-time
+        permissions:
+          $ref: "#/components/schemas/DashboardOperationsPermissions"
+        filterOptions:
+          $ref: "#/components/schemas/DashboardFilterOptions"
+        summary:
+          $ref: "#/components/schemas/DashboardOperationsSummary"
+        pipeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardPipelineStage"
+        trend:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardTrendPoint"
+        attention:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardAttentionItem"
+        activity:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardActivityItem"
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardRecentOrder"
+        dispatchQueue:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardDispatchOrder"
+        installationSchedule:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardInstallationScheduleItem"
+        recentMeasurements:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardMeasurementUpload"
+        topClients:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardTopClient"
+        reminderCandidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardReminderCandidate"
+        sectionErrors:
+          $ref: "#/components/schemas/DashboardSectionErrors"
+      required: [updatedAt, permissions, filterOptions, summary, pipeline, trend, attention, activity, recentOrders, dispatchQueue, installationSchedule, recentMeasurements, topClients, reminderCandidates, sectionErrors]
     PaymentReminderOrder:
       type: object
       properties:

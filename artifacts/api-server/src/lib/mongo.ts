@@ -1554,6 +1554,7 @@ export async function initializeMongo(): Promise<void> {
     orders.createIndex({ clientId: 1, createdAt: -1 }, { name: "orders_by_client_date" }),
     orders.createIndex({ status: 1, createdAt: -1 }, { name: "orders_by_status_date" }),
     orders.createIndex({ locationCode: 1, createdAt: -1 }, { name: "orders_by_location_date" }),
+    orders.createIndex({ createdAt: -1 }, { name: "orders_by_created_date" }),
     orderWindows.createIndex({ orderRecordId: 1, windowNo: 1 }, { unique: true, partialFilterExpression: { archivedAt: null }, name: "active_window_no_unique" }),
     orderWindows.createIndex({ orderRecordId: 1, updatedAt: -1 }, { name: "windows_by_order" }),
     glassTrackingOrders.createIndex({ orderRecordId: 1 }, { unique: true, name: "glass_tracking_order_unique" }),
@@ -1578,6 +1579,10 @@ export async function initializeMongo(): Promise<void> {
     quotations.createIndex({ updatedAt: -1 }, { name: "quotations_by_updated_at" }),
     quotations.createIndex({ clientId: 1, updatedAt: -1 }, { name: "quotations_by_client" }),
     quotations.createIndex({ status: 1, approvalApproverId: 1, approvalSubmittedAt: -1 }, { name: "quotation_approval_queue" }),
+    getInstallations(db).createIndex(
+      { scheduledDate: 1, installationStatus: 1 },
+      { name: "installations_by_scheduled_date" },
+    ),
     appNotifications.createIndex({ userId: 1, createdAt: -1 }, { name: "notifications_by_user_date" }),
     appNotifications.createIndex({ userId: 1, readAt: 1 }, { name: "notifications_by_user_read_state" }),
     pushSubscriptions.createIndex({ userId: 1, updatedAt: -1 }, { name: "push_subscriptions_by_user" }),
@@ -1594,6 +1599,10 @@ export async function initializeMongo(): Promise<void> {
       },
     ),
     measurementRecords.createIndex({ updatedAt: -1 }, { name: "measurement_records_by_updated_at" }),
+    getMeasurementVersions(db).createIndex(
+      { uploadedAt: -1 },
+      { name: "measurement_versions_by_upload_date" },
+    ),
     quotationRateSubmissions.createIndex(
       { measurementRecordId: 1 },
       {
@@ -1601,6 +1610,10 @@ export async function initializeMongo(): Promise<void> {
         name: "rate_request_measurement_sheet_unique",
         partialFilterExpression: { measurementRecordId: { $type: "string" } },
       },
+    ),
+    quotationRateSubmissions.createIndex(
+      { status: 1, createdAt: -1 },
+      { name: "rate_requests_by_status_date" },
     ),
   ]);
 

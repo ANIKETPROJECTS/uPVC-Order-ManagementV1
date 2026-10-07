@@ -299,6 +299,175 @@ export const GetDashboardResponse = zod.object({
 
 
 /**
+ * @summary Get permission-scoped operational dashboard data
+ */
+export const getOperationsDashboardQueryQMax = 120;
+
+export const getOperationsDashboardQueryCompareDefault = false;
+
+export const GetOperationsDashboardQueryParams = zod.object({
+  "from": zod.date(),
+  "to": zod.date(),
+  "q": zod.coerce.string().max(getOperationsDashboardQueryQMax).optional(),
+  "stage": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
+  "clientId": zod.coerce.string().optional(),
+  "locationCode": zod.coerce.string().optional(),
+  "installerId": zod.coerce.string().optional(),
+  "paymentStatus": zod.enum(['paid', 'partial', 'unpaid']).optional(),
+  "assignment": zod.enum(['assigned', 'unassigned']).optional(),
+  "glassStatus": zod.enum(['untracked', 'pending', 'partial', 'received', 'broken']).optional(),
+  "compare": zod.coerce.boolean().default(getOperationsDashboardQueryCompareDefault)
+})
+
+export const GetOperationsDashboardResponse = zod.object({
+  "updatedAt": zod.coerce.date(),
+  "permissions": zod.object({
+  "orders": zod.boolean(),
+  "readiness": zod.boolean(),
+  "finance": zod.boolean(),
+  "dispatch": zod.boolean(),
+  "installation": zod.boolean(),
+  "approvals": zod.boolean(),
+  "measurements": zod.boolean(),
+  "glass": zod.boolean()
+}),
+  "filterOptions": zod.object({
+  "clients": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})),
+  "locations": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})),
+  "installers": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+}))
+}),
+  "summary": zod.object({
+  "activeOrders": zod.number().int(),
+  "orderValue": zod.number().nullable(),
+  "readyWindows": zod.number().int(),
+  "totalWindows": zod.number().int(),
+  "readyWindowPercent": zod.number().nullable(),
+  "installedOrders": zod.number().int(),
+  "outstandingBalance": zod.number().nullable()
+}).and(zod.object({
+  "previousPeriod": zod.union([zod.object({
+  "activeOrders": zod.number().int(),
+  "orderValue": zod.number().nullable(),
+  "readyWindows": zod.number().int(),
+  "totalWindows": zod.number().int(),
+  "readyWindowPercent": zod.number().nullable(),
+  "installedOrders": zod.number().int(),
+  "outstandingBalance": zod.number().nullable()
+}),zod.null()])
+})),
+  "pipeline": zod.array(zod.object({
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "label": zod.string(),
+  "count": zod.number().int(),
+  "orderValue": zod.number().nullable()
+})),
+  "trend": zod.array(zod.object({
+  "bucket": zod.coerce.date(),
+  "label": zod.string(),
+  "orderCount": zod.number().int(),
+  "orderValue": zod.number().nullable(),
+  "readyWindows": zod.number().int(),
+  "totalWindows": zod.number().int(),
+  "installedOrders": zod.number().int(),
+  "outstandingBalance": zod.number().nullable()
+})),
+  "attention": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "count": zod.number().int(),
+  "amount": zod.number().nullable(),
+  "href": zod.string(),
+  "severity": zod.enum(['critical', 'warning', 'info', 'success'])
+})),
+  "activity": zod.array(zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "action": zod.string(),
+  "summary": zod.string(),
+  "actorName": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "recentOrders": zod.array(zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "createdAt": zod.coerce.date(),
+  "orderValue": zod.number().nullable(),
+  "totalWindows": zod.number().int(),
+  "readyWindows": zod.number().int(),
+  "dispatchStatus": zod.union([zod.literal('pending_dispatch'),zod.literal('dispatched'),zod.literal('delivered'),zod.literal(null)]).nullable(),
+  "installationStatus": zod.union([zod.literal('pending'),zod.literal('issue'),zod.literal('installed'),zod.literal(null)]).nullable()
+})),
+  "dispatchQueue": zod.array(zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered'])
+})),
+  "installationSchedule": zod.array(zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "scheduledDate": zod.coerce.date(),
+  "teamName": zod.string().nullable(),
+  "subteamName": zod.string().nullable(),
+  "assignedMembers": zod.array(zod.string()),
+  "status": zod.enum(['pending', 'issue', 'installed'])
+})),
+  "recentMeasurements": zod.array(zod.object({
+  "id": zod.string(),
+  "sheetId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "filename": zod.string(),
+  "uploadedAt": zod.coerce.date(),
+  "orderRecordId": zod.string().nullable()
+})),
+  "topClients": zod.array(zod.object({
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "orderCount": zod.number().int(),
+  "orderValue": zod.number().nullable()
+})),
+  "reminderCandidates": zod.array(zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "balance": zod.number(),
+  "canOpenWhatsApp": zod.boolean()
+})),
+  "sectionErrors": zod.object({
+  "orders": zod.string().nullable(),
+  "windows": zod.string().nullable(),
+  "finance": zod.string().nullable(),
+  "dispatch": zod.string().nullable(),
+  "installation": zod.string().nullable(),
+  "approvals": zod.string().nullable(),
+  "glass": zod.string().nullable(),
+  "measurements": zod.string().nullable(),
+  "activity": zod.string().nullable()
+})
+})
+
+
+/**
  * @summary List every order with all-time payment progress
  */
 export const GetBalancePaymentRegisterResponseItem = zod.object({

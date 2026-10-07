@@ -1197,6 +1197,239 @@ export interface Dashboard {
   liveActivity: DashboardLiveActivityList;
 }
 
+export interface DashboardOperationsPermissions {
+  orders: boolean;
+  readiness: boolean;
+  finance: boolean;
+  dispatch: boolean;
+  installation: boolean;
+  approvals: boolean;
+  measurements: boolean;
+  glass: boolean;
+}
+
+export interface DashboardFilterOption {
+  id: string;
+  label: string;
+}
+
+export interface DashboardFilterOptions {
+  clients: DashboardFilterOption[];
+  locations: DashboardFilterOption[];
+  installers: DashboardFilterOption[];
+}
+
+export interface DashboardPeriodSnapshot {
+  activeOrders: number;
+  /** @nullable */
+  orderValue: number | null;
+  readyWindows: number;
+  totalWindows: number;
+  /** @nullable */
+  readyWindowPercent: number | null;
+  installedOrders: number;
+  /** @nullable */
+  outstandingBalance: number | null;
+}
+
+export type DashboardOperationsSummary = DashboardPeriodSnapshot & ({
+  previousPeriod: DashboardPeriodSnapshot | null;
+});
+
+export interface DashboardPipelineStage {
+  status: OrderStatus;
+  label: string;
+  count: number;
+  /** @nullable */
+  orderValue: number | null;
+}
+
+export interface DashboardTrendPoint {
+  bucket: string;
+  label: string;
+  orderCount: number;
+  /** @nullable */
+  orderValue: number | null;
+  readyWindows: number;
+  totalWindows: number;
+  installedOrders: number;
+  /** @nullable */
+  outstandingBalance: number | null;
+}
+
+export type DashboardAttentionItemSeverity = typeof DashboardAttentionItemSeverity[keyof typeof DashboardAttentionItemSeverity];
+
+
+export const DashboardAttentionItemSeverity = {
+  critical: 'critical',
+  warning: 'warning',
+  info: 'info',
+  success: 'success',
+} as const;
+
+export interface DashboardAttentionItem {
+  id: string;
+  title: string;
+  description: string;
+  count: number;
+  /** @nullable */
+  amount: number | null;
+  href: string;
+  severity: DashboardAttentionItemSeverity;
+}
+
+export interface DashboardActivityItem {
+  id: string;
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  action: string;
+  summary: string;
+  actorName: string;
+  createdAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type DashboardRecentOrderDispatchStatus = typeof DashboardRecentOrderDispatchStatus[keyof typeof DashboardRecentOrderDispatchStatus] | null;
+
+
+export const DashboardRecentOrderDispatchStatus = {
+  pending_dispatch: 'pending_dispatch',
+  dispatched: 'dispatched',
+  delivered: 'delivered',
+} as const;
+
+/**
+ * @nullable
+ */
+export type DashboardRecentOrderInstallationStatus = typeof DashboardRecentOrderInstallationStatus[keyof typeof DashboardRecentOrderInstallationStatus] | null;
+
+
+export const DashboardRecentOrderInstallationStatus = {
+  pending: 'pending',
+  issue: 'issue',
+  installed: 'installed',
+} as const;
+
+export interface DashboardRecentOrder {
+  id: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  status: OrderStatus;
+  createdAt: string;
+  /** @nullable */
+  orderValue: number | null;
+  totalWindows: number;
+  readyWindows: number;
+  /** @nullable */
+  dispatchStatus: DashboardRecentOrderDispatchStatus;
+  /** @nullable */
+  installationStatus: DashboardRecentOrderInstallationStatus;
+}
+
+export interface DashboardDispatchOrder {
+  id: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  dispatchStatus: DispatchStatus;
+}
+
+export type DashboardInstallationScheduleItemStatus = typeof DashboardInstallationScheduleItemStatus[keyof typeof DashboardInstallationScheduleItemStatus];
+
+
+export const DashboardInstallationScheduleItemStatus = {
+  pending: 'pending',
+  issue: 'issue',
+  installed: 'installed',
+} as const;
+
+export interface DashboardInstallationScheduleItem {
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  scheduledDate: string;
+  /** @nullable */
+  teamName: string | null;
+  /** @nullable */
+  subteamName: string | null;
+  assignedMembers: string[];
+  status: DashboardInstallationScheduleItemStatus;
+}
+
+export interface DashboardMeasurementUpload {
+  id: string;
+  /** @nullable */
+  sheetId: string | null;
+  clientName: string;
+  /** @nullable */
+  location: string | null;
+  filename: string;
+  uploadedAt: string;
+  /** @nullable */
+  orderRecordId: string | null;
+}
+
+export interface DashboardTopClient {
+  clientId: string;
+  clientName: string;
+  orderCount: number;
+  /** @nullable */
+  orderValue: number | null;
+}
+
+export interface DashboardReminderCandidate {
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  balance: number;
+  canOpenWhatsApp: boolean;
+}
+
+export interface DashboardSectionErrors {
+  /** @nullable */
+  orders: string | null;
+  /** @nullable */
+  windows: string | null;
+  /** @nullable */
+  finance: string | null;
+  /** @nullable */
+  dispatch: string | null;
+  /** @nullable */
+  installation: string | null;
+  /** @nullable */
+  approvals: string | null;
+  /** @nullable */
+  glass: string | null;
+  /** @nullable */
+  measurements: string | null;
+  /** @nullable */
+  activity: string | null;
+}
+
+export interface OperationsDashboard {
+  updatedAt: string;
+  permissions: DashboardOperationsPermissions;
+  filterOptions: DashboardFilterOptions;
+  summary: DashboardOperationsSummary;
+  pipeline: DashboardPipelineStage[];
+  trend: DashboardTrendPoint[];
+  attention: DashboardAttentionItem[];
+  activity: DashboardActivityItem[];
+  recentOrders: DashboardRecentOrder[];
+  dispatchQueue: DashboardDispatchOrder[];
+  installationSchedule: DashboardInstallationScheduleItem[];
+  recentMeasurements: DashboardMeasurementUpload[];
+  topClients: DashboardTopClient[];
+  reminderCandidates: DashboardReminderCandidate[];
+  sectionErrors: DashboardSectionErrors;
+}
+
 export interface PaymentReminderOrder {
   orderRecordId: string;
   orderId: string;
@@ -2108,6 +2341,51 @@ export type ListUsersStatus = typeof ListUsersStatus[keyof typeof ListUsersStatu
 export const ListUsersStatus = {
   active: 'active',
   inactive: 'inactive',
+} as const;
+
+export type GetOperationsDashboardParams = {
+from: string;
+to: string;
+/**
+ * @maxLength 120
+ */
+q?: string;
+stage?: OrderStatus;
+clientId?: string;
+locationCode?: string;
+installerId?: string;
+paymentStatus?: GetOperationsDashboardPaymentStatus;
+assignment?: GetOperationsDashboardAssignment;
+glassStatus?: GetOperationsDashboardGlassStatus;
+compare?: boolean;
+};
+
+export type GetOperationsDashboardPaymentStatus = typeof GetOperationsDashboardPaymentStatus[keyof typeof GetOperationsDashboardPaymentStatus];
+
+
+export const GetOperationsDashboardPaymentStatus = {
+  paid: 'paid',
+  partial: 'partial',
+  unpaid: 'unpaid',
+} as const;
+
+export type GetOperationsDashboardAssignment = typeof GetOperationsDashboardAssignment[keyof typeof GetOperationsDashboardAssignment];
+
+
+export const GetOperationsDashboardAssignment = {
+  assigned: 'assigned',
+  unassigned: 'unassigned',
+} as const;
+
+export type GetOperationsDashboardGlassStatus = typeof GetOperationsDashboardGlassStatus[keyof typeof GetOperationsDashboardGlassStatus];
+
+
+export const GetOperationsDashboardGlassStatus = {
+  untracked: 'untracked',
+  pending: 'pending',
+  partial: 'partial',
+  received: 'received',
+  broken: 'broken',
 } as const;
 
 export type ListClientsParams = {
