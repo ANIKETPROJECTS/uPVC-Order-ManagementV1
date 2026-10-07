@@ -1,0 +1,71 @@
+You are working on my existing order-management web app (Framewise / Shree Sai Wintech – windows, shutters, glass, QR production, installations, payments). I need two changes.
+
+========================================
+TASK 1 — REMOVE "REPORTS" FROM ADMIN & REPORTS
+========================================
+In the sidebar, under the "Admin & reports" section, the flyout currently shows "User access" and "Reports (SOON)".
+- Remove the "Reports" item completely (menu entry, route, placeholder page, any imports/permissions/constants referring to it).
+- Keep "User access" untouched.
+- Make sure nothing else in the codebase breaks (search for all references before deleting).
+- Do not rename the section yet; leave "Admin & reports" as is unless I ask.
+
+========================================
+TASK 2 — BUILD A "DASHBOARD" UNDER OVERVIEW
+========================================
+The sidebar "Overview" section should open a Dashboard page that gives a full, live overview of the ENTIRE software.
+
+STEP 1 — AUDIT FIRST (do NOT write dashboard code yet)
+Go through the whole codebase and understand it end-to-end:
+1. List every module/page (e.g. Orders, Measurements, Rate Approval, QR Production, Window Tracking, Glass Tracking, Payments, Dispatch Tracking, Installations, Quotation Builder / approvals, Communication, Measurement sheets / retained register, Sales & Orders, Production, Finance, User access, etc.).
+2. For each module, note: data models/tables, key fields (status, amount, dates, assignee, client), status/stage enums, and existing API endpoints / queries / services.
+3. Note which filters already exist on other pages (search, status, client, date range, installer, payment status, etc.) and reuse the same components, naming and query patterns.
+4. Note the existing design system (colors, cards, fonts, charts library, dark/light mode, role-based access) so the dashboard matches.
+5. Give me a short summary of what you found and a PROPOSED list of dashboard sections, with the data source for each. Then continue to build (don't wait unless something is ambiguous).
+
+STEP 2 — DASHBOARD SECTIONS
+Include only sections that are supported by real data in this software. Based on my reference screenshots, the expected sections are (add/remove based on your audit):
+
+A. Hero banner – "Every order, one clear view": Total orders, % windows ready, installed count, live clock/"Live" indicator.
+B. KPI cards (with small sparkline + trend vs previous period): Total orders (active count), Revenue (order value), Windows ready (e.g. 131/201 + % complete), Pending balance (needs follow-up).
+C. Order Pipeline – stage cards with count + value + progress bar: Measurement → Rate Pending → In Production → Ready → Installed. Clicking a stage filters orders/recent orders by that stage.
+D. Needs Attention (with total count badge) – actionable alerts: orders awaiting dispatch, rate approvals pending, glass shipments flagged/broken, installed with balance due, balance reminders ready (with a "Send" button that uses the existing reminder flow). Each item links to the relevant page/record.
+E. Live Activity feed – advance payment confirmed, QR scanned, balance reminder sent, glass breakage flagged, etc., with relative timestamps and auto-refresh/polling (or websocket if the app already uses it).
+F. Order & Revenue Trend – area/line chart with orders count and revenue total; quick range toggle 7D / 30D / 90D / 6M.
+G. Orders by Stage – donut chart with legend (In Production, Installed, Measurement, Rate Pending, Ready); clicking a segment filters.
+H. Recent Orders table – order no., client (avatar), windows (ready/total), value, status chip, "View all" link.
+I. Installer Capacity – per-installer load bar (e.g. 3/5), red when at/near full.
+J. If data exists, also consider: Quotation approvals pending, Measurement sheets uploaded recently, Production/QR scan progress, Glass tracking status, Dispatch status, Payments collected vs pending, Top clients, Overdue items. Add these ONLY if the audit shows real data for them.
+
+STEP 3 — GLOBAL FILTERS (top of dashboard, sticky)
+Add a filter bar that controls EVERY widget on the page at once:
+- Search box (orders, clients, order no. – same behaviour as the existing top search, with the ⌘K shortcut).
+- Date range picker with presets: Today, Yesterday, Last 7 days, Last 30 days, Last 90 days, This month, Last month, This financial year (Apr–Mar), Custom range. Default: Last 30 days.
+- Compare toggle: "vs previous period" (drives the trend arrows/percentages on KPI cards).
+- Additional filters reusing whatever other pages already have: Order status/stage, Client, Location, Installer, Payment status (Paid / Partial / Pending), Order assignment, Glass vendor, etc. (use only those that exist in the app).
+- "Reset filters" button, active-filter chips, and persist the selection in the URL query params (so it survives refresh/share) and optionally localStorage.
+- Auto-refresh toggle (e.g. every 30–60s) plus manual refresh button and "Last updated" text.
+
+Date-range behaviour (important):
+- Every widget must respond to the selected date range: KPI cards, pipeline counts/values, Needs Attention, Live Activity, trend chart, orders-by-stage, recent orders, installer capacity, etc.
+- Define clearly which date field each widget uses (order created date, payment date, installation date, dispatch date, activity timestamp) and document it in a code comment.
+- The trend chart bucket size should adapt: hourly/daily for ≤30 days, weekly for 90 days, monthly for 6M+.
+- Previous-period comparison must use an equal-length period immediately before the selected one.
+- Show proper empty states ("No orders in this period") and loading skeletons.
+
+STEP 4 — TECHNICAL REQUIREMENTS
+- Backend: create (or extend) aggregation endpoints, e.g. GET /api/dashboard/summary, /pipeline, /attention, /activity, /trend, /stage-distribution, /recent-orders, /installer-capacity – all accepting the same filter params (from, to, search, stage, client, installer, paymentStatus, etc.). Use efficient aggregate queries (no N+1, add indexes if needed).
+- Respect existing role-based access: Super Admin / Master Admin see everything; other roles see only what they're permitted to (hide widgets and revenue figures they can't access).
+- Currency in Indian format (₹9,70,200; use lakh "L" / crore "Cr" shorthand on small cards).
+- Fully responsive (desktop, tablet, mobile), support existing light/dark theme, match the existing UI style (rounded cards, soft gradients, teal/navy palette, status chips).
+- Reuse existing components, hooks, API client and chart library; don't introduce a new library unless unavoidable.
+- Make all cards/rows clickable, deep-linking to the relevant page with the same filters pre-applied.
+- Handle errors per widget (one failing widget must not break the page).
+- Add sidebar item "Dashboard" under OVERVIEW (replace/redirect the current "Overview" entry if it's a placeholder) and make it the default landing page after login.
+
+STEP 5 — DELIVERABLES
+1. Short audit summary + final list of dashboard sections chosen (with reason for each included/excluded).
+2. Code changes (backend + frontend) with file list.
+3. Notes on any assumptions, plus any seed/test data needed to preview it.
+4. Quick test checklist: change date range → all widgets update; apply stage/client/installer filter → all widgets update; reset works; role restrictions work; Reports menu is gone.
+
+Work step by step: do Task 1, then the audit, then show me the proposed sections, then build.

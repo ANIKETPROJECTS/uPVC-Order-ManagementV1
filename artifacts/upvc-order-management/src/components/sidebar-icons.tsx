@@ -14,7 +14,6 @@ export type SidebarIconName =
   | 'balance-payment'
   | 'dispatch'
   | 'installation'
-  | 'reporting'
   | 'roles';
 
 type SidebarSectionIconProps = {
@@ -39,7 +38,6 @@ const accents: Record<SidebarIconName, string> = {
   'balance-payment': '#9E91FF',
   dispatch: '#FF977D',
   installation: '#73D4A6',
-  reporting: '#8AA8FF',
   roles: '#F4AE65',
 };
 
@@ -184,15 +182,6 @@ export function SidebarSectionIcon({ name, size = 19, className = '' }: SidebarS
           <path d="M6.2 10v9h11.6v-9" fill="#DDF8E8" stroke="#56B98E" strokeWidth="1.2" strokeLinejoin="round" />
           <path d="M10 19v-5h4v5" fill="#9CCBFF" />
           <path d="m16 5.5 2.6 2.6m-1.2-3.7 2.3 2.3" stroke="#FFC568" strokeWidth="1.7" strokeLinecap="round" />
-        </g>
-      )}
-      {name === 'reporting' && (
-        <g>
-          <path d="M4.5 19.5h15" stroke="#CBD8F4" strokeWidth="1.4" strokeLinecap="round" />
-          <rect x="5.5" y="12.5" width="3.2" height="6" rx="1" fill="#61D2C3" />
-          <rect x="10.3" y="8.5" width="3.2" height="10" rx="1" fill="#8A8BFF" />
-          <rect x="15.1" y="5" width="3.2" height="13.5" rx="1" fill="#FFC568" />
-          <path d="m5.8 10 4-2 3.2 1 4-4" stroke="#EEF3FF" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
         </g>
       )}
       {name === 'roles' && (

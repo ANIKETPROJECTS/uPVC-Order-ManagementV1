@@ -21,7 +21,6 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'balance-payment', label: 'Balance Payment Register', short: 'Balance payment', built: true },
   { key: 'dispatch', label: 'Dispatch Status & QR Tracking', short: 'Dispatch', built: true },
   { key: 'installation', label: 'Installation Scheduling', short: 'Installation', built: true },
-  { key: 'reporting', label: 'Central Dashboard & Reporting', short: 'Reports' },
 ];
 
 export const permissionValues: PermissionValue[] = ['none', 'view', 'edit'];

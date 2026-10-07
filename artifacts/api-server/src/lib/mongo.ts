@@ -46,7 +46,6 @@ export const MODULES = [
   { id: "balance-payment", label: "Balance Payment Register" },
   { id: "dispatch", label: "Dispatch QR & Gate Pass" },
   { id: "installation", label: "Installation Scheduling" },
-  { id: "reporting", label: "Central Dashboard & Reporting" },
 ] as const;
 
 export type ModuleId = (typeof MODULES)[number]["id"];
@@ -1282,7 +1281,6 @@ const seedRoles: Array<Omit<RoleDocument, "createdAt" | "updatedAt">> = [
       "glass-procurement": "view",
       dispatch: "view",
       installation: "view",
-      reporting: "view",
     }),
   },
   {
@@ -1308,7 +1306,6 @@ const seedRoles: Array<Omit<RoleDocument, "createdAt" | "updatedAt">> = [
       payments: "edit",
       "balance-payment": "view",
       dispatch: "edit",
-      reporting: "view",
     }),
   },
   {

@@ -86,7 +86,6 @@ const iconMap: Record<string, SidebarIconName> = {
   'balance-payment': 'balance-payment',
   dispatch: 'dispatch',
   installation: 'installation',
-  reporting: 'reporting',
 };
 
 const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : `/${key}`;
@@ -103,7 +102,7 @@ const isModuleActive = (key: string, location: string) => {
 };
 
 const navigationGroups: { id: string; label: string; icon: SidebarIconName; moduleKeys: string[] }[] = [
-  { id: 'management', label: 'Admin & reports', icon: 'user-access', moduleKeys: ['user-access', 'reporting'] },
+  { id: 'management', label: 'Admin & reports', icon: 'user-access', moduleKeys: ['user-access'] },
   { id: 'orders', label: 'Sales & orders', icon: 'order-hub', moduleKeys: ['order-hub', 'quotation-builder', 'confirmation'] },
   { id: 'production', label: 'Production', icon: 'measurements', moduleKeys: ['measurements', 'glass-procurement'] },
   { id: 'finance', label: 'Finance', icon: 'payments', moduleKeys: ['payments', 'balance-payment'] },
