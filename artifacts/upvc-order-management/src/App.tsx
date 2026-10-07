@@ -63,13 +63,17 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
 
 function Router() {
   const session = useGetAuthSession();
-  return <ErrorBoundary resetKey={window.location.pathname}>
-    {session.isLoading ? <div className="flex min-h-[100dvh] items-center justify-center bg-background"><div className="w-full max-w-sm space-y-3 px-6"><div className="h-10 w-10 animate-pulse rounded-xl bg-secondary" /><div className="h-7 w-56 animate-pulse rounded-lg bg-muted" /><div className="h-4 w-72 animate-pulse rounded-lg bg-muted" /></div></div> : session.isError ? <LoginPage /> : <AuthenticatedRoutes user={session.data?.user || null} />}
-  </ErrorBoundary>;
+  const userId = session.data?.user?.id ?? 'signed-out';
+  return <ThemeProvider key={userId} attribute="class" defaultTheme="light" enableSystem={false} storageKey={`framewise-theme:${userId}`} disableTransitionOnChange>
+    <ErrorBoundary resetKey={window.location.pathname}>
+      {session.isLoading ? <div className="flex min-h-[100dvh] items-center justify-center bg-background"><div className="w-full max-w-sm space-y-3 px-6"><div className="h-10 w-10 animate-pulse rounded-xl bg-secondary" /><div className="h-7 w-56 animate-pulse rounded-lg bg-muted" /><div className="h-4 w-72 animate-pulse rounded-lg bg-muted" /></div></div> : session.isError ? <LoginPage /> : <AuthenticatedRoutes user={session.data?.user || null} />}
+    </ErrorBoundary>
+    <Toaster />
+  </ThemeProvider>;
 }
 
 function App() {
-  return <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="framewise-theme" disableTransitionOnChange><QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider></ThemeProvider>;
+  return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter></TooltipProvider></QueryClientProvider>;
 }
 
 export default App;

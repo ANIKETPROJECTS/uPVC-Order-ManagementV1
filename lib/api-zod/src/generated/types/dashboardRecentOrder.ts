@@ -7,14 +7,13 @@
  */
 import type { DashboardRecentOrderDispatchStatus } from './dashboardRecentOrderDispatchStatus';
 import type { DashboardRecentOrderInstallationStatus } from './dashboardRecentOrderInstallationStatus';
-import type { OrderStatus } from './orderStatus';
 
 export interface DashboardRecentOrder {
   id: string;
   orderId: string;
   clientName: string;
   locationName: string;
-  status: OrderStatus;
+  status: string;
   createdAt: Date;
   /** @nullable */
   orderValue: number | null;
@@ -24,4 +23,6 @@ export interface DashboardRecentOrder {
   dispatchStatus: DashboardRecentOrderDispatchStatus;
   /** @nullable */
   installationStatus: DashboardRecentOrderInstallationStatus;
+  /** @nullable */
+  paymentStatus: string | null;
 }

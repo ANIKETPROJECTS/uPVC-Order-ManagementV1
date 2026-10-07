@@ -71,6 +71,8 @@ export interface UserDocument {
   avatarUrl?: string | null;
   roleId: string;
   installationCapacity?: number;
+  dashboardWidgetOrder?: string[];
+  dashboardHiddenWidgets?: string[];
   status: UserStatus;
   lastLogin: Date | null;
   permissionOverrides: PermissionMap | null;
@@ -1619,6 +1621,91 @@ export async function initializeMongo(): Promise<void> {
       { name: "rate_requests_by_status_date" },
     ),
   ]);
+
+  const dashboardActivityMigration = db.collection<{ _id: string; completedAt: Date }>("operations_migrations");
+  const activityBackfillMigrationId = "dashboard-order-activity-backfill-v1";
+  if (!(await dashboardActivityMigration.findOne({ _id: activityBackfillMigrationId }))) {
+    const legacyOrders = await orders.find({})
+      .project<{ _id: string; orderId: string; createdAt: Date; updatedAt: Date }>({
+        _id: 1,
+        orderId: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .toArray();
+    const legacyOrderIds = legacyOrders.map((order) => order._id);
+    const existingEvents = legacyOrderIds.length
+      ? await orderActivity.find({ orderRecordId: { $in: legacyOrderIds } })
+        .project<{ orderRecordId: string; action: string; createdAt: Date }>({
+          orderRecordId: 1,
+          action: 1,
+          createdAt: 1,
+        })
+        .toArray()
+      : [];
+    const eventsByOrder = new Map<string, typeof existingEvents>();
+    for (const event of existingEvents) {
+      const events = eventsByOrder.get(event.orderRecordId) ?? [];
+      events.push(event);
+      eventsByOrder.set(event.orderRecordId, events);
+    }
+    const activityBackfillOperations = legacyOrders.flatMap((order) => {
+      const events = eventsByOrder.get(order._id) ?? [];
+      const operations = [];
+      if (!events.some((event) => event.action === "order.created")) {
+        operations.push({
+          updateOne: {
+            filter: { _id: `dashboard-backfill:created:${order._id}` },
+            update: {
+              $setOnInsert: {
+                _id: `dashboard-backfill:created:${order._id}`,
+                orderRecordId: order._id,
+                actorId: "system",
+                actorName: "System",
+                action: "order.created",
+                summary: `Order ${order.orderId} entered the system; activity history was backfilled from its creation date.`,
+                createdAt: order.createdAt,
+              },
+            },
+            upsert: true,
+          },
+        });
+      }
+      if (
+        order.updatedAt instanceof Date
+        && order.createdAt instanceof Date
+        && order.updatedAt.getTime() - order.createdAt.getTime() > 5_000
+        && !events.some((event) => Math.abs(event.createdAt.getTime() - order.updatedAt.getTime()) <= 5_000)
+      ) {
+        operations.push({
+          updateOne: {
+            filter: { _id: `dashboard-backfill:updated:${order._id}` },
+            update: {
+              $setOnInsert: {
+                _id: `dashboard-backfill:updated:${order._id}`,
+                orderRecordId: order._id,
+                actorId: "system",
+                actorName: "System",
+                action: "order.updated",
+                summary: `Order ${order.orderId} was last updated; activity history was backfilled from its updated date.`,
+                createdAt: order.updatedAt,
+              },
+            },
+            upsert: true,
+          },
+        });
+      }
+      return operations;
+    });
+    if (activityBackfillOperations.length) {
+      await orderActivity.bulkWrite(activityBackfillOperations, { ordered: false });
+    }
+    await dashboardActivityMigration.updateOne(
+      { _id: activityBackfillMigrationId },
+      { $setOnInsert: { completedAt: new Date() } },
+      { upsert: true },
+    );
+  }
 
   const now = new Date();
   for (const profile of seedWindowProfiles) {

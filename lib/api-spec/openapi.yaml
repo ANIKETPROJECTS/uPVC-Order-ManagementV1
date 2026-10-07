@@ -306,7 +306,7 @@ paths:
         - name: stage
           in: query
           schema:
-            $ref: "#/components/schemas/OrderStatus"
+            type: string
         - name: clientId
           in: query
           schema:
@@ -323,17 +323,14 @@ paths:
           in: query
           schema:
             type: string
-            enum: [paid, partial, unpaid]
         - name: assignment
           in: query
           schema:
             type: string
-            enum: [assigned, unassigned]
         - name: glassStatus
           in: query
           schema:
             type: string
-            enum: [untracked, pending, partial, received, broken]
         - name: compare
           in: query
           schema:
@@ -346,6 +343,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OperationsDashboard"
+  /dashboard/preferences:
+    get:
+      operationId: getDashboardPreferences
+      tags: [dashboard]
+      summary: Get the signed-in user's dashboard preferences
+      responses:
+        "200":
+          description: Saved widget visibility and order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardPreferences"
+    put:
+      operationId: updateDashboardPreferences
+      tags: [dashboard]
+      summary: Save the signed-in user's dashboard preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DashboardPreferencesInput"
+      responses:
+        "200":
+          description: Saved widget visibility and order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardPreferences"
   /payments/balance-register:
     get:
       operationId: getBalancePaymentRegister
@@ -4747,7 +4773,53 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DashboardFilterOption"
-      required: [clients, locations, installers]
+        stages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardFilterOption"
+        paymentStates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardFilterOption"
+        assignmentStates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardFilterOption"
+        glassStates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardFilterOption"
+      required: [clients, locations, installers, stages, paymentStates, assignmentStates, glassStates]
+    DashboardPreferences:
+      type: object
+      properties:
+        order:
+          type: array
+          items:
+            type: string
+        hidden:
+          type: array
+          items:
+            type: string
+      required: [order, hidden]
+    DashboardPreferencesInput:
+      type: object
+      properties:
+        order:
+          type: array
+          maxItems: 40
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        hidden:
+          type: array
+          maxItems: 40
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+      required: [order, hidden]
     DashboardPeriodSnapshot:
       type: object
       properties:
@@ -4780,7 +4852,7 @@ components:
       type: object
       properties:
         status:
-          $ref: "#/components/schemas/OrderStatus"
+          type: string
         label:
           type: string
         count:
@@ -4861,7 +4933,7 @@ components:
         locationName:
           type: string
         status:
-          $ref: "#/components/schemas/OrderStatus"
+          type: string
         createdAt:
           type: string
           format: date-time
@@ -4877,7 +4949,9 @@ components:
         installationStatus:
           type: ["string", "null"]
           enum: [pending, issue, installed, null]
-      required: [id, orderId, clientName, locationName, status, createdAt, orderValue, totalWindows, readyWindows, dispatchStatus, installationStatus]
+        paymentStatus:
+          type: ["string", "null"]
+      required: [id, orderId, clientName, locationName, status, createdAt, orderValue, totalWindows, readyWindows, dispatchStatus, installationStatus, paymentStatus]
     DashboardDispatchOrder:
       type: object
       properties:

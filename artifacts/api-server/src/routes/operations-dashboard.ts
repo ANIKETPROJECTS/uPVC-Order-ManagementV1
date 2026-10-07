@@ -1,8 +1,11 @@
 import { Router, type IRouter, type Request } from "express";
 import type { Filter } from "mongodb";
 import {
+  GetDashboardPreferencesResponse,
   GetOperationsDashboardQueryParams,
   GetOperationsDashboardResponse,
+  UpdateDashboardPreferencesBody,
+  UpdateDashboardPreferencesResponse,
 } from "@workspace/api-zod";
 import {
   getClients,
@@ -24,7 +27,6 @@ import {
   getUsers,
   type InstallationDocument,
   type OrderDocument,
-  type OrderStatus,
   type PermissionMap,
   type QuotationDocument,
   type QuotationRateSubmissionDocument,
@@ -34,22 +36,9 @@ import {
 const router: IRouter = Router();
 const IST_OFFSET = "+05:30";
 const DAY_MS = 24 * 60 * 60 * 1000;
-const ORDER_STATUSES: OrderStatus[] = [
-  "quotation_stage",
-  "confirmed",
-  "in_production",
-  "ready",
-  "dispatched",
-  "installed",
-];
-const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  quotation_stage: "Quotation stage",
-  confirmed: "Confirmed",
-  in_production: "In production",
-  ready: "Ready",
-  dispatched: "Dispatched",
-  installed: "Installed",
-};
+const dashboardStatusLabel = (status: string) => status
+  .replaceAll("_", " ")
+  .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 type ErrorSection =
   | "orders"
@@ -107,7 +96,7 @@ function getPermission(
 
 function buildOrderQuery(
   params: {
-    stage?: OrderStatus;
+    stage?: string;
     clientId?: string;
     locationCode?: string;
     q?: string;
@@ -118,7 +107,7 @@ function buildOrderQuery(
   if (dateRange) {
     query.createdAt = { $gte: dateRange.start, $lt: dateRange.endExclusive };
   }
-  if (params.stage) query.status = params.stage;
+  if (params.stage) query.status = params.stage as OrderDocument["status"];
   if (params.clientId) query.clientId = params.clientId;
   if (params.locationCode) query.locationCode = params.locationCode;
   if (params.q) {
@@ -183,9 +172,9 @@ function matchesRelatedFilters(
   order: OrderDocument,
   params: {
     installerId?: string;
-    assignment?: "assigned" | "unassigned";
-    paymentStatus?: "paid" | "partial" | "unpaid";
-    glassStatus?: "untracked" | "pending" | "partial" | "received" | "broken";
+    assignment?: string;
+    paymentStatus?: string;
+    glassStatus?: string;
   },
   installationByOrder: Map<string, InstallationDocument>,
   glassByOrder: Map<string, { items: Array<{ ordered: number; received: number; broken: number }> }>,
@@ -445,6 +434,17 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
       "orders",
       sectionErrors,
       () => getOrders(db).find(currentQuery).sort({ createdAt: -1 }).toArray(),
+      [],
+    )
+    : [];
+  const orderStatuses = canViewOrders
+    ? await safeRead(
+      req,
+      "orders",
+      sectionErrors,
+      async () => [...new Set((await getOrders(db).distinct("status", { isActive: { $ne: false } }))
+        .filter((status) => typeof status === "string" && status.trim().length > 0))]
+        .sort((left, right) => dashboardStatusLabel(left).localeCompare(dashboardStatusLabel(right))),
       [],
     )
     : [];
@@ -811,21 +811,97 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
       req,
       "activity",
       sectionErrors,
-      () => filteredCurrentOrderIds.size
-        ? getOrderActivity(db)
-          .find({
-            orderRecordId: { $in: [...filteredCurrentOrderIds] },
-            createdAt: { $gte: start, $lt: endExclusive },
-          })
-          .sort({ createdAt: -1 })
-          .limit(60)
-          .toArray()
-        : Promise.resolve([]),
+      () => getOrderActivity(db)
+        .find({ createdAt: { $gte: start, $lt: endExclusive } })
+        .sort({ createdAt: -1 })
+        .limit(300)
+        .toArray(),
       [],
     )
     : [];
+  const activityOrderIds = [...new Set(activityRows.map((item) => item.orderRecordId))];
+  const activityOrders = activityOrderIds.length
+    ? await safeRead(
+      req,
+      "activity",
+      sectionErrors,
+      () => getOrders(db).find({
+        _id: { $in: activityOrderIds },
+        isActive: { $ne: false },
+      }).toArray(),
+      [],
+    )
+    : [];
+  const activityOrderById = new Map(activityOrders.map((order) => [order._id, order]));
+  const activityHasRelatedFilters = Boolean(
+    (canViewInstallation && (params.installerId || params.assignment))
+    || (canViewFinance && params.paymentStatus)
+    || (canViewGlass && params.glassStatus),
+  );
+  const activityInstallationRows = activityHasRelatedFilters && canViewInstallation && activityOrderIds.length
+    ? await safeRead(
+      req,
+      "installation",
+      sectionErrors,
+      () => getInstallations(db).find({ orderRecordId: { $in: activityOrderIds } }).toArray(),
+      [],
+    )
+    : [];
+  const activityGlassRows = activityHasRelatedFilters && canViewGlass && activityOrderIds.length
+    ? await safeRead(
+      req,
+      "glass",
+      sectionErrors,
+      () => getGlassTrackingOrders(db).find({ orderRecordId: { $in: activityOrderIds } }).toArray(),
+      [],
+    )
+    : [];
+  const activityFinanceRows = activityHasRelatedFilters && canViewFinance && activityOrderIds.length
+    ? await safeRead(
+      req,
+      "finance",
+      sectionErrors,
+      async () => Promise.all([
+        getOrderPayments(db).aggregate<{ _id: string; total: number }>([
+          { $match: { orderRecordId: { $in: activityOrderIds }, status: "received" } },
+          { $group: { _id: "$orderRecordId", total: { $sum: "$amount" } } },
+        ]).toArray(),
+        getOrderRefunds(db).aggregate<{ _id: string; total: number }>([
+          { $match: { orderRecordId: { $in: activityOrderIds } } },
+          { $group: { _id: "$orderRecordId", total: { $sum: "$amount" } } },
+        ]).toArray(),
+      ]),
+      [[], []],
+    )
+    : [[], []];
+  const activityInstallationByOrder = new Map([
+    ...installationByOrder,
+    ...activityInstallationRows.map((row) => [row.orderRecordId, row] as const),
+  ]);
+  const activityGlassByOrder = new Map([
+    ...glassByOrder,
+    ...activityGlassRows.map((row) => [row.orderRecordId, row] as const),
+  ]);
+  const activityReceivedByOrder = new Map([
+    ...receivedByOrder,
+    ...activityFinanceRows[0].map((row) => [row._id, row.total] as const),
+  ]);
+  const activityRefundedByOrder = new Map([
+    ...refundedByOrder,
+    ...activityFinanceRows[1].map((row) => [row._id, row.total] as const),
+  ]);
   const activity = activityRows
     .filter((item) => {
+      const order = activityOrderById.get(item.orderRecordId);
+      if (!order || !matchesCommon(order)) return false;
+      if (activityHasRelatedFilters && !matchesRelatedFilters(
+        order,
+        params,
+        activityInstallationByOrder,
+        activityGlassByOrder,
+        activityReceivedByOrder,
+        activityRefundedByOrder,
+      )) return false;
       const action = item.action.toLowerCase();
       if (!canViewFinance && action.startsWith("payment")) return false;
       if (!canViewGlass && action.startsWith("glass")) return false;
@@ -972,14 +1048,14 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
     });
   }
 
-  const statusMap = new Map<OrderStatus, OrderDocument[]>(
-    ORDER_STATUSES.map((status) => [status, filteredCurrentOrders.filter((order) => order.status === status)]),
+  const statusMap = new Map<string, OrderDocument[]>(
+    orderStatuses.map((status) => [status, filteredCurrentOrders.filter((order) => order.status === status)]),
   );
-  const pipeline = ORDER_STATUSES.map((status) => {
+  const pipeline = orderStatuses.map((status) => {
     const rows = statusMap.get(status) ?? [];
     return {
       status,
-      label: ORDER_STATUS_LABELS[status],
+      label: dashboardStatusLabel(status),
       count: canViewOrders ? rows.length : 0,
       orderValue: canViewFinance
         ? rows.reduce((sum, order) => sum + (order.orderValue ?? 0), 0)
@@ -1059,6 +1135,9 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
       installationStatus: canViewInstallation
         ? installationByOrder.get(order._id)?.installationStatus ?? "pending"
         : null,
+      paymentStatus: canViewFinance
+        ? paymentState(order, receivedByOrder, refundedByOrder)
+        : null,
     }))
     : [];
   const topClientRows = new Map<string, { clientName: string; orders: OrderDocument[] }>();
@@ -1126,6 +1205,22 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
       clients: canViewOrders ? clients.map((client) => ({ id: client._id, label: client.name })) : [],
       locations: canViewOrders ? locations.map((location) => ({ id: location.code, label: location.name })) : [],
       installers: canViewInstallation ? installerOptions : [],
+      stages: canViewOrders ? orderStatuses.map((status) => ({ id: status, label: dashboardStatusLabel(status) })) : [],
+      paymentStates: canViewFinance
+        ? [...new Set(currentOrders.map((order) => paymentState(order, receivedByOrder, refundedByOrder)).filter((state) => state !== "unknown"))]
+          .sort()
+          .map((state) => ({ id: state, label: dashboardStatusLabel(state) }))
+        : [],
+      assignmentStates: canViewInstallation
+        ? [...new Set(currentOrders.map((order) => installmentIsAssigned(installationByOrder.get(order._id)) ? "assigned" : "unassigned"))]
+          .sort()
+          .map((state) => ({ id: state, label: dashboardStatusLabel(state) }))
+        : [],
+      glassStates: canViewGlass
+        ? [...new Set(currentOrders.map((order) => glassState(glassByOrder.get(order._id))))]
+          .sort()
+          .map((state) => ({ id: state, label: dashboardStatusLabel(state) }))
+        : [],
     },
     summary: {
       ...snapshot(
@@ -1174,6 +1269,54 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
   };
   res.setHeader("Cache-Control", "private, no-store");
   res.json(GetOperationsDashboardResponse.parse(response));
+});
+
+router.get("/dashboard/preferences", async (req, res): Promise<void> => {
+  const db = await getMongoDb();
+  const user = req.session.userId
+    ? await getUsers(db).findOne({ _id: req.session.userId, status: "active" })
+    : null;
+  if (!user) {
+    res.status(401).json({ error: "Sign in to continue." });
+    return;
+  }
+  res.json(GetDashboardPreferencesResponse.parse({
+    order: user.dashboardWidgetOrder ?? [],
+    hidden: user.dashboardHiddenWidgets ?? [],
+  }));
+});
+
+router.put("/dashboard/preferences", async (req, res): Promise<void> => {
+  const parsed = UpdateDashboardPreferencesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Dashboard preferences are invalid." });
+    return;
+  }
+  const db = await getMongoDb();
+  const user = req.session.userId
+    ? await getUsers(db).findOne({ _id: req.session.userId, status: "active" })
+    : null;
+  if (!user) {
+    res.status(401).json({ error: "Sign in to continue." });
+    return;
+  }
+  if (user.roleId !== "master-admin") {
+    res.status(403).json({ error: "Master Admin access is required to customize dashboard widgets." });
+    return;
+  }
+  const order = [...new Set(parsed.data.order)];
+  const hidden = [...new Set(parsed.data.hidden)];
+  await getUsers(db).updateOne(
+    { _id: user._id, status: "active" },
+    {
+      $set: {
+        dashboardWidgetOrder: order,
+        dashboardHiddenWidgets: hidden,
+        updatedAt: new Date(),
+      },
+    },
+  );
+  res.json(UpdateDashboardPreferencesResponse.parse({ order, hidden }));
 });
 
 export default router;

@@ -5,10 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { GetOperationsDashboardAssignment } from './getOperationsDashboardAssignment';
-import type { GetOperationsDashboardGlassStatus } from './getOperationsDashboardGlassStatus';
-import type { GetOperationsDashboardPaymentStatus } from './getOperationsDashboardPaymentStatus';
-import type { OrderStatus } from './orderStatus';
 
 export type GetOperationsDashboardParams = {
 from: Date;
@@ -17,12 +13,12 @@ to: Date;
  * @maxLength 120
  */
 q?: string;
-stage?: OrderStatus;
+stage?: string;
 clientId?: string;
 locationCode?: string;
 installerId?: string;
-paymentStatus?: GetOperationsDashboardPaymentStatus;
-assignment?: GetOperationsDashboardAssignment;
-glassStatus?: GetOperationsDashboardGlassStatus;
+paymentStatus?: string;
+assignment?: string;
+glassStatus?: string;
 compare?: boolean;
 };

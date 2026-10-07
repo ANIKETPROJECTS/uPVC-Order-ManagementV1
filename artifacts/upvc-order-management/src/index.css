@@ -93,6 +93,99 @@
   font-family: var(--dashboard-font);
 }
 
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+  gap: 1rem;
+}
+
+.dashboard-layout > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.dashboard-chart-row > [data-dashboard-widget="trend"] {
+  grid-column: span 8;
+}
+
+.dashboard-chart-row > [data-dashboard-widget="stage-mix"] {
+  grid-column: span 4;
+}
+
+.dashboard-operations-row > [data-dashboard-widget] {
+  grid-column: span 4;
+}
+
+.dashboard-register-row > [data-dashboard-widget="recent-orders"] {
+  grid-column: span 8;
+}
+
+.dashboard-register-row > [data-dashboard-widget="top-clients"] {
+  grid-column: span 4;
+}
+
+.dashboard-secondary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.dashboard-pipeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: .5rem;
+}
+
+@media (max-width: 1279px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  }
+
+  .dashboard-operations-row > [data-dashboard-widget] {
+    grid-column: span 6;
+  }
+
+  .dashboard-register-row > [data-dashboard-widget] {
+    grid-column: span 12;
+  }
+}
+
+@media (max-width: 1023px) {
+  .dashboard-chart-row > [data-dashboard-widget] {
+    grid-column: span 12;
+  }
+
+  .dashboard-pipeline-grid {
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-layout {
+    gap: .75rem;
+  }
+
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .6rem;
+  }
+
+  .dashboard-operations-row > [data-dashboard-widget] {
+    grid-column: span 12;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .dark .dashboard-page {
   --background: 222 47% 8%;
   --foreground: 210 40% 96%;

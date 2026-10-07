@@ -1232,6 +1232,30 @@ export interface DashboardFilterOptions {
   clients: DashboardFilterOption[];
   locations: DashboardFilterOption[];
   installers: DashboardFilterOption[];
+  stages: DashboardFilterOption[];
+  paymentStates: DashboardFilterOption[];
+  assignmentStates: DashboardFilterOption[];
+  glassStates: DashboardFilterOption[];
+}
+
+export interface DashboardPreferences {
+  order: string[];
+  hidden: string[];
+}
+
+export interface DashboardPreferencesInput {
+  /**
+     * @maxItems 40
+     * @items.minLength 1
+     * @items.maxLength 80
+     */
+  order: string[];
+  /**
+     * @maxItems 40
+     * @items.minLength 1
+     * @items.maxLength 80
+     */
+  hidden: string[];
 }
 
 export interface DashboardPeriodSnapshot {
@@ -1252,7 +1276,7 @@ export type DashboardOperationsSummary = DashboardPeriodSnapshot & ({
 });
 
 export interface DashboardPipelineStage {
-  status: OrderStatus;
+  status: string;
   label: string;
   count: number;
   /** @nullable */
@@ -1333,7 +1357,7 @@ export interface DashboardRecentOrder {
   orderId: string;
   clientName: string;
   locationName: string;
-  status: OrderStatus;
+  status: string;
   createdAt: string;
   /** @nullable */
   orderValue: number | null;
@@ -1343,6 +1367,8 @@ export interface DashboardRecentOrder {
   dispatchStatus: DashboardRecentOrderDispatchStatus;
   /** @nullable */
   installationStatus: DashboardRecentOrderInstallationStatus;
+  /** @nullable */
+  paymentStatus: string | null;
 }
 
 export interface DashboardDispatchOrder {
@@ -2376,43 +2402,15 @@ to: string;
  * @maxLength 120
  */
 q?: string;
-stage?: OrderStatus;
+stage?: string;
 clientId?: string;
 locationCode?: string;
 installerId?: string;
-paymentStatus?: GetOperationsDashboardPaymentStatus;
-assignment?: GetOperationsDashboardAssignment;
-glassStatus?: GetOperationsDashboardGlassStatus;
+paymentStatus?: string;
+assignment?: string;
+glassStatus?: string;
 compare?: boolean;
 };
-
-export type GetOperationsDashboardPaymentStatus = typeof GetOperationsDashboardPaymentStatus[keyof typeof GetOperationsDashboardPaymentStatus];
-
-
-export const GetOperationsDashboardPaymentStatus = {
-  paid: 'paid',
-  partial: 'partial',
-  unpaid: 'unpaid',
-} as const;
-
-export type GetOperationsDashboardAssignment = typeof GetOperationsDashboardAssignment[keyof typeof GetOperationsDashboardAssignment];
-
-
-export const GetOperationsDashboardAssignment = {
-  assigned: 'assigned',
-  unassigned: 'unassigned',
-} as const;
-
-export type GetOperationsDashboardGlassStatus = typeof GetOperationsDashboardGlassStatus[keyof typeof GetOperationsDashboardGlassStatus];
-
-
-export const GetOperationsDashboardGlassStatus = {
-  untracked: 'untracked',
-  pending: 'pending',
-  partial: 'partial',
-  received: 'received',
-  broken: 'broken',
-} as const;
 
 export type ListClientsParams = {
 /**

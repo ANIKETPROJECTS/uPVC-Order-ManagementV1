@@ -6,12 +6,14 @@ import {
 } from "@workspace/api-zod";
 import { Router, type RequestHandler } from "express";
 import {
+  getOrderActivity,
   getMongoDb,
   getOrders,
   getPublicUser,
   getUsers,
   type OrderDocument,
 } from "../lib/mongo";
+import { randomUUID } from "node:crypto";
 
 const router = Router();
 
@@ -92,13 +94,15 @@ router.patch(
       return;
     }
 
-    const orders = getOrders(await getMongoDb());
+    const db = await getMongoDb();
+    const orders = getOrders(db);
+    const updatedAt = new Date();
     const result = await orders.updateOne(
       { _id: params.data.id },
       {
         $set: {
           dispatchStatus: body.data.dispatchStatus,
-          updatedAt: new Date(),
+          updatedAt,
           updatedBy: userId,
         },
       },
@@ -113,6 +117,16 @@ router.patch(
       res.status(404).json({ error: "Order not found." });
       return;
     }
+    const actor = await getUsers(db).findOne({ _id: userId, status: "active" });
+    await getOrderActivity(db).insertOne({
+      _id: randomUUID(),
+      orderRecordId: updated._id,
+      actorId: userId,
+      actorName: actor?.name ?? "Team member",
+      action: "dispatch.status_set",
+      summary: `Set dispatch status for ${updated.orderId} to ${updated.dispatchStatus ?? "pending_dispatch"}.`,
+      createdAt: updatedAt,
+    });
     res.json(UpdateDispatchOrderStatusResponse.parse(dispatchOrderResponse(updated)));
   },
 );

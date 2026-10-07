@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 import {
   CreateMeasurementRecordBody,
   CreateMeasurementRecordResponse,
@@ -31,6 +31,7 @@ import { Router, type Request, type RequestHandler } from "express";
 import {
   getMeasurementRecords,
   getMeasurementReferences,
+  getOrderActivity,
   allocateMeasurementSheetId,
   getMongoClient,
   getMeasurementSheetsBucket,
@@ -68,6 +69,25 @@ type Actor = {
   permissions: Record<string, string>;
   masterAdmin: boolean;
 };
+
+async function recordMeasurementOrderActivity(
+  db: Db,
+  orderRecordId: string | null | undefined,
+  actor: Actor,
+  action: string,
+  summary: string,
+): Promise<void> {
+  if (!orderRecordId) return;
+  await getOrderActivity(db).insertOne({
+    _id: randomUUID(),
+    orderRecordId,
+    actorId: actor.id,
+    actorName: actor.name,
+    action,
+    summary,
+    createdAt: new Date(),
+  });
+}
 
 async function actorContext(
   req: Request,
@@ -359,6 +379,13 @@ router.post("/measurement-records", async (req, res): Promise<void> => {
     updatedAt: now,
   };
   await getMeasurementRecords(db).insertOne(record);
+  await recordMeasurementOrderActivity(
+    db,
+    record.orderRecordId,
+    actor,
+    "measurement.record_created",
+    `Created measurement sheet ${record.sheetId}.`,
+  );
   res.status(201).json(CreateMeasurementRecordResponse.parse(await recordResponse(record)));
 });
 
@@ -478,6 +505,15 @@ router.patch("/measurement-records/:recordId", async (req, res): Promise<void> =
     await collection.updateOne({ _id: old._id }, { $set: updates });
   }
   const updated = await collection.findOne({ _id: old._id });
+  for (const orderRecordId of new Set([old.orderRecordId, updated?.orderRecordId])) {
+    await recordMeasurementOrderActivity(
+      db,
+      orderRecordId,
+      actor,
+      "measurement.record_updated",
+      `Updated measurement sheet ${updated?.sheetId ?? old.sheetId}.`,
+    );
+  }
   res.json(UpdateMeasurementRecordResponse.parse(await recordResponse(updated!)));
 });
 
@@ -534,6 +570,13 @@ router.delete("/measurement-records/:recordId", async (req, res): Promise<void> 
       req.log.warn({ err: error, recordId: record._id, versionId: version._id }, "Failed to remove stored bytes for a deleted measurement record");
     }
   }
+  await recordMeasurementOrderActivity(
+    db,
+    record.orderRecordId,
+    actor,
+    "measurement.record_deleted",
+    `Deleted measurement sheet ${record.sheetId}.`,
+  );
   res.status(204).send();
 });
 
@@ -772,6 +815,13 @@ router.post("/measurement-records/:recordId/versions/:filename", async (req, res
       );
       throw error;
     }
+    await recordMeasurementOrderActivity(
+      db,
+      record.orderRecordId,
+      actor,
+      "measurement.version_uploaded",
+      `Uploaded measurement sheet ${record.sheetId} version ${version.versionNumber}.`,
+    );
     res.status(201).json(UploadMeasurementVersionResponse.parse(versionResponse(version)));
   });
 });

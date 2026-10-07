@@ -340,13 +340,13 @@ export const GetOperationsDashboardQueryParams = zod.object({
   "from": zod.date(),
   "to": zod.date(),
   "q": zod.coerce.string().max(getOperationsDashboardQueryQMax).optional(),
-  "stage": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
+  "stage": zod.coerce.string().optional(),
   "clientId": zod.coerce.string().optional(),
   "locationCode": zod.coerce.string().optional(),
   "installerId": zod.coerce.string().optional(),
-  "paymentStatus": zod.enum(['paid', 'partial', 'unpaid']).optional(),
-  "assignment": zod.enum(['assigned', 'unassigned']).optional(),
-  "glassStatus": zod.enum(['untracked', 'pending', 'partial', 'received', 'broken']).optional(),
+  "paymentStatus": zod.coerce.string().optional(),
+  "assignment": zod.coerce.string().optional(),
+  "glassStatus": zod.coerce.string().optional(),
   "compare": zod.coerce.boolean().default(getOperationsDashboardQueryCompareDefault)
 })
 
@@ -374,6 +374,22 @@ export const GetOperationsDashboardResponse = zod.object({
   "installers": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string()
+})),
+  "stages": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})),
+  "paymentStates": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})),
+  "assignmentStates": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})),
+  "glassStates": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
 }))
 }),
   "summary": zod.object({
@@ -396,7 +412,7 @@ export const GetOperationsDashboardResponse = zod.object({
 }),zod.null()])
 })),
   "pipeline": zod.array(zod.object({
-  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "status": zod.string(),
   "label": zod.string(),
   "count": zod.number().int(),
   "orderValue": zod.number().nullable()
@@ -435,13 +451,14 @@ export const GetOperationsDashboardResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
-  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "status": zod.string(),
   "createdAt": zod.coerce.date(),
   "orderValue": zod.number().nullable(),
   "totalWindows": zod.number().int(),
   "readyWindows": zod.number().int(),
   "dispatchStatus": zod.union([zod.literal('pending_dispatch'),zod.literal('dispatched'),zod.literal('delivered'),zod.literal(null)]).nullable(),
-  "installationStatus": zod.union([zod.literal('pending'),zod.literal('issue'),zod.literal('installed'),zod.literal(null)]).nullable()
+  "installationStatus": zod.union([zod.literal('pending'),zod.literal('issue'),zod.literal('installed'),zod.literal(null)]).nullable(),
+  "paymentStatus": zod.string().nullable()
 })),
   "dispatchQueue": zod.array(zod.object({
   "id": zod.string(),
@@ -503,6 +520,39 @@ export const GetOperationsDashboardResponse = zod.object({
   "measurements": zod.string().nullable(),
   "activity": zod.string().nullable()
 })
+})
+
+
+/**
+ * @summary Get the signed-in user's dashboard preferences
+ */
+export const GetDashboardPreferencesResponse = zod.object({
+  "order": zod.array(zod.string()),
+  "hidden": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Save the signed-in user's dashboard preferences
+ */
+export const updateDashboardPreferencesBodyOrderItemMax = 80;
+
+export const updateDashboardPreferencesBodyOrderMax = 40;
+
+export const updateDashboardPreferencesBodyHiddenItemMax = 80;
+
+export const updateDashboardPreferencesBodyHiddenMax = 40;
+
+
+
+export const UpdateDashboardPreferencesBody = zod.object({
+  "order": zod.array(zod.string().min(1).max(updateDashboardPreferencesBodyOrderItemMax)).max(updateDashboardPreferencesBodyOrderMax),
+  "hidden": zod.array(zod.string().min(1).max(updateDashboardPreferencesBodyHiddenItemMax)).max(updateDashboardPreferencesBodyHiddenMax)
+})
+
+export const UpdateDashboardPreferencesResponse = zod.object({
+  "order": zod.array(zod.string()),
+  "hidden": zod.array(zod.string())
 })
 
 

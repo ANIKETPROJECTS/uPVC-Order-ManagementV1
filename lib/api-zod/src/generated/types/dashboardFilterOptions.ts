@@ -11,4 +11,8 @@ export interface DashboardFilterOptions {
   clients: DashboardFilterOption[];
   locations: DashboardFilterOption[];
   installers: DashboardFilterOption[];
+  stages: DashboardFilterOption[];
+  paymentStates: DashboardFilterOption[];
+  assignmentStates: DashboardFilterOption[];
+  glassStates: DashboardFilterOption[];
 }

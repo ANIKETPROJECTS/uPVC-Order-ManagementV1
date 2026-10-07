@@ -38,6 +38,8 @@ import type {
   ClientUpdate,
   CreateOrderGrievance,
   Dashboard,
+  DashboardPreferences,
+  DashboardPreferencesInput,
   DispatchOrder,
   DispatchOrderList,
   DispatchStatusUpdate,
@@ -1396,6 +1398,171 @@ export function useGetOperationsDashboard<TData = Awaited<ReturnType<typeof getO
 
 
 
+
+export const getGetDashboardPreferencesUrl = () => {
+
+
+
+
+  return `/api/dashboard/preferences`
+}
+
+/**
+ * @summary Get the signed-in user's dashboard preferences
+ */
+export const getDashboardPreferences = async ( options?: Parameters<typeof customFetch>[1]): Promise<DashboardPreferences> => {
+
+  return customFetch<DashboardPreferences>(getGetDashboardPreferencesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardPreferencesQueryKey = () => {
+    return [
+    `/api/dashboard/preferences`
+    ] as const;
+    }
+
+
+export const getGetDashboardPreferencesQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardPreferences>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPreferences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardPreferencesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardPreferences>>> = ({ signal }) => getDashboardPreferences({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardPreferences>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardPreferencesQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardPreferences>>>
+export type GetDashboardPreferencesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the signed-in user's dashboard preferences
+ */
+
+export function useGetDashboardPreferences<TData = Awaited<ReturnType<typeof getDashboardPreferences>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPreferences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardPreferencesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateDashboardPreferencesUrl = () => {
+
+
+
+
+  return `/api/dashboard/preferences`
+}
+
+/**
+ * @summary Save the signed-in user's dashboard preferences
+ */
+export const updateDashboardPreferences = async (dashboardPreferencesInput: DashboardPreferencesInput, options?: Parameters<typeof customFetch>[1]): Promise<DashboardPreferences> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<DashboardPreferences>(getUpdateDashboardPreferencesUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(dashboardPreferencesInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateDashboardPreferencesMutationKey = () => ['updateDashboardPreferences'] as const;
+
+export const getUpdateDashboardPreferencesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDashboardPreferences>>, TError,UpdateDashboardPreferencesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDashboardPreferences>>, TError,UpdateDashboardPreferencesMutationVariables, TContext> => {
+
+const mutationKey = getUpdateDashboardPreferencesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDashboardPreferences>>, UpdateDashboardPreferencesMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateDashboardPreferences(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDashboardPreferencesMutationResult = NonNullable<Awaited<ReturnType<typeof updateDashboardPreferences>>>
+    export type UpdateDashboardPreferencesMutationBody = BodyType<DashboardPreferencesInput>
+    export type UpdateDashboardPreferencesMutationError = ErrorType<unknown>
+    export type UpdateDashboardPreferencesMutationVariables = {data: BodyType<DashboardPreferencesInput>}
+
+    /**
+ * @summary Save the signed-in user's dashboard preferences
+ */
+export const useUpdateDashboardPreferences = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDashboardPreferences>>, TError,UpdateDashboardPreferencesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDashboardPreferences>>,
+        TError,
+        UpdateDashboardPreferencesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateDashboardPreferencesMutationOptions(options));
+    }
 
 export const getGetBalancePaymentRegisterUrl = () => {
 
