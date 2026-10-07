@@ -1,0 +1,93 @@
+The Operations Dashboard is built and working, but the layout and look need a full redesign. Do NOT change backend aggregation logic or filters unless needed. Redesign the frontend to match my reference screenshots (dark navy-teal hero, white rounded cards, soft shadows, teal/navy palette, gradient icon tiles, sparklines).
+
+Before coding: look at the current Dashboard component(s), the shared filter hooks/components, the chart library already in use, and the theme tokens (light/dark). Reuse them. Do not add a new library unless unavoidable.
+
+========================================
+1. NEW PAGE ORDER (top to bottom)
+========================================
+1. Hero banner
+2. Sticky filter bar (compact)
+3. KPI cards row
+4. Charts row: Order & Revenue Trend (≈2/3 width) + Orders by Stage donut (≈1/3)
+5. Order Pipeline (5 stage cards)
+6. Row: Needs Attention (left) + Live Activity (right)
+7. Row: Recent Orders table (≈2/3) + Installer Capacity (≈1/3)
+8. Secondary row of compact cards (only render a card if it has data, else collapse into a single "No activity in this period" strip): Dispatch queue, Payment follow-through, Installation schedule, Top clients, Measurement uploads
+
+Graphs MUST appear directly after the KPI cards, above everything else except hero/filters/KPIs.
+
+========================================
+2. HERO BANNER
+========================================
+- Dark navy → teal gradient, rounded 24px, subtle glass tiles/pattern on the right like the reference.
+- Small pill: "Live Order Overview" with a pulsing green dot.
+- Headline: "Every order, one clear view" (second half in teal/mint accent).
+- Subtext: "From measurement to installation — track production, payments and dispatch in real time."
+- LIVE CLOCK + DATE (important): show current time with seconds (e.g. 11:04:33 AM) ticking every second, plus full date (e.g. Wednesday, 7 October 2026) in Asia/Kolkata timezone. Use a single setInterval in a small isolated component so the rest of the page does not re-render every second. Add a "Live" badge, plus "Last data refresh: hh:mm:ss" next to it.
+- Right side: 3 glass mini-stat tiles — Total Orders, % Windows Ready, Installed — driven by current filters.
+- Refresh button + auto-refresh dropdown (Off / 30s / 60s) + print + theme toggle stay in the hero's top-right.
+
+========================================
+3. FILTER BAR (compact + sticky)
+========================================
+- Single row on desktop (wraps on mobile), sticky under the top header with blur background.
+- Order: Search (⌘K), Date range (presets popover: Today, Yesterday, 7 days, 30 days, 90 days, This month, Last month, This FY, Custom), Stage, Client, then a "More filters" popover containing Location, Installer, Payments, Assignment, Glass readiness, plus "Compare with previous period" toggle.
+- Active filters shown as removable chips below; "Reset" button; keep URL query-param persistence.
+- Default range: Last 30 days.
+
+========================================
+4. KPI CARDS
+========================================
+5 cards in ONE row (4 on tablet = 2x2 + 1, 1-col on mobile; make the grid tidy, no orphan card with empty space beside it — use auto-fit grid or make the 5th span full width on small screens):
+- Total Orders (sub: "N active")
+- Revenue / Order Value
+- Windows Ready (e.g. 131/201 + "65% complete" with mini progress)
+- Outstanding Balance (red accent, "Needs follow-up")
+- Installed Orders
+Each card: gradient icon tile (distinct colour per card), label, big number, sparkline on the top-right, and a trend line (▲ +18% vs previous period in green / ▼ in red) when Compare is ON. Show ₹ in Indian format (₹9,70,200) and L/Cr shorthand when value is large. Count-up animation on first load, skeleton while loading.
+
+========================================
+5. CHARTS (the star of the page)
+========================================
+A. Order & Revenue Trend — smooth area chart (teal gradient fill) with big "Orders N" and "Revenue ₹X" at top-left, segmented toggle 7D / 30D / 90D / 6M on top-right (this toggle should also update the global date range). Add a second line/bars for Orders count with its own axis if possible, tooltips with date, orders, revenue. Bucket size adapts: daily ≤30d, weekly for 90d, monthly for 6M+. Y-axis labels in ₹ with L/Cr shorthand. Fix axis clipping (labels like "00000" are cut off in the reference).
+B. Orders by Stage — donut with total in the centre, legend below with colour dots + counts. Click on a segment/legend = filter by that stage. Colours: Measurement #94A3B8, Rate Pending #F59E0B, In Production #3B82F6, Ready #14B8A6, Dispatched #8B5CF6, Installed #10B981.
+Both charts: card height equal, empty state ("No orders in this period") with a faint illustration, loading skeleton, and a download/export icon (PNG/CSV).
+
+========================================
+6. ORDER PIPELINE
+========================================
+Replace the plain "Work moving through the line" tiles with 5–6 stage cards connected by small arrows: icon tile (coloured), count, label, ₹ value, and a progress bar showing share of total. Stages from my real enums (Quotation, Confirmed/Measurement, Rate Pending, In Production, Ready, Dispatched, Installed — use whatever actually exists). Clicking a card applies the stage filter and highlights the card.
+
+========================================
+7. NEEDS ATTENTION + LIVE ACTIVITY
+========================================
+- Needs Attention: header with orange shield icon and total-count badge. Rows with coloured icon tile, title, subtitle (order/client names), count, arrow link. Rows: orders awaiting dispatch, rate approvals pending, quotations awaiting approval, glass shipments flagged/broken, installation issues, installed with balance due, balance reminders ready (inline orange "Send" button using the existing reminder flow). Hide rows with zero count or show them greyed at the bottom; sort by severity.
+- Live Activity: scrollable feed with small icon per event type (payment = wallet, QR scan = qr-code, reminder = send, breakage = alert-triangle, dispatch = truck, installation = wrench), text, actor · order no., relative time ("just now", "29m ago"). "Live" dot + "updated Xs ago" — poll every 15–30s (or use the existing websocket) and animate new items sliding in at the top. Respect the global date range and filters.
+
+========================================
+8. RECENT ORDERS + INSTALLER CAPACITY (MUST BE LIVE)
+========================================
+- Both must fetch real data from the backend with the same global filters and auto-refresh/polling as the rest of the page; no hardcoded or mock data anywhere. Subscribe to the same refresh tick so they update together.
+- Recent Orders table: Order no. (bold), Client with coloured initials avatar, Windows ready/total, Value (₹ Indian format), Status chip (coloured per stage with small icon), optional Location column on wide screens. Latest first, top 6–8 rows, "View all ↗" link to Orders page with current filters, row click opens that order. Newly changed rows get a brief highlight flash.
+- Installer Capacity: avatar initials, installer name, assigned/capacity (e.g. 3/5), progress bar — teal normally, amber at ≥80%, red at 100%. Data comes from real installation assignments within the selected date range (scheduled installations vs installer daily/weekly capacity — use whatever capacity field exists; if none exists, add a configurable `capacity` on installer/user profile with default 5 and tell me). Sort by load descending. Click an installer = filter dashboard by that installer. Empty state if no installers.
+
+========================================
+9. ICONS (use the icon set already in the project, e.g. lucide-react)
+========================================
+Total Orders = Package/Boxes, Revenue = Wallet/IndianRupee, Windows Ready = LayoutGrid/PanelsTopLeft, Outstanding Balance = CalendarClock/AlertCircle, Installed = PackageCheck/Wrench, Measurement = Ruler, Rate Pending = Clock, In Production = Factory, Ready = CheckCircle2, Dispatched = Truck, Installed stage = PartyPopper/BadgeCheck, Needs Attention = ShieldAlert, Live Activity = Radio/Activity, Trend = TrendingUp, Installer = HardHat/Users, Glass = GlassWater/Layers, Payments = Wallet, QR = QrCode, Search = Search, Date = CalendarDays, Refresh = RefreshCw, Print = Printer, Theme = Sun/Moon.
+
+========================================
+10. COLOURS / STYLE
+========================================
+Replace the beige/cream page background with a light cool grey-blue (#F1F5FB) in light mode and deep navy (#0B1220) in dark mode. Primary teal #14B8A6 / #0F9D8A, navy #0B1B3A, accent orange #F97316 for CTAs, red #EF4444 for risk, green #10B981 for success, purple #8B5CF6 and blue #3B82F6 for secondary accents. Cards: white, radius 20px, 1px soft border, soft shadow, hover lift. Font: Inter. Define all as theme tokens (CSS variables) so both light and dark work. No flat/boring grey tiles.
+
+========================================
+11. QUALITY
+========================================
+- Every widget wrapped in an error boundary + skeleton + empty state.
+- Fully responsive; no horizontal scroll.
+- Role-based visibility unchanged (hide revenue/balance for roles without access).
+- Memoize heavy components; the clock must not re-render the page.
+- Do not leave dummy/seed values in the UI.
+
+DELIVERABLES: list of files changed, short summary, and a test checklist (date change updates every widget incl. Recent Orders & Installer Capacity, auto-refresh updates live data, clock ticks, charts appear right after KPIs, dark mode OK, mobile OK).
