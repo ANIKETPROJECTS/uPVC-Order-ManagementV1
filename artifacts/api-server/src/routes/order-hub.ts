@@ -955,13 +955,15 @@ router.patch(
         return;
       }
       const client = await getClients(db).findOne({ _id: before.clientId });
-      const clientType = parsed.data.clientType ?? before.clientType ?? client?.type;
+      const clientType = parsed.data.clientType === null
+        ? null
+        : parsed.data.clientType ?? before.clientType ?? client?.type;
       if (linkedQuotation && clientType !== "Project" && clientType !== "Retail") {
         res.status(409).json({ error: "Set this order's client type to Project or Retail before linking a quotation." });
         return;
       }
       const generatedOrderId = linkedQuotation
-        ? formatQuotationOrderId(clientType, linkedQuotation.quoteNo)
+        ? formatQuotationOrderId(clientType as ClientType, linkedQuotation.quoteNo)
         : `TMP-${String(before.sequenceNo).padStart(6, "0")}`;
       if (!generatedOrderId) {
         res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
@@ -993,11 +995,12 @@ router.patch(
       res.status(404).json({ error: "Order not found." });
       return;
     }
-    if (parsed.data.quotationId !== undefined) {
+    const orderIdChanged = before.orderId !== order.orderId;
+    if (orderIdChanged) {
       await Promise.all([
         getOrderPaymentFlags(db).updateMany(
           { orderRecordId: order._id },
-          { $set: { orderId: order.orderId } },
+          { $set: { orderId: order.orderId, clientName: order.clientName, locationName: order.locationName } },
         ),
         getOrderGrievances(db).updateMany(
           { orderRecordId: order._id },
@@ -1008,15 +1011,28 @@ router.patch(
           { $set: { orderId: order.orderId } },
         ),
       ]);
+    } else if (before.clientName !== order.clientName || before.locationName !== order.locationName) {
+      await getOrderPaymentFlags(db).updateMany(
+        { orderRecordId: order._id },
+        { $set: { clientName: order.clientName, locationName: order.locationName } },
+      );
     }
     const actor = await getUsers(db).findOne({ _id: actorId });
     const activeStateChanged =
       before &&
       (before.isActive !== false) !== (order.isActive !== false);
+    const quotationChanged = before.quotationId !== order.quotationId;
     if (
       before &&
       actor &&
-      (before.locationCode !== order.locationCode ||
+      (before.clientName !== order.clientName ||
+        before.clientType !== order.clientType ||
+        before.clientPhone !== order.clientPhone ||
+        before.clientAddress !== order.clientAddress ||
+        before.clientGstin !== order.clientGstin ||
+        quotationChanged ||
+        orderIdChanged ||
+        before.locationCode !== order.locationCode ||
         before.locationName !== order.locationName ||
         before.siteAddress !== order.siteAddress ||
         before.siteLatitude !== order.siteLatitude ||
@@ -1026,6 +1042,11 @@ router.patch(
         activeStateChanged)
     ) {
       const changes = [
+        before.clientName !== order.clientName ? `client name to ${order.clientName}` : "",
+        before.clientType !== order.clientType ? `client type to ${order.clientType ?? "not set"}` : "",
+        before.clientPhone !== order.clientPhone ? "client phone" : "",
+        before.clientAddress !== order.clientAddress ? "client address" : "",
+        before.clientGstin !== order.clientGstin ? "GSTIN" : "",
         before.locationName !== order.locationName
           ? `location to ${order.locationName}`
           : before.locationCode !== order.locationCode
@@ -1035,9 +1056,12 @@ router.patch(
         before.siteLatitude !== order.siteLatitude || before.siteLongitude !== order.siteLongitude ? "map pin" : "",
         before.status !== order.status ? `status to ${order.status}` : "",
         before.notes !== order.notes ? "internal notes" : "",
-        before.quotationId !== order.quotationId
-          ? `linked quotation ${order.quotationNo} and changed Order ID to ${order.orderId}`
+        quotationChanged
+          ? order.quotationNo
+            ? `linked quotation ${order.quotationNo}`
+            : "removed the linked quotation"
           : "",
+        orderIdChanged ? `changed Order ID to ${order.orderId}` : "",
         (before.isActive !== false) !== (order.isActive !== false)
           ? order.isActive === false ? "archived the order" : "restored the order"
           : "",

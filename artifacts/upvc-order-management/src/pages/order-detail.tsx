@@ -105,6 +105,7 @@ import { SiteLocation } from '@/components/site-location';
 import { SiteMapPicker } from '@/components/site-map-picker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -216,13 +217,39 @@ function SummaryStat({ label, value, detail, testId }: { label: string; value: s
 }
 
 const detailSchema = z.object({
+  clientName: z.string().trim().min(2, 'Enter the client name.').max(120),
+  clientType: z.enum(['Project', 'Retail', 'unassigned']),
+  clientPhone: z.string().max(30),
+  clientAddress: z.string().max(500),
+  clientGstin: z.string().max(15),
+  quotationId: z.string(),
   locationName: z.string().trim().min(2, 'Enter a city or location name.').max(120),
   siteAddress: z.string().trim().min(3, 'Enter the order’s site address.').max(500, 'Keep the address under 500 characters.'),
+  sameAsClientAddress: z.boolean(),
   siteLatitude: z.number().min(-90).max(90).nullable(),
   siteLongitude: z.number().min(-180).max(180).nullable(),
   status: z.string(),
   notes: z.string().max(2000).nullable().optional(),
 });
+
+function orderDetailValues(order: Order): z.infer<typeof detailSchema> {
+  const siteAddress = order.siteAddress || order.clientAddress || '';
+  return {
+    clientName: order.clientName || '',
+    clientType: order.clientType === 'Project' || order.clientType === 'Retail' ? order.clientType : 'unassigned',
+    clientPhone: order.clientPhone || '',
+    clientAddress: order.clientAddress || '',
+    clientGstin: order.clientGstin || '',
+    quotationId: order.quotationId || '',
+    locationName: order.locationName || '',
+    siteAddress,
+    sameAsClientAddress: Boolean(order.clientAddress?.trim() && siteAddress.trim() === order.clientAddress.trim()),
+    siteLatitude: order.siteLatitude ?? null,
+    siteLongitude: order.siteLongitude ?? null,
+    status: order.status,
+    notes: order.notes || '',
+  };
+}
 
 function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: string }) {
   const queryClient = useQueryClient();
@@ -230,7 +257,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   const canEdit = hasPermission(user, 'order-hub');
   const update = useUpdateOrder();
   const quotationsQuery = useListQuotations({
-    query: { queryKey: getListQuotationsQueryKey(), enabled: canEdit && !order.quotationId },
+    query: { queryKey: getListQuotationsQueryKey(), enabled: canEdit },
   });
   const [selectedQuotationId, setSelectedQuotationId] = useState('');
   const availableQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
@@ -241,7 +268,10 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   const [editing, setEditing] = useState(
     () => new URLSearchParams(window.location.search).get('edit') === 'true',
   );
-  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { locationName: order.locationName || '', siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' } });
+  const form = useForm<z.infer<typeof detailSchema>>({
+    resolver: zodResolver(detailSchema),
+    defaultValues: orderDetailValues(order),
+  });
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.has('edit')) {
@@ -253,7 +283,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   useEffect(() => {
     if (initializedForId.current !== order.id) {
       initializedForId.current = order.id;
-      form.reset({ locationName: order.locationName || '', siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
+      form.reset(orderDetailValues(order));
     }
   }, [form, order.id, order.locationName, order.siteAddress, order.clientAddress, order.siteLatitude, order.siteLongitude, order.notes, order.status]);
   useEffect(() => {
@@ -266,7 +296,35 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
     });
     return () => window.cancelAnimationFrame(frame);
   }, [editing]);
-  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationName: values.locationName.trim(), siteAddress: values.siteAddress.trim(), siteLatitude: values.siteLatitude, siteLongitude: values.siteLongitude, status: values.status as Status, notes: values.notes || null } }, {
+  const save = (values: z.infer<typeof detailSchema>) => {
+    const existingClientType = order.clientType ?? 'unassigned';
+    if (values.clientType === 'unassigned' && values.quotationId) {
+      toast({
+        title: 'Client type is required for a linked quotation',
+        description: 'Remove the quotation or choose Project or Retail before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const data = {
+      clientName: values.clientName.trim(),
+      clientPhone: values.clientPhone.trim() || null,
+      clientAddress: values.clientAddress.trim() || null,
+      clientGstin: values.clientGstin.trim().toUpperCase() || null,
+      ...(values.clientType !== existingClientType
+        ? { clientType: values.clientType === 'unassigned' ? null : values.clientType as 'Project' | 'Retail' }
+        : {}),
+      ...(values.quotationId !== (order.quotationId || '')
+        ? { quotationId: values.quotationId || null }
+        : {}),
+      locationName: values.locationName.trim(),
+      siteAddress: values.siteAddress.trim(),
+      siteLatitude: values.siteLatitude,
+      siteLongitude: values.siteLongitude,
+      status: values.status as Status,
+      notes: values.notes || null,
+    };
+    update.mutate({ id: order.id, data }, {
     onSuccess: (updated) => {
       queryClient.setQueryData(getGetOrderQueryKey(id), updated);
       void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
@@ -276,7 +334,13 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
       setEditing(false);
       toast({ title: 'Order record updated', description: `${updated.orderId} is now ${statusLabel(updated.status)}.` });
     },
+    onError: (cause) => toast({
+      title: 'Order record could not be updated',
+      description: cause instanceof Error ? cause.message : 'Check the order fields and try again.',
+      variant: 'destructive',
+    }),
   });
+  };
   const linkQuotation = () => {
     if (!selectedQuotationId) return;
     update.mutate({ id: order.id, data: { quotationId: selectedQuotationId } }, {
@@ -304,7 +368,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
         {canEdit && (
           <Button variant="outline" size="sm" onClick={() => {
             setEditing((value) => !value);
-            form.reset({ locationName: order.locationName || '', siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
+            form.reset(orderDetailValues(order));
           }} data-testid="button-toggle-order-edit">
             <Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}
           </Button>
@@ -355,23 +419,126 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
         {editing && canEdit ? (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(save)} className="space-y-4" data-testid="form-order-detail">
-              <FormField control={form.control} name="locationName" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>City / location</FormLabel>
-                  <FormControl><Input {...field} placeholder="e.g. Pune" data-testid="input-edit-order-location-name" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
+                <p className="text-xs font-semibold">Client details for this order</p>
+                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">These edits apply to this order only. The saved client profile and other orders will not change.</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <FormField control={form.control} name="clientName" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Client / company name</FormLabel>
+                      <FormControl><Input {...field} maxLength={120} data-testid="input-edit-order-client-name" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="clientType" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Client type</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl><SelectTrigger data-testid="select-edit-order-client-type"><SelectValue placeholder="Choose a type" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Not set</SelectItem>
+                          <SelectItem value="Project">Project</SelectItem>
+                          <SelectItem value="Retail">Retail</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="clientPhone" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl><Input {...field} type="tel" maxLength={30} placeholder="+91" data-testid="input-edit-order-client-phone" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="clientGstin" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>GSTIN</FormLabel>
+                      <FormControl><Input {...field} maxLength={15} data-testid="input-edit-order-client-gstin" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="clientAddress" render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Client address</FormLabel>
+                      <FormControl><Textarea {...field} rows={2} maxLength={500} placeholder="Billing or registered address" onChange={(event) => {
+                        field.onChange(event);
+                        if (form.getValues('sameAsClientAddress')) {
+                          form.setValue('siteAddress', event.target.value, { shouldDirty: true, shouldValidate: true });
+                          form.setValue('siteLatitude', null, { shouldDirty: true });
+                          form.setValue('siteLongitude', null, { shouldDirty: true });
+                        }
+                      }} data-testid="input-edit-order-client-address" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="quotationId" render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Quotation (optional)</FormLabel>
+                      <Select value={field.value || 'none'} onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}>
+                        <FormControl><SelectTrigger data-testid="select-edit-order-quotation"><SelectValue placeholder="No quotation linked" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No quotation linked</SelectItem>
+                          {order.quotationId && !availableQuotations.some((quotation) => quotation.id === order.quotationId) && (
+                            <SelectItem value={order.quotationId}>{order.quotationNo || 'Current quotation'} · currently linked</SelectItem>
+                          )}
+                          {availableQuotations.map((quotation) => (
+                            <SelectItem key={quotation.id} value={quotation.id}>
+                              {quotation.quoteNo} · {quotation.projectName || quotation.customerName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] leading-4 text-muted-foreground">Linking or removing a quotation may change this order’s ID. A QT quotation must belong to this client.</p>
+                      {quotationsQuery.isError && <Button type="button" variant="outline" size="sm" onClick={() => void quotationsQuery.refetch()}>Retry loading quotations</Button>}
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField control={form.control} name="locationName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City / location</FormLabel>
+                    <FormControl><Input {...field} placeholder="e.g. Pune" data-testid="input-edit-order-location-name" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-background px-3 py-2.5 sm:mt-7">
+                  <FormField control={form.control} name="sameAsClientAddress" render={({ field }) => (
+                    <>
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={(checked) => {
+                          const isSameAddress = checked === true;
+                          field.onChange(isSameAddress);
+                          if (isSameAddress) {
+                            form.setValue('siteAddress', form.getValues('clientAddress'), { shouldDirty: true, shouldValidate: true });
+                            form.setValue('siteLatitude', null, { shouldDirty: true });
+                            form.setValue('siteLongitude', null, { shouldDirty: true });
+                          }
+                        }} data-testid="checkbox-edit-order-same-client-address" />
+                      </FormControl>
+                      <div>
+                        <FormLabel className="cursor-pointer text-xs">Order site address is the same as client address</FormLabel>
+                        <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">Keeps the two address fields in sync.</p>
+                      </div>
+                    </>
+                  )} />
+                </div>
+              </div>
               <FormField control={form.control} name="siteAddress" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Order site address</FormLabel>
                   <FormControl><Textarea {...field} onChange={(event) => {
                     field.onChange(event);
+                    if (form.getValues('sameAsClientAddress')) {
+                      form.setValue('sameAsClientAddress', false, { shouldDirty: true });
+                    }
                     if (form.getValues('siteLatitude') !== null || form.getValues('siteLongitude') !== null) {
                       form.setValue('siteLatitude', null, { shouldDirty: true });
                       form.setValue('siteLongitude', null, { shouldDirty: true });
                     }
-                  }} rows={3} maxLength={500} placeholder="Building, street, area, city, state, PIN code" data-testid="input-edit-order-site-address" /></FormControl>
+                  }} disabled={form.watch('sameAsClientAddress')} rows={3} maxLength={500} placeholder="Building, street, area, city, state, PIN code" data-testid="input-edit-order-site-address" /></FormControl>
                   <p className="text-[10px] leading-4 text-muted-foreground">This address belongs to this order; editing the text after pinning clears the map pin.</p>
                   {field.value.trim().length >= 3 && <SiteLocation address={field.value} latitude={form.watch('siteLatitude')} longitude={form.watch('siteLongitude')} compact testId="preview-edit-order-site-address" />}
                   <FormMessage />
@@ -384,7 +551,10 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
                 onSelect={(point) => {
                   form.setValue('siteLatitude', point.latitude, { shouldValidate: true, shouldDirty: true });
                   form.setValue('siteLongitude', point.longitude, { shouldValidate: true, shouldDirty: true });
-                  if (point.address) form.setValue('siteAddress', point.address, { shouldValidate: true, shouldDirty: true });
+                  if (point.address) {
+                    form.setValue('sameAsClientAddress', false, { shouldDirty: true });
+                    form.setValue('siteAddress', point.address, { shouldValidate: true, shouldDirty: true });
+                  }
                 }}
                 onClear={() => {
                   form.setValue('siteLatitude', null, { shouldValidate: true, shouldDirty: true });

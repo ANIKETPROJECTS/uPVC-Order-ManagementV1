@@ -1530,7 +1530,7 @@ export const updateOrderBodyNotesMax = 2000;
 export const UpdateOrderBody = zod.object({
   "quotationId": zod.string().nullish(),
   "clientName": zod.string().min(updateOrderBodyClientNameMin).max(updateOrderBodyClientNameMax).optional(),
-  "clientType": zod.enum(['Project', 'Retail']).optional(),
+  "clientType": zod.union([zod.literal('Project'),zod.literal('Retail'),zod.literal(null)]).nullish(),
   "clientPhone": zod.string().max(updateOrderBodyClientPhoneMax).nullish(),
   "clientAddress": zod.string().max(updateOrderBodyClientAddressMax).nullish(),
   "clientGstin": zod.string().max(updateOrderBodyClientGstinMax).nullish(),

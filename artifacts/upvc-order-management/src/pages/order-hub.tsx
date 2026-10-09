@@ -710,9 +710,9 @@ export default function OrderHubPage({ user }: { user: User }) {
                     </div>
                     <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-mobile-${order.id}`}>{statusLabel(order.status)}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-[10px]">
-                    <div><p className="uppercase tracking-wider text-muted-foreground">City / location</p><p className="mt-1 font-medium">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-mobile-site-${order.id}`} /></div>
-                    <div><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div>
+                  <div className="grid grid-cols-2 divide-x divide-border/70 text-[10px]">
+                    <div className="pr-3"><p className="uppercase tracking-wider text-muted-foreground">City / location</p><p className="mt-1 font-medium">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-mobile-site-${order.id}`} /></div>
+                    <div className="pl-3"><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
                     <span className="text-[10px] text-muted-foreground">{order.clientPhone || 'No phone recorded'}</span>
@@ -721,31 +721,31 @@ export default function OrderHubPage({ user }: { user: User }) {
                 </article>
               ))}
             </div>
-            <table className="hidden w-full min-w-[900px] text-left text-xs md:table">
+            <table className="hidden w-full min-w-[900px] border-collapse text-left text-xs md:table">
               <thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 font-bold">Order</th>
-                  <th className="px-4 py-3 font-bold">Client</th>
-                  <th className="px-4 py-3 font-bold">Location</th>
-                  <th className="px-4 py-3 font-bold">Status</th>
-                  <th className="px-4 py-3 font-bold">Created</th>
-                  <th className="px-4 py-3 text-right font-bold">Actions</th>
+                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Order</th>
+                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Client</th>
+                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Location</th>
+                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Status</th>
+                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Created</th>
+                  <th className="border-b border-border/80 px-4 py-3 text-right font-bold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/70">
+              <tbody>
                 {pageOrders.map((order) => (
                   <tr key={order.id} className="group hover:bg-primary/[0.025]" data-testid={`row-order-${order.id}`}>
-                    <td className="px-4 py-3.5">
+                    <td className="border-b border-r border-border/70 px-4 py-3.5">
                       <Link href={`/order-hub/${order.id}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-order-${order.id}`}>{order.orderId}</Link>
                       <p className="mt-1 text-[10px] text-muted-foreground">Sequence {String(order.sequenceNo).padStart(3, '0')}</p>
                       {!order.isActive && <span className="mt-1 inline-flex rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold text-muted-foreground">Inactive</span>}
                       {order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}
                     </td>
-                    <td className="px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td>
-                    <td className="px-4 py-3.5"><p className="font-semibold">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-table-site-${order.id}`} /></td>
-                    <td className="px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
-                    <td className="px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td>
-                    <td className="px-4 py-3.5"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>
+                    <td className="border-b border-r border-border/70 px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td>
+                    <td className="border-b border-r border-border/70 px-4 py-3.5"><p className="font-semibold">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-table-site-${order.id}`} /></td>
+                    <td className="border-b border-r border-border/70 px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
+                    <td className="border-b border-r border-border/70 px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td>
+                    <td className="border-b border-border/70 px-4 py-3.5"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>
                   </tr>
                 ))}
               </tbody>

@@ -157,6 +157,7 @@ export * from './orderRefundInput';
 export * from './orderRefundList';
 export * from './orderStatus';
 export * from './orderUpdate';
+export * from './orderUpdateClientType';
 export * from './orderWindow';
 export * from './orderWindowInput';
 export * from './orderWindowList';

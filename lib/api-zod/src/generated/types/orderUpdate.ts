@@ -5,8 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { ClientType } from './clientType';
 import type { OrderStatus } from './orderStatus';
+import type { OrderUpdateClientType } from './orderUpdateClientType';
 
 export interface OrderUpdate {
   /** @nullable */
@@ -16,7 +16,8 @@ export interface OrderUpdate {
      * @maxLength 120
      */
   clientName?: string;
-  clientType?: ClientType;
+  /** @nullable */
+  clientType?: OrderUpdateClientType;
   /**
      * @maxLength 30
      * @nullable

@@ -4103,7 +4103,8 @@ components:
           minLength: 2
           maxLength: 120
         clientType:
-          $ref: "#/components/schemas/ClientType"
+          type: ["string", "null"]
+          enum: [Project, Retail, null]
         clientPhone:
           type: ["string", "null"]
           maxLength: 30

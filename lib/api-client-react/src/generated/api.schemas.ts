@@ -669,6 +669,17 @@ export interface OrderInput {
   notes?: string | null;
 }
 
+/**
+ * @nullable
+ */
+export type OrderUpdateClientType = typeof OrderUpdateClientType[keyof typeof OrderUpdateClientType] | null;
+
+
+export const OrderUpdateClientType = {
+  Project: 'Project',
+  Retail: 'Retail',
+} as const;
+
 export interface OrderUpdate {
   /** @nullable */
   quotationId?: string | null;
@@ -677,7 +688,8 @@ export interface OrderUpdate {
      * @maxLength 120
      */
   clientName?: string;
-  clientType?: ClientType;
+  /** @nullable */
+  clientType?: OrderUpdateClientType;
   /**
      * @maxLength 30
      * @nullable
