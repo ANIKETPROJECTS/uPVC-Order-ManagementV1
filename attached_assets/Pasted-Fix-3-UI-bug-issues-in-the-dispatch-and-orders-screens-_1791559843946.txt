@@ -1,0 +1,17 @@
+Fix 3 UI/bug issues in the dispatch and orders screens. Read the current Dispatch register page, the QR dialog component, the dispatch QR API (/dispatches/:id/qr.png) and the Orders list table first. Do not change backend logic except what is needed for issue 1.
+
+1. DISPATCH QR NOT GENERATING
+After creating a dispatch, the "Dispatch QR" dialog (and the post-save "Download QR" option) shows an empty beige box.
+- Find why the image does not render. Check in particular: the QR endpoint is sign-in protected, and a plain <img src="/dispatches/:id/qr.png"> does not send the auth token/cookie header. Fix by fetching the image through the existing authenticated API client as a blob and rendering it with URL.createObjectURL (revoke on close), or by generating the QR client-side from the protected status link using the QR library already in the project.
+- Make sure the QR encodes the full absolute URL of the dispatch status page (with qr_token), using the correct public app base URL (not localhost / internal host).
+- Show a loading spinner while fetching and a clear error message with a Retry button if it fails.
+- Add Download PNG and Print buttons that work in the dialog. Verify the same QR works from the Create-dispatch success step, the register row QR icon, and the order detail Dispatches tab.
+- Report the actual root cause in your reply.
+
+2. DISPATCH REGISTER FILTERS (2 rows, clear labels)
+Currently 7 controls sit in one cramped row, placeholders are cut ("All locati", "Dispatch code, LO1, order,") and the date fields have no visible labels.
+Rearrange into a responsive 2-row grid with visible labels above each field:
+- Row 1: Search (wide, flex 2, placeholder "Search code, order, client, location"), Status, Client, Location.
+- Row 2: Lot, From date, To date (clearly labelled "From" and "To", full dd-mm-yyyy visible, min width ~150px), and a Clear button aligned right.
+- Tablet: 2 columns. Mobile: 1 column. No text truncation in placeholders, no horizontal scroll.
+- Keep the "Planned" and other status filters working, show active-filter chips only when a filter is applied.
