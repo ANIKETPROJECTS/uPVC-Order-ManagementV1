@@ -3148,7 +3148,7 @@ export const getCreateOrderUrl = () => {
 }
 
 /**
- * @summary Link a quotation and generate the canonical Order ID
+ * @summary Create an order with manual client and site details; link a quotation now or later
  */
 export const createOrder = async (orderInput: OrderInput, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
 
@@ -3214,7 +3214,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateOrderMutationVariables = {data: BodyType<OrderInput>}
 
     /**
- * @summary Link a quotation and generate the canonical Order ID
+ * @summary Create an order with manual client and site details; link a quotation now or later
  */
 export const useCreateOrder = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrder>>, TError,CreateOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -3313,7 +3313,7 @@ export const getUpdateOrderUrl = (id: string,) => {
 }
 
 /**
- * @summary Update an order's location, lifecycle status, notes, or active state
+ * @summary Update an order's location, lifecycle status, notes, active state, or quotation link
  */
 export const updateOrder = async (id: string,
     orderUpdate: OrderUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
@@ -3380,7 +3380,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateOrderMutationVariables = {id: string;data: BodyType<OrderUpdate>}
 
     /**
- * @summary Update an order's location, lifecycle status, notes, or active state
+ * @summary Update an order's location, lifecycle status, notes, active state, or quotation link
  */
 export const useUpdateOrder = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrder>>, TError,UpdateOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -8,7 +8,14 @@
 import type { OrderStatus } from './orderStatus';
 
 export interface OrderUpdate {
+  /** @minLength 1 */
+  quotationId?: string;
   status?: OrderStatus;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  locationName?: string;
   /**
      * @minLength 2
      * @maxLength 5

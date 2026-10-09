@@ -1286,6 +1286,8 @@ export const UpdateOrderLocationResponse = zod.object({
  */
 export const listOrdersQueryQMax = 100;
 
+export const listOrdersQueryLocationNameMax = 120;
+
 
 
 export const ListOrdersQueryParams = zod.object({
@@ -1293,6 +1295,7 @@ export const ListOrdersQueryParams = zod.object({
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
   "clientId": zod.coerce.string().optional(),
   "locationCode": zod.coerce.string().optional(),
+  "locationName": zod.coerce.string().max(listOrdersQueryLocationNameMax).optional(),
   "from": zod.date().optional(),
   "to": zod.date().optional(),
   "includeInactive": zod.coerce.boolean().optional()
@@ -1346,12 +1349,21 @@ export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
 
 
 /**
- * @summary Link a quotation and generate the canonical Order ID
+ * @summary Create an order with manual client and site details; link a quotation now or later
  */
 
+export const createOrderBodyClientNameMin = 2;
+export const createOrderBodyClientNameMax = 120;
 
-export const createOrderBodyLocationCodeMin = 2;
-export const createOrderBodyLocationCodeMax = 5;
+export const createOrderBodyClientPhoneMax = 30;
+
+export const createOrderBodyClientAddressMax = 500;
+
+export const createOrderBodyClientGstinMax = 15;
+
+
+export const createOrderBodyLocationNameMin = 2;
+export const createOrderBodyLocationNameMax = 120;
 
 export const createOrderBodySiteAddressMin = 3;
 export const createOrderBodySiteAddressMax = 500;
@@ -1367,9 +1379,14 @@ export const createOrderBodyNotesMax = 2000;
 
 
 export const CreateOrderBody = zod.object({
-  "clientId": zod.string().min(1),
-  "quotationId": zod.string().min(1),
-  "locationCode": zod.string().min(createOrderBodyLocationCodeMin).max(createOrderBodyLocationCodeMax),
+  "clientId": zod.string().min(1).optional(),
+  "clientName": zod.string().min(createOrderBodyClientNameMin).max(createOrderBodyClientNameMax).optional(),
+  "clientType": zod.enum(['Project', 'Retail']).optional(),
+  "clientPhone": zod.string().max(createOrderBodyClientPhoneMax).nullish(),
+  "clientAddress": zod.string().max(createOrderBodyClientAddressMax).nullish(),
+  "clientGstin": zod.string().max(createOrderBodyClientGstinMax).nullish(),
+  "quotationId": zod.string().min(1).optional(),
+  "locationName": zod.string().min(createOrderBodyLocationNameMin).max(createOrderBodyLocationNameMax),
   "siteAddress": zod.string().min(createOrderBodySiteAddressMin).max(createOrderBodySiteAddressMax),
   "siteLatitude": zod.number().min(createOrderBodySiteLatitudeMin).max(createOrderBodySiteLatitudeMax).nullish(),
   "siteLongitude": zod.number().min(createOrderBodySiteLongitudeMin).max(createOrderBodySiteLongitudeMax).nullish(),
@@ -1476,11 +1493,15 @@ export const GetOrderResponse = zod.object({
 
 
 /**
- * @summary Update an order's location, lifecycle status, notes, or active state
+ * @summary Update an order's location, lifecycle status, notes, active state, or quotation link
  */
 export const UpdateOrderParams = zod.object({
   "id": zod.coerce.string()
 })
+
+
+export const updateOrderBodyLocationNameMin = 2;
+export const updateOrderBodyLocationNameMax = 120;
 
 export const updateOrderBodyLocationCodeMin = 2;
 export const updateOrderBodyLocationCodeMax = 5;
@@ -1499,7 +1520,9 @@ export const updateOrderBodyNotesMax = 2000;
 
 
 export const UpdateOrderBody = zod.object({
+  "quotationId": zod.string().min(1).optional(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
+  "locationName": zod.string().min(updateOrderBodyLocationNameMin).max(updateOrderBodyLocationNameMax).optional(),
   "locationCode": zod.string().min(updateOrderBodyLocationCodeMin).max(updateOrderBodyLocationCodeMax).optional(),
   "siteAddress": zod.string().min(updateOrderBodySiteAddressMin).max(updateOrderBodySiteAddressMax).optional(),
   "siteLatitude": zod.number().min(updateOrderBodySiteLatitudeMin).max(updateOrderBodySiteLatitudeMax).nullish(),

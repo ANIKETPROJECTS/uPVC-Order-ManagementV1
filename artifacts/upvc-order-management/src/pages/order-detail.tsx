@@ -37,6 +37,7 @@ import {
   getDownloadOrderDocumentQueryKey,
   getGetPaymentOverviewQueryKey,
   getGetOrderQueryKey,
+  getListQuotationsQueryKey,
   getListOrderDocumentCategoriesQueryKey,
   getListOrderActivityQueryKey,
   getListOrderGrievancesQueryKey,
@@ -69,8 +70,8 @@ import {
   useListOrderDocumentCategories,
   useListOrderDocuments,
   useListOrderGrievances,
-  useListOrderLocations,
   useListOrderMessageTemplates,
+  useListQuotations,
   useListOrderPaymentFlags,
   useListOrderPayments,
   useListOrderRefunds,
@@ -91,13 +92,14 @@ import type {
   OrderDocumentCategory,
   OrderDocumentCategoryConfig,
   OrderGrievance,
-  OrderLocation,
   PaymentFlag,
   OrderPayment,
   OrderWindow,
+  Quotation,
   User,
 } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
+import { LifecycleMessageTemplates } from '@/components/lifecycle-message-templates';
 import { OrderQrCard } from '@/components/order-qr-card';
 import { SiteLocation } from '@/components/site-location';
 import { SiteMapPicker } from '@/components/site-map-picker';
@@ -214,7 +216,7 @@ function SummaryStat({ label, value, detail, testId }: { label: string; value: s
 }
 
 const detailSchema = z.object({
-  locationCode: z.string().min(2).max(5),
+  locationName: z.string().trim().min(2, 'Enter a city or location name.').max(120),
   siteAddress: z.string().trim().min(3, 'Enter the order’s site address.').max(500, 'Keep the address under 500 characters.'),
   siteLatitude: z.number().min(-90).max(90).nullable(),
   siteLongitude: z.number().min(-180).max(180).nullable(),
@@ -227,11 +229,19 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   const { toast } = useToast();
   const canEdit = hasPermission(user, 'order-hub');
   const update = useUpdateOrder();
-  const locations = useListOrderLocations({ includeInactive: false });
+  const quotationsQuery = useListQuotations({
+    query: { queryKey: getListQuotationsQueryKey(), enabled: canEdit && !order.quotationId },
+  });
+  const [selectedQuotationId, setSelectedQuotationId] = useState('');
+  const availableQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
+    quotation.clientId === order.clientId &&
+    !quotation.sampleOnly &&
+    /^QT-\d+$/i.test(quotation.quoteNo.trim()),
+  );
   const [editing, setEditing] = useState(
     () => new URLSearchParams(window.location.search).get('edit') === 'true',
   );
-  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' } });
+  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { locationName: order.locationName || '', siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' } });
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.has('edit')) {
@@ -243,9 +253,9 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   useEffect(() => {
     if (initializedForId.current !== order.id) {
       initializedForId.current = order.id;
-      form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
+      form.reset({ locationName: order.locationName || '', siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
     }
-  }, [form, order.id, order.locationCode, order.siteAddress, order.clientAddress, order.siteLatitude, order.siteLongitude, order.notes, order.status]);
+  }, [form, order.id, order.locationName, order.siteAddress, order.clientAddress, order.siteLatitude, order.siteLongitude, order.notes, order.status]);
   useEffect(() => {
     if (!editing) return;
     const frame = window.requestAnimationFrame(() => {
@@ -256,7 +266,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
     });
     return () => window.cancelAnimationFrame(frame);
   }, [editing]);
-  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationCode: values.locationCode, siteAddress: values.siteAddress.trim(), siteLatitude: values.siteLatitude, siteLongitude: values.siteLongitude, status: values.status as Status, notes: values.notes || null } }, {
+  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationName: values.locationName.trim(), siteAddress: values.siteAddress.trim(), siteLatitude: values.siteLatitude, siteLongitude: values.siteLongitude, status: values.status as Status, notes: values.notes || null } }, {
     onSuccess: (updated) => {
       queryClient.setQueryData(getGetOrderQueryKey(id), updated);
       void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
@@ -267,6 +277,23 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
       toast({ title: 'Order record updated', description: `${updated.orderId} is now ${statusLabel(updated.status)}.` });
     },
   });
+  const linkQuotation = () => {
+    if (!selectedQuotationId) return;
+    update.mutate({ id: order.id, data: { quotationId: selectedQuotationId } }, {
+      onSuccess: (updated) => {
+        queryClient.setQueryData(getGetOrderQueryKey(id), updated);
+        void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(id) });
+        toast({ title: 'Quotation linked', description: `Order ID updated to ${updated.orderId}.` });
+        setSelectedQuotationId('');
+      },
+      onError: (cause) => toast({
+        title: 'Quotation could not be linked',
+        description: cause instanceof Error ? cause.message : 'Please check the selected quotation.',
+        variant: 'destructive',
+      }),
+    });
+  };
   return (
     <Card id="order-record-card" className={`scroll-mt-24 border-border/80 ${editing ? 'ring-2 ring-primary/20' : ''}`} data-testid="card-order-record">
       <CardHeader className="flex-row items-start justify-between pb-3">
@@ -277,28 +304,61 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
         {canEdit && (
           <Button variant="outline" size="sm" onClick={() => {
             setEditing((value) => !value);
-            form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
+            form.reset({ locationName: order.locationName || '', siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
           }} data-testid="button-toggle-order-edit">
             <Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}
           </Button>
         )}
       </CardHeader>
       <CardContent>
+        {order.quotationNo ? (
+          <div className="mb-4 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2.5 text-xs" data-testid="text-linked-quotation">
+            <span className="text-muted-foreground">Linked quotation</span>
+            <span className="ml-2 font-mono font-bold text-primary">{order.quotationNo}</span>
+          </div>
+        ) : canEdit ? (
+          <div className="mb-4 space-y-2 rounded-lg border border-dashed border-border p-3" data-testid="panel-link-quotation">
+            <div>
+              <p className="text-xs font-semibold">Link a quotation later</p>
+              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Link a QT quotation for this client to replace the temporary Order ID with its canonical ID.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Select
+                value={selectedQuotationId || 'none'}
+                onValueChange={(value) => setSelectedQuotationId(value === 'none' ? '' : value)}
+                disabled={quotationsQuery.isLoading}
+              >
+                <SelectTrigger className="min-w-0 flex-1" data-testid="select-link-order-quotation">
+                  <SelectValue placeholder="Choose a quotation" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Choose a quotation</SelectItem>
+                  {availableQuotations.map((quotation) => (
+                    <SelectItem key={quotation.id} value={quotation.id}>
+                      {quotation.quoteNo} · {quotation.projectName || quotation.customerName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" size="sm" disabled={!selectedQuotationId || update.isPending} onClick={linkQuotation} data-testid="button-link-order-quotation">
+                {update.isPending ? 'Linking…' : 'Link quotation'}
+              </Button>
+            </div>
+            {!quotationsQuery.isLoading && availableQuotations.length === 0 && (
+              <p className="text-[10px] text-muted-foreground">No QT-numbered quotations are available for this client yet.</p>
+            )}
+            {quotationsQuery.isError && (
+              <Button type="button" variant="outline" size="sm" onClick={() => void quotationsQuery.refetch()}>Retry loading quotations</Button>
+            )}
+          </div>
+        ) : null}
         {editing && canEdit ? (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(save)} className="space-y-4" data-testid="form-order-detail">
-              <FormField control={form.control} name="locationCode" render={({ field }) => (
+              <FormField control={form.control} name="locationName" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Order location</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger data-testid="select-order-location"><SelectValue placeholder="Choose a location" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {(locations.data || []).map((location: OrderLocation) => <SelectItem key={location.id} value={location.code}>{location.code} · {location.name}</SelectItem>)}
-                      {!(locations.data || []).some((location: OrderLocation) => location.code === order.locationCode) && (
-                        <SelectItem value={order.locationCode}>{order.locationCode} · {order.locationName} (inactive)</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>City / location</FormLabel>
+                  <FormControl><Input {...field} placeholder="e.g. Pune" data-testid="input-edit-order-location-name" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -1221,11 +1281,24 @@ export default function OrderDetailPage({ user }: { user: User }) {
   const timeline = STATUS_OPTIONS.map((item, index) => ({ ...item, active: STATUS_OPTIONS.findIndex((status) => status.value === record.status) >= index, current: item.value === record.status }));
   return <AppShell user={user} title={record.orderId} eyebrow="Module 2 · order record"><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-order-hub"><ArrowLeft size={15} /> Back to order hub</Link><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full bg-primary" /> <span>Last updated {dateLabel(record.updatedAt)}</span></div></div>
-    <section className="order-hub-accent relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header"><div className="absolute right-10 top-8 h-28 w-28 rounded-full border border-sidebar-primary/20" /><div className="relative flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="min-w-0"><p className="break-all font-mono text-xs font-bold tracking-[0.13em] text-sidebar-primary" data-testid="text-order-id">{record.orderId}</p><h2 className="mt-3 break-words font-display text-2xl font-bold tracking-[-0.04em] sm:text-3xl md:text-4xl" data-testid="text-order-client">{record.clientName}</h2><p className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70"><span className="font-mono text-sidebar-primary">{record.locationCode}</span> <span className="break-words">{record.locationName}</span> <span className="text-white/40">·</span> <span>created {dateLabel(record.createdAt)}</span></p></div><span className={`inline-flex w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusTone(record.status)}`} data-testid="status-order-detail">{statusLabel(record.status)}</span></div></section>
+    <section className="order-hub-accent relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header"><div className="absolute right-10 top-8 h-28 w-28 rounded-full border border-sidebar-primary/20" /><div className="relative flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="min-w-0"><p className="break-all font-mono text-xs font-bold tracking-[0.13em] text-sidebar-primary" data-testid="text-order-id">{record.orderId}</p><h2 className="mt-3 break-words font-display text-2xl font-bold tracking-[-0.04em] sm:text-3xl md:text-4xl" data-testid="text-order-client">{record.clientName}</h2><p className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70"><span className="break-words">{record.locationName}</span> <span className="text-white/40">·</span> <span>created {dateLabel(record.createdAt)}</span></p></div><span className={`inline-flex w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusTone(record.status)}`} data-testid="status-order-detail">{statusLabel(record.status)}</span></div></section>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Windows" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Total area" value={`${summary.sqFt.toFixed(2)} sq ft`} detail="Summed from window records" testId="text-summary-area" /><SummaryStat label="Glass state" value={summary.glass} detail="Aggregate procurement state" testId="text-summary-glass" /><SummaryStat label="Paid" value={hasPermission(user, 'payments', 'view') ? plainInr(received) : 'Restricted'} detail="Received receipts less refunds" testId="text-summary-received" /></div>
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6" data-testid="section-order-lifecycle"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-base font-bold">Where this order is now</h2></div><span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span></div><div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">{timeline.map((item, index) => <div key={item.value} className="relative min-w-0" data-testid={`timeline-stage-${item.value}`}>{index < timeline.length - 1 && <div aria-hidden="true" className={`absolute left-7 -right-4 top-3.5 z-0 hidden h-px lg:block ${item.active ? 'bg-primary/35' : 'bg-border'}`} />}<span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.current ? 'border-primary bg-primary text-primary-foreground' : item.active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}>{item.current ? <Check size={13} /> : String(index + 1).padStart(2, '0')}</span><p className={`mt-2 min-h-8 text-[10px] font-bold leading-4 ${item.active ? 'text-primary' : 'text-muted-foreground'}`}>{item.label}</p></div>)}</div></section>
     <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : new URLSearchParams(window.location.search).get('tab') === 'grievances' ? 'grievances' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-5"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="grievances" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-grievances">Grievances</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
-      <TabsContent value="details" className="space-y-5"><OrderQrCard orderId={record.orderId} orderRecordId={record.id} /><OrderLotsCard order={record} user={user} id={id} /><div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><OrderRecordCard order={record} user={user} id={id} /><MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} /></div><WindowsPanel orderId={id} user={user} /></TabsContent>
+      <TabsContent value="details" className="space-y-5">
+        <OrderQrCard orderId={record.orderId} orderRecordId={record.id} />
+        <OrderLotsCard order={record} user={user} id={id} />
+        <OrderRecordCard order={record} user={user} id={id} />
+        <WindowsPanel orderId={id} user={user} />
+        <LifecycleMessageTemplates
+          templates={templates.data || []}
+          canEdit={user.roleId === 'master-admin'}
+          loading={templates.isLoading}
+          error={templates.isError}
+          onRetry={() => void templates.refetch()}
+        />
+        <MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} />
+      </TabsContent>
       <TabsContent value="billing" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><OrderPaymentFlagsPanel orderId={id} user={user} /><PaymentsPanel orderId={id} user={user} order={record} /></TabsContent>
       <TabsContent value="documents"><DocumentsPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="grievances"><GrievancesPanel order={record} user={user} /></TabsContent>

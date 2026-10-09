@@ -616,14 +616,35 @@ export interface Order {
 
 export interface OrderInput {
   /** @minLength 1 */
-  clientId: string;
-  /** @minLength 1 */
-  quotationId: string;
+  clientId?: string;
   /**
      * @minLength 2
-     * @maxLength 5
+     * @maxLength 120
      */
-  locationCode: string;
+  clientName?: string;
+  clientType?: ClientType;
+  /**
+     * @maxLength 30
+     * @nullable
+     */
+  clientPhone?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  clientAddress?: string | null;
+  /**
+     * @maxLength 15
+     * @nullable
+     */
+  clientGstin?: string | null;
+  /** @minLength 1 */
+  quotationId?: string;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  locationName: string;
   /**
      * @minLength 3
      * @maxLength 500
@@ -649,7 +670,14 @@ export interface OrderInput {
 }
 
 export interface OrderUpdate {
+  /** @minLength 1 */
+  quotationId?: string;
   status?: OrderStatus;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  locationName?: string;
   /**
      * @minLength 2
      * @maxLength 5
@@ -2555,6 +2583,10 @@ q?: string;
 status?: OrderStatus;
 clientId?: string;
 locationCode?: string;
+/**
+ * @maxLength 120
+ */
+locationName?: string;
 from?: string;
 to?: string;
 includeInactive?: boolean;

@@ -15,6 +15,10 @@ q?: string;
 status?: OrderStatus;
 clientId?: string;
 locationCode?: string;
+/**
+ * @maxLength 120
+ */
+locationName?: string;
 from?: Date;
 to?: Date;
 includeInactive?: boolean;

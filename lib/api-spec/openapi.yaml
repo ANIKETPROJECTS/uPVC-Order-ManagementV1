@@ -777,6 +777,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: locationName
+          in: query
+          schema:
+            type: string
+            maxLength: 120
         - name: from
           in: query
           schema:
@@ -807,7 +812,7 @@ paths:
     post:
       operationId: createOrder
       tags: [order-hub]
-      summary: Link a quotation and generate the canonical Order ID
+      summary: Create an order with manual client and site details; link a quotation now or later
       requestBody:
         required: true
         content:
@@ -828,7 +833,7 @@ paths:
         "403":
           description: Edit access required
         "404":
-          description: Active client, location, or quotation not found
+          description: Client, location, or quotation details are invalid
         "409":
           description: The client needs a type, the quotation is already linked, or the generated order ID is already in use
   /orders/{id}:
@@ -858,7 +863,7 @@ paths:
     patch:
       operationId: updateOrder
       tags: [order-hub]
-      summary: Update an order's location, lifecycle status, notes, or active state
+      summary: Update an order's location, lifecycle status, notes, active state, or quotation link
       parameters:
         - name: id
           in: path
@@ -886,6 +891,8 @@ paths:
           description: Edit access required
         "404":
           description: Order not found
+        "409":
+          description: Quotation is already linked or the generated Order ID is already in use
     delete:
       operationId: deleteOrder
       tags: [order-hub]
@@ -4048,13 +4055,28 @@ components:
         clientId:
           type: string
           minLength: 1
+        clientName:
+          type: string
+          minLength: 2
+          maxLength: 120
+        clientType:
+          $ref: "#/components/schemas/ClientType"
+        clientPhone:
+          type: ["string", "null"]
+          maxLength: 30
+        clientAddress:
+          type: ["string", "null"]
+          maxLength: 500
+        clientGstin:
+          type: ["string", "null"]
+          maxLength: 15
         quotationId:
           type: string
           minLength: 1
-        locationCode:
+        locationName:
           type: string
           minLength: 2
-          maxLength: 5
+          maxLength: 120
         siteAddress:
           type: string
           minLength: 3
@@ -4070,12 +4092,19 @@ components:
         notes:
           type: ["string", "null"]
           maxLength: 2000
-      required: [clientId, quotationId, locationCode, siteAddress]
+      required: [locationName, siteAddress]
     OrderUpdate:
       type: object
       properties:
+        quotationId:
+          type: string
+          minLength: 1
         status:
           $ref: "#/components/schemas/OrderStatus"
+        locationName:
+          type: string
+          minLength: 2
+          maxLength: 120
         locationCode:
           type: string
           minLength: 2

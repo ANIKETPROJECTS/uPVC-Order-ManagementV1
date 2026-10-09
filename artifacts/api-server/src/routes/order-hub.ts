@@ -46,6 +46,9 @@ import {
   getOrders,
   getOrderActivity,
   getOrderPayments,
+  getOrderPaymentFlags,
+  getOrderGrievances,
+  getQuotationRateSubmissions,
   getQuotations,
   getPublicUser,
   getUsers,
@@ -85,6 +88,24 @@ function isDuplicateKeyError(error: unknown): boolean {
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function locationCodeFromName(locationName: string): string {
+  const code = locationName
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 5)
+    .toUpperCase();
+  return code || "SITE";
+}
+
+async function generateClientPrefix(db: Awaited<ReturnType<typeof getMongoDb>>): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const prefix = `C${randomUUID().replaceAll("-", "").slice(0, 7).toUpperCase()}`;
+    const existing = await getClients(db).findOne({ prefixUpper: prefix });
+    if (!existing) return prefix;
+  }
+  throw new Error("A unique client prefix could not be generated.");
 }
 
 function requireOrderHubPermission(required: "view" | "edit"): RequestHandler {
@@ -515,6 +536,9 @@ router.get("/orders", async (req, res): Promise<void> => {
   if (parsed.data.locationCode) {
     filter.locationCode = parsed.data.locationCode.trim().toUpperCase();
   }
+  if (parsed.data.locationName?.trim()) {
+    filter.locationName = new RegExp(escapeRegex(parsed.data.locationName.trim()), "i");
+  }
   if (parsed.data.from || parsed.data.to) {
     const dateFilter: { $gte?: Date; $lte?: Date } = {};
     if (parsed.data.from) dateFilter.$gte = new Date(`${parsed.data.from}T00:00:00.000Z`);
@@ -538,6 +562,8 @@ router.get("/orders", async (req, res): Promise<void> => {
       { "lots.lotId": matcher },
       { clientName: matcher },
       { clientPrefix: matcher },
+      { clientPhone: matcher },
+      { siteAddress: matcher },
       { locationName: matcher },
     ];
   }
@@ -558,21 +584,15 @@ router.post(
       return;
     }
     const db = await getMongoDb();
-    const client = await getClients(db).findOne({
-      _id: parsed.data.clientId,
-      isActive: true,
-    });
-    const locationCode = normalizeLocationCode(parsed.data.locationCode);
-    const location = await getOrderLocations(db).findOne({
-      codeUpper: locationCode,
-      isActive: true,
-    });
-    if (!client || !location) {
-      res.status(404).json({ error: "Choose an active client and location." });
+    const actorId = req.session.userId;
+    if (!actorId) {
+      res.status(401).json({ error: "Sign in to continue." });
       return;
     }
-    if (client.type !== "Project" && client.type !== "Retail") {
-      res.status(409).json({ error: "Choose Project or Retail for this client before creating an order." });
+
+    const locationName = parsed.data.locationName.trim();
+    if (locationName.length < 2) {
+      res.status(400).json({ error: "Enter a city or location name." });
       return;
     }
     const siteAddress = parsed.data.siteAddress.trim();
@@ -586,36 +606,50 @@ router.post(
       res.status(400).json({ error: "Choose both map coordinates or clear the selected pin." });
       return;
     }
-    const quotation = await getQuotations(db).findOne({ _id: parsed.data.quotationId });
-    if (!quotation || quotation.archivedAt) {
-      res.status(404).json({ error: "Choose an active quotation for this order." });
+
+    const isManualClient = !parsed.data.clientId;
+    const manualName = parsed.data.clientName?.trim() || "";
+    if (isManualClient && (!manualName || !parsed.data.clientType)) {
+      res.status(400).json({ error: "Enter the client name and choose Project or Retail." });
       return;
     }
-    if (quotation.sampleOnly) {
-      res.status(400).json({ error: "Sample quotations cannot be used to create an order." });
+    if (isManualClient && parsed.data.quotationId) {
+      res.status(400).json({ error: "Create this manually entered client order first, then link its quotation from the order screen." });
       return;
     }
-    if (quotation.clientId !== client._id) {
-      res.status(400).json({ error: "Choose a quotation linked to the selected client." });
+
+    const existingClient = parsed.data.clientId
+      ? await getClients(db).findOne({ _id: parsed.data.clientId, isActive: true })
+      : null;
+    if (parsed.data.clientId && !existingClient) {
+      res.status(404).json({ error: "Choose an active client." });
       return;
     }
-    const generatedOrderId = formatQuotationOrderId(client.type, quotation.quoteNo);
-    if (!generatedOrderId) {
-      res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
+    const clientType = parsed.data.clientType ?? existingClient?.type;
+    if (clientType !== "Project" && clientType !== "Retail") {
+      res.status(409).json({ error: "Choose Project or Retail for this client before creating an order." });
       return;
     }
-    if (await getOrders(db).findOne({ quotationId: quotation._id })) {
-      res.status(409).json({ error: "This quotation is already linked to an order." });
+    if (existingClient?.type && parsed.data.clientType && existingClient.type !== parsed.data.clientType) {
+      res.status(409).json({ error: "The selected client already has a different client type." });
       return;
     }
-    if (await getOrders(db).findOne({ orderId: generatedOrderId })) {
-      res.status(409).json({ error: `Order ID ${generatedOrderId} is already in use.` });
-      return;
-    }
-    const actorId = req.session.userId;
-    if (!actorId) {
-      res.status(401).json({ error: "Sign in to continue." });
-      return;
+
+    let quotation = null;
+    if (parsed.data.quotationId) {
+      quotation = await getQuotations(db).findOne({ _id: parsed.data.quotationId });
+      if (!quotation || quotation.archivedAt) {
+        res.status(404).json({ error: "Choose an active quotation for this order." });
+        return;
+      }
+      if (quotation.sampleOnly) {
+        res.status(400).json({ error: "Sample quotations cannot be used to create an order." });
+        return;
+      }
+      if (quotation.clientId !== existingClient?._id) {
+        res.status(400).json({ error: "Choose a quotation linked to the selected client." });
+        return;
+      }
     }
 
     const now = new Date();
@@ -628,9 +662,47 @@ router.post(
       throw new Error("The order sequence counter could not be allocated.");
     }
     const sequenceNo = counter.value;
-    const normalizedLocationCode = normalizeLocationCode(location.code);
+
+    const generatedOrderId = quotation
+      ? formatQuotationOrderId(clientType, quotation.quoteNo)
+      : `TMP-${String(sequenceNo).padStart(6, "0")}`;
+    if (!generatedOrderId) {
+      res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
+      return;
+    }
+    if (quotation && await getOrders(db).findOne({ quotationId: quotation._id })) {
+      res.status(409).json({ error: "This quotation is already linked to an order." });
+      return;
+    }
+    if (await getOrders(db).findOne({ orderId: generatedOrderId })) {
+      res.status(409).json({ error: `Order ID ${generatedOrderId} is already in use.` });
+      return;
+    }
+
+    const clientId = existingClient?._id ?? randomUUID();
+    const clientPrefix = existingClient?.prefix ?? await generateClientPrefix(db);
+    const clientName = existingClient?.name ?? manualName;
+    const clientPhone = existingClient?.phone ?? parsed.data.clientPhone?.trim() ?? "";
+    const clientAddress = existingClient?.address ?? parsed.data.clientAddress?.trim() ?? "";
+    const clientGstin = existingClient?.gstin ?? parsed.data.clientGstin?.trim().toUpperCase() ?? null;
+    const client: ClientDocument = existingClient
+      ? { ...existingClient, type: clientType }
+      : {
+          _id: clientId,
+          name: clientName,
+          nameLower: clientName.toLowerCase(),
+          phone: clientPhone,
+          address: clientAddress,
+          gstin: clientGstin,
+          prefix: clientPrefix,
+          prefixUpper: clientPrefix,
+          type: clientType,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        };
     const lots: OrderLotDocument[] =
-      client.type === "Project"
+      clientType === "Project"
         ? [{
             _id: randomUUID(),
             sequence: 1,
@@ -644,23 +716,23 @@ router.post(
       orderId: generatedOrderId,
       legacyOrderId: null,
       sequenceNo,
-      clientId: client._id,
-      clientType: client.type,
-      clientName: client.name,
-      clientPrefix: client.prefix,
-      clientPhone: client.phone,
-      clientAddress: client.address,
-      clientGstin: client.gstin,
-      locationCode: normalizedLocationCode,
-      locationName: location.name,
+      clientId,
+      clientType,
+      clientName,
+      clientPrefix,
+      clientPhone: clientPhone || null,
+      clientAddress: clientAddress || null,
+      clientGstin,
+      locationCode: locationCodeFromName(locationName),
+      locationName,
       siteAddress,
       siteLatitude,
       siteLongitude,
-      quotationId: quotation._id,
-      quotationNo: quotation.quoteNo,
+      quotationId: quotation?._id ?? null,
+      quotationNo: quotation?.quoteNo ?? null,
       needsReview: false,
       lots,
-      nextLotSequence: client.type === "Project" ? 2 : 1,
+      nextLotSequence: clientType === "Project" ? 2 : 1,
       status: "quotation_stage",
       isActive: true,
       dispatchStatus: "pending_dispatch",
@@ -671,9 +743,22 @@ router.post(
       updatedBy: null,
       updatedAt: now,
     };
+    let insertedManualClient = false;
     try {
+      if (!existingClient) {
+        await getClients(db).insertOne(client);
+        insertedManualClient = true;
+      } else if (!existingClient.type) {
+        await getClients(db).updateOne(
+          { _id: existingClient._id },
+          { $set: { type: clientType, updatedAt: now } },
+        );
+      }
       await getOrders(db).insertOne(order);
     } catch (error) {
+      if (insertedManualClient) {
+        await getClients(db).deleteOne({ _id: client._id });
+      }
       if (isDuplicateKeyError(error)) {
         res.status(409).json({ error: `Order ID ${generatedOrderId} is already in use.` });
         return;
@@ -730,9 +815,11 @@ router.patch(
       parsed.data.siteAddress === undefined &&
       parsed.data.siteLatitude === undefined &&
       parsed.data.siteLongitude === undefined &&
+      parsed.data.locationName === undefined &&
+      parsed.data.quotationId === undefined &&
       parsed.data.isActive === undefined
     ) {
-      res.status(400).json({ error: "Provide an order status, notes, or active-state update." });
+      res.status(400).json({ error: "Provide at least one order field to update." });
       return;
     }
     const actorId = req.session.userId;
@@ -762,6 +849,15 @@ router.patch(
       }
       updates.siteAddress = siteAddress;
     }
+    if (parsed.data.locationName !== undefined) {
+      const locationName = parsed.data.locationName.trim();
+      if (locationName.length < 2) {
+        res.status(400).json({ error: "Enter a city or location name." });
+        return;
+      }
+      updates.locationName = locationName;
+      updates.locationCode = locationCodeFromName(locationName);
+    }
     const db = await getMongoDb();
     const before = await getOrders(db).findOne({ _id: params.data.id });
     if (!before) {
@@ -778,7 +874,7 @@ router.patch(
       updates.siteLatitude = siteLatitude;
       updates.siteLongitude = siteLongitude;
     }
-    if (parsed.data.locationCode !== undefined) {
+    if (parsed.data.locationCode !== undefined && parsed.data.locationName === undefined) {
       const locationCode = normalizeLocationCode(parsed.data.locationCode);
       if (locationCode !== normalizeLocationCode(before.locationCode)) {
         const location = await getOrderLocations(db).findOne({
@@ -793,6 +889,53 @@ router.patch(
         updates.locationName = location.name;
       }
     }
+    if (parsed.data.quotationId !== undefined) {
+      if (before.quotationId && before.quotationId !== parsed.data.quotationId) {
+        res.status(409).json({ error: "This order already has a linked quotation." });
+        return;
+      }
+      const quotation = await getQuotations(db).findOne({ _id: parsed.data.quotationId });
+      if (!quotation || quotation.archivedAt) {
+        res.status(404).json({ error: "Choose an active quotation for this order." });
+        return;
+      }
+      if (quotation.sampleOnly) {
+        res.status(400).json({ error: "Sample quotations cannot be linked to an order." });
+        return;
+      }
+      if (quotation.clientId !== before.clientId) {
+        res.status(400).json({ error: "Choose a quotation linked to this order's client." });
+        return;
+      }
+      if (await getOrders(db).findOne({ quotationId: quotation._id, _id: { $ne: before._id } })) {
+        res.status(409).json({ error: "This quotation is already linked to another order." });
+        return;
+      }
+      const client = await getClients(db).findOne({ _id: before.clientId });
+      const clientType = before.clientType ?? client?.type;
+      if (clientType !== "Project" && clientType !== "Retail") {
+        res.status(409).json({ error: "Set this client's type to Project or Retail before linking a quotation." });
+        return;
+      }
+      const generatedOrderId = formatQuotationOrderId(clientType, quotation.quoteNo);
+      if (!generatedOrderId) {
+        res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
+        return;
+      }
+      if (await getOrders(db).findOne({ orderId: generatedOrderId, _id: { $ne: before._id } })) {
+        res.status(409).json({ error: `Order ID ${generatedOrderId} is already in use.` });
+        return;
+      }
+      updates.orderId = generatedOrderId;
+      updates.quotationId = quotation._id;
+      updates.quotationNo = quotation.quoteNo;
+      updates.clientType = clientType;
+      updates.needsReview = false;
+      updates.lots = (before.lots ?? []).map((lot) => ({
+        ...lot,
+        lotId: formatLotId(generatedOrderId, lot.sequence),
+      }));
+    }
     const result = await getOrders(db).updateOne(
       { _id: params.data.id },
       { $set: updates },
@@ -806,6 +949,22 @@ router.patch(
       res.status(404).json({ error: "Order not found." });
       return;
     }
+    if (parsed.data.quotationId !== undefined) {
+      await Promise.all([
+        getOrderPaymentFlags(db).updateMany(
+          { orderRecordId: order._id },
+          { $set: { orderId: order.orderId } },
+        ),
+        getOrderGrievances(db).updateMany(
+          { orderRecordId: order._id },
+          { $set: { orderId: order.orderId } },
+        ),
+        getQuotationRateSubmissions(db).updateMany(
+          { orderRecordId: order._id },
+          { $set: { orderId: order.orderId } },
+        ),
+      ]);
+    }
     const actor = await getUsers(db).findOne({ _id: actorId });
     const activeStateChanged =
       before &&
@@ -814,6 +973,7 @@ router.patch(
       before &&
       actor &&
       (before.locationCode !== order.locationCode ||
+        before.locationName !== order.locationName ||
         before.siteAddress !== order.siteAddress ||
         before.siteLatitude !== order.siteLatitude ||
         before.siteLongitude !== order.siteLongitude ||
@@ -822,13 +982,18 @@ router.patch(
         activeStateChanged)
     ) {
       const changes = [
-        before.locationCode !== order.locationCode
-          ? `location to ${order.locationCode} · ${order.locationName}`
-          : "",
+        before.locationName !== order.locationName
+          ? `location to ${order.locationName}`
+          : before.locationCode !== order.locationCode
+            ? `location code to ${order.locationCode}`
+            : "",
         before.siteAddress !== order.siteAddress ? "site address" : "",
         before.siteLatitude !== order.siteLatitude || before.siteLongitude !== order.siteLongitude ? "map pin" : "",
         before.status !== order.status ? `status to ${order.status}` : "",
         before.notes !== order.notes ? "internal notes" : "",
+        before.quotationId !== order.quotationId
+          ? `linked quotation ${order.quotationNo} and changed Order ID to ${order.orderId}`
+          : "",
         (before.isActive !== false) !== (order.isActive !== false)
           ? order.isActive === false ? "archived the order" : "restored the order"
           : "",
