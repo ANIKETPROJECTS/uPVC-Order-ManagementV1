@@ -58,6 +58,26 @@ export function GlassQuantityEditor({
     })));
   };
 
+  const fillAllAsReceived = () => {
+    if (!canEdit || isSaving) return;
+    setDraft((current) => {
+      const next = { ...current };
+      for (const item of items) {
+        const currentItem = current[item.id] ?? {
+          received: String(item.received),
+          broken: String(item.broken),
+        };
+        const brokenValue = currentItem.broken;
+        const broken = /^\d+$/.test(brokenValue) ? Number(brokenValue) : item.broken;
+        next[item.id] = {
+          ...currentItem,
+          received: String(Math.max(0, item.ordered - broken)),
+        };
+      }
+      return next;
+    });
+  };
+
   if (!items.length) {
     return <div className="rounded-xl border border-dashed border-primary/25 bg-primary/[0.025] p-5 text-xs text-muted-foreground">
       <div className="flex items-start gap-3">
@@ -73,7 +93,7 @@ export function GlassQuantityEditor({
         <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border border-primary/15 bg-card text-primary"><Save size={14} /></span>
         <div>
           <p className="text-xs font-bold">Window glass lines <span className="ml-1 font-mono text-[10px] font-medium text-muted-foreground">{items.length}</span></p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Record intact pieces received and broken pieces separately.</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">All received sets Received to Ordered minus Broken; save to apply.</p>
         </div>
       </div>
       <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
@@ -82,10 +102,23 @@ export function GlassQuantityEditor({
           <span>Received <strong className="ml-1 font-mono text-foreground">{receivedTotal}</strong></span>
           <span>Broken <strong className="ml-1 font-mono text-foreground">{brokenTotal}</strong></span>
         </div>
-        {canEdit && <Button type="button" size="sm" onClick={save} disabled={!hasChanges || Boolean(validationMessage) || isSaving} data-testid={`button-save-glass-quantities-${orderId}`}>
-        {isSaving ? <LoaderCircle size={13} className="mr-1.5 animate-spin" /> : hasChanges ? <Save size={13} className="mr-1.5" /> : <Check size={13} className="mr-1.5" />}
-        {isSaving ? 'Saving…' : hasChanges ? 'Save quantities' : 'Saved'}
-        </Button>}
+        {canEdit && <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={fillAllAsReceived}
+            disabled={isSaving}
+            title="Set each received count to ordered minus broken. Save quantities to apply."
+            data-testid={`button-all-glass-received-${orderId}`}
+          >
+            <Check size={13} className="mr-1.5" /> All received
+          </Button>
+          <Button type="button" size="sm" onClick={save} disabled={!hasChanges || Boolean(validationMessage) || isSaving} data-testid={`button-save-glass-quantities-${orderId}`}>
+            {isSaving ? <LoaderCircle size={13} className="mr-1.5 animate-spin" /> : hasChanges ? <Save size={13} className="mr-1.5" /> : <Check size={13} className="mr-1.5" />}
+            {isSaving ? 'Saving…' : hasChanges ? 'Save quantities' : 'Saved'}
+          </Button>
+        </div>}
       </div>
     </div>
 
