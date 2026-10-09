@@ -78,16 +78,18 @@ function OrderRowActions({
   onRestore: (order: Order) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1">
-      <Link
-        href={`/order-hub/${order.id}`}
-        className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/10"
-        data-testid={`button-open-order-${order.id}`}
-      >
-        View <ArrowRight size={13} />
-      </Link>
+    <div className="flex flex-col items-end gap-1">
+      <div>
+        <Link
+          href={`/order-hub/${order.id}`}
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/10"
+          data-testid={`button-open-order-${order.id}`}
+        >
+          View <ArrowRight size={13} />
+        </Link>
+      </div>
       {canEdit && (
-        <>
+        <div className="flex items-center justify-end gap-1">
           {order.isActive && (
             <Link
               href={`/order-hub/${order.id}?edit=true#order-record-card`}
@@ -120,7 +122,7 @@ function OrderRowActions({
               <RotateCcw size={12} /> Restore
             </button>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -721,42 +723,42 @@ export default function OrderHubPage({ user }: { user: User }) {
               ))}
             </div>
             <div className="hidden overflow-x-auto overscroll-x-contain lg:block" data-testid="order-table-scroll">
-            <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-xs">
+            <table className="w-full min-w-[900px] table-fixed border-collapse text-left text-xs">
               <colgroup>
                 <col style={{ width: '9%' }} />
                 <col style={{ width: '16%' }} />
-                <col style={{ width: '18%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '11%' }} />
                 <col style={{ width: '12%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '23%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '16%' }} />
               </colgroup>
               <thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
                 <tr>
-                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Order</th>
-                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Client</th>
-                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Location</th>
-                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Status</th>
-                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Dispatches</th>
-                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Created</th>
-                  <th className="sticky right-0 z-20 border-b border-l border-border/80 bg-muted/95 px-2 py-3 text-right font-bold shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.65)]">Actions</th>
+                  <th className="whitespace-nowrap border-b border-r border-border/80 px-3 py-3 font-bold">Order</th>
+                  <th className="border-b border-r border-border/80 px-3 py-3 font-bold">Client</th>
+                  <th className="border-b border-r border-border/80 px-3 py-3 font-bold">Location</th>
+                  <th className="border-b border-r border-border/80 px-3 py-3 font-bold">Status</th>
+                  <th className="border-b border-r border-border/80 px-3 py-3 font-bold">Dispatches</th>
+                  <th className="whitespace-nowrap border-b border-r border-border/80 px-3 py-3 font-bold">Created</th>
+                  <th className="whitespace-nowrap border-b border-l border-border/80 px-2 py-3 text-right font-bold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {pageOrders.map((order) => (
                   <tr key={order.id} className="group hover:bg-primary/[0.025]" data-testid={`row-order-${order.id}`}>
-                    <td className="border-b border-r border-border/70 px-4 py-3.5">
+                    <td className="border-b border-r border-border/70 px-3 py-3.5">
                       <Link href={`/order-hub/${order.id}`} className="font-mono text-[11px] font-bold text-primary hover:underline" data-testid={`link-order-${order.id}`}>{order.orderId}</Link>
                       <p className="mt-1 text-[10px] text-muted-foreground">Sequence {String(order.sequenceNo).padStart(3, '0')}</p>
                       {!order.isActive && <span className="mt-1 inline-flex rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold text-muted-foreground">Inactive</span>}
                       {order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}
                     </td>
-                    <td className="border-b border-r border-border/70 px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td>
-                    <td className="border-b border-r border-border/70 px-4 py-3.5"><p className="font-semibold">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-table-site-${order.id}`} /></td>
-                    <td className="border-b border-r border-border/70 px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
-                    <td className="border-b border-r border-border/70 px-4 py-3.5">{(() => { const summary = dispatchForOrder(order.id); const latest = summary?.lots.map((lot) => lot.latestDispatchCode).filter(Boolean).slice(-1)[0]; const count = summary?.lots.reduce((total, lot) => total + lot.dispatchCount, 0) ?? 0; return <Link href={`/order-hub/${order.id}?tab=dispatches`} className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline" data-testid={`link-order-dispatches-${order.id}`}>{count} records{latest ? ` · ${latest}` : ''}</Link>; })()}</td>
-                    <td className="border-b border-r border-border/70 px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td>
-                    <td className="sticky right-0 z-10 border-b border-l border-border/70 bg-card px-2 py-3.5 group-hover:bg-secondary/30"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>
+                    <td className="border-b border-r border-border/70 px-3 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td>
+                    <td className="border-b border-r border-border/70 px-3 py-3.5"><p className="font-semibold">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-table-site-${order.id}`} /></td>
+                    <td className="border-b border-r border-border/70 px-3 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
+                    <td className="border-b border-r border-border/70 px-3 py-3.5">{(() => { const summary = dispatchForOrder(order.id); const latest = summary?.lots.map((lot) => lot.latestDispatchCode).filter(Boolean).slice(-1)[0]; const count = summary?.lots.reduce((total, lot) => total + lot.dispatchCount, 0) ?? 0; return <Link href={`/order-hub/${order.id}?tab=dispatches`} className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline" data-testid={`link-order-dispatches-${order.id}`}>{count} records{latest ? ` · ${latest}` : ''}</Link>; })()}</td>
+                    <td className="border-b border-r border-border/70 px-3 py-3.5 text-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px] text-muted-foreground">{order.createdBy}</p></td>
+                    <td className="border-b border-l border-border/70 px-2 py-3.5"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>
                   </tr>
                 ))}
               </tbody>
