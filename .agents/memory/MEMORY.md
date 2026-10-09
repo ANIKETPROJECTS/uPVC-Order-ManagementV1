@@ -22,3 +22,4 @@
 - [Per-file measurement classification](measurement-file-classification.md) — each file version keeps its type and Reference; reusable customer names stay separate from user and Client records.
 - [Glass tracking deletion](glass-tracking-deletion.md) — deleting tracking clears the active glass entry only; retain the parent order and imported workbook history.
 - [Mongo reset scope](mongo-reset-scope.md) — explicitly authorized resets preserve user accounts and role access; verify the intended database before clearing operational records.
+- [Manual demo data only](manual-demo-data.md) — never seed business records automatically; create samples only through an explicitly requested one-time operation.
