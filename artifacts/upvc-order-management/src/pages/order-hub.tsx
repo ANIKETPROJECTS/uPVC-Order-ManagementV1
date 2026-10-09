@@ -685,7 +685,7 @@ export default function OrderHubPage({ user }: { user: User }) {
           Include inactive
         </label>
       </div>
-      <div className="mt-5 overflow-hidden rounded-xl border border-border/80">
+      <div className="mt-5 min-w-0 rounded-xl border border-border/80">
         {orders.isLoading ? (
           <div className="p-4"><StatePanel type="loading" /></div>
         ) : orders.isError ? (
@@ -694,7 +694,7 @@ export default function OrderHubPage({ user }: { user: User }) {
           <div className="p-4"><StatePanel type="empty" /></div>
         ) : (
           <>
-            <div className="divide-y divide-border/70 md:hidden">
+            <div className="divide-y divide-border/70 lg:hidden">
               {pageOrders.map((order) => (
                 <article key={order.id} className="space-y-3 p-4 transition-colors hover:bg-primary/[0.025]" data-testid={`card-order-${order.id}`}>
                   <div className="flex items-start justify-between gap-3">
@@ -720,7 +720,17 @@ export default function OrderHubPage({ user }: { user: User }) {
                 </article>
               ))}
             </div>
-            <table className="hidden w-full min-w-[1020px] border-collapse text-left text-xs md:table">
+            <div className="hidden overflow-x-auto overscroll-x-contain lg:block" data-testid="order-table-scroll">
+            <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-xs">
+              <colgroup>
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '23%' }} />
+              </colgroup>
               <thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
                 <tr>
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Order</th>
@@ -729,7 +739,7 @@ export default function OrderHubPage({ user }: { user: User }) {
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Status</th>
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Dispatches</th>
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Created</th>
-                  <th className="border-b border-border/80 px-4 py-3 text-right font-bold">Actions</th>
+                  <th className="sticky right-0 z-20 border-b border-l border-border/80 bg-muted/95 px-2 py-3 text-right font-bold shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.65)]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -746,11 +756,12 @@ export default function OrderHubPage({ user }: { user: User }) {
                     <td className="border-b border-r border-border/70 px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
                     <td className="border-b border-r border-border/70 px-4 py-3.5">{(() => { const summary = dispatchForOrder(order.id); const latest = summary?.lots.map((lot) => lot.latestDispatchCode).filter(Boolean).slice(-1)[0]; const count = summary?.lots.reduce((total, lot) => total + lot.dispatchCount, 0) ?? 0; return <Link href={`/order-hub/${order.id}?tab=dispatches`} className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline" data-testid={`link-order-dispatches-${order.id}`}>{count} records{latest ? ` · ${latest}` : ''}</Link>; })()}</td>
                     <td className="border-b border-r border-border/70 px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td>
-                    <td className="border-b border-border/70 px-4 py-3.5"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>
+                    <td className="sticky right-0 z-10 border-b border-l border-border/70 bg-card px-2 py-3.5 group-hover:bg-secondary/30"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </>
         )}
       </div>

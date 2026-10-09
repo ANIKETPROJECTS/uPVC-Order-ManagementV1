@@ -239,6 +239,9 @@ export default function DispatchPage({ user }: { user: User }) {
   const [postCreateRecord, setPostCreateRecord] = useState<DispatchRecord | null>(null);
   const [cancelTarget, setCancelTarget] = useState<DispatchRecord | null>(null);
   const [qrTarget, setQrTarget] = useState<DispatchRecord | null>(null);
+  const [qrImageUrl, setQrImageUrl] = useState('');
+  const [qrImageRecordId, setQrImageRecordId] = useState('');
+  const [qrImageFailed, setQrImageFailed] = useState(false);
   const [challanTarget, setChallanTarget] = useState<DispatchRecord | null>(null);
   const [editFields, setEditFields] = useState({ plannedAt: '', locationName: '', siteAddress: '', siteLatitude: '', siteLongitude: '', vehicleNumber: '', driverName: '', driverPhone: '', challanNumber: '', dispatchNote: '' });
   useEffect(() => { const timer = window.setTimeout(() => setQuerySearch(search.trim()), 220); return () => window.clearTimeout(timer); }, [search]);
@@ -267,9 +270,26 @@ export default function DispatchPage({ user }: { user: User }) {
       challanNumber: active.challanNumber || '', dispatchNote: active.dispatchNote || '',
     });
   }, [active?.id]);
-  const qr = useGetDispatchQrPng(qrTarget?.id || '', { query: { enabled: Boolean(qrTarget), queryKey: getGetDispatchQrPngQueryKey(qrTarget?.id || '') } });
-  const imageUrl = useMemo(() => qr.data ? URL.createObjectURL(qr.data) : '', [qr.data]);
-  useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
+  const qr = useGetDispatchQrPng(qrTarget?.id || '', {
+    query: {
+      enabled: Boolean(qrTarget),
+      queryKey: getGetDispatchQrPngQueryKey(qrTarget?.id || ''),
+      retry: false,
+    },
+    request: { responseType: 'blob', credentials: 'include' },
+  });
+  useEffect(() => {
+    setQrImageFailed(false);
+    setQrImageUrl('');
+    setQrImageRecordId('');
+    if (!qrTarget || !qr.data) {
+      return;
+    }
+    const objectUrl = URL.createObjectURL(qr.data);
+    setQrImageUrl(objectUrl);
+    setQrImageRecordId(qrTarget.id);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [qrTarget?.id, qr.data]);
   const records = useMemo(() => allRecords.filter((item) => {
     const needle = search.trim().toLowerCase();
     const matchesText = !needle || [item.dispatchCode, ...item.legacyDispatchCodes, item.lotId, ...item.legacyLotIds, `L${String(item.lotSequence).padStart(2, '0')}`, item.orderId, item.clientName, item.locationName, item.siteAddress || ''].some((value) => value.toLowerCase().includes(needle));
@@ -310,6 +330,25 @@ export default function DispatchPage({ user }: { user: User }) {
     }
   };
   const cancelRecord = (reason: string) => cancelTarget && cancel.mutate({ id: cancelTarget.id, data: { reason } }, { onSuccess: async () => { await refresh(); toast({ title: 'Dispatch cancelled', description: 'Its QR code is now revoked.' }); setCancelTarget(null); setActive(null); }, onError: (error) => toast({ title: 'Dispatch could not be cancelled', description: error instanceof Error ? error.message : 'The server rejected this cancellation.', variant: 'destructive' }) });
+  const clearFilters = () => {
+    setSearch('');
+    setQuerySearch('');
+    setFilter('all');
+    setClientFilter('all');
+    setLocationFilter('all');
+    setLotFilter('');
+    setDateFrom('');
+    setDateTo('');
+  };
+  const activeFilters: { label: string; clear: () => void }[] = [
+    ...(search.trim() ? [{ label: `Search: ${search.trim()}`, clear: () => { setSearch(''); setQuerySearch(''); } }] : []),
+    ...(filter !== 'all' ? [{ label: `Status: ${human(filter)}`, clear: () => setFilter('all') }] : []),
+    ...(clientFilter !== 'all' ? [{ label: `Client: ${clientFilter}`, clear: () => setClientFilter('all') }] : []),
+    ...(locationFilter !== 'all' ? [{ label: `Location: ${locationFilter}`, clear: () => setLocationFilter('all') }] : []),
+    ...(lotFilter.trim() ? [{ label: `Lot: ${lotFilter.trim()}`, clear: () => setLotFilter('') }] : []),
+    ...(dateFrom ? [{ label: `From: ${dateFrom}`, clear: () => setDateFrom('') }] : []),
+    ...(dateTo ? [{ label: `To: ${dateTo}`, clear: () => setDateTo('') }] : []),
+  ];
   return <AppShell user={user} title="Dispatch register" eyebrow="Fulfilment · lot handoffs">
     <main className="mx-auto w-full max-w-[1500px] space-y-5 pb-10">
       <section className="relative overflow-hidden rounded-2xl border border-primary/15 bg-[linear-gradient(115deg,#edf6f2_0%,#e2f0ec_55%,#f7ebd9_100%)] px-5 py-5 shadow-sm md:flex md:items-end md:justify-between md:px-7 md:py-6">
@@ -320,19 +359,49 @@ export default function DispatchPage({ user }: { user: User }) {
         {[{ label: 'Ready lots · never dispatched', value: summary.data?.readyLotsAwaitingDispatch.length ?? 0, icon: PackageCheck, detail: 'Ready with no active dispatch record' }, { label: 'In transit', value: kpis?.dispatched ?? 0, icon: Truck, detail: 'Awaiting delivery confirmation' }, { label: 'Delivered', value: kpis?.delivered ?? 0, icon: Check, detail: 'Dispatch records completed' }, { label: 'Dispatch records', value: kpis?.total ?? allRecords.length, icon: CalendarClock, detail: `${kpis?.planned ?? 0} planned` }].map((item) => <div key={item.label} className="rounded-xl border border-border/80 bg-card p-3.5 shadow-sm sm:p-4" data-testid={`metric-${item.label.toLowerCase().replaceAll(/[^a-z]+/g, '-')}`}><div className="flex items-start justify-between gap-2"><p className="max-w-[170px] text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground sm:text-[10px]">{item.label}</p><item.icon size={16} className="shrink-0 text-primary" /></div><p className="mt-2 font-display text-2xl font-bold tabular-nums">{query.isLoading || summary.isLoading ? '—' : item.value}</p><p className="mt-1 text-[10px] text-muted-foreground">{item.detail}</p></div>)}
       </section>
       <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
-        <header className="border-b border-border/70 p-4 md:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2"><span className="h-5 w-1 rounded-full bg-primary" /><h2 className="font-display text-lg font-bold">Dispatch records</h2><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px]" data-testid="text-dispatch-count">{records.length} / {kpis?.total ?? allRecords.length}</span></div><p className="ml-3 mt-1 text-xs text-muted-foreground">Search dispatch codes, legacy lot aliases, order, client or location.</p></div>{!canEdit && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-900"><ShieldCheck size={13} /> View only</span>}</div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-9">
-            <label className="relative sm:col-span-2"><Search size={14} className="absolute left-3 top-3 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Dispatch code, L01, order, client…" className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs" data-testid="input-dispatch-search" /></label>
-            <select value={filter} onChange={(e) => setFilter(e.target.value as StatusFilter)} className="h-10 rounded-lg border border-input bg-background px-3 text-xs" data-testid="select-dispatch-filter"><option value="all">All statuses</option>{STATUS.map((s) => <option value={s} key={s}>{human(s)}</option>)}</select>
-            <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="h-10 rounded-lg border border-input bg-background px-3 text-xs" data-testid="select-dispatch-client"><option value="all">All clients</option>{clientOptions.map((client) => <option value={client} key={client}>{client}</option>)}</select>
-            <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="h-10 rounded-lg border border-input bg-background px-3 text-xs" data-testid="select-dispatch-location"><option value="all">All locations</option>{locationOptions.map((location) => <option value={location} key={location}>{location}</option>)}</select>
-            <input value={lotFilter} onChange={(e) => setLotFilter(e.target.value)} placeholder="Filter lot" className="h-10 rounded-lg border border-input bg-background px-3 text-xs" data-testid="input-dispatch-lot-filter" />
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="h-10 rounded-lg border border-input bg-background px-3 text-xs" data-testid="select-dispatch-sort"><option value="date-desc">Planned / newest</option><option value="date-asc">Planned / oldest</option><option value="code">Dispatch code</option><option value="client">Client name</option></select>
-            <div className="flex gap-2"><input type="date" aria-label="From date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-[10px]" data-testid="input-dispatch-date-from" /><input type="date" aria-label="To date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-[10px]" data-testid="input-dispatch-date-to" /></div>
+        <header className="border-b border-border/70 p-4 md:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2"><span className="h-5 w-1 rounded-full bg-primary" /><h2 className="font-display text-lg font-bold">Dispatch records</h2><span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px]" data-testid="text-dispatch-count">{records.length} / {kpis?.total ?? allRecords.length}</span></div>
+              <p className="ml-3 mt-1 text-xs text-muted-foreground">Search dispatch codes, legacy lot aliases, order, client or location.</p>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="text-[10px] font-bold text-muted-foreground">Sort<select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="mt-1 block h-9 w-full min-w-[155px] rounded-lg border border-input bg-background px-3 text-xs font-normal text-foreground" data-testid="select-dispatch-sort"><option value="date-desc">Planned / newest</option><option value="date-asc">Planned / oldest</option><option value="code">Dispatch code</option><option value="client">Client name</option></select></label>
+              {!canEdit && <span className="mb-0.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-900"><ShieldCheck size={13} /> View only</span>}
+            </div>
+          </div>
+          <div className="mt-4 space-y-3" data-testid="dispatch-filter-rows">
+            <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(145px,1fr))]">
+              <label className="block min-w-0 text-[10px] font-bold text-muted-foreground md:col-span-2 xl:col-span-1">Search
+                <span className="relative mt-1.5 block"><Search size={14} className="absolute left-3 top-3 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code, order, client, location" className="h-10 w-full min-w-0 rounded-lg border border-input bg-background pl-9 pr-3 text-xs font-normal text-foreground" data-testid="input-dispatch-search" /></span>
+              </label>
+              <label className="block min-w-0 text-[10px] font-bold text-muted-foreground">Status
+                <select value={filter} onChange={(e) => setFilter(e.target.value as StatusFilter)} className="mt-1.5 h-10 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-xs font-normal text-foreground" data-testid="select-dispatch-filter"><option value="all">All statuses</option>{STATUS.map((s) => <option value={s} key={s}>{human(s)}</option>)}</select>
+              </label>
+              <label className="block min-w-0 text-[10px] font-bold text-muted-foreground">Client
+                <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="mt-1.5 h-10 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-xs font-normal text-foreground" data-testid="select-dispatch-client"><option value="all">All clients</option>{clientOptions.map((client) => <option value={client} key={client}>{client}</option>)}</select>
+              </label>
+              <label className="block min-w-0 text-[10px] font-bold text-muted-foreground">Location
+                <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="mt-1.5 h-10 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-xs font-normal text-foreground" data-testid="select-dispatch-location"><option value="all">All locations</option>{locationOptions.map((location) => <option value={location} key={location}>{location}</option>)}</select>
+              </label>
+            </div>
+            <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(145px,1fr)_minmax(170px,1fr)_minmax(170px,1fr)_auto]">
+              <label className="block min-w-0 text-[10px] font-bold text-muted-foreground">Lot
+                <input value={lotFilter} onChange={(e) => setLotFilter(e.target.value)} placeholder="All lots" className="mt-1.5 h-10 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-xs font-normal text-foreground" data-testid="input-dispatch-lot-filter" />
+              </label>
+              <label className="block min-w-0 text-[10px] font-bold text-muted-foreground">From
+                <input type="date" aria-label="From date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="mt-1.5 h-10 w-full min-w-0 rounded-lg border border-input bg-background px-2 text-xs font-normal text-foreground xl:min-w-[160px]" data-testid="input-dispatch-date-from" />
+              </label>
+              <label className="block min-w-0 text-[10px] font-bold text-muted-foreground">To
+                <input type="date" aria-label="To date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="mt-1.5 h-10 w-full min-w-0 rounded-lg border border-input bg-background px-2 text-xs font-normal text-foreground xl:min-w-[160px]" data-testid="input-dispatch-date-to" />
+              </label>
+              <div className="flex items-end justify-end"><Button type="button" variant="outline" onClick={clearFilters} className="h-10 w-full md:w-auto" data-testid="button-clear-dispatch-filters"><X size={14} /> Clear</Button></div>
+            </div>
+            {activeFilters.length > 0 && <div className="flex flex-wrap gap-1.5 pt-1" aria-label="Active dispatch filters" data-testid="list-active-dispatch-filters">{activeFilters.map((item) => <button key={item.label} type="button" onClick={item.clear} className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/[.06] px-2.5 py-1 text-[10px] font-semibold text-primary hover:bg-primary/10" title={`Remove ${item.label} filter`}>{item.label}<X size={11} className="shrink-0" /></button>)}</div>}
           </div>
         </header>
         <div className="space-y-2 p-2 sm:p-3">
-          {!canView ? <div className="grid min-h-56 place-items-center text-sm text-muted-foreground" data-testid="state-dispatch-access-denied">Dispatch access is required.</div> : query.isLoading ? <div className="space-y-2" data-testid="state-dispatch-loading">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-muted/65" />)}</div> : query.isError ? <div className="grid min-h-56 place-items-center rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center" data-testid="state-dispatch-error"><div><CircleAlert className="mx-auto text-destructive" /><p className="mt-2 text-sm font-bold">Dispatch register unavailable</p><p className="mt-1 text-xs text-muted-foreground">The live records could not be loaded.</p><Button className="mt-3" variant="outline" size="sm" onClick={() => void query.refetch()} data-testid="button-retry-dispatch"><RefreshCw size={13} /> Retry</Button></div></div> : !records.length ? <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-dispatch-empty"><div><PackageCheck className="mx-auto text-primary" size={24} /><p className="mt-3 text-sm font-bold">{kpis?.total ? 'No dispatches match these filters' : 'No dispatch records yet'}</p><p className="mt-1 text-xs text-muted-foreground">{kpis?.total ? 'Clear a filter or adjust your search.' : 'Create a dispatch when a lot is ready for a whole-lot handoff.'}</p>{Boolean(kpis?.total) && <Button variant="outline" size="sm" className="mt-3" onClick={() => { setSearch(''); setQuerySearch(''); setFilter('all'); setClientFilter('all'); setLocationFilter('all'); setLotFilter(''); setDateFrom(''); setDateTo(''); }}>Clear filters</Button>}</div></div> : records.map((item) => <article key={item.id} className="grid min-w-0 gap-3 rounded-xl border border-border/70 bg-background p-3.5 transition hover:border-primary/25 hover:bg-primary/[.015] sm:grid-cols-[minmax(0,1.1fr)_minmax(130px,.9fr)_minmax(120px,.7fr)_auto] sm:items-center" data-testid={`row-dispatch-record-${item.id}`}>
+              {!canView ? <div className="grid min-h-56 place-items-center text-sm text-muted-foreground" data-testid="state-dispatch-access-denied">Dispatch access is required.</div> : query.isLoading ? <div className="space-y-2" data-testid="state-dispatch-loading">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-muted/65" />)}</div> : query.isError ? <div className="grid min-h-56 place-items-center rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center" data-testid="state-dispatch-error"><div><CircleAlert className="mx-auto text-destructive" /><p className="mt-2 text-sm font-bold">Dispatch register unavailable</p><p className="mt-1 text-xs text-muted-foreground">The live records could not be loaded.</p><Button className="mt-3" variant="outline" size="sm" onClick={() => void query.refetch()} data-testid="button-retry-dispatch"><RefreshCw size={13} /> Retry</Button></div></div> : !records.length ? <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-dispatch-empty"><div><PackageCheck className="mx-auto text-primary" size={24} /><p className="mt-3 text-sm font-bold">{kpis?.total ? 'No dispatches match these filters' : 'No dispatch records yet'}</p><p className="mt-1 text-xs text-muted-foreground">{kpis?.total ? 'Clear a filter or adjust your search.' : 'Create a dispatch when a lot is ready for a whole-lot handoff.'}</p>{Boolean(kpis?.total) && <Button variant="outline" size="sm" className="mt-3" onClick={clearFilters}>Clear filters</Button>}</div></div> : records.map((item) => <article key={item.id} className="grid min-w-0 gap-3 rounded-xl border border-border/70 bg-background p-3.5 transition hover:border-primary/25 hover:bg-primary/[.015] sm:grid-cols-[minmax(0,1.1fr)_minmax(130px,.9fr)_minmax(120px,.7fr)_auto] sm:items-center" data-testid={`row-dispatch-record-${item.id}`}>
             <div className="min-w-0"><p className="font-mono text-sm font-bold text-primary" data-testid={`text-dispatch-code-${item.id}`}>{item.dispatchCode}</p><p className="mt-1 truncate text-xs font-semibold">{item.clientName} <span className="text-muted-foreground">· {item.orderId}</span></p><p className="mt-1 text-[10px] text-muted-foreground">{item.lotId} <span className="px-1">·</span> {item.windowsSnapshot.length} windows <span className="px-1">·</span> {item.dispatchNote || 'No dispatch note'}</p></div>
             <div className="min-w-0 text-xs"><p className="flex items-center gap-1.5 font-semibold"><MapPin size={13} className="shrink-0 text-primary" />{item.locationName}</p><p className="mt-1 truncate text-[10px] text-muted-foreground">{item.siteAddress || 'Delivery address not recorded'}</p></div>
             <div className="flex items-center justify-between gap-3 sm:block"><StatusBadge status={item.status} /><p className="mt-1 text-[10px] text-muted-foreground">{item.status === 'delivered' ? `Delivered ${fmt(item.deliveredAt)}` : item.status === 'dispatched' ? `Dispatched ${fmt(item.dispatchedAt)}` : `Planned ${fmt(item.plannedAt)}`}</p></div>
@@ -368,7 +437,7 @@ export default function DispatchPage({ user }: { user: User }) {
     <Dialog open={Boolean(qrTarget)} onOpenChange={(open) => { if (!open) setQrTarget(null); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle>Dispatch QR</DialogTitle><DialogDescription>{qrTarget ? `${qrTarget.dispatchCode} · protected status link` : ''}</DialogDescription></DialogHeader>
-        {qr.isLoading ? <div className="h-60 animate-pulse rounded-xl bg-muted" /> : qr.isError ? <div className="rounded-lg bg-amber-50 p-4 text-xs text-amber-900" data-testid="state-dispatch-qr-error">QR unavailable or revoked. Refresh the record and try again.</div> : imageUrl && <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/20 p-4"><img src={imageUrl} alt="Authenticated dispatch QR code" className="h-52 w-52 rounded-lg bg-white p-2" data-testid="img-dispatch-qr" /><p className="font-mono text-sm font-bold">{qrTarget?.dispatchCode}</p><div className="flex flex-wrap justify-center gap-2"><Button size="sm" variant="outline" onClick={() => qr.data && downloadBlob(qr.data, `${qrTarget?.dispatchCode}-qr.png`)} data-testid="button-download-dispatch-qr"><Download size={14} /> Download PNG</Button><Button size="sm" variant="outline" onClick={() => { if (imageUrl && qrTarget && !printDispatchQr(imageUrl, qrTarget.dispatchCode)) toast({ title: 'Allow pop-ups to print the QR', description: 'The QR image is still available to download.' }); }} data-testid="button-print-dispatch-qr">Print QR</Button></div></div>}
+        {qrTarget && (qr.isFetching || (!qr.isError && !qrImageFailed && qrImageRecordId !== qrTarget.id)) ? <div className="grid h-60 place-items-center rounded-xl border border-border bg-muted/20" role="status" aria-live="polite" data-testid="state-dispatch-qr-loading"><div className="text-center text-xs text-muted-foreground"><RefreshCw size={22} className="mx-auto animate-spin text-primary" /><p className="mt-3">Loading dispatch QR…</p></div></div> : qr.isError || qrImageFailed ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" data-testid="state-dispatch-qr-error"><p className="font-semibold">The dispatch QR could not be loaded.</p><p className="mt-1 text-xs leading-5">Check your sign-in and dispatch access, then try again. Cancelled or revoked dispatch links are unavailable.</p><Button className="mt-3" size="sm" variant="outline" disabled={qr.isFetching} onClick={() => { setQrImageFailed(false); setQrImageUrl(''); setQrImageRecordId(''); void qr.refetch(); }} data-testid="button-retry-dispatch-qr"><RefreshCw size={13} className={qr.isFetching ? 'animate-spin' : ''} /> Retry</Button></div> : qrImageUrl && qrImageRecordId === qrTarget?.id && <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/20 p-4"><img src={qrImageUrl} alt={`QR code for dispatch status ${qrTarget.dispatchCode}`} onError={() => setQrImageFailed(true)} className="h-52 w-52 rounded-lg bg-white p-2" data-testid="img-dispatch-qr" /><p className="font-mono text-sm font-bold">{qrTarget.dispatchCode}</p><div className="flex flex-wrap justify-center gap-2"><Button size="sm" variant="outline" disabled={!qr.data} onClick={() => qr.data && downloadBlob(qr.data, `${qrTarget.dispatchCode}-qr.png`)} data-testid="button-download-dispatch-qr"><Download size={14} /> Download PNG</Button><Button size="sm" variant="outline" onClick={() => { if (!printDispatchQr(qrImageUrl, qrTarget.dispatchCode)) toast({ title: 'Allow pop-ups to print the QR', description: 'The QR image is still available to download.' }); }} data-testid="button-print-dispatch-qr">Print QR</Button></div></div>}
         <DialogFooter><Button variant="outline" onClick={() => setQrTarget(null)}>Close</Button></DialogFooter>
       </DialogContent>
     </Dialog>
