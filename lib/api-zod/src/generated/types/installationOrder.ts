@@ -17,6 +17,18 @@ export interface InstallationOrder {
   locationName: string;
   /** @nullable */
   siteAddress: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude: number | null;
   orderStatus: OrderStatus;
   dispatchStatus: DispatchStatus;
   installationStatus: InstallationStatus;

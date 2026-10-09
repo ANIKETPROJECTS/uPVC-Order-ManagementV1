@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './site-map-picker.css';
 import { LoaderCircle, MapPin, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -104,7 +105,7 @@ export function SiteMapPicker({
     }
   }, [latitude, longitude]);
 
-  const searchAddress = async (event: React.FormEvent<HTMLFormElement>) => {
+  const searchAddress = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const query = searchText.trim();
     if (!query) {
@@ -135,7 +136,7 @@ export function SiteMapPicker({
       const selected: SiteCoordinates = {
         latitude: Number(Number(result.lat).toFixed(6)),
         longitude: Number(Number(result.lon).toFixed(6)),
-        address: result.display_name,
+        address: result.display_name.slice(0, 500),
       };
       onSelect(selected);
       mapRef.current?.setView([selected.latitude, selected.longitude], 16);

@@ -31,6 +31,18 @@ export interface Order {
   clientAddress: string | null;
   /** @nullable */
   siteAddress: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude: number | null;
   /** @nullable */
   clientGstin: string | null;
   locationCode: string;

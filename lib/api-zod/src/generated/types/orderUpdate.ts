@@ -19,6 +19,18 @@ export interface OrderUpdate {
      * @maxLength 500
      */
   siteAddress?: string;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude?: number | null;
   isActive?: boolean;
   /**
      * @maxLength 2000

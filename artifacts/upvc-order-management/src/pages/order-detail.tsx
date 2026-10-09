@@ -100,6 +100,7 @@ import type {
 import { AppShell } from '@/components/app-shell';
 import { OrderQrCard } from '@/components/order-qr-card';
 import { SiteLocation } from '@/components/site-location';
+import { SiteMapPicker } from '@/components/site-map-picker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -215,6 +216,8 @@ function SummaryStat({ label, value, detail, testId }: { label: string; value: s
 const detailSchema = z.object({
   locationCode: z.string().min(2).max(5),
   siteAddress: z.string().trim().min(3, 'Enter the order’s site address.').max(500, 'Keep the address under 500 characters.'),
+  siteLatitude: z.number().min(-90).max(90).nullable(),
+  siteLongitude: z.number().min(-180).max(180).nullable(),
   status: z.string(),
   notes: z.string().max(2000).nullable().optional(),
 });
@@ -228,7 +231,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   const [editing, setEditing] = useState(
     () => new URLSearchParams(window.location.search).get('edit') === 'true',
   );
-  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', status: order.status, notes: order.notes || '' } });
+  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' } });
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.has('edit')) {
@@ -240,10 +243,10 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   useEffect(() => {
     if (initializedForId.current !== order.id) {
       initializedForId.current = order.id;
-      form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', status: order.status, notes: order.notes || '' });
+      form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
     }
-  }, [form, order.id, order.locationCode, order.siteAddress, order.clientAddress, order.notes, order.status]);
-  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationCode: values.locationCode, siteAddress: values.siteAddress.trim(), status: values.status as Status, notes: values.notes || null } }, {
+  }, [form, order.id, order.locationCode, order.siteAddress, order.clientAddress, order.siteLatitude, order.siteLongitude, order.notes, order.status]);
+  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationCode: values.locationCode, siteAddress: values.siteAddress.trim(), siteLatitude: values.siteLatitude, siteLongitude: values.siteLongitude, status: values.status as Status, notes: values.notes || null } }, {
     onSuccess: (updated) => {
       queryClient.setQueryData(getGetOrderQueryKey(id), updated);
       void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
@@ -264,7 +267,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
         {canEdit && (
           <Button variant="outline" size="sm" onClick={() => {
             setEditing((value) => !value);
-            form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', status: order.status, notes: order.notes || '' });
+            form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
           }} data-testid="button-toggle-order-edit">
             <Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}
           </Button>
@@ -292,12 +295,33 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
               <FormField control={form.control} name="siteAddress" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Order site address</FormLabel>
-                  <FormControl><Textarea {...field} rows={3} maxLength={500} placeholder="Building, street, area, city, state, PIN code" data-testid="input-edit-order-site-address" /></FormControl>
-                  <p className="text-[10px] leading-4 text-muted-foreground">This address belongs to this order; changing it won’t change the client’s saved address.</p>
-                  {field.value.trim().length >= 3 && <SiteLocation address={field.value} compact testId="preview-edit-order-site-address" />}
+                  <FormControl><Textarea {...field} onChange={(event) => {
+                    field.onChange(event);
+                    if (form.getValues('siteLatitude') !== null || form.getValues('siteLongitude') !== null) {
+                      form.setValue('siteLatitude', null, { shouldDirty: true });
+                      form.setValue('siteLongitude', null, { shouldDirty: true });
+                    }
+                  }} rows={3} maxLength={500} placeholder="Building, street, area, city, state, PIN code" data-testid="input-edit-order-site-address" /></FormControl>
+                  <p className="text-[10px] leading-4 text-muted-foreground">This address belongs to this order; editing the text after pinning clears the map pin.</p>
+                  {field.value.trim().length >= 3 && <SiteLocation address={field.value} latitude={form.watch('siteLatitude')} longitude={form.watch('siteLongitude')} compact testId="preview-edit-order-site-address" />}
                   <FormMessage />
                 </FormItem>
               )} />
+              <SiteMapPicker
+                address={form.watch('siteAddress')}
+                latitude={form.watch('siteLatitude')}
+                longitude={form.watch('siteLongitude')}
+                onSelect={(point) => {
+                  form.setValue('siteLatitude', point.latitude, { shouldValidate: true, shouldDirty: true });
+                  form.setValue('siteLongitude', point.longitude, { shouldValidate: true, shouldDirty: true });
+                  if (point.address) form.setValue('siteAddress', point.address, { shouldValidate: true, shouldDirty: true });
+                }}
+                onClear={() => {
+                  form.setValue('siteLatitude', null, { shouldValidate: true, shouldDirty: true });
+                  form.setValue('siteLongitude', null, { shouldValidate: true, shouldDirty: true });
+                }}
+                testId="edit-order-site-map-picker"
+              />
               <FormField control={form.control} name="status" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Lifecycle status</FormLabel>
@@ -332,7 +356,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
             </div>
             <div className="order-rule pl-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Order site address</p>
-              <SiteLocation address={order.siteAddress || order.clientAddress} testId="order-site-location" />
+              <SiteLocation address={order.siteAddress || order.clientAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} showMap testId="order-site-location" />
             </div>
             <div className="order-rule pl-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Tax identity</p>

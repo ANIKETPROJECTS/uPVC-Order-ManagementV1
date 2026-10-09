@@ -22,6 +22,18 @@ export interface OrderInput {
      */
   siteAddress: string;
   /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude?: number | null;
+  /**
      * @maxLength 2000
      * @nullable
      */

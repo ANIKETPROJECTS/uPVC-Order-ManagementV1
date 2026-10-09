@@ -12,6 +12,18 @@ export interface PublicInstallationShare {
   locationName: string;
   /** @nullable */
   siteAddress: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude: number | null;
   /** @minimum 0 */
   windowQty: number;
   teamName: string;

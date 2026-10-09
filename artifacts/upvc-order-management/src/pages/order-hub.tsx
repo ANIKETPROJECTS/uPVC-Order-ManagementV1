@@ -50,6 +50,7 @@ import {
 import type { Client, Order, OrderLocation, OrderMessageTemplate, Quotation, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { SiteLocation } from '@/components/site-location';
+import { SiteMapPicker } from '@/components/site-map-picker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -161,6 +162,8 @@ const orderSchema = z.object({
   quotationId: z.string().min(1, 'Select a quotation before creating the order.'),
   locationCode: z.string().min(2, 'Select a location.'),
   siteAddress: z.string().trim().min(3, 'Enter the order’s site address.').max(500, 'Keep the address under 500 characters.'),
+  siteLatitude: z.number().min(-90).max(90).nullable(),
+  siteLongitude: z.number().min(-180).max(180).nullable(),
   notes: z.string().max(2000).optional(),
 });
 const templateSchema = z.object({ template: z.string().min(10, 'Message template is too short.') });
@@ -289,10 +292,12 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
   });
   const form = useForm<z.infer<typeof orderSchema>>({
     resolver: zodResolver(orderSchema),
-    defaultValues: { clientId: '', quotationId: '', locationCode: '', siteAddress: '', notes: '' },
+    defaultValues: { clientId: '', quotationId: '', locationCode: '', siteAddress: '', siteLatitude: null, siteLongitude: null, notes: '' },
   });
   const selectedClient = clients.find((client) => client.id === form.watch('clientId'));
   const siteAddress = form.watch('siteAddress');
+  const siteLatitude = form.watch('siteLatitude');
+  const siteLongitude = form.watch('siteLongitude');
   const clientQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
     quotation.clientId === selectedClient?.id &&
     !quotation.sampleOnly &&
@@ -305,7 +310,7 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
     !create.isPending;
 
   useEffect(() => {
-    if (open) form.reset({ clientId: '', quotationId: '', locationCode: '', siteAddress: '', notes: '' });
+    if (open) form.reset({ clientId: '', quotationId: '', locationCode: '', siteAddress: '', siteLatitude: null, siteLongitude: null, notes: '' });
   }, [open, form]);
 
   const submit = (values: z.infer<typeof orderSchema>) => {
@@ -351,6 +356,8 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
                     field.onChange(value);
                     form.setValue('quotationId', '', { shouldValidate: true });
                     form.setValue('siteAddress', clients.find((client) => client.id === value)?.address || '', { shouldValidate: true });
+                    form.setValue('siteLatitude', null, { shouldValidate: true });
+                    form.setValue('siteLongitude', null, { shouldValidate: true });
                   }}
                   value={field.value}
                 >
@@ -442,17 +449,39 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
                 <FormControl>
                   <Textarea
                     {...field}
+                    onChange={(event) => {
+                      field.onChange(event);
+                      if (form.getValues('siteLatitude') !== null || form.getValues('siteLongitude') !== null) {
+                        form.setValue('siteLatitude', null, { shouldDirty: true });
+                        form.setValue('siteLongitude', null, { shouldDirty: true });
+                      }
+                    }}
                     rows={3}
                     maxLength={500}
                     placeholder="Building, street, area, city, state, PIN code"
                     data-testid="input-order-site-address"
                   />
                 </FormControl>
-                <p className="text-[10px] leading-4 text-muted-foreground">Starts with the client address. Update it if this order’s installation site is different; the address will open directly in Google Maps.</p>
-                {siteAddress.trim().length >= 3 && <SiteLocation address={siteAddress} compact testId="preview-order-site-address" />}
+                <p className="text-[10px] leading-4 text-muted-foreground">Starts with the client address. Update it if this order’s site is different; editing the text after pinning clears the pin.</p>
+                {siteAddress.trim().length >= 3 && <SiteLocation address={siteAddress} latitude={siteLatitude} longitude={siteLongitude} compact testId="preview-order-site-address" />}
                 <FormMessage />
               </FormItem>
             )} />
+            <SiteMapPicker
+              address={siteAddress}
+              latitude={siteLatitude}
+              longitude={siteLongitude}
+              onSelect={(point) => {
+                form.setValue('siteLatitude', point.latitude, { shouldValidate: true, shouldDirty: true });
+                form.setValue('siteLongitude', point.longitude, { shouldValidate: true, shouldDirty: true });
+                if (point.address) form.setValue('siteAddress', point.address, { shouldValidate: true, shouldDirty: true });
+              }}
+              onClear={() => {
+                form.setValue('siteLatitude', null, { shouldValidate: true, shouldDirty: true });
+                form.setValue('siteLongitude', null, { shouldValidate: true, shouldDirty: true });
+              }}
+              testId="order-site-map-picker"
+            />
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel>Initial notes <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
@@ -617,7 +646,7 @@ export default function OrderHubPage({ user }: { user: User }) {
                     <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-mobile-${order.id}`}>{statusLabel(order.status)}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-[10px]">
-                     <div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p><SiteLocation address={order.siteAddress} compact testId={`order-mobile-site-${order.id}`} /></div>
+                     <div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-mobile-site-${order.id}`} /></div>
                     <div><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
@@ -648,7 +677,7 @@ export default function OrderHubPage({ user }: { user: User }) {
                       {order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}
                     </td>
                     <td className="px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td>
-                    <td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p><SiteLocation address={order.siteAddress} compact testId={`order-table-site-${order.id}`} /></td>
+                    <td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-table-site-${order.id}`} /></td>
                     <td className="px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
                     <td className="px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td>
                     <td className="px-4 py-3.5"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>

@@ -356,6 +356,18 @@ export interface InstallationOrder {
   locationName: string;
   /** @nullable */
   siteAddress: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude: number | null;
   orderStatus: OrderStatus;
   dispatchStatus: DispatchStatus;
   installationStatus: InstallationStatus;
@@ -402,6 +414,18 @@ export interface PublicInstallationShare {
   locationName: string;
   /** @nullable */
   siteAddress: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude: number | null;
   /** @minimum 0 */
   windowQty: number;
   teamName: string;
@@ -561,6 +585,18 @@ export interface Order {
   clientAddress: string | null;
   /** @nullable */
   siteAddress: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude: number | null;
   /** @nullable */
   clientGstin: string | null;
   locationCode: string;
@@ -594,6 +630,18 @@ export interface OrderInput {
      */
   siteAddress: string;
   /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude?: number | null;
+  /**
      * @maxLength 2000
      * @nullable
      */
@@ -612,6 +660,18 @@ export interface OrderUpdate {
      * @maxLength 500
      */
   siteAddress?: string;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude?: number | null;
   isActive?: boolean;
   /**
      * @maxLength 2000

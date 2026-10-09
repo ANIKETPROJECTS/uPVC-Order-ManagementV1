@@ -53,7 +53,7 @@ export default function PublicInstallationSharePage() {
         <section className="mt-4 rounded-2xl border border-[hsl(39_25%_84%)] bg-[hsl(42_46%_99%)] p-5 sm:p-6" data-testid="panel-public-installation-location">
           <p className="text-[10px] font-bold uppercase tracking-[.15em] text-[hsl(168_58%_35%)]">Site location</p>
           <div className="mt-3">
-            <SiteLocation address={job.siteAddress || job.locationName} showMap testId="public-installation-site-location" />
+            <SiteLocation address={job.siteAddress || job.locationName} latitude={job.siteLatitude} longitude={job.siteLongitude} showMap testId="public-installation-site-location" />
           </div>
         </section>
 

@@ -1299,6 +1299,12 @@ export const ListOrdersQueryParams = zod.object({
 })
 
 
+export const listOrdersResponseSiteLatitudeMin = -90;
+export const listOrdersResponseSiteLatitudeMax = 90;
+
+export const listOrdersResponseSiteLongitudeMin = -180;
+export const listOrdersResponseSiteLongitudeMax = 180;
+
 
 
 export const ListOrdersResponseItem = zod.object({
@@ -1322,6 +1328,8 @@ export const ListOrdersResponseItem = zod.object({
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(listOrdersResponseSiteLatitudeMin).max(listOrdersResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(listOrdersResponseSiteLongitudeMin).max(listOrdersResponseSiteLongitudeMax).nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1348,6 +1356,12 @@ export const createOrderBodyLocationCodeMax = 5;
 export const createOrderBodySiteAddressMin = 3;
 export const createOrderBodySiteAddressMax = 500;
 
+export const createOrderBodySiteLatitudeMin = -90;
+export const createOrderBodySiteLatitudeMax = 90;
+
+export const createOrderBodySiteLongitudeMin = -180;
+export const createOrderBodySiteLongitudeMax = 180;
+
 export const createOrderBodyNotesMax = 2000;
 
 
@@ -1357,9 +1371,17 @@ export const CreateOrderBody = zod.object({
   "quotationId": zod.string().min(1),
   "locationCode": zod.string().min(createOrderBodyLocationCodeMin).max(createOrderBodyLocationCodeMax),
   "siteAddress": zod.string().min(createOrderBodySiteAddressMin).max(createOrderBodySiteAddressMax),
+  "siteLatitude": zod.number().min(createOrderBodySiteLatitudeMin).max(createOrderBodySiteLatitudeMax).nullish(),
+  "siteLongitude": zod.number().min(createOrderBodySiteLongitudeMin).max(createOrderBodySiteLongitudeMax).nullish(),
   "notes": zod.string().max(createOrderBodyNotesMax).nullish()
 })
 
+
+export const createOrderResponseSiteLatitudeMin = -90;
+export const createOrderResponseSiteLatitudeMax = 90;
+
+export const createOrderResponseSiteLongitudeMin = -180;
+export const createOrderResponseSiteLongitudeMax = 180;
 
 
 
@@ -1384,6 +1406,8 @@ export const CreateOrderResponse = zod.object({
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(createOrderResponseSiteLatitudeMin).max(createOrderResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(createOrderResponseSiteLongitudeMin).max(createOrderResponseSiteLongitudeMax).nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1405,6 +1429,12 @@ export const GetOrderParams = zod.object({
   "id": zod.coerce.string()
 })
 
+
+export const getOrderResponseSiteLatitudeMin = -90;
+export const getOrderResponseSiteLatitudeMax = 90;
+
+export const getOrderResponseSiteLongitudeMin = -180;
+export const getOrderResponseSiteLongitudeMax = 180;
 
 
 
@@ -1429,6 +1459,8 @@ export const GetOrderResponse = zod.object({
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(getOrderResponseSiteLatitudeMin).max(getOrderResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(getOrderResponseSiteLongitudeMin).max(getOrderResponseSiteLongitudeMax).nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1456,6 +1488,12 @@ export const updateOrderBodyLocationCodeMax = 5;
 export const updateOrderBodySiteAddressMin = 3;
 export const updateOrderBodySiteAddressMax = 500;
 
+export const updateOrderBodySiteLatitudeMin = -90;
+export const updateOrderBodySiteLatitudeMax = 90;
+
+export const updateOrderBodySiteLongitudeMin = -180;
+export const updateOrderBodySiteLongitudeMax = 180;
+
 export const updateOrderBodyNotesMax = 2000;
 
 
@@ -1464,10 +1502,18 @@ export const UpdateOrderBody = zod.object({
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
   "locationCode": zod.string().min(updateOrderBodyLocationCodeMin).max(updateOrderBodyLocationCodeMax).optional(),
   "siteAddress": zod.string().min(updateOrderBodySiteAddressMin).max(updateOrderBodySiteAddressMax).optional(),
+  "siteLatitude": zod.number().min(updateOrderBodySiteLatitudeMin).max(updateOrderBodySiteLatitudeMax).nullish(),
+  "siteLongitude": zod.number().min(updateOrderBodySiteLongitudeMin).max(updateOrderBodySiteLongitudeMax).nullish(),
   "isActive": zod.boolean().optional(),
   "notes": zod.string().max(updateOrderBodyNotesMax).nullish()
 })
 
+
+export const updateOrderResponseSiteLatitudeMin = -90;
+export const updateOrderResponseSiteLatitudeMax = 90;
+
+export const updateOrderResponseSiteLongitudeMin = -180;
+export const updateOrderResponseSiteLongitudeMax = 180;
 
 
 
@@ -1492,6 +1538,8 @@ export const UpdateOrderResponse = zod.object({
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(updateOrderResponseSiteLatitudeMin).max(updateOrderResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(updateOrderResponseSiteLongitudeMin).max(updateOrderResponseSiteLongitudeMax).nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1513,6 +1561,12 @@ export const DeleteOrderParams = zod.object({
   "id": zod.coerce.string()
 })
 
+
+export const deleteOrderResponseSiteLatitudeMin = -90;
+export const deleteOrderResponseSiteLatitudeMax = 90;
+
+export const deleteOrderResponseSiteLongitudeMin = -180;
+export const deleteOrderResponseSiteLongitudeMax = 180;
 
 
 
@@ -1537,6 +1591,8 @@ export const DeleteOrderResponse = zod.object({
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(deleteOrderResponseSiteLatitudeMin).max(deleteOrderResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(deleteOrderResponseSiteLongitudeMin).max(deleteOrderResponseSiteLongitudeMax).nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1558,6 +1614,12 @@ export const AddOrderLotParams = zod.object({
   "id": zod.coerce.string()
 })
 
+
+export const addOrderLotResponseSiteLatitudeMin = -90;
+export const addOrderLotResponseSiteLatitudeMax = 90;
+
+export const addOrderLotResponseSiteLongitudeMin = -180;
+export const addOrderLotResponseSiteLongitudeMax = 180;
 
 
 
@@ -1582,6 +1644,8 @@ export const AddOrderLotResponse = zod.object({
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(addOrderLotResponseSiteLatitudeMin).max(addOrderLotResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(addOrderLotResponseSiteLongitudeMin).max(addOrderLotResponseSiteLongitudeMax).nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1638,6 +1702,12 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
 /**
  * @summary List delivered orders and their installation state
  */
+export const listInstallationOrdersResponseSiteLatitudeMin = -90;
+export const listInstallationOrdersResponseSiteLatitudeMax = 90;
+
+export const listInstallationOrdersResponseSiteLongitudeMin = -180;
+export const listInstallationOrdersResponseSiteLongitudeMax = 180;
+
 export const listInstallationOrdersResponseWindowQtyMin = 0;
 
 export const listInstallationOrdersResponseActualSquareFootageMin = 0;
@@ -1650,6 +1720,8 @@ export const ListInstallationOrdersResponseItem = zod.object({
   "clientName": zod.string(),
   "locationName": zod.string(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(listInstallationOrdersResponseSiteLatitudeMin).max(listInstallationOrdersResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(listInstallationOrdersResponseSiteLongitudeMin).max(listInstallationOrdersResponseSiteLongitudeMax).nullable(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "installationStatus": zod.enum(['pending', 'issue', 'installed']),
@@ -1686,6 +1758,12 @@ export const GetPublicInstallationShareParams = zod.object({
   "token": zod.coerce.string().min(getPublicInstallationSharePathTokenMin).max(getPublicInstallationSharePathTokenMax)
 })
 
+export const getPublicInstallationShareResponseSiteLatitudeMin = -90;
+export const getPublicInstallationShareResponseSiteLatitudeMax = 90;
+
+export const getPublicInstallationShareResponseSiteLongitudeMin = -180;
+export const getPublicInstallationShareResponseSiteLongitudeMax = 180;
+
 export const getPublicInstallationShareResponseWindowQtyMin = 0;
 
 export const getPublicInstallationShareResponseActualSquareFootageMin = 0;
@@ -1697,6 +1775,8 @@ export const GetPublicInstallationShareResponse = zod.object({
   "clientName": zod.string(),
   "locationName": zod.string(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(getPublicInstallationShareResponseSiteLatitudeMin).max(getPublicInstallationShareResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(getPublicInstallationShareResponseSiteLongitudeMin).max(getPublicInstallationShareResponseSiteLongitudeMax).nullable(),
   "windowQty": zod.number().int().min(getPublicInstallationShareResponseWindowQtyMin),
   "teamName": zod.string(),
   "subteamName": zod.string().nullable(),
@@ -1780,6 +1860,12 @@ export const UpdateInstallationOrderBody = zod.object({
   "issueReason": zod.string().max(updateInstallationOrderBodyIssueReasonMax).optional()
 })
 
+export const updateInstallationOrderResponseSiteLatitudeMin = -90;
+export const updateInstallationOrderResponseSiteLatitudeMax = 90;
+
+export const updateInstallationOrderResponseSiteLongitudeMin = -180;
+export const updateInstallationOrderResponseSiteLongitudeMax = 180;
+
 export const updateInstallationOrderResponseWindowQtyMin = 0;
 
 export const updateInstallationOrderResponseActualSquareFootageMin = 0;
@@ -1792,6 +1878,8 @@ export const UpdateInstallationOrderResponse = zod.object({
   "clientName": zod.string(),
   "locationName": zod.string(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(updateInstallationOrderResponseSiteLatitudeMin).max(updateInstallationOrderResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(updateInstallationOrderResponseSiteLongitudeMin).max(updateInstallationOrderResponseSiteLongitudeMax).nullable(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "installationStatus": zod.enum(['pending', 'issue', 'installed']),
@@ -1968,6 +2056,12 @@ export const AssignInstallationOrderBody = zod.object({
   "actualSquareFootage": zod.number().min(assignInstallationOrderBodyActualSquareFootageMin).nullable()
 })
 
+export const assignInstallationOrderResponseSiteLatitudeMin = -90;
+export const assignInstallationOrderResponseSiteLatitudeMax = 90;
+
+export const assignInstallationOrderResponseSiteLongitudeMin = -180;
+export const assignInstallationOrderResponseSiteLongitudeMax = 180;
+
 export const assignInstallationOrderResponseWindowQtyMin = 0;
 
 export const assignInstallationOrderResponseActualSquareFootageMin = 0;
@@ -1980,6 +2074,8 @@ export const AssignInstallationOrderResponse = zod.object({
   "clientName": zod.string(),
   "locationName": zod.string(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(assignInstallationOrderResponseSiteLatitudeMin).max(assignInstallationOrderResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(assignInstallationOrderResponseSiteLongitudeMin).max(assignInstallationOrderResponseSiteLongitudeMax).nullable(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "installationStatus": zod.enum(['pending', 'issue', 'installed']),
@@ -5178,6 +5274,12 @@ export const UpdateOrderBillingBody = zod.object({
 })
 
 
+export const updateOrderBillingResponseSiteLatitudeMin = -90;
+export const updateOrderBillingResponseSiteLatitudeMax = 90;
+
+export const updateOrderBillingResponseSiteLongitudeMin = -180;
+export const updateOrderBillingResponseSiteLongitudeMax = 180;
+
 
 
 export const UpdateOrderBillingResponse = zod.object({
@@ -5201,6 +5303,8 @@ export const UpdateOrderBillingResponse = zod.object({
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
   "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(updateOrderBillingResponseSiteLatitudeMin).max(updateOrderBillingResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(updateOrderBillingResponseSiteLongitudeMin).max(updateOrderBillingResponseSiteLongitudeMax).nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
