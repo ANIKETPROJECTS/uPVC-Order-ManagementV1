@@ -506,7 +506,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
                 )} />
                 <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-background px-3 py-2.5 sm:mt-7">
                   <FormField control={form.control} name="sameAsClientAddress" render={({ field }) => (
-                    <>
+                    <FormItem className="flex w-full items-start gap-3 space-y-0">
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={(checked) => {
                           const isSameAddress = checked === true;
@@ -522,7 +522,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
                         <FormLabel className="cursor-pointer text-xs">Order site address is the same as client address</FormLabel>
                         <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">Keeps the two address fields in sync.</p>
                       </div>
-                    </>
+                    </FormItem>
                   )} />
                 </div>
               </div>
