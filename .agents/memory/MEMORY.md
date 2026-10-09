@@ -3,7 +3,7 @@
 - [pnpm workspace installs](pnpm-dependency-installs.md) — the package helper targets the workspace root; use the filtered pnpm package command for app-only dependencies.
 - [Quotation profile snapshots](quotation-snapshots.md) — keep saved proposal details stable when the reusable profile catalogue changes.
 - [Quotation request IDs](quotation-request-ids.md) — new requests use a global QTR sequence and India-local creation date; keep legacy IDs stable.
-- [Order IDs from quotations](order-ids-from-quotations.md) — new unlinked orders use TMP IDs; linking a same-client QT switches to canonical P/R + quotation digits.
+- [Order IDs from quotations](order-ids-from-quotations.md) — quotations can be linked across client names; use the quote number and the order’s type without replacing its client details.
 - [Scoped workspace themes](workspace-theme-scope.md) — keep the earlier light navigation palette across themes; the top header and main content follow saved appearance.
 - [Manual WhatsApp reminders](manual-whatsapp-reminders.md) — open a drafted message for an employee to send; never use Meta APIs or WhatsApp credentials.
 - [Measurement sheet labels](measurement-sheet-labels.md) — keep optional user-facing sheet names separate from original filenames, with legacy filename fallback.

@@ -642,29 +642,6 @@ router.post(
         res.status(400).json({ error: "Sample quotations cannot be used to create an order." });
         return;
       }
-      if (isManualClient) {
-        const quotationClient = quotation.clientId
-          ? await getClients(db).findOne({ _id: quotation.clientId, isActive: true })
-          : null;
-        if (
-          !quotationClient ||
-          quotationClient.name.trim().toLocaleLowerCase() !== manualName.toLocaleLowerCase()
-        ) {
-          res.status(400).json({
-            error: "The selected quotation must belong to the manually entered client. Enter that client's saved name or choose the existing client.",
-          });
-          return;
-        }
-        if (quotationClient.type && quotationClient.type !== parsed.data.clientType) {
-          res.status(409).json({ error: "The selected quotation client's type does not match the chosen Project or Retail type." });
-          return;
-        }
-        existingClient = quotationClient;
-      }
-      if (quotation.clientId !== existingClient?._id) {
-        res.status(400).json({ error: "Choose a quotation linked to the selected client." });
-        return;
-      }
     }
 
     const now = new Date();
@@ -944,10 +921,6 @@ router.patch(
       }
       if (linkedQuotation?.sampleOnly) {
         res.status(400).json({ error: "Sample quotations cannot be linked to an order." });
-        return;
-      }
-      if (linkedQuotation && linkedQuotation.clientId !== before.clientId) {
-        res.status(400).json({ error: "Choose a quotation linked to this order's client." });
         return;
       }
       if (linkedQuotation && await getOrders(db).findOne({ quotationId: linkedQuotation._id, _id: { $ne: before._id } })) {

@@ -57,6 +57,8 @@ const STATUS_OPTIONS: { value: Status; label: string; tone: string }[] = [
 
 const statusLabel = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.label || status.replaceAll('_', ' ');
 const statusTone = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.tone || 'bg-muted text-muted-foreground';
+const quotationOptionLabel = (quotation: Quotation) =>
+  `${quotation.quoteNo} · ${quotation.customerName}${quotation.projectName && quotation.projectName !== quotation.customerName ? ` — ${quotation.projectName}` : ''}`;
 const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
 const shortDate = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' }).format(new Date(value));
 
@@ -201,18 +203,11 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
   const siteAddress = form.watch('siteAddress');
   const siteLatitude = form.watch('siteLatitude');
   const siteLongitude = form.watch('siteLongitude');
-  const manualMatchingClient = clients.find((client) =>
-    client.isActive &&
-    client.name.trim().toLocaleLowerCase() === clientName.trim().toLocaleLowerCase() &&
-    (!client.type || !clientType || client.type === clientType),
-  );
-  const quotationClientId = clientMode === 'existing' ? selectedClient?.id : manualMatchingClient?.id;
-  const clientQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
-    quotation.clientId === quotationClientId &&
+  const availableQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
     !quotation.sampleOnly &&
     /^QT-\d+$/i.test(quotation.quoteNo.trim()),
   );
-  const selectedQuotation = clientQuotations.find((quotation) => quotation.id === form.watch('quotationId'));
+  const selectedQuotation = availableQuotations.find((quotation) => quotation.id === form.watch('quotationId'));
   const previewId = orderIdPreview(clientType ?? null, selectedQuotation?.quoteNo);
   const clientIsReady = clientMode === 'manual'
     ? clientName.trim().length >= 2 && Boolean(clientType)
@@ -424,24 +419,25 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
                       <FormControl><SelectTrigger data-testid="select-order-quotation"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="none">Create without a quotation</SelectItem>
-                        {clientQuotations.map((quotation) => (
-                          <SelectItem key={quotation.id} value={quotation.id}>{quotation.quoteNo} · {quotation.projectName || quotation.customerName}</SelectItem>
+                        {availableQuotations.map((quotation) => (
+                          <SelectItem key={quotation.id} value={quotation.id}>{quotationOptionLabel(quotation)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
-                {selectedClient && quotationsQuery.isLoading && <p className="text-xs text-muted-foreground" role="status">Loading this client’s quotations…</p>}
+                <p className="text-[10px] leading-4 text-muted-foreground">Choose any active quotation. Its customer name does not need to match this order’s client.</p>
+                {selectedClient && quotationsQuery.isLoading && <p className="text-xs text-muted-foreground" role="status">Loading available quotations…</p>}
                 {selectedClient && quotationsQuery.isError && (
                   <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs" role="alert">
                     <span>Quotations could not be loaded. You can still create the order without one.</span>
                     <Button type="button" size="sm" variant="outline" onClick={() => void quotationsQuery.refetch()}>Retry</Button>
                   </div>
                 )}
-                {selectedClient && !quotationsQuery.isLoading && !quotationsQuery.isError && clientQuotations.length === 0 && (
+                {selectedClient && !quotationsQuery.isLoading && !quotationsQuery.isError && availableQuotations.length === 0 && (
                   <p className="rounded-lg border border-border bg-muted/25 px-3 py-2.5 text-xs text-muted-foreground" role="status" data-testid="notice-order-no-quotation">
-                    You can create this order now and link a quotation from its order page later.
+                    No active QT-numbered quotations are available. You can create this order now and link one later.
                   </p>
                 )}
               </>
@@ -454,13 +450,13 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
                     <Select
                       onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
                       value={field.value || 'none'}
-                      disabled={!manualMatchingClient || quotationsQuery.isLoading}
+                      disabled={quotationsQuery.isLoading}
                     >
                       <FormControl><SelectTrigger data-testid="select-manual-order-quotation"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="none">Create without a quotation</SelectItem>
-                        {clientQuotations.map((quotation) => (
-                          <SelectItem key={quotation.id} value={quotation.id}>{quotation.quoteNo} · {quotation.projectName || quotation.customerName}</SelectItem>
+                        {availableQuotations.map((quotation) => (
+                          <SelectItem key={quotation.id} value={quotation.id}>{quotationOptionLabel(quotation)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -468,19 +464,17 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
                   </FormItem>
                 )} />
                 <p className="rounded-lg border border-border bg-muted/25 px-3 py-2.5 text-xs text-muted-foreground">
-                  {manualMatchingClient
-                    ? `A matching saved client profile was found. Linking a quotation will use that profile and its client type (${manualMatchingClient.type || clientType}).`
-                    : 'If this client already has a saved quotation, enter the matching client name and type to link it now. Otherwise the new client profile will be saved without a quotation, which you can link later.'}
+                  Any active QT quotation can be linked, even if its customer name differs. The order keeps the client details entered above.
                 </p>
-                {manualMatchingClient && quotationsQuery.isLoading && <p className="text-xs text-muted-foreground" role="status">Loading this client’s quotations…</p>}
-                {manualMatchingClient && quotationsQuery.isError && (
+                {quotationsQuery.isLoading && <p className="text-xs text-muted-foreground" role="status">Loading available quotations…</p>}
+                {quotationsQuery.isError && (
                   <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs" role="alert">
                     <span>Quotations could not be loaded. You can still create the order without one.</span>
                     <Button type="button" size="sm" variant="outline" onClick={() => void quotationsQuery.refetch()}>Retry</Button>
                   </div>
                 )}
-                {manualMatchingClient && !quotationsQuery.isLoading && !quotationsQuery.isError && clientQuotations.length === 0 && (
-                  <p className="text-xs text-muted-foreground" role="status">No QT-numbered quotations are available for this client.</p>
+                {!quotationsQuery.isLoading && !quotationsQuery.isError && availableQuotations.length === 0 && (
+                  <p className="text-xs text-muted-foreground" role="status">No active QT-numbered quotations are available.</p>
                 )}
               </div>
             )}

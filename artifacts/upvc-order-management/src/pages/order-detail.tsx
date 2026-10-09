@@ -12,6 +12,7 @@ import {
   Clipboard,
   ClipboardCheck,
   CircleAlert,
+  ChevronDown,
   Download,
   Eye,
   Flag,
@@ -157,6 +158,8 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 
 const statusLabel = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.label || status.replaceAll('_', ' ');
 const statusTone = (status: string) => STATUS_OPTIONS.find((item) => item.value === status)?.tone || 'bg-muted text-muted-foreground';
+const quotationOptionLabel = (quotation: Quotation) =>
+  `${quotation.quoteNo} · ${quotation.customerName}${quotation.projectName && quotation.projectName !== quotation.customerName ? ` — ${quotation.projectName}` : ''}`;
 const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 const inr = (value: number | null | undefined) => formatInr(value, 'Not set');
 const plainInr = (value: number) => formatInr(value);
@@ -261,13 +264,12 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   });
   const [selectedQuotationId, setSelectedQuotationId] = useState('');
   const availableQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
-    quotation.clientId === order.clientId &&
     !quotation.sampleOnly &&
     /^QT-\d+$/i.test(quotation.quoteNo.trim()),
   );
-  const [editing, setEditing] = useState(
-    () => new URLSearchParams(window.location.search).get('edit') === 'true',
-  );
+  const editRequested = new URLSearchParams(window.location.search).get('edit') === 'true';
+  const [editing, setEditing] = useState(() => canEdit && editRequested);
+  const [detailsOpen, setDetailsOpen] = useState(() => canEdit && editRequested);
   const form = useForm<z.infer<typeof detailSchema>>({
     resolver: zodResolver(detailSchema),
     defaultValues: orderDetailValues(order),
@@ -332,6 +334,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
       void queryClient.invalidateQueries({ queryKey: getGetPaymentOverviewQueryKey() });
       void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(id) });
       setEditing(false);
+      setDetailsOpen(false);
       toast({ title: 'Order record updated', description: `${updated.orderId} is now ${statusLabel(updated.status)}.` });
     },
     onError: (cause) => toast({
@@ -362,19 +365,41 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
     <Card id="order-record-card" className={`scroll-mt-24 border-border/80 ${editing ? 'ring-2 ring-primary/20' : ''}`} data-testid="card-order-record">
       <CardHeader className="flex-row items-start justify-between pb-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{editing ? 'Editing order' : 'Order facts'}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{editing ? 'Editing order' : 'Order details'}</p>
           <CardTitle className="mt-1 text-base">{editing ? 'Edit order details' : 'Central record'}</CardTitle>
+          {!detailsOpen && <p className="mt-1 text-xs text-muted-foreground">{order.clientName} · {order.locationName} · {order.clientType || 'Client type not set'}</p>}
         </div>
-        {canEdit && (
-          <Button variant="outline" size="sm" onClick={() => {
-            setEditing((value) => !value);
-            form.reset(orderDetailValues(order));
-          }} data-testid="button-toggle-order-edit">
-            <Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={() => {
+              if (editing) {
+                setEditing(false);
+                setDetailsOpen(false);
+              } else {
+                setEditing(true);
+                setDetailsOpen(true);
+              }
+              form.reset(orderDetailValues(order));
+            }} data-testid="button-toggle-order-edit">
+              <Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-expanded={detailsOpen}
+            aria-controls={detailsOpen ? 'order-record-content' : undefined}
+            onClick={() => setDetailsOpen((value) => !value)}
+            disabled={editing}
+            data-testid="button-toggle-order-details"
+          >
+            {detailsOpen ? 'Hide details' : 'Show details'}
+            <ChevronDown className={`transition-transform ${detailsOpen ? 'rotate-180' : ''}`} size={14} />
           </Button>
-        )}
+        </div>
       </CardHeader>
-      <CardContent>
+      {detailsOpen && <CardContent id="order-record-content">
         {order.quotationNo ? (
           <div className="mb-4 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2.5 text-xs" data-testid="text-linked-quotation">
             <span className="text-muted-foreground">Linked quotation</span>
@@ -384,7 +409,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
           <div className="mb-4 space-y-2 rounded-lg border border-dashed border-border p-3" data-testid="panel-link-quotation">
             <div>
               <p className="text-xs font-semibold">Link a quotation later</p>
-              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Link a QT quotation for this client to replace the temporary Order ID with its canonical ID.</p>
+              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Choose any active QT quotation; its customer name need not match this order. The order’s own client details stay unchanged.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Select
@@ -399,7 +424,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
                   <SelectItem value="none">Choose a quotation</SelectItem>
                   {availableQuotations.map((quotation) => (
                     <SelectItem key={quotation.id} value={quotation.id}>
-                      {quotation.quoteNo} · {quotation.projectName || quotation.customerName}
+                      {quotationOptionLabel(quotation)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -409,7 +434,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
               </Button>
             </div>
             {!quotationsQuery.isLoading && availableQuotations.length === 0 && (
-              <p className="text-[10px] text-muted-foreground">No QT-numbered quotations are available for this client yet.</p>
+              <p className="text-[10px] text-muted-foreground">No active QT-numbered quotations are available yet.</p>
             )}
             {quotationsQuery.isError && (
               <Button type="button" variant="outline" size="sm" onClick={() => void quotationsQuery.refetch()}>Retry loading quotations</Button>
@@ -484,12 +509,12 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
                           )}
                           {availableQuotations.map((quotation) => (
                             <SelectItem key={quotation.id} value={quotation.id}>
-                              {quotation.quoteNo} · {quotation.projectName || quotation.customerName}
+                              {quotationOptionLabel(quotation)}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-[10px] leading-4 text-muted-foreground">Linking or removing a quotation may change this order’s ID. A QT quotation must belong to this client.</p>
+                      <p className="text-[10px] leading-4 text-muted-foreground">Linking or removing a quotation may change this order’s ID. The quotation customer name does not need to match this order’s client.</p>
                       {quotationsQuery.isError && <Button type="button" variant="outline" size="sm" onClick={() => void quotationsQuery.refetch()}>Retry loading quotations</Button>}
                       <FormMessage />
                     </FormItem>
@@ -626,7 +651,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
             </div>
           </div>
         )}
-      </CardContent>
+      </CardContent>}
     </Card>
   );
 }
