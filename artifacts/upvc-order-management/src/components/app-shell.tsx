@@ -195,91 +195,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
     );
   };
 
-  const desktopFlyoutGroup = navigationGroups.find((group) => group.id === desktopFlyout?.groupId);
-  const desktopFlyoutModules = desktopFlyoutGroup ? getVisibleGroupModules(desktopFlyoutGroup) : [];
-
-  const renderDesktopFlyout = () => {
-    if (!desktopFlyout || !desktopFlyoutGroup) return null;
-
-    const renderFlyoutModule = (module: (typeof MODULES)[number]) => {
-      const active = isModuleActive(module.key, location);
-      const iconName = iconMap[module.key] || 'overview';
-      const itemClass = `flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 transition-colors ${
-        active
-          ? 'border-sidebar-primary/40 bg-sidebar-primary/15 text-sidebar-foreground'
-          : 'border-transparent bg-sidebar-accent/35 text-sidebar-foreground/75 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground'
-      }`;
-
-      if (!module.built) {
-        return (
-          <div
-            key={module.key}
-            className={`${itemClass} cursor-not-allowed opacity-50`}
-            aria-disabled="true"
-            title={collapsed ? `${module.short} — Coming Soon` : undefined}
-            data-testid={`flyout-coming-soon-${module.key}`}
-          >
-            <SidebarSectionIcon name={iconName} size={34} className="shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-xs font-semibold">{module.short}</span>
-            <span className="shrink-0 text-[9px] uppercase tracking-wide text-sidebar-foreground/55">Soon</span>
-          </div>
-        );
-      }
-
-      return (
-        <Link
-          key={module.key}
-          href={pathForModule(module.key)}
-          onClick={closeDesktopFlyout}
-          aria-current={active ? 'page' : undefined}
-          className={`${itemClass} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary`}
-          data-testid={`flyout-link-${module.key}`}
-        >
-          <SidebarSectionIcon name={iconName} size={34} className="shrink-0" />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs font-semibold">{module.short}</span>
-            <span className="mt-0.5 block truncate text-[10px] text-sidebar-foreground/45">{module.label}</span>
-          </span>
-          <ChevronRight size={15} className="shrink-0 text-sidebar-foreground/40 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-        </Link>
-      );
-    };
-
-    return (
-      <nav
-        id={`nav-flyout-${desktopFlyoutGroup.id}`}
-        aria-label={`${desktopFlyoutGroup.label} submenu`}
-        className="fixed z-[70] hidden w-[286px] overflow-y-auto overscroll-contain rounded-2xl border border-sidebar-border bg-sidebar-flyout p-3 text-sidebar-foreground shadow-sidebar-flyout md:block"
-        style={{ top: desktopFlyout.top, left: desktopFlyout.left, maxHeight: desktopFlyout.maxHeight }}
-        onMouseEnter={clearFlyoutClose}
-        onMouseLeave={scheduleFlyoutClose}
-        onFocus={clearFlyoutClose}
-        onBlur={(event) => {
-          const nextFocusedElement = event.relatedTarget;
-          if (!(nextFocusedElement instanceof Node) || !event.currentTarget.contains(nextFocusedElement)) {
-            scheduleFlyoutClose();
-          }
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            closeDesktopFlyout();
-            document.getElementById(`nav-trigger-${desktopFlyoutGroup.id}`)?.focus();
-          }
-        }}
-        data-testid={`flyout-nav-group-${desktopFlyoutGroup.id}`}
-      >
-        <div className="mb-2 border-b border-sidebar-border px-2 pb-3">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45">Workspace section</p>
-          <h2 className="mt-1 text-sm font-semibold">{desktopFlyoutGroup.label}</h2>
-          <p className="mt-1 text-[10px] text-sidebar-foreground/55">Choose a destination</p>
-        </div>
-        <div className="space-y-1.5">
-          {desktopFlyoutModules.map(renderFlyoutModule)}
-        </div>
-      </nav>
-    );
-  };
-
   return (
     <div className="min-h-[100dvh] bg-background">
       <button
@@ -303,9 +218,9 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
         <div className="sidebar-scrollbar flex-1 overflow-y-auto px-3 py-5">
           <p className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40 ${collapsed ? 'text-center' : ''}`}>{collapsed ? '•••' : 'Workspace'}</p>
           <nav className="space-y-1" aria-label="Main navigation">
-            <Link href="/" onClick={() => setMobileOpen(false)} title={collapsed ? 'Dashboard' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-dashboard">
+            <Link href="/" onClick={() => setMobileOpen(false)} title={collapsed ? 'Overview' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-dashboard">
               <SidebarSectionIcon name="overview" size={40} className="shrink-0" />
-              {!collapsed && <span className="flex-1">Dashboard</span>}
+              {!collapsed && <span className="flex-1">Overview</span>}
             </Link>
             <Link href="/communication" onClick={() => setMobileOpen(false)} title={collapsed ? 'Communication' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/communication') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-communication">
               <MessageSquareText size={24} className="mx-[2px] shrink-0" />
@@ -320,67 +235,18 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               <Bell size={22} className="mx-[3px] shrink-0" />
               {!collapsed && <span className="flex-1">Quotation approvals</span>}
             </Link>}
+            <div aria-hidden="true" className="mx-3 my-3 border-t border-sidebar-border" />
+            {orderHubModule && canOpenOrderScanner && renderModuleLink(orderHubModule)}
             {navigationGroups.map((group) => {
               const groupModules = getVisibleGroupModules(group);
               if (groupModules.length === 0) return null;
 
-              const expanded = openGroups.includes(group.id);
-              const active = groupModules.some((module) => isModuleActive(module.key, location));
-              const flyoutOpen = desktopFlyout?.groupId === group.id;
-              const flyoutItemCount = groupModules.length;
-
               return (
-                <section key={group.id} className="pt-1">
-                  <button
-                    type="button"
-                    id={`nav-trigger-${group.id}`}
-                    onClick={(event) => {
-                      if (window.matchMedia('(min-width: 768px)').matches) {
-                        openDesktopFlyout(group.id, event.currentTarget, flyoutItemCount);
-                      } else {
-                        toggleGroup(group.id);
-                      }
-                    }}
-                    onMouseEnter={(event) => openDesktopFlyout(group.id, event.currentTarget, flyoutItemCount)}
-                    onMouseLeave={scheduleFlyoutClose}
-                    onFocus={(event) => openDesktopFlyout(group.id, event.currentTarget, flyoutItemCount)}
-                    onBlur={scheduleFlyoutClose}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') {
-                        closeDesktopFlyout();
-                      } else if (event.key === 'ArrowDown' && window.matchMedia('(min-width: 768px)').matches) {
-                        event.preventDefault();
-                        openDesktopFlyout(group.id, event.currentTarget, flyoutItemCount);
-                        window.setTimeout(() => focusFirstFlyoutLink(group.id), 0);
-                      }
-                    }}
-                    aria-expanded={isDesktopViewport ? flyoutOpen : expanded}
-                    aria-controls={isDesktopViewport ? (flyoutOpen ? `nav-flyout-${group.id}` : undefined) : `nav-group-${group.id}`}
-                    aria-label={`${group.label}, ${(isDesktopViewport ? flyoutOpen : expanded) ? 'expanded' : 'collapsed'}`}
-                    title={collapsed ? group.label : undefined}
-                    className={`relative flex h-12 w-full items-center rounded-lg text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors ${
-                      collapsed ? 'justify-center px-0' : 'gap-2 px-3'
-                    } ${
-                      active || flyoutOpen
-                        ? 'bg-sidebar-accent/60 text-sidebar-foreground'
-                        : 'text-sidebar-foreground/55 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'
-                    }`}
-                    data-testid={`button-nav-group-${group.id}`}
-                  >
-                    <SidebarSectionIcon name={group.icon} size={36} className="shrink-0" />
-                    {!collapsed && <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>}
-                    <ChevronDown
-                      size={collapsed ? 12 : 16}
-                      className={`shrink-0 transition-transform md:hidden ${expanded ? 'rotate-180' : ''} ${collapsed ? 'absolute bottom-1 right-2' : ''}`}
-                      aria-hidden="true"
-                    />
-                    <ChevronRight
-                      size={collapsed ? 12 : 16}
-                      className={`hidden shrink-0 transition-transform md:block ${flyoutOpen ? 'translate-x-0.5' : ''} ${collapsed ? 'absolute bottom-1 right-2' : ''}`}
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <div id={`nav-group-${group.id}`} className={`mt-1 space-y-1 md:hidden ${expanded ? '' : 'hidden'}`}>
+                <section key={group.id} className="pt-3" aria-label={group.label} data-testid={`nav-section-${group.id}`}>
+                  <p className={collapsed ? 'sr-only' : 'px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45'}>
+                    {group.label}
+                  </p>
+                  <div className={`space-y-1 ${collapsed ? '' : 'pl-2'}`}>
                     {groupModules.map(renderModuleLink)}
                   </div>
                 </section>
@@ -409,7 +275,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
         </div>
         <button onClick={() => setCollapsed((value) => !value)} className="absolute -right-3 top-[82px] hidden h-7 w-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-accent text-sidebar-foreground shadow-sm transition hover:bg-sidebar-primary hover:text-sidebar-primary-foreground md:flex" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} data-testid="button-toggle-sidebar">{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button>
       </aside>
-      {renderDesktopFlyout()}
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} canManageApprover={canManageApprover} />
       <main className={`min-h-[100dvh] transition-[margin] duration-200 ${collapsed ? 'md:ml-[76px]' : 'md:ml-[260px]'}`}>
          <header className="sticky top-0 z-20 flex min-h-[76px] items-center justify-between gap-3 border-b border-border bg-background/90 px-4 pl-[72px] backdrop-blur sm:px-5 md:px-8">
