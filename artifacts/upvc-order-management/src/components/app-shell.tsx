@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, LogOut, Menu, MessageSquareText, ScanLine, Settings2, X, CheckCheck, ExternalLink } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, LogOut, Menu, MessageSquareText, ScanLine, Settings2, X, CheckCheck, ExternalLink } from 'lucide-react';
 import type { User } from '@workspace/api-client-react';
 import { getGetAuthSessionQueryKey, getGetPushConfigQueryKey, getListNotificationsQueryKey, useLogout, useListNotifications, useMarkAllNotificationsRead, useMarkNotificationRead, useGetPushConfig, useSavePushSubscription, useDeletePushSubscription } from '@workspace/api-client-react';
 import { SidebarSectionIcon, type SidebarIconName } from '@/components/sidebar-icons';
@@ -95,40 +95,25 @@ const isModuleActive = (key: string, location: string) => {
   return key === 'user-access'
     ? location.startsWith('/admin/users') || location.startsWith('/admin/roles') || location.startsWith('/admin/groups')
     : key === 'order-hub'
-      ? location.startsWith('/order-hub') || (!isDispatchScanner && (location.startsWith('/order-scanner') || location.startsWith('/order-status')))
+      ? location.startsWith('/order-hub') || location.startsWith('/order-status')
       : key === 'dispatch'
         ? location.startsWith('/dispatch') || isDispatchScanner
     : location.startsWith(pathForModule(key));
 };
 
-const navigationGroups: { id: string; label: string; icon: SidebarIconName; moduleKeys: string[] }[] = [
-  { id: 'management', label: 'Admin & reports', icon: 'user-access', moduleKeys: ['user-access'] },
-  { id: 'orders', label: 'Sales & orders', icon: 'order-hub', moduleKeys: ['order-hub', 'quotation-builder', 'confirmation'] },
-  { id: 'production', label: 'Production', icon: 'measurements', moduleKeys: ['measurements', 'glass-procurement'] },
-  { id: 'finance', label: 'Finance', icon: 'payments', moduleKeys: ['payments', 'balance-payment'] },
-  { id: 'fulfillment', label: 'Fulfillment', icon: 'dispatch', moduleKeys: ['dispatch', 'installation'] },
+const navigationGroups: { id: string; label: string; moduleKeys: string[] }[] = [
+  { id: 'pre-production', label: 'Pre-production', moduleKeys: ['measurements', 'quotation-builder', 'confirmation'] },
+  { id: 'materials', label: 'Materials', moduleKeys: ['glass-procurement'] },
+  { id: 'finance', label: 'Finance', moduleKeys: ['payments', 'balance-payment'] },
+  { id: 'fulfillment', label: 'Fulfillment', moduleKeys: ['dispatch', 'installation'] },
+  { id: 'management', label: 'Admin & reports', moduleKeys: ['user-access'] },
 ];
-
-type DesktopFlyout = {
-  groupId: string;
-  top: number;
-  left: number;
-  maxHeight: number;
-};
 
 export function AppShell({ user, children, title, eyebrow }: { user: User; children: React.ReactNode; title: string; eyebrow?: string }) {
   const [location, setLocation] = useLocation();
-  const isDesktopViewport = window.matchMedia('(min-width: 768px)').matches;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [desktopFlyout, setDesktopFlyout] = useState<DesktopFlyout | null>(null);
-  const flyoutCloseTimer = useRef<number | null>(null);
-  const [openGroups, setOpenGroups] = useState<string[]>(() =>
-    navigationGroups
-      .filter((group) => group.moduleKeys.some((key) => isModuleActive(key, location)))
-      .map((group) => group.id),
-  );
   const queryClient = useQueryClient();
   const logout = useLogout();
   const isMasterAdmin = user.roleId === 'master-admin';
@@ -136,32 +121,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
   const canOpenApprovalQueue = canManageApprover
     || user.roleId === 'approver'
     || user.permissions?.['rate-approval'] === 'edit';
-
-  useEffect(() => {
-    setDesktopFlyout(null);
-    if (flyoutCloseTimer.current !== null) {
-      window.clearTimeout(flyoutCloseTimer.current);
-      flyoutCloseTimer.current = null;
-    }
-    const activeGroup = navigationGroups.find((group) =>
-      group.moduleKeys.some((key) => isModuleActive(key, location)),
-    );
-    if (!activeGroup) return;
-    setOpenGroups((current) =>
-      current.includes(activeGroup.id) ? current : [...current, activeGroup.id],
-    );
-  }, [location]);
-
-  useEffect(() => {
-    const closeFlyoutOnMobile = () => {
-      if (!window.matchMedia('(min-width: 768px)').matches) setDesktopFlyout(null);
-    };
-    window.addEventListener('resize', closeFlyoutOnMobile);
-    return () => {
-      window.removeEventListener('resize', closeFlyoutOnMobile);
-      if (flyoutCloseTimer.current !== null) window.clearTimeout(flyoutCloseTimer.current);
-    };
-  }, []);
 
   const signOut = () => {
     logout.mutate(undefined, {
@@ -172,62 +131,19 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
     });
   };
 
-  const toggleGroup = (groupId: string) => {
-    setOpenGroups((current) =>
-      current.includes(groupId)
-        ? current.filter((id) => id !== groupId)
-        : [...current, groupId],
-    );
-  };
-
-  const clearFlyoutClose = () => {
-    if (flyoutCloseTimer.current !== null) {
-      window.clearTimeout(flyoutCloseTimer.current);
-      flyoutCloseTimer.current = null;
-    }
-  };
-
-  const closeDesktopFlyout = () => {
-    clearFlyoutClose();
-    setDesktopFlyout(null);
-  };
-
-  const scheduleFlyoutClose = () => {
-    clearFlyoutClose();
-    flyoutCloseTimer.current = window.setTimeout(() => {
-      setDesktopFlyout(null);
-      flyoutCloseTimer.current = null;
-    }, 180);
-  };
-
-  const openDesktopFlyout = (groupId: string, trigger: HTMLButtonElement, itemCount: number) => {
-    if (!window.matchMedia('(min-width: 768px)').matches) return;
-    clearFlyoutClose();
-    const rect = trigger.getBoundingClientRect();
-    const estimatedHeight = Math.min(window.innerHeight - 24, Math.max(180, 88 + itemCount * 48));
-    const preferredTop = rect.top + (rect.height - estimatedHeight) / 2;
-    const top = Math.max(12, Math.min(preferredTop, window.innerHeight - estimatedHeight - 12));
-    setDesktopFlyout({
-      groupId,
-      top,
-      left: rect.right + 8,
-      maxHeight: Math.max(180, window.innerHeight - top - 12),
-    });
-  };
-
-  const focusFirstFlyoutLink = (groupId: string) => {
-    document.querySelector<HTMLElement>(`#nav-flyout-${groupId} a[href]`)?.focus();
+  const isModuleVisible = (module: (typeof MODULES)[number]) => {
+    if (module.key === 'user-access' && !isMasterAdmin) return false;
+    const permission = user.permissions?.[module.key];
+    return permission === 'view' || permission === 'edit';
   };
 
   const getVisibleGroupModules = (group: (typeof navigationGroups)[number]) =>
     group.moduleKeys
       .map((key) => MODULES.find((module) => module.key === key))
-      .filter((module): module is (typeof MODULES)[number] => {
-        if (!module) return false;
-        if (module.key === 'user-access' && !isMasterAdmin) return false;
-        const permission = user.permissions?.[module.key];
-        return permission === 'view' || permission === 'edit';
-      });
+      .filter((module): module is (typeof MODULES)[number] => Boolean(module && isModuleVisible(module)));
+
+  const orderHubModule = MODULES.find((module) => module.key === 'order-hub');
+  const canOpenOrderScanner = Boolean(orderHubModule && isModuleVisible(orderHubModule));
 
   const renderModuleLink = (module: (typeof MODULES)[number]) => {
     const iconName = iconMap[module.key] || 'overview';
@@ -281,8 +197,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
 
   const desktopFlyoutGroup = navigationGroups.find((group) => group.id === desktopFlyout?.groupId);
   const desktopFlyoutModules = desktopFlyoutGroup ? getVisibleGroupModules(desktopFlyoutGroup) : [];
-  const desktopFlyoutHasScanner = desktopFlyoutGroup?.id === 'orders'
-    && desktopFlyoutModules.some((module) => module.key === 'order-hub');
 
   const renderDesktopFlyout = () => {
     if (!desktopFlyout || !desktopFlyoutGroup) return null;
@@ -361,26 +275,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
         </div>
         <div className="space-y-1.5">
           {desktopFlyoutModules.map(renderFlyoutModule)}
-          {desktopFlyoutHasScanner && (
-            <Link
-              href="/order-scanner"
-              onClick={closeDesktopFlyout}
-              aria-current={location.startsWith('/order-scanner') ? 'page' : undefined}
-              className={`group flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary ${
-                location.startsWith('/order-scanner')
-                  ? 'border-sidebar-primary/40 bg-sidebar-primary/15 text-sidebar-foreground'
-                  : 'border-transparent bg-sidebar-accent/35 text-sidebar-foreground/75 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground'
-              }`}
-              data-testid="flyout-link-order-scanner"
-            >
-              <ScanLine size={24} className="shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-semibold">QR scanner</span>
-                <span className="mt-0.5 block truncate text-[10px] text-sidebar-foreground/45">Scan an order code</span>
-              </span>
-              <ChevronRight size={15} className="shrink-0 text-sidebar-foreground/40 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </Link>
-          )}
         </div>
       </nav>
     );
@@ -417,6 +311,11 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               <MessageSquareText size={24} className="mx-[2px] shrink-0" />
               {!collapsed && <span className="flex-1">Communication</span>}
             </Link>
+            {canOpenOrderScanner && <Link href="/order-scanner" onClick={() => setMobileOpen(false)} title={collapsed ? 'QR scanner' : undefined} aria-current={location.startsWith('/order-scanner') ? 'page' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/order-scanner') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-order-scanner">
+              <ScanLine size={24} className="mx-[2px] shrink-0" />
+              {!collapsed && <span className="flex-1">QR scanner</span>}
+              {collapsed && <span className="sr-only">QR scanner</span>}
+            </Link>}
             {canOpenApprovalQueue && <Link href="/quotation-approvals" onClick={() => setMobileOpen(false)} title={collapsed ? 'Quotation approvals' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/quotation-approvals') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-quotation-approvals">
               <Bell size={22} className="mx-[3px] shrink-0" />
               {!collapsed && <span className="flex-1">Quotation approvals</span>}
@@ -428,8 +327,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               const expanded = openGroups.includes(group.id);
               const active = groupModules.some((module) => isModuleActive(module.key, location));
               const flyoutOpen = desktopFlyout?.groupId === group.id;
-              const hasScanner = group.id === 'orders' && groupModules.some((module) => module.key === 'order-hub');
-              const flyoutItemCount = groupModules.length + (hasScanner ? 1 : 0);
+              const flyoutItemCount = groupModules.length;
 
               return (
                 <section key={group.id} className="pt-1">
@@ -484,26 +382,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
                   </button>
                   <div id={`nav-group-${group.id}`} className={`mt-1 space-y-1 md:hidden ${expanded ? '' : 'hidden'}`}>
                     {groupModules.map(renderModuleLink)}
-                    {hasScanner && (
-                      <Link
-                        href="/order-scanner"
-                        onClick={() => setMobileOpen(false)}
-                        title={collapsed ? 'QR scanner' : undefined}
-                        aria-current={location.startsWith('/order-scanner') ? 'page' : undefined}
-                        className={`flex h-12 min-w-0 items-center rounded-lg text-sm transition-colors ${
-                          collapsed ? 'justify-center px-0' : 'gap-3 px-3'
-                        } ${
-                          location.startsWith('/order-scanner')
-                            ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground'
-                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                        }`}
-                        data-testid="link-nav-order-scanner"
-                      >
-                        <ScanLine size={24} className="mx-[2px] shrink-0" />
-                        {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">QR scanner</span>}
-                        {collapsed && <span className="sr-only">QR scanner</span>}
-                      </Link>
-                    )}
                   </div>
                 </section>
               );
