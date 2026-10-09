@@ -8,35 +8,14 @@
 import type { OrderGlassStatus } from './orderGlassStatus';
 import type { OrderWindowReadiness } from './orderWindowReadiness';
 
-export interface OrderWindowInput {
-  /** @minLength 1 */
-  lotRecordId?: string;
-  /**
-     * @minLength 1
-     * @maxLength 20
-     */
+export interface DispatchWindowSnapshot {
+  windowId: string;
   windowNo: string;
-  /**
-     * @maximum 10000
-     * @exclusiveMinimum 0
-     */
   widthMm: number;
-  /**
-     * @maximum 10000
-     * @exclusiveMinimum 0
-     */
   heightMm: number;
-  /**
-     * @minLength 1
-     * @maxLength 100
-     */
   windowType: string;
+  sqFt: number;
   frameStatus: OrderWindowReadiness;
   shutterStatus: OrderWindowReadiness;
   glassStatus: OrderGlassStatus;
-  /**
-     * @maxLength 500
-     * @nullable
-     */
-  pendingReason?: string | null;
 }

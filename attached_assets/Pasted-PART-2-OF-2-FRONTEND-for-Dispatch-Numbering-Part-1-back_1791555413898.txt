@@ -1,0 +1,48 @@
+PART 2 OF 2: FRONTEND for Dispatch Numbering. Part 1 (backend, migrations, APIs) is already done. Read the current Dispatch desk, Orders list, Order detail (tabs, Lot register, Windows table, Lifecycle trace, summary cards), QR scanner, QR status page, Dashboard, Communication templates and the new /dispatches APIs first. Reuse existing components, styles and permissions. Do not change backend logic except small fixes you must report.
+
+Confirmed rules: D counter per lot, lot format L1, whole lot dispatched together (no window selection), multiple active dispatches of the same lot allowed at the same time, no first/re-dispatch type and no mandatory reason (only an optional note), a QR and a challan for every lot dispatch.
+
+1. DISPATCH PAGE (rework)
+- Register rows are dispatches (not orders): dispatch code, client, lot, windows count, delivery location, status chip, dispatched/delivered date, note, actions (View, Update status, QR, Challan).
+- "Create dispatch" flow (modal or page): search order, then choose lot. Show ALL lots of the order with their readiness and their existing dispatches (e.g. "D1 In transit", "D2 Delivered"). Then show a read-only summary of the lot's windows, an optional note, vehicle no., driver name/phone, challan no., delivery location (prefilled from the order), preview of the code that will be generated (next D number), and save. After saving, offer "Print challan" and "Download QR". If the lot is not ready, show why, and offer admin override (permission + mandatory reason) only to users who have dispatch.override.
+- Do NOT block creating D2 or D3 because an earlier dispatch is still open.
+- KPI cards: "Ready lots awaiting dispatch" (lots with no dispatch created yet), "In transit" (status dispatched), "Delivered", "Total dispatches".
+- Filters: search (supports full code like R2637-L1-D2 and old L01 formats), status, lot, client, date range, sort, list/grid toggle.
+- Update-status modal shows only dispatch statuses: Planned, Dispatched, Delivered, Returned, Cancelled (cancel asks for a reason). "Installed" must not appear anywhere in dispatch UI.
+- Row QR button opens a QR dialog (download PNG, print). Challan button opens/downloads the PDF.
+
+2. DISPATCH QR PAGE + SCANNER
+- Scanning a dispatch QR opens a sign-in protected "Dispatch status" page showing: dispatch code, order, client, lot, windows list, vehicle/driver, note, current status, history. With dispatch.edit, show buttons to mark Dispatched / Delivered / Returned. Cancelled or revoked QR shows a clear "This dispatch was cancelled" message.
+- Update the QR scanner module to recognise dispatch QRs and route them to this page, while the existing order QR keeps working as before.
+- Remove "Dispatched" and "Installed" from the existing order QR "Update order status" dropdown (or turn them into a link "Manage dispatches" that opens the Create dispatch flow for that order).
+
+3. ORDER DETAIL
+- Add a "Dispatches" tab: Order Details, Billing & Payment, Order Documents, Dispatches, Grievances, User Log. It lists all dispatches of the order grouped by lot with code, note, status, dates, vehicle, and Challan/QR actions, plus a "Create dispatch" button.
+- Lot register: per-lot dispatch chips (D1 Delivered, D2 In transit), latest code, and a "Create dispatch" button on lots that are ready. Lots must display as L1, L2.
+- Windows table: new "Dispatch" column showing the lot's latest dispatch code or "Not dispatched".
+- Top summary cards: add "Lots dispatched x / y".
+- Lifecycle trace: sub-label under the Dispatched stage (e.g. "L1 D1 delivered · L2 not dispatched").
+- Order Documents: show dispatch challans grouped under their dispatch code.
+
+4. ORDERS LIST
+- New "Dispatches" column (e.g. "3 dispatches · latest L1-D2"). Dispatch codes and old L01 style codes must be searchable in the order search.
+
+5. DASHBOARD, COMMUNICATION
+- Dashboard: Dispatch queue widget, Needs attention ("Dispatch follow-up" for dispatches planned/in transit too long, new "Ready lots not yet dispatched"), pipeline and Live activity use dispatch-level data. Live activity events: "Dispatch R2637-L1-D2 created / dispatched / delivered / returned / cancelled". Rows deep-link to the dispatch with filters applied.
+- Stage communication templates and previews support {{dispatch_code}}, {{lot_no}}, {{vehicle_no}}. Add them to the template variable picker.
+
+6. UI QUALITY
+Error/empty/loading states, responsive layout, no horizontal scroll, light theme default with the always-dark sidebar, permission-based hiding of buttons, Asia/Kolkata dates, Indian formatting.
+
+DELIVERABLES for Part 2: files changed and a test checklist:
+(1) Create dispatch lists all lots with readiness and existing dispatches, preview shows the correct next D number;
+(2) D2 can be created while D1 is still in transit, and both appear in the register, each with its own QR and challan;
+(3) other lots of the same order start from D1;
+(4) lots show L1 everywhere, and searching L01 or the full code works;
+(5) order detail Dispatches tab, lot chips, windows column, summary card and lifecycle sub-label show correct data;
+(6) dispatch QR scan opens the right page, cancelled dispatch QR shows the cancelled message, scanner routes correctly;
+(7) order QR page no longer allows manual Dispatched/Installed;
+(8) "Installed" does not appear in any dispatch UI;
+(9) dashboard widgets and live activity reflect dispatch events;
+(10) challan PDF prints the code, QR and windows list;
+(11) KPI "Ready lots awaiting dispatch" counts only lots with no dispatch yet.

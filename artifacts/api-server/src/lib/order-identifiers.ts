@@ -49,5 +49,35 @@ export function formatLotId(orderId: string, sequence: number): string {
   if (!Number.isInteger(sequence) || sequence < 1) {
     throw new Error("Lot sequence must be a positive integer.");
   }
+  return `${orderId}-L${sequence}`;
+}
+
+export function formatLegacyLotId(orderId: string, sequence: number): string {
+  if (!Number.isInteger(sequence) || sequence < 1) {
+    throw new Error("Lot sequence must be a positive integer.");
+  }
   return `${orderId}-L${String(sequence).padStart(2, "0")}`;
+}
+
+export function formatDispatchCode(
+  orderId: string,
+  lotSequence: number,
+  dispatchNo: number,
+): string {
+  if (!Number.isInteger(lotSequence) || lotSequence < 1) {
+    throw new Error("Lot sequence must be a positive integer.");
+  }
+  if (!Number.isInteger(dispatchNo) || dispatchNo < 1) {
+    throw new Error("Dispatch number must be a positive integer.");
+  }
+  return `${orderId}-L${lotSequence}-D${dispatchNo}`;
+}
+
+export function normalizeLotCodeAlias(value: string): string {
+  return value.replace(/(^|-)L0*(\d+)(?=-|$)/gi, (_match, prefix: string, digits: string) => {
+    const sequence = Number.parseInt(digits, 10);
+    return Number.isSafeInteger(sequence) && sequence > 0
+      ? `${prefix}L${sequence}`
+      : `${prefix}L${digits}`;
+  });
 }

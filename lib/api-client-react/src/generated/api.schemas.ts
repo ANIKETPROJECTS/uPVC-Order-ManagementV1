@@ -335,6 +335,266 @@ export interface DispatchStatusUpdate {
 
 export type DispatchOrderList = DispatchOrder[];
 
+export type DispatchRecordStatus = typeof DispatchRecordStatus[keyof typeof DispatchRecordStatus];
+
+
+export const DispatchRecordStatus = {
+  planned: 'planned',
+  dispatched: 'dispatched',
+  delivered: 'delivered',
+  returned: 'returned',
+  cancelled: 'cancelled',
+} as const;
+
+export type OrderWindowReadiness = typeof OrderWindowReadiness[keyof typeof OrderWindowReadiness];
+
+
+export const OrderWindowReadiness = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  ready: 'ready',
+} as const;
+
+export type OrderGlassStatus = typeof OrderGlassStatus[keyof typeof OrderGlassStatus];
+
+
+export const OrderGlassStatus = {
+  pending: 'pending',
+  partial: 'partial',
+  received: 'received',
+} as const;
+
+export interface DispatchWindowSnapshot {
+  windowId: string;
+  windowNo: string;
+  widthMm: number;
+  heightMm: number;
+  windowType: string;
+  sqFt: number;
+  frameStatus: OrderWindowReadiness;
+  shutterStatus: OrderWindowReadiness;
+  glassStatus: OrderGlassStatus;
+}
+
+export type LotDispatchSummaryDispatchStatus = typeof LotDispatchSummaryDispatchStatus[keyof typeof LotDispatchSummaryDispatchStatus];
+
+
+export const LotDispatchSummaryDispatchStatus = {
+  not_dispatched: 'not_dispatched',
+  dispatched: 'dispatched',
+  delivered: 'delivered',
+} as const;
+
+export interface LotDispatchSummary {
+  lotRecordId: string;
+  lotId: string;
+  lotSequence: number;
+  dispatchStatus: LotDispatchSummaryDispatchStatus;
+  dispatchCount: number;
+  /** @nullable */
+  latestDispatchCode: string | null;
+}
+
+export interface OrderDispatchSummary {
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  dispatchStatus: DispatchStatus;
+  totalLots: number;
+  dispatchedLots: number;
+  deliveredLots: number;
+  activeDispatches: number;
+  lots: LotDispatchSummary[];
+}
+
+export interface DispatchStatusCounts {
+  total: number;
+  planned: number;
+  dispatched: number;
+  delivered: number;
+  returned: number;
+  cancelled: number;
+}
+
+export interface DispatchRecord {
+  id: string;
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  lotRecordId: string;
+  lotId: string;
+  lotSequence: number;
+  dispatchNo: number;
+  dispatchCode: string;
+  /** @nullable */
+  dispatchNote: string | null;
+  status: DispatchRecordStatus;
+  /** @nullable */
+  plannedAt: string | null;
+  /** @nullable */
+  dispatchedAt: string | null;
+  /** @nullable */
+  deliveredAt: string | null;
+  /** @nullable */
+  returnedAt: string | null;
+  locationName: string;
+  /** @nullable */
+  siteAddress: string | null;
+  /** @nullable */
+  siteLatitude: number | null;
+  /** @nullable */
+  siteLongitude: number | null;
+  /** @nullable */
+  vehicleNumber: string | null;
+  /** @nullable */
+  driverName: string | null;
+  /** @nullable */
+  driverPhone: string | null;
+  /** @nullable */
+  challanNumber: string | null;
+  windowsSnapshot: DispatchWindowSnapshot[];
+  /** @nullable */
+  qrRevokedAt: string | null;
+  /** @nullable */
+  overrideReason: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+  /** @nullable */
+  cancelledBy: string | null;
+  /** @nullable */
+  cancelledAt: string | null;
+  /** @nullable */
+  cancelReason: string | null;
+}
+
+export interface DispatchSharedDetail {
+  dispatchCode: string;
+  orderId: string;
+  clientName: string;
+  lotId: string;
+  status: DispatchRecordStatus;
+  /** @nullable */
+  plannedAt: string | null;
+  /** @nullable */
+  dispatchedAt: string | null;
+  /** @nullable */
+  deliveredAt: string | null;
+  locationName: string;
+  /** @nullable */
+  siteAddress: string | null;
+  /** @nullable */
+  siteLatitude: number | null;
+  /** @nullable */
+  siteLongitude: number | null;
+  /** @nullable */
+  vehicleNumber: string | null;
+  /** @nullable */
+  driverName: string | null;
+  /** @nullable */
+  driverPhone: string | null;
+  /** @nullable */
+  challanNumber: string | null;
+  windowsSnapshot: DispatchWindowSnapshot[];
+}
+
+export interface DispatchRecordListResponse {
+  records: DispatchRecord[];
+  orderSummaries: OrderDispatchSummary[];
+  statusCounts: DispatchStatusCounts;
+}
+
+export interface DispatchSummaryResponse {
+  orders: OrderDispatchSummary[];
+  statusCounts: DispatchStatusCounts;
+}
+
+export interface CreateDispatchRecordInput {
+  /** @minLength 1 */
+  orderRecordId: string;
+  /** @minLength 1 */
+  lotRecordId: string;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  dispatchNote?: string | null;
+  /** @nullable */
+  plannedAt?: string | null;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  overrideReason?: string | null;
+}
+
+export interface UpdateDispatchRecordInput {
+  status?: DispatchRecordStatus;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  dispatchNote?: string | null;
+  /** @nullable */
+  plannedAt?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  locationName?: string;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  siteAddress?: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude?: number | null;
+  /**
+     * @maxLength 80
+     * @nullable
+     */
+  vehicleNumber?: string | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  driverName?: string | null;
+  /**
+     * @maxLength 40
+     * @nullable
+     */
+  driverPhone?: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  challanNumber?: string | null;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  overrideReason?: string | null;
+}
+
+export interface CancelDispatchRecordInput {
+  /**
+     * @minLength 2
+     * @maxLength 500
+     */
+  reason: string;
+}
+
 export type InstallationStatus = typeof InstallationStatus[keyof typeof InstallationStatus];
 
 
@@ -751,27 +1011,11 @@ export interface OrderBillingUpdate {
 
 export type OrderList = Order[];
 
-export type OrderWindowReadiness = typeof OrderWindowReadiness[keyof typeof OrderWindowReadiness];
-
-
-export const OrderWindowReadiness = {
-  pending: 'pending',
-  in_progress: 'in_progress',
-  ready: 'ready',
-} as const;
-
-export type OrderGlassStatus = typeof OrderGlassStatus[keyof typeof OrderGlassStatus];
-
-
-export const OrderGlassStatus = {
-  pending: 'pending',
-  partial: 'partial',
-  received: 'received',
-} as const;
-
 export interface OrderWindow {
   id: string;
   orderRecordId: string;
+  /** @nullable */
+  lotRecordId: string | null;
   windowNo: string;
   widthMm: number;
   heightMm: number;
@@ -787,6 +1031,8 @@ export interface OrderWindow {
 }
 
 export interface OrderWindowInput {
+  /** @minLength 1 */
+  lotRecordId?: string;
   /**
      * @minLength 1
      * @maxLength 20
@@ -818,6 +1064,8 @@ export interface OrderWindowInput {
 }
 
 export interface OrderWindowUpdate {
+  /** @minLength 1 */
+  lotRecordId?: string;
   /**
      * @minLength 1
      * @maxLength 20
@@ -2623,6 +2871,15 @@ locationName?: string;
 from?: string;
 to?: string;
 includeInactive?: boolean;
+};
+
+export type ListDispatchRecordsParams = {
+orderRecordId?: string;
+status?: DispatchRecordStatus;
+/**
+ * @maxLength 160
+ */
+q?: string;
 };
 
 export type SearchQuotationRateSubmissionsParams = {

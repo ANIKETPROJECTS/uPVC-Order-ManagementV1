@@ -11,6 +11,8 @@ import type { OrderWindowReadiness } from './orderWindowReadiness';
 export interface OrderWindow {
   id: string;
   orderRecordId: string;
+  /** @nullable */
+  lotRecordId: string | null;
   windowNo: string;
   widthMm: number;
   heightMm: number;
