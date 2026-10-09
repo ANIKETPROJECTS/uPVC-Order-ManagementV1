@@ -339,6 +339,7 @@ export interface InstallationTeamDocument {
   _id: string;
   name: string;
   nameLower: string;
+  phone?: string;
   memberIds: string[];
   subteams: InstallationSubteamDocument[];
   createdBy: string;
@@ -358,6 +359,11 @@ export interface InstallationDocument {
   subteamNameSnapshot?: string | null;
   scheduledDate?: string | null;
   assignedMembers?: InstallationAssignedMemberDocument[];
+  shareToken?: string | null;
+  actualSquareFootage?: number | null;
+  drawingFilename?: string | null;
+  drawingSizeBytes?: number | null;
+  drawingStoragePath?: string | null;
   updatedBy: string;
   updatedAt: Date;
   createdAt: Date;
@@ -1342,6 +1348,14 @@ export async function initializeMongo(): Promise<void> {
     getInstallations(db).createIndex(
       { scheduledDate: 1, installationStatus: 1 },
       { name: "installations_by_scheduled_date" },
+    ),
+    getInstallations(db).createIndex(
+      { shareToken: 1 },
+      {
+        unique: true,
+        name: "installation_share_token_unique",
+        partialFilterExpression: { shareToken: { $type: "string" } },
+      },
     ),
     appNotifications.createIndex({ userId: 1, createdAt: -1 }, { name: "notifications_by_user_date" }),
     appNotifications.createIndex({ userId: 1, readAt: 1 }, { name: "notifications_by_user_read_state" }),

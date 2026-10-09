@@ -35,5 +35,16 @@ export interface InstallationOrder {
   /** @nullable */
   scheduledDate: Date | null;
   assignedMembers: InstallationAssignedMember[];
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  actualSquareFootage: number | null;
+  /** @nullable */
+  shareToken: string | null;
+  /** @nullable */
+  drawingFilename: string | null;
+  /** @nullable */
+  drawingSizeBytes: number | null;
   updatedAt: Date;
 }

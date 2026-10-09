@@ -51,6 +51,7 @@ import type {
   GlassWorkbookPreview,
   HealthStatus,
   InstallationAssignmentUpdate,
+  InstallationDrawing,
   InstallationOrder,
   InstallationOrderList,
   InstallationOrderUpdate,
@@ -117,6 +118,7 @@ import type {
   PaymentFlagResolution,
   PaymentFlagUpdate,
   PaymentOverview,
+  PublicInstallationShare,
   PurchaseOrderRegisterList,
   PushConfig,
   PushSubscriptionDeleteInput,
@@ -3781,6 +3783,402 @@ export function useListInstallationOrders<TData = Awaited<ReturnType<typeof list
 
 
 
+
+export const getGetPublicInstallationShareUrl = (token: string,) => {
+
+
+
+
+  return `/api/installation/share/${token}`
+}
+
+/**
+ * @summary Read the job details for a valid installation sharing token
+ */
+export const getPublicInstallationShare = async (token: string, options?: Parameters<typeof customFetch>[1]): Promise<PublicInstallationShare> => {
+
+  return customFetch<PublicInstallationShare>(getGetPublicInstallationShareUrl(token),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicInstallationShareQueryKey = (token: string,) => {
+    return [
+    `/api/installation/share/${token}`
+    ] as const;
+    }
+
+
+export const getGetPublicInstallationShareQueryOptions = <TData = Awaited<ReturnType<typeof getPublicInstallationShare>>, TError = ErrorType<void>>(token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicInstallationShare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicInstallationShareQueryKey(token);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicInstallationShare>>> = ({ signal }) => getPublicInstallationShare(token, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: token !== null && token !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicInstallationShare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicInstallationShareQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicInstallationShare>>>
+export type GetPublicInstallationShareQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the job details for a valid installation sharing token
+ */
+
+export function useGetPublicInstallationShare<TData = Awaited<ReturnType<typeof getPublicInstallationShare>>, TError = ErrorType<void>>(
+ token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicInstallationShare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicInstallationShareQueryOptions(token,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPublicInstallationDrawingUrl = (token: string,) => {
+
+
+
+
+  return `/api/installation/share/${token}/drawing`
+}
+
+/**
+ * @summary Download the current drawing attached to a shared installation
+ */
+export const getPublicInstallationDrawing = async (token: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetPublicInstallationDrawingUrl(token),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicInstallationDrawingQueryKey = (token: string,) => {
+    return [
+    `/api/installation/share/${token}/drawing`
+    ] as const;
+    }
+
+
+export const getGetPublicInstallationDrawingQueryOptions = <TData = Awaited<ReturnType<typeof getPublicInstallationDrawing>>, TError = ErrorType<void>>(token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicInstallationDrawing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicInstallationDrawingQueryKey(token);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicInstallationDrawing>>> = ({ signal }) => getPublicInstallationDrawing(token, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: token !== null && token !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicInstallationDrawing>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicInstallationDrawingQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicInstallationDrawing>>>
+export type GetPublicInstallationDrawingQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download the current drawing attached to a shared installation
+ */
+
+export function useGetPublicInstallationDrawing<TData = Awaited<ReturnType<typeof getPublicInstallationDrawing>>, TError = ErrorType<void>>(
+ token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicInstallationDrawing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicInstallationDrawingQueryOptions(token,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadInstallationDrawingUrl = (id: string,
+    filename: string,) => {
+
+
+
+
+  return `/api/installation/orders/${id}/drawing/${filename}`
+}
+
+/**
+ * @summary Upload or replace the drawing PDF for an installation
+ */
+export const uploadInstallationDrawing = async (id: string,
+    filename: string,
+    uploadInstallationDrawingBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<InstallationDrawing> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InstallationDrawing>(getUploadInstallationDrawingUrl(id,filename),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/pdf', ...getHeaders(options?.headers) },
+    body: uploadInstallationDrawingBody
+  }
+);}
+
+
+
+
+
+export const getUploadInstallationDrawingMutationKey = () => ['uploadInstallationDrawing'] as const;
+
+export const getUploadInstallationDrawingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadInstallationDrawing>>, TError,UploadInstallationDrawingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadInstallationDrawing>>, TError,UploadInstallationDrawingMutationVariables, TContext> => {
+
+const mutationKey = getUploadInstallationDrawingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadInstallationDrawing>>, UploadInstallationDrawingMutationVariables> = (props) => {
+          const {id,filename,data} = props ?? {};
+
+          return  uploadInstallationDrawing(id,filename,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadInstallationDrawingMutationResult = NonNullable<Awaited<ReturnType<typeof uploadInstallationDrawing>>>
+    export type UploadInstallationDrawingMutationBody = BodyType<Blob>
+    export type UploadInstallationDrawingMutationError = ErrorType<void>
+    export type UploadInstallationDrawingMutationVariables = {id: string;filename: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Upload or replace the drawing PDF for an installation
+ */
+export const useUploadInstallationDrawing = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadInstallationDrawing>>, TError,UploadInstallationDrawingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadInstallationDrawing>>,
+        TError,
+        UploadInstallationDrawingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadInstallationDrawingMutationOptions(options));
+    }
+
+export const getGetInstallationDrawingUrl = (id: string,) => {
+
+
+
+
+  return `/api/installation/orders/${id}/drawing`
+}
+
+/**
+ * @summary Read an installation drawing in the authenticated Installation register
+ */
+export const getInstallationDrawing = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetInstallationDrawingUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInstallationDrawingQueryKey = (id: string,) => {
+    return [
+    `/api/installation/orders/${id}/drawing`
+    ] as const;
+    }
+
+
+export const getGetInstallationDrawingQueryOptions = <TData = Awaited<ReturnType<typeof getInstallationDrawing>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInstallationDrawing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInstallationDrawingQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInstallationDrawing>>> = ({ signal }) => getInstallationDrawing(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInstallationDrawing>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInstallationDrawingQueryResult = NonNullable<Awaited<ReturnType<typeof getInstallationDrawing>>>
+export type GetInstallationDrawingQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read an installation drawing in the authenticated Installation register
+ */
+
+export function useGetInstallationDrawing<TData = Awaited<ReturnType<typeof getInstallationDrawing>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInstallationDrawing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInstallationDrawingQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDeleteInstallationDrawingUrl = (id: string,) => {
+
+
+
+
+  return `/api/installation/orders/${id}/drawing`
+}
+
+/**
+ * @summary Remove the drawing attached to an installation
+ */
+export const deleteInstallationDrawing = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteInstallationDrawingUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteInstallationDrawingMutationKey = () => ['deleteInstallationDrawing'] as const;
+
+export const getDeleteInstallationDrawingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInstallationDrawing>>, TError,DeleteInstallationDrawingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteInstallationDrawing>>, TError,DeleteInstallationDrawingMutationVariables, TContext> => {
+
+const mutationKey = getDeleteInstallationDrawingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteInstallationDrawing>>, DeleteInstallationDrawingMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteInstallationDrawing(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteInstallationDrawingMutationResult = NonNullable<Awaited<ReturnType<typeof deleteInstallationDrawing>>>
+
+    export type DeleteInstallationDrawingMutationError = ErrorType<void>
+    export type DeleteInstallationDrawingMutationVariables = {id: string}
+
+    /**
+ * @summary Remove the drawing attached to an installation
+ */
+export const useDeleteInstallationDrawing = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInstallationDrawing>>, TError,DeleteInstallationDrawingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteInstallationDrawing>>,
+        TError,
+        DeleteInstallationDrawingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteInstallationDrawingMutationOptions(options));
+    }
 
 export const getUpdateInstallationOrderUrl = (id: string,) => {
 

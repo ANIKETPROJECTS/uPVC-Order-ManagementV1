@@ -13,4 +13,9 @@ export interface InstallationAssignmentUpdate {
   scheduledDate: Date;
   /** @minItems 1 */
   memberIds: string[];
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  actualSquareFootage: number | null;
 }

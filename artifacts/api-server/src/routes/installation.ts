@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import type { Request, Response } from "express";
 import {
   CreateOrderGrievanceBody,
   CreateOrderGrievanceParams,
@@ -13,6 +14,12 @@ import {
   AssignInstallationOrderParams,
   AssignInstallationOrderResponse,
   UnassignInstallationOrderParams,
+  GetPublicInstallationShareParams,
+  GetPublicInstallationShareResponse,
+  UploadInstallationDrawingParams,
+  UploadInstallationDrawingResponse,
+  DeleteInstallationDrawingParams,
+  GetPublicInstallationDrawingParams,
 } from "@workspace/api-zod";
 import { Router } from "express";
 import {
@@ -24,14 +31,21 @@ import {
   getOrderGrievances,
   getOrderWindows,
   getOrders,
+  type InstallationSubteamDocument,
   type InstallationDocument,
   type InstallationTeamDocument,
   type OrderDocument,
   type OrderGrievanceDocument,
 } from "../lib/mongo";
+import {
+  removeProjectUpload,
+  resolveProjectUploadPath,
+  storeProjectUpload,
+} from "../lib/project-upload-storage";
 import { getActor, resolveEligibleInstallationMembers } from "./installation-access";
 
 const router = Router();
+const MAX_INSTALLATION_PDF_BYTES = 10 * 1024 * 1024;
 
 function installationResponse(
   order: OrderDocument,
@@ -61,6 +75,10 @@ function installationResponse(
       ? new Date(`${installation.scheduledDate}T00:00:00.000Z`)
       : null,
     assignedMembers: installation?.assignedMembers ?? [],
+    actualSquareFootage: installation?.actualSquareFootage ?? null,
+    shareToken: installation?.shareToken ?? null,
+    drawingFilename: installation?.drawingFilename ?? null,
+    drawingSizeBytes: installation?.drawingSizeBytes ?? null,
     updatedAt: installation?.updatedAt ?? order.updatedAt,
   };
 }
@@ -91,6 +109,289 @@ function grievanceResponse(item: OrderGrievanceDocument) {
 
 class InstallationConflict extends Error {}
 
+function safeFilename(filename: string) {
+  return filename.replace(/[\x00-\x1f\x7f"]/g, "_").replace(/[\\/]/g, "_");
+}
+
+function contentDisposition(disposition: "attachment" | "inline", filename: string) {
+  const clean = safeFilename(filename);
+  const ascii = clean.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  const encoded = encodeURIComponent(clean).replace(/[!'()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
+function sendInstallationDrawing(
+  req: Request,
+  res: Response,
+  storagePath: string,
+  filename: string,
+): void {
+  const filePath = resolveProjectUploadPath(storagePath);
+  if (!filePath) {
+    res.status(404).json({ error: "Installation drawing content not found." });
+    return;
+  }
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    contentDisposition(req.query.download === "1" ? "attachment" : "inline", filename),
+  );
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile(filePath, { dotfiles: "deny" }, (error) => {
+    if (error && !res.headersSent) res.status(404).json({ error: "Installation drawing content not found." });
+    else if (error) req.log.error({ err: error, storagePath }, "Failed to serve an installation drawing");
+  });
+}
+
+function readInstallationPdf(
+  req: Request,
+  res: Response,
+  next: (error?: unknown) => void,
+  done: (body: Buffer) => Promise<void>,
+): void {
+  const finish = (body: Buffer) => {
+    void Promise.resolve().then(() => done(body)).catch(next);
+  };
+  if (Buffer.isBuffer(req.body)) {
+    if (req.body.length > MAX_INSTALLATION_PDF_BYTES) {
+      res.status(413).json({ error: "PDF must be 10 MiB or smaller." });
+      return;
+    }
+    finish(req.body);
+    return;
+  }
+  const declaredLength = Number(req.headers["content-length"]);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_INSTALLATION_PDF_BYTES) {
+    res.status(413).json({ error: "PDF must be 10 MiB or smaller." });
+    req.resume();
+    return;
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  let tooLarge = false;
+  req.on("data", (chunk: Buffer) => {
+    if (tooLarge) return;
+    size += chunk.length;
+    if (size > MAX_INSTALLATION_PDF_BYTES) {
+      tooLarge = true;
+      chunks.length = 0;
+      if (!res.headersSent) res.status(413).json({ error: "PDF must be 10 MiB or smaller." });
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on("end", () => {
+    if (!tooLarge) finish(Buffer.concat(chunks, size));
+  });
+  req.on("aborted", () => next(new Error("Installation drawing upload was interrupted.")));
+  req.on("error", next);
+}
+
+async function getActiveShare(db: Awaited<ReturnType<typeof getMongoDb>>, token: string) {
+  if (!/^[a-f0-9]{64}$/.test(token)) return null;
+  const installation = await getInstallations(db).findOne({ shareToken: token });
+  if (!installation?.teamId) return null;
+  const [order, team] = await Promise.all([
+    getOrders(db).findOne({ _id: installation.orderRecordId }),
+    getInstallationTeams(db).findOne({ _id: installation.teamId }),
+  ]);
+  if (!order || order.dispatchStatus !== "delivered") return null;
+  return { installation, order, team };
+}
+
+router.get("/installation/share/:token", async (req, res): Promise<void> => {
+  const parsed = GetPublicInstallationShareParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(404).json({ error: "Installation link not found." });
+    return;
+  }
+  const db = await getMongoDb();
+  const share = await getActiveShare(db, parsed.data.token);
+  if (!share) {
+    res.status(404).json({ error: "This installation link is invalid or no longer active." });
+    return;
+  }
+  const { installation, order, team } = share;
+  const subteam = team?.subteams.find((candidate: InstallationSubteamDocument) => candidate._id === installation.subteamId);
+  const windowQty = await getOrderWindows(db).countDocuments({
+    orderRecordId: order._id,
+    archivedAt: { $exists: false },
+  });
+  res.setHeader("Cache-Control", "no-store");
+  res.json(GetPublicInstallationShareResponse.parse({
+    orderId: order.orderId,
+    clientName: order.clientName,
+    locationName: order.locationName,
+    windowQty,
+    teamName: team?.name ?? installation.teamNameSnapshot ?? "Installation team",
+    subteamName: subteam?.name ?? installation.subteamNameSnapshot ?? null,
+    scheduledDate: installation.scheduledDate
+      ? new Date(`${installation.scheduledDate}T00:00:00.000Z`)
+      : null,
+    actualSquareFootage: installation.actualSquareFootage ?? null,
+    drawingFilename: installation.drawingFilename ?? null,
+    drawingUrl: installation.drawingStoragePath
+      ? `/api/installation/share/${parsed.data.token}/drawing`
+      : null,
+  }));
+});
+
+router.get("/installation/share/:token/drawing", async (req, res): Promise<void> => {
+  const parsed = GetPublicInstallationDrawingParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(404).json({ error: "Installation drawing not found." });
+    return;
+  }
+  const db = await getMongoDb();
+  const share = await getActiveShare(db, parsed.data.token);
+  if (!share?.installation.drawingStoragePath || !share.installation.drawingFilename) {
+    res.status(404).json({ error: "No drawing is available for this installation." });
+    return;
+  }
+  sendInstallationDrawing(req, res, share.installation.drawingStoragePath, share.installation.drawingFilename);
+});
+
+router.get("/installation/orders/:id/drawing", async (req, res): Promise<void> => {
+  const params = DeleteInstallationDrawingParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const actor = await getActor(req, res, "installation", "view");
+  if (!actor) return;
+  const db = await getMongoDb();
+  const order = await getOrders(db).findOne({ _id: params.data.id, dispatchStatus: "delivered" });
+  if (!order) {
+    res.status(404).json({ error: "Delivered installation not found." });
+    return;
+  }
+  const installation = await getInstallations(db).findOne({
+    orderRecordId: order._id,
+    drawingStoragePath: { $type: "string" },
+  });
+  if (!installation?.drawingStoragePath || !installation.drawingFilename) {
+    res.status(404).json({ error: "Installation drawing not found." });
+    return;
+  }
+  sendInstallationDrawing(req, res, installation.drawingStoragePath, installation.drawingFilename);
+});
+
+router.post(
+  "/installation/orders/:id/drawing/:filename",
+  (req, res, next) => {
+    const parsed = UploadInstallationDrawingParams.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    next();
+  },
+  async (req, res, next): Promise<void> => {
+    const params = UploadInstallationDrawingParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const actor = await getActor(req, res, "installation", "edit");
+    if (!actor) return;
+    const db = await getMongoDb();
+    const order = await getOrders(db).findOne({ _id: params.data.id, dispatchStatus: "delivered" });
+    if (!order) {
+      res.status(404).json({ error: "Delivered installation not found." });
+      return;
+    }
+    const installations = getInstallations(db);
+    const installation = await installations.findOne({ _id: order._id });
+    readInstallationPdf(req, res, next, async (body) => {
+      const filename = safeFilename(params.data.filename);
+      const declaredType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+      if (
+        !filename.toLowerCase().endsWith(".pdf") ||
+        body.length < 5 ||
+        body.subarray(0, 5).toString("ascii") !== "%PDF-" ||
+        (declaredType !== "application/pdf" && declaredType !== "application/octet-stream")
+      ) {
+        res.status(400).json({ error: "Choose a non-empty PDF file." });
+        return;
+      }
+      const storagePath = await storeProjectUpload("installation-drawings", filename, body);
+      let updated: InstallationDocument | null;
+      try {
+        updated = await installations.findOneAndUpdate(
+          { _id: order._id },
+          {
+            $set: {
+              drawingFilename: filename,
+              drawingSizeBytes: body.length,
+              drawingStoragePath: storagePath,
+              updatedBy: actor.id,
+              updatedAt: new Date(),
+            },
+            $setOnInsert: {
+              _id: order._id,
+              orderRecordId: order._id,
+              installationStatus: order.status === "installed" ? "installed" : "pending",
+              installationDate: null,
+              issueReason: null,
+              createdAt: new Date(),
+            },
+          },
+          { returnDocument: "after", upsert: true },
+        );
+      } catch (error) {
+        await removeProjectUpload(storagePath).catch((cleanupError: unknown) =>
+          req.log.error({ err: cleanupError }, "Failed to clean up an installation drawing after a database error"),
+        );
+        throw error;
+      }
+      if (!updated) throw new Error("Installation drawing was not saved.");
+      if (installation?.drawingStoragePath) {
+        await removeProjectUpload(installation.drawingStoragePath).catch((cleanupError: unknown) =>
+          req.log.error({ err: cleanupError }, "Failed to remove the replaced installation drawing"),
+        );
+      }
+      res.json(UploadInstallationDrawingResponse.parse({ filename, sizeBytes: body.length }));
+    });
+  },
+);
+
+router.delete("/installation/orders/:id/drawing", async (req, res): Promise<void> => {
+  const params = DeleteInstallationDrawingParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const actor = await getActor(req, res, "installation", "edit");
+  if (!actor) return;
+  const db = await getMongoDb();
+  const installation = await getInstallations(db).findOne({
+    orderRecordId: params.data.id,
+    drawingStoragePath: { $type: "string" },
+  });
+  if (!installation?.drawingStoragePath) {
+    res.status(404).json({ error: "Installation drawing not found." });
+    return;
+  }
+  const result = await getInstallations(db).updateOne(
+    { _id: installation._id, drawingStoragePath: installation.drawingStoragePath },
+    {
+      $unset: { drawingFilename: "", drawingSizeBytes: "", drawingStoragePath: "" },
+      $set: { updatedBy: actor.id, updatedAt: new Date() },
+    },
+  );
+  if (result.modifiedCount !== 1) {
+    res.status(409).json({ error: "The drawing changed while it was being removed. Refresh and try again." });
+    return;
+  }
+  await removeProjectUpload(installation.drawingStoragePath).catch((error: unknown) =>
+    req.log.error({ err: error }, "Failed to remove a deleted installation drawing"),
+  );
+  res.status(204).send();
+});
+
 router.get("/installation/orders", async (req, res): Promise<void> => {
   const actor = await getActor(req, res, "installation", "view");
   if (!actor) return;
@@ -108,6 +409,24 @@ router.get("/installation/orders", async (req, res): Promise<void> => {
   const installations = await getInstallations(db)
     .find({ _id: { $in: orders.map((order) => order._id) } })
     .toArray();
+  for (const installation of installations) {
+    if (!installation.teamId || installation.shareToken) continue;
+    const token = randomBytes(32).toString("hex");
+    const updated = await getInstallations(db).updateOne(
+      {
+        _id: installation._id,
+        teamId: installation.teamId,
+        $or: [{ shareToken: { $exists: false } }, { shareToken: null }],
+      },
+      { $set: { shareToken: token } },
+    );
+    if (updated.modifiedCount === 1) {
+      installation.shareToken = token;
+    } else {
+      const refreshed = await getInstallations(db).findOne({ _id: installation._id });
+      installation.shareToken = refreshed?.shareToken ?? null;
+    }
+  }
   const teams = await getInstallationTeams(db).find().toArray();
   const windows = await getOrderWindows(db).find({
     orderRecordId: { $in: orders.map((order) => order._id) },
@@ -181,6 +500,11 @@ router.patch("/installation/orders/:id/assignment", async (req, res): Promise<vo
       if (existingInstallation?.installationStatus === "installed") {
         throw new InstallationConflict("Installed orders cannot be reassigned.");
       }
+      const sameAssignment = existingInstallation?.teamId === team._id
+        && (existingInstallation.subteamId ?? null) === (subteam?._id ?? null);
+      const shareToken = sameAssignment && existingInstallation?.shareToken
+        ? existingInstallation.shareToken
+        : randomBytes(32).toString("hex");
       const now = new Date();
       const result = await getInstallations(db).findOneAndUpdate(
         { _id: order._id },
@@ -193,6 +517,8 @@ router.patch("/installation/orders/:id/assignment", async (req, res): Promise<vo
             subteamNameSnapshot: subteam?.name ?? null,
             scheduledDate,
             assignedMembers,
+            actualSquareFootage: body.data.actualSquareFootage,
+            shareToken,
             updatedBy: actor.id,
             updatedAt: now,
           },
@@ -308,6 +634,7 @@ router.delete("/installation/orders/:id/assignment", async (req, res): Promise<v
             subteamId: null,
             subteamNameSnapshot: null,
             assignedMembers: [],
+            shareToken: null,
             updatedBy: actor.id,
             updatedAt: now,
           },

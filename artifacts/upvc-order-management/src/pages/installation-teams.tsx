@@ -79,6 +79,7 @@ function TeamEditor({ team, users, pending, onClose, onSave }: {
   onClose: () => void; onSave: (id: string | null, input: InstallationTeamInput) => void;
 }) {
   const [name, setName] = useState(team?.name || '');
+  const [phone, setPhone] = useState(team?.phone || '');
   const [memberIds, setMemberIds] = useState<string[]>(() => team?.memberIds || []);
   const [subteams, setSubteams] = useState<DraftSubteam[]>(() => team?.subteams.map((item) => ({ id: item.id, name: item.name, memberIds: [...item.memberIds] })) || []);
   const [newSubteamName, setNewSubteamName] = useState('');
@@ -107,7 +108,9 @@ function TeamEditor({ team, users, pending, onClose, onSave }: {
       setError('Every subdivision needs a name and members from this parent team.');
       return;
     }
-    onSave(team?.id || null, { name: name.trim(), memberIds, subteams: subteams.map((item) => ({ ...item, name: item.name.trim() })) });
+    const removedSubteams = team?.subteams.filter((item) => !subteams.some((draft) => draft.id === item.id)) ?? [];
+    if (removedSubteams.length && !window.confirm(`Remove ${removedSubteams.map((item) => item.name).join(', ')}? Active installations assigned to those subdivisions will be unassigned and their visit dates retained. Completed installation records will stay in history.`)) return;
+    onSave(team?.id || null, { name: name.trim(), phone: phone.trim(), memberIds, subteams: subteams.map((item) => ({ ...item, name: item.name.trim() })) });
   };
 
   return <section className="scroll-mt-4 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm" data-testid="panel-installation-team-editor">
@@ -116,7 +119,10 @@ function TeamEditor({ team, users, pending, onClose, onSave }: {
       <Button type="button" variant="outline" onClick={onClose} disabled={pending} data-testid="button-close-installation-team-editor">Cancel</Button>
     </header>
     <div className="space-y-5 p-4 md:p-6">
-      <label className="block max-w-xl space-y-2"><span className="text-xs font-bold">Team name</span><Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="e.g. North field crew" data-testid="input-installation-team-name" /></label>
+       <div className="grid gap-4 sm:grid-cols-2">
+         <label className="block max-w-xl space-y-2"><span className="text-xs font-bold">Team name</span><Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="e.g. North field crew" data-testid="input-installation-team-name" /></label>
+         <label className="block max-w-xl space-y-2"><span className="text-xs font-bold">Team phone</span><Input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={40} placeholder="Crew contact number" data-testid="input-installation-team-phone" /></label>
+       </div>
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
         <section className="min-w-0 space-y-3 rounded-2xl border border-border/75 bg-background/60 p-4">
           <div className="flex flex-wrap items-end justify-between gap-2"><div><h3 className="text-sm font-bold">Parent team members</h3><p className="mt-1 text-xs text-muted-foreground">Search and select eligible users from the existing user list.</p></div><span className="rounded-full bg-secondary px-2.5 py-1 font-mono text-[11px] font-semibold text-secondary-foreground">{memberIds.length} selected</span></div>
@@ -168,7 +174,7 @@ export default function InstallationTeamsPage({ user }: { user: User }) {
   const visibleTeams = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return teams.filter((team) => {
-      const matches = !needle || `${team.name} ${team.memberIds.map((id) => users.find((userItem) => userItem.id === id)?.name || '').join(' ')} ${team.subteams.map((subteam) => subteam.name).join(' ')}`.toLowerCase().includes(needle);
+      const matches = !needle || `${team.name} ${team.phone} ${team.memberIds.map((id) => users.find((userItem) => userItem.id === id)?.name || '').join(' ')} ${team.subteams.map((subteam) => subteam.name).join(' ')}`.toLowerCase().includes(needle);
       return matches && (filter === 'all' || (filter === 'subdivisions' ? team.subteams.length > 0 : team.subteams.length === 0));
     }).sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'members' ? b.memberIds.length - a.memberIds.length : b.updatedAt.localeCompare(a.updatedAt));
   }, [teams, users, search, filter, sort]);
@@ -194,7 +200,7 @@ export default function InstallationTeamsPage({ user }: { user: User }) {
     else createTeam.mutate({ data }, options);
   };
   const removeTeam = (team: InstallationTeam) => {
-    if (!window.confirm(`Delete “${team.name}”? This removes the team and its subdivisions.`)) return;
+    if (!window.confirm(`Delete “${team.name}” and its subdivisions? Active orders assigned to this team will be unassigned, and their visit dates will be retained. Completed installation records will stay in history.`)) return;
     deleteTeam.mutate({ id: team.id }, {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getListInstallationTeamsQueryKey() });
@@ -241,7 +247,7 @@ export default function InstallationTeamsPage({ user }: { user: User }) {
                     const teamMembers = team.memberIds.map((id) => users.find((member) => member.id === id)).filter((member): member is Member => Boolean(member));
                     const memberCount = team.memberIds.length;
                     return <article key={team.id} className={`group rounded-2xl border border-border/80 bg-card p-4 shadow-sm transition-[border-color,transform] hover:-translate-y-0.5 hover:border-primary/30 ${layout === 'list' ? 'md:flex md:items-center md:gap-6 md:px-5' : ''}`} data-testid={`card-installation-team-${team.id}`}>
-                      <div className="flex min-w-0 items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><UsersRound size={20} /></div><div className="min-w-0 flex-1"><h2 className="truncate font-display text-lg font-bold tracking-tight" data-testid={`text-installation-team-name-${team.id}`}>{team.name}</h2><p className="mt-1 text-[11px] text-muted-foreground" data-testid={`text-installation-team-summary-${team.id}`}>{memberCount} {memberCount === 1 ? 'member' : 'members'} <span className="mx-1 text-border">·</span> {team.subteams.length} {team.subteams.length === 1 ? 'subdivision' : 'subdivisions'}</p></div>
+                       <div className="flex min-w-0 items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><UsersRound size={20} /></div><div className="min-w-0 flex-1"><h2 className="truncate font-display text-lg font-bold tracking-tight" data-testid={`text-installation-team-name-${team.id}`}>{team.name}</h2><p className="mt-1 text-[11px] text-muted-foreground" data-testid={`text-installation-team-summary-${team.id}`}>{memberCount} {memberCount === 1 ? 'member' : 'members'} <span className="mx-1 text-border">·</span> {team.subteams.length} {team.subteams.length === 1 ? 'subdivision' : 'subdivisions'}</p>{team.phone && <p className="mt-1 text-[11px] font-medium text-primary" data-testid={`text-installation-team-phone-${team.id}`}>{team.phone}</p>}</div>
                         {canEdit && <div className="flex shrink-0 gap-1"><Button type="button" variant="ghost" size="icon" aria-label={`Edit ${team.name}`} disabled={editorOpen || createTeam.isPending || updateTeam.isPending} onClick={() => openTeamEditor(team)} data-testid={`button-edit-installation-team-${team.id}`}><span className="text-[11px] font-bold">Edit</span></Button><Button type="button" variant="ghost" size="icon" aria-label={`Delete ${team.name}`} disabled={editorOpen || deleteTeam.isPending || createTeam.isPending || updateTeam.isPending} onClick={() => removeTeam(team)} className="text-muted-foreground hover:text-destructive" data-testid={`button-delete-installation-team-${team.id}`}><Trash2 size={15} /></Button></div>}
                       </div>
                       <div className={`mt-4 ${layout === 'list' ? 'md:mt-0 md:min-w-[230px] md:max-w-[330px] md:flex-1' : ''}`}><p className="mb-2 text-[9px] font-bold uppercase tracking-[.13em] text-muted-foreground">Team members</p>{teamMembers.length ? <div className="flex flex-wrap gap-1.5">{teamMembers.map((member) => <span key={member.id} className="rounded-full bg-muted/70 px-2.5 py-1 text-[10px] font-semibold" data-testid={`chip-team-member-${team.id}-${member.id}`}>{member.name}</span>)}{teamMembers.length < memberCount && <span className="rounded-full bg-muted/70 px-2.5 py-1 text-[10px] text-muted-foreground">{memberCount - teamMembers.length} unavailable</span>}</div> : <p className="text-xs text-muted-foreground">No member details available</p>}</div>

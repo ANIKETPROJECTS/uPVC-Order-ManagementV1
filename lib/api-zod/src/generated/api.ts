@@ -1626,6 +1626,8 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
  */
 export const listInstallationOrdersResponseWindowQtyMin = 0;
 
+export const listInstallationOrdersResponseActualSquareFootageMin = 0;
+
 
 
 export const ListInstallationOrdersResponseItem = zod.object({
@@ -1648,9 +1650,101 @@ export const ListInstallationOrdersResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string()
 })),
+  "actualSquareFootage": zod.number().min(listInstallationOrdersResponseActualSquareFootageMin).nullable(),
+  "shareToken": zod.string().nullable(),
+  "drawingFilename": zod.string().nullable(),
+  "drawingSizeBytes": zod.number().int().nullable(),
   "updatedAt": zod.coerce.date()
 })
 export const ListInstallationOrdersResponse = zod.array(ListInstallationOrdersResponseItem)
+
+
+/**
+ * @summary Read the job details for a valid installation sharing token
+ */
+export const getPublicInstallationSharePathTokenMin = 40;
+export const getPublicInstallationSharePathTokenMax = 100;
+
+
+
+export const GetPublicInstallationShareParams = zod.object({
+  "token": zod.coerce.string().min(getPublicInstallationSharePathTokenMin).max(getPublicInstallationSharePathTokenMax)
+})
+
+export const getPublicInstallationShareResponseWindowQtyMin = 0;
+
+export const getPublicInstallationShareResponseActualSquareFootageMin = 0;
+
+
+
+export const GetPublicInstallationShareResponse = zod.object({
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "windowQty": zod.number().int().min(getPublicInstallationShareResponseWindowQtyMin),
+  "teamName": zod.string(),
+  "subteamName": zod.string().nullable(),
+  "scheduledDate": zod.coerce.date().nullable(),
+  "actualSquareFootage": zod.number().min(getPublicInstallationShareResponseActualSquareFootageMin).nullable(),
+  "drawingFilename": zod.string().nullable(),
+  "drawingUrl": zod.string().nullable()
+})
+
+
+/**
+ * @summary Download the current drawing attached to a shared installation
+ */
+export const getPublicInstallationDrawingPathTokenMin = 40;
+export const getPublicInstallationDrawingPathTokenMax = 100;
+
+
+
+export const GetPublicInstallationDrawingParams = zod.object({
+  "token": zod.coerce.string().min(getPublicInstallationDrawingPathTokenMin).max(getPublicInstallationDrawingPathTokenMax)
+})
+
+export const GetPublicInstallationDrawingResponse = zod.unknown()
+
+
+/**
+ * @summary Upload or replace the drawing PDF for an installation
+ */
+export const uploadInstallationDrawingPathFilenameMax = 180;
+
+
+
+export const UploadInstallationDrawingParams = zod.object({
+  "id": zod.coerce.string(),
+  "filename": zod.coerce.string().min(1).max(uploadInstallationDrawingPathFilenameMax)
+})
+
+
+
+
+export const UploadInstallationDrawingResponse = zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int().min(1)
+})
+
+
+/**
+ * @summary Read an installation drawing in the authenticated Installation register
+ */
+export const GetInstallationDrawingParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetInstallationDrawingResponse = zod.unknown()
+
+
+/**
+ * @summary Remove the drawing attached to an installation
+ */
+export const DeleteInstallationDrawingParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteInstallationDrawingResponse = zod.void()
 
 
 /**
@@ -1671,6 +1765,8 @@ export const UpdateInstallationOrderBody = zod.object({
 })
 
 export const updateInstallationOrderResponseWindowQtyMin = 0;
+
+export const updateInstallationOrderResponseActualSquareFootageMin = 0;
 
 
 
@@ -1694,6 +1790,10 @@ export const UpdateInstallationOrderResponse = zod.object({
   "id": zod.string(),
   "name": zod.string()
 })),
+  "actualSquareFootage": zod.number().min(updateInstallationOrderResponseActualSquareFootageMin).nullable(),
+  "shareToken": zod.string().nullable(),
+  "drawingFilename": zod.string().nullable(),
+  "drawingSizeBytes": zod.number().int().nullable(),
   "updatedAt": zod.coerce.date()
 })
 
@@ -1716,6 +1816,7 @@ export const ListInstallationUsersResponse = zod.array(ListInstallationUsersResp
 export const ListInstallationTeamsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
+  "phone": zod.string(),
   "memberIds": zod.array(zod.string()),
   "subteams": zod.array(zod.object({
   "id": zod.string(),
@@ -1733,6 +1834,8 @@ export const ListInstallationTeamsResponse = zod.array(ListInstallationTeamsResp
  */
 export const createInstallationTeamBodyNameMax = 120;
 
+export const createInstallationTeamBodyPhoneMax = 40;
+
 
 export const createInstallationTeamBodySubteamsItemNameMax = 120;
 
@@ -1741,6 +1844,7 @@ export const createInstallationTeamBodySubteamsItemNameMax = 120;
 
 export const CreateInstallationTeamBody = zod.object({
   "name": zod.string().min(1).max(createInstallationTeamBodyNameMax),
+  "phone": zod.string().max(createInstallationTeamBodyPhoneMax),
   "memberIds": zod.array(zod.string()).min(1),
   "subteams": zod.array(zod.object({
   "id": zod.string().optional(),
@@ -1752,6 +1856,7 @@ export const CreateInstallationTeamBody = zod.object({
 export const CreateInstallationTeamResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
+  "phone": zod.string(),
   "memberIds": zod.array(zod.string()),
   "subteams": zod.array(zod.object({
   "id": zod.string(),
@@ -1772,6 +1877,8 @@ export const UpdateInstallationTeamParams = zod.object({
 
 export const updateInstallationTeamBodyNameMax = 120;
 
+export const updateInstallationTeamBodyPhoneMax = 40;
+
 
 export const updateInstallationTeamBodySubteamsItemNameMax = 120;
 
@@ -1780,6 +1887,7 @@ export const updateInstallationTeamBodySubteamsItemNameMax = 120;
 
 export const UpdateInstallationTeamBody = zod.object({
   "name": zod.string().min(1).max(updateInstallationTeamBodyNameMax),
+  "phone": zod.string().max(updateInstallationTeamBodyPhoneMax),
   "memberIds": zod.array(zod.string()).min(1),
   "subteams": zod.array(zod.object({
   "id": zod.string().optional(),
@@ -1791,6 +1899,7 @@ export const UpdateInstallationTeamBody = zod.object({
 export const UpdateInstallationTeamResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
+  "phone": zod.string(),
   "memberIds": zod.array(zod.string()),
   "subteams": zod.array(zod.object({
   "id": zod.string(),
@@ -1830,16 +1939,21 @@ export const AssignInstallationOrderParams = zod.object({
 })
 
 
+export const assignInstallationOrderBodyActualSquareFootageMin = 0;
+
 
 
 export const AssignInstallationOrderBody = zod.object({
   "teamId": zod.string(),
   "subteamId": zod.string().nullable(),
   "scheduledDate": zod.coerce.date(),
-  "memberIds": zod.array(zod.string()).min(1)
+  "memberIds": zod.array(zod.string()).min(1),
+  "actualSquareFootage": zod.number().min(assignInstallationOrderBodyActualSquareFootageMin).nullable()
 })
 
 export const assignInstallationOrderResponseWindowQtyMin = 0;
+
+export const assignInstallationOrderResponseActualSquareFootageMin = 0;
 
 
 
@@ -1863,6 +1977,10 @@ export const AssignInstallationOrderResponse = zod.object({
   "id": zod.string(),
   "name": zod.string()
 })),
+  "actualSquareFootage": zod.number().min(assignInstallationOrderResponseActualSquareFootageMin).nullable(),
+  "shareToken": zod.string().nullable(),
+  "drawingFilename": zod.string().nullable(),
+  "drawingSizeBytes": zod.number().int().nullable(),
   "updatedAt": zod.coerce.date()
 })
 

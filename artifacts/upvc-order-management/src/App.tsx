@@ -30,6 +30,7 @@ import BalancePaymentPage from '@/pages/balance-payment';
 import GlassTrackingPage from '@/pages/glass-tracking';
 import ConfirmationPage from '@/pages/confirmation';
 import QuotationApprovalsPage from '@/pages/quotation-approvals';
+import PublicInstallationSharePage from '@/pages/installation-share';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 20_000 } } });
 
@@ -61,15 +62,24 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
   </Switch>;
 }
 
-function Router() {
+function AuthenticatedRouter() {
   const session = useGetAuthSession();
   const userId = session.data?.user?.id ?? 'signed-out';
   return <ThemeProvider key={userId} attribute="class" defaultTheme="light" enableSystem={false} storageKey={`framewise-theme:${userId}`} disableTransitionOnChange>
+    {session.isLoading ? <div className="flex min-h-[100dvh] items-center justify-center bg-background"><div className="w-full max-w-sm space-y-3 px-6"><div className="h-10 w-10 animate-pulse rounded-xl bg-secondary" /><div className="h-7 w-56 rounded-lg bg-muted" /><div className="h-4 w-72 rounded-lg bg-muted" /></div></div> : session.isError ? <LoginPage /> : <AuthenticatedRoutes user={session.data?.user || null} />}
+  </ThemeProvider>;
+}
+
+function Router() {
+  return <>
     <ErrorBoundary resetKey={window.location.pathname}>
-      {session.isLoading ? <div className="flex min-h-[100dvh] items-center justify-center bg-background"><div className="w-full max-w-sm space-y-3 px-6"><div className="h-10 w-10 animate-pulse rounded-xl bg-secondary" /><div className="h-7 w-56 animate-pulse rounded-lg bg-muted" /><div className="h-4 w-72 animate-pulse rounded-lg bg-muted" /></div></div> : session.isError ? <LoginPage /> : <AuthenticatedRoutes user={session.data?.user || null} />}
+      <Switch>
+        <Route path="/installation/share/:token" component={PublicInstallationSharePage} />
+        <Route component={AuthenticatedRouter} />
+      </Switch>
     </ErrorBoundary>
     <Toaster />
-  </ThemeProvider>;
+  </>;
 }
 
 function App() {

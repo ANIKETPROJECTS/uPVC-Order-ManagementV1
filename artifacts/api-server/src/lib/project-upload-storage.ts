@@ -8,6 +8,7 @@ export const PROJECT_UPLOAD_CATEGORIES = [
   "glass-order-workbooks",
   "measurement-sheets",
   "quotation-rate-pdfs",
+  "installation-drawings",
   "avatars",
   "window-profiles",
 ] as const;

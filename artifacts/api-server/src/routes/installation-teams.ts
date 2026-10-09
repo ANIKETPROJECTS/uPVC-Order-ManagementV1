@@ -13,6 +13,7 @@ import { Router, type Response } from "express";
 import {
   getInstallationTeams,
   getInstallations,
+  getMongoClient,
   getMongoDb,
   type InstallationSubteamDocument,
   type InstallationTeamDocument,
@@ -40,6 +41,7 @@ function teamResponse(team: InstallationTeamDocument) {
   return {
     id: team._id,
     name: team.name,
+    phone: team.phone ?? "",
     memberIds: team.memberIds,
     subteams: team.subteams.map((subteam) => ({
       id: subteam._id,
@@ -149,6 +151,7 @@ router.post("/installation/teams", async (req, res): Promise<void> => {
       _id: randomUUID(),
       name,
       nameLower,
+      phone: parsed.data.phone.trim(),
       memberIds,
       subteams,
       createdBy: actor.id,
@@ -198,27 +201,45 @@ router.patch("/installation/teams/:id", async (req, res): Promise<void> => {
 
     const retainedSubteamIds = new Set(subteams.map((subteam) => subteam._id));
     const removedSubteams = existing.subteams.filter((subteam) => !retainedSubteamIds.has(subteam._id));
-    for (const removedSubteam of removedSubteams) {
-      const activeAssignment = await getInstallations(db).findOne({
-        teamId: existing._id,
-        subteamId: removedSubteam._id,
-        installationStatus: { $ne: "installed" },
-      });
-      if (activeAssignment) {
-        throw new TeamConflict("Reassign active orders from this subdivision before deleting it.");
-      }
-    }
 
     const updatedAt = new Date();
     const update = {
       name,
       nameLower,
+      phone: parsed.data.phone.trim(),
       memberIds,
       subteams,
       updatedBy: actor.id,
       updatedAt,
     };
-    await teams.updateOne({ _id: existing._id }, { $set: update });
+    const session = (await getMongoClient()).startSession();
+    try {
+      await session.withTransaction(async () => {
+        if (removedSubteams.length) {
+          await getInstallations(db).updateMany(
+            {
+              teamId: existing._id,
+              subteamId: { $in: removedSubteams.map((subteam) => subteam._id) },
+              installationStatus: { $ne: "installed" },
+            },
+            {
+              $unset: {
+                teamId: "",
+                teamNameSnapshot: "",
+                subteamId: "",
+                subteamNameSnapshot: "",
+                shareToken: "",
+              },
+              $set: { assignedMembers: [], updatedBy: actor.id, updatedAt },
+            },
+            { session },
+          );
+        }
+        await teams.updateOne({ _id: existing._id }, { $set: update }, { session });
+      });
+    } finally {
+      await session.endSession();
+    }
     const updated = await teams.findOne({ _id: existing._id });
     if (!updated) {
       res.status(404).json({ error: "Installation team not found." });
@@ -247,15 +268,38 @@ router.delete("/installation/teams/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Installation team not found." });
     return;
   }
-  const activeAssignment = await getInstallations(db).findOne({
-    teamId: team._id,
-    installationStatus: { $ne: "installed" },
-  });
-  if (activeAssignment) {
-    res.status(409).json({ error: "Reassign active orders before deleting this team." });
-    return;
+  const session = (await getMongoClient()).startSession();
+  try {
+    await session.withTransaction(async () => {
+      await getInstallations(db).updateMany(
+        { teamId: team._id, installationStatus: { $ne: "installed" } },
+        {
+          $unset: {
+            teamId: "",
+            teamNameSnapshot: "",
+            subteamId: "",
+            subteamNameSnapshot: "",
+            shareToken: "",
+          },
+          $set: {
+            assignedMembers: [],
+            updatedBy: actor.id,
+            updatedAt: new Date(),
+          },
+        },
+        { session },
+      );
+      const result = await teams.deleteOne({ _id: team._id }, { session });
+      if (result.deletedCount !== 1) {
+        throw new TeamConflict("Installation team changed before it could be deleted.");
+      }
+    });
+  } catch (error) {
+    if (sendTeamError(res, error)) return;
+    throw error;
+  } finally {
+    await session.endSession();
   }
-  await teams.deleteOne({ _id: team._id });
   res.status(204).send();
 });
 

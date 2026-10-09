@@ -10,6 +10,7 @@ import type { InstallationSubteam } from './installationSubteam';
 export interface InstallationTeam {
   id: string;
   name: string;
+  phone: string;
   memberIds: string[];
   subteams: InstallationSubteam[];
   createdAt: Date;

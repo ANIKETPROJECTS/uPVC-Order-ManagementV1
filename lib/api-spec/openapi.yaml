@@ -999,6 +999,137 @@ paths:
           description: Sign in required
         "403":
           description: Installation view access required
+  /installation/share/{token}:
+    get:
+      operationId: getPublicInstallationShare
+      tags: [installation]
+      summary: Read the job details for a valid installation sharing token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 40
+            maxLength: 100
+      responses:
+        "200":
+          description: Read-only installation job details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicInstallationShare"
+        "404":
+          description: The installation link is invalid or no longer active
+  /installation/share/{token}/drawing:
+    get:
+      operationId: getPublicInstallationDrawing
+      tags: [installation]
+      summary: Download the current drawing attached to a shared installation
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 40
+            maxLength: 100
+      responses:
+        "200":
+          description: Current window drawing PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: The drawing is not available for this link
+  /installation/orders/{id}/drawing/{filename}:
+    post:
+      operationId: uploadInstallationDrawing
+      tags: [installation]
+      summary: Upload or replace the drawing PDF for an installation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 180
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Current drawing details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationDrawing"
+        "400":
+          description: Invalid PDF upload
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
+        "404":
+          description: Delivered installation not found
+        "413":
+          description: PDF exceeds the upload size limit
+  /installation/orders/{id}/drawing:
+    get:
+      operationId: getInstallationDrawing
+      tags: [installation]
+      summary: Read an installation drawing in the authenticated Installation register
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current installation drawing PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation view access required
+        "404":
+          description: Delivered installation or drawing not found
+    delete:
+      operationId: deleteInstallationDrawing
+      tags: [installation]
+      summary: Remove the drawing attached to an installation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Drawing removed
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
+        "404":
+          description: Delivered installation or drawing not found
   /installation/orders/{id}:
     patch:
       operationId: updateInstallationOrder
@@ -3557,10 +3688,55 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/InstallationAssignedMember"
+        actualSquareFootage:
+          type: ["number", "null"]
+          minimum: 0
+        shareToken:
+          type: ["string", "null"]
+        drawingFilename:
+          type: ["string", "null"]
+        drawingSizeBytes:
+          type: ["integer", "null"]
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, installationStatus, installationDate, issueReason, windowQty, teamId, teamName, subteamId, subteamName, scheduledDate, assignedMembers, updatedAt]
+      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, installationStatus, installationDate, issueReason, windowQty, teamId, teamName, subteamId, subteamName, scheduledDate, assignedMembers, actualSquareFootage, shareToken, drawingFilename, drawingSizeBytes, updatedAt]
+    InstallationDrawing:
+      type: object
+      properties:
+        filename:
+          type: string
+        sizeBytes:
+          type: integer
+          minimum: 1
+      required: [filename, sizeBytes]
+    PublicInstallationShare:
+      type: object
+      properties:
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        windowQty:
+          type: integer
+          minimum: 0
+        teamName:
+          type: string
+        subteamName:
+          type: ["string", "null"]
+        scheduledDate:
+          type: ["string", "null"]
+          format: date
+        actualSquareFootage:
+          type: ["number", "null"]
+          minimum: 0
+        drawingFilename:
+          type: ["string", "null"]
+        drawingUrl:
+          type: ["string", "null"]
+      required: [orderId, clientName, locationName, windowQty, teamName, subteamName, scheduledDate, actualSquareFootage, drawingFilename, drawingUrl]
     InstallationOrderUpdate:
       type: object
       properties:
@@ -3636,6 +3812,8 @@ components:
           type: string
         name:
           type: string
+        phone:
+          type: string
         memberIds:
           type: array
           items:
@@ -3650,7 +3828,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, name, memberIds, subteams, createdAt, updatedAt]
+      required: [id, name, phone, memberIds, subteams, createdAt, updatedAt]
     InstallationTeamList:
       type: array
       items:
@@ -3662,6 +3840,9 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        phone:
+          type: string
+          maxLength: 40
         memberIds:
           type: array
           minItems: 1
@@ -3671,7 +3852,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/InstallationSubteamInput"
-      required: [name, memberIds, subteams]
+      required: [name, phone, memberIds, subteams]
     InstallationAssignmentUpdate:
       type: object
       properties:
@@ -3687,7 +3868,10 @@ components:
           minItems: 1
           items:
             type: string
-      required: [teamId, subteamId, scheduledDate, memberIds]
+        actualSquareFootage:
+          type: ["number", "null"]
+          minimum: 0
+      required: [teamId, subteamId, scheduledDate, memberIds, actualSquareFootage]
     OrderGrievance:
       type: object
       properties:

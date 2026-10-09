@@ -374,7 +374,46 @@ export interface InstallationOrder {
   /** @nullable */
   scheduledDate: string | null;
   assignedMembers: InstallationAssignedMember[];
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  actualSquareFootage: number | null;
+  /** @nullable */
+  shareToken: string | null;
+  /** @nullable */
+  drawingFilename: string | null;
+  /** @nullable */
+  drawingSizeBytes: number | null;
   updatedAt: string;
+}
+
+export interface InstallationDrawing {
+  filename: string;
+  /** @minimum 1 */
+  sizeBytes: number;
+}
+
+export interface PublicInstallationShare {
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  /** @minimum 0 */
+  windowQty: number;
+  teamName: string;
+  /** @nullable */
+  subteamName: string | null;
+  /** @nullable */
+  scheduledDate: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  actualSquareFootage: number | null;
+  /** @nullable */
+  drawingFilename: string | null;
+  /** @nullable */
+  drawingUrl: string | null;
 }
 
 export type InstallationOrderUpdateInstallationStatus = typeof InstallationOrderUpdateInstallationStatus[keyof typeof InstallationOrderUpdateInstallationStatus];
@@ -423,6 +462,7 @@ export interface InstallationSubteamInput {
 export interface InstallationTeam {
   id: string;
   name: string;
+  phone: string;
   memberIds: string[];
   subteams: InstallationSubteam[];
   createdAt: string;
@@ -437,6 +477,8 @@ export interface InstallationTeamInput {
      * @maxLength 120
      */
   name: string;
+  /** @maxLength 40 */
+  phone: string;
   /** @minItems 1 */
   memberIds: string[];
   subteams: InstallationSubteamInput[];
@@ -449,6 +491,11 @@ export interface InstallationAssignmentUpdate {
   scheduledDate: string;
   /** @minItems 1 */
   memberIds: string[];
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  actualSquareFootage: number | null;
 }
 
 export type OrderGrievanceStatus = typeof OrderGrievanceStatus[keyof typeof OrderGrievanceStatus];

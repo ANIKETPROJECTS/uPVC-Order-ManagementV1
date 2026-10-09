@@ -336,7 +336,15 @@ async function conversationList(db: Db, user: UserDocument) {
   );
 }
 
-router.use(requireActiveUser);
+router.use((req, res, next) => {
+  const ownsPath =
+    req.path === "/chat" ||
+    req.path.startsWith("/chat/") ||
+    req.path === "/admin/chat-groups" ||
+    req.path.startsWith("/admin/chat-groups/");
+  if (!ownsPath) return next();
+  return requireActiveUser(req, res, next);
+});
 router.use("/admin/chat-groups", requireMasterAdmin);
 
 router.get("/chat/people", async (_req, res): Promise<void> => {

@@ -13,6 +13,8 @@ export interface InstallationTeamInput {
      * @maxLength 120
      */
   name: string;
+  /** @maxLength 40 */
+  phone: string;
   /** @minItems 1 */
   memberIds: string[];
   subteams: InstallationSubteamInput[];
