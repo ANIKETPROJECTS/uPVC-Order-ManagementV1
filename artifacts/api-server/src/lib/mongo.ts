@@ -1250,6 +1250,7 @@ export async function initializeMongo(): Promise<void> {
   const chatMessages = getChatMessages(db);
   const clients = getClients(db);
   const locations = getOrderLocations(db);
+  const orders = getOrders(db);
   const orderWindows = getOrderWindows(db);
   const glassTrackingOrders = getGlassTrackingOrders(db);
   const glassTrackingWorkbookImports = getGlassTrackingWorkbookImports(db);

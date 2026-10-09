@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
-import { ArrowDownUp, Check, ChevronDown, ChevronUp, Clock3, FileSpreadsheet, LayoutGrid, List, PackageCheck, Pencil, RefreshCw, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
+import { ArrowDownUp, Check, ChevronDown, ChevronUp, Clock3, LayoutGrid, List, PackageCheck, Pencil, RefreshCw, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import { getGetGlassTrackingQueryKey, useDeleteGlassTracking, useGetGlassTracking, useUpdateGlassTracking, useUpdateGlassTrackingQuantities } from '@workspace/api-client-react';
 import type { GlassTrackingOrder, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
@@ -61,92 +61,6 @@ function invoiceFilenameStem(filename: string | null) {
   if (!filename) return null;
   const name = filename.split(/[\\/]/).pop() || filename;
   return name.replace(/\.[^.]+$/, '') || null;
-}
-
-function DemoDataPreview() {
-  const demoOrders: GlassTrackingOrder[] = [
-    {
-      orderRecordId: 'demo-glass-order-2401',
-      orderId: 'DEMO-GL-2401',
-      clientName: 'Cedar Grove Villas',
-      locationName: 'Pune',
-      invoiceNo: 'INV-DEMO-2401',
-      invoiceFilename: 'INV-DEMO-2401.pdf',
-      glassInputFilename: 'glass-order-demo-rev2.xlsx',
-      glassInputRevision: 2,
-      glassInputUploadedAt: '2026-10-05T10:00:00.000Z',
-      ordered: 18,
-      received: 14,
-      broken: 2,
-      status: 'partial',
-      updatedAt: '2026-10-05T10:00:00.000Z',
-      items: [
-        { id: 'demo-glass-item-1', villaNo: '4-A', windowNo: '1', glassType: '6mm Toughened Glass', widthMm: 1026, heightMm: 2082, ordered: 8, received: 8, broken: 0 },
-        { id: 'demo-glass-item-2', villaNo: '4-B', windowNo: '2', glassType: '5mm Frosted Toughened', widthMm: 1055, heightMm: 1540, ordered: 10, received: 6, broken: 2 },
-      ],
-    },
-    {
-      orderRecordId: 'demo-glass-order-2402',
-      orderId: 'DEMO-GL-2402',
-      clientName: 'Maple Court Residence',
-      locationName: 'Mumbai',
-      invoiceNo: null,
-      invoiceFilename: null,
-      glassInputFilename: null,
-      glassInputRevision: 0,
-      glassInputUploadedAt: null,
-      ordered: 0,
-      received: 0,
-      broken: 0,
-      status: 'glass_input_pending',
-      updatedAt: '2026-10-05T10:00:00.000Z',
-      items: [],
-    },
-    {
-      orderRecordId: 'demo-glass-order-2403',
-      orderId: 'DEMO-GL-2403',
-      clientName: 'Hilltop Bungalows',
-      locationName: 'Pune',
-      invoiceNo: 'INV-DEMO-2403',
-      invoiceFilename: 'INV-DEMO-2403.pdf',
-      glassInputFilename: 'hilltop-glass-order.xlsx',
-      glassInputRevision: 1,
-      glassInputUploadedAt: '2026-10-04T10:00:00.000Z',
-      ordered: 8,
-      received: 8,
-      broken: 0,
-      status: 'received',
-      updatedAt: '2026-10-04T10:00:00.000Z',
-      items: [
-        { id: 'demo-glass-item-3', villaNo: 'B-2', windowNo: '3', glassType: '8mm Toughened Glass', widthMm: 1028, heightMm: 1304, ordered: 8, received: 8, broken: 0 },
-      ],
-    },
-  ];
-
-  return <section className="overflow-hidden rounded-2xl border border-dashed border-primary/30 bg-primary/[0.025]" data-testid="glass-demo-preview">
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 px-4 py-3">
-      <div className="flex items-center gap-2"><FileSpreadsheet size={15} className="text-primary" /><div><h2 className="text-sm font-bold">Development sample register</h2><p className="text-[10px] text-muted-foreground">Illustrative orders only · never saved</p></div></div>
-      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">Synthetic demo data</span>
-    </div>
-    <div className="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-3">
-      {demoOrders.map((order) => <article key={order.orderRecordId} className="rounded-xl border border-border/70 bg-card p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0"><p className="font-mono text-xs font-bold text-primary">{order.orderId}</p><p className="mt-1 truncate text-sm font-semibold">{order.clientName}</p></div>
-          <StatusBadge status={order.status} id={order.orderRecordId} />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-3 text-xs">
-          <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice No.</p><p className="mt-1 truncate font-medium">{order.invoiceNo ?? 'Invoice Upload Pending'}</p></div>
-          <div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ordered · Received · Broken</p><p className="mt-1 font-mono font-semibold">{order.ordered} · {order.received} · {order.broken}</p></div>
-        </div>
-        {order.items.length ? <ul className="mt-3 space-y-1.5 border-t border-border/60 pt-3 text-[11px]">
-          {order.items.map((item) => <li key={item.id} className="leading-5">
-            <span className="font-semibold">{item.villaNo} · {item.windowNo}</span>
-            <span className="text-muted-foreground"> · {item.glassType} · {item.widthMm} × {item.heightMm} mm · {item.ordered} ordered, {item.received} received, {item.broken} broken</span>
-          </li>)}
-        </ul> : <p className="mt-3 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">No workbook uploaded for this sample order.</p>}
-      </article>)}
-    </div>
-  </section>;
 }
 
 export default function GlassTrackingPage({ user }: { user: User }) {
@@ -299,7 +213,6 @@ export default function GlassTrackingPage({ user }: { user: User }) {
         })}
       </section>}
 
-      {canView && import.meta.env.DEV ? <DemoDataPreview /> : null}
 
       <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
         <div className="border-b border-border/75 p-4 md:p-5">
