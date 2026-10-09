@@ -102,7 +102,7 @@ function OrderRowActions({
         <>
           {order.isActive && (
             <Link
-              href={`/order-hub/${order.id}?edit=true`}
+              href={`/order-hub/${order.id}?edit=true#order-record-card`}
               className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-bold text-foreground hover:bg-muted"
               data-testid={`button-edit-order-${order.id}`}
             >

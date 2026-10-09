@@ -246,6 +246,16 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
       form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', siteLatitude: order.siteLatitude ?? null, siteLongitude: order.siteLongitude ?? null, status: order.status, notes: order.notes || '' });
     }
   }, [form, order.id, order.locationCode, order.siteAddress, order.clientAddress, order.siteLatitude, order.siteLongitude, order.notes, order.status]);
+  useEffect(() => {
+    if (!editing) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector('[data-testid="card-order-record"]')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editing]);
   const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationCode: values.locationCode, siteAddress: values.siteAddress.trim(), siteLatitude: values.siteLatitude, siteLongitude: values.siteLongitude, status: values.status as Status, notes: values.notes || null } }, {
     onSuccess: (updated) => {
       queryClient.setQueryData(getGetOrderQueryKey(id), updated);
@@ -258,11 +268,11 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
     },
   });
   return (
-    <Card className="border-border/80" data-testid="card-order-record">
+    <Card id="order-record-card" className={`scroll-mt-24 border-border/80 ${editing ? 'ring-2 ring-primary/20' : ''}`} data-testid="card-order-record">
       <CardHeader className="flex-row items-start justify-between pb-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order facts</p>
-          <CardTitle className="mt-1 text-base">Central record</CardTitle>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{editing ? 'Editing order' : 'Order facts'}</p>
+          <CardTitle className="mt-1 text-base">{editing ? 'Edit order details' : 'Central record'}</CardTitle>
         </div>
         {canEdit && (
           <Button variant="outline" size="sm" onClick={() => {
