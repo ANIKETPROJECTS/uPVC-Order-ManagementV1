@@ -41,6 +41,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 
 type Status = (typeof OrderStatus)[keyof typeof OrderStatus];
@@ -139,6 +140,7 @@ const orderSchema = z.object({
   quotationId: z.string().optional(),
   locationName: z.string().trim().min(2, 'Enter a city or location name.').max(120),
   siteAddress: z.string().trim().min(3, 'Enter the order’s site address.').max(500, 'Keep the address under 500 characters.'),
+  sameAsClientAddress: z.boolean(),
   siteLatitude: z.number().min(-90).max(90).nullable(),
   siteLongitude: z.number().min(-180).max(180).nullable(),
   notes: z.string().max(2000).optional(),
@@ -183,6 +185,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
       quotationId: '',
       locationName: '',
       siteAddress: '',
+      sameAsClientAddress: false,
       siteLatitude: null,
       siteLongitude: null,
       notes: '',
@@ -225,6 +228,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
       quotationId: '',
       locationName: '',
       siteAddress: '',
+      sameAsClientAddress: false,
       siteLatitude: null,
       siteLongitude: null,
       notes: '',
