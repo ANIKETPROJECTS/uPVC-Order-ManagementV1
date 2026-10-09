@@ -188,6 +188,8 @@ export interface OrderDocument {
   clientPhone: string | null;
   clientAddress: string | null;
   siteAddress?: string | null;
+  siteLatitude?: number | null;
+  siteLongitude?: number | null;
   clientGstin: string | null;
   locationCode: string;
   locationName: string;

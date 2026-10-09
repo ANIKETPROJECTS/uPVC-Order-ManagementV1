@@ -3661,6 +3661,14 @@ components:
           type: string
         siteAddress:
           type: ["string", "null"]
+        siteLatitude:
+          type: ["number", "null"]
+          minimum: -90
+          maximum: 90
+        siteLongitude:
+          type: ["number", "null"]
+          minimum: -180
+          maximum: 180
         orderStatus:
           $ref: "#/components/schemas/OrderStatus"
         dispatchStatus:
@@ -3702,7 +3710,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderId, clientName, locationName, siteAddress, orderStatus, dispatchStatus, installationStatus, installationDate, issueReason, windowQty, teamId, teamName, subteamId, subteamName, scheduledDate, assignedMembers, actualSquareFootage, shareToken, drawingFilename, drawingSizeBytes, updatedAt]
+      required: [id, orderId, clientName, locationName, siteAddress, siteLatitude, siteLongitude, orderStatus, dispatchStatus, installationStatus, installationDate, issueReason, windowQty, teamId, teamName, subteamId, subteamName, scheduledDate, assignedMembers, actualSquareFootage, shareToken, drawingFilename, drawingSizeBytes, updatedAt]
     InstallationDrawing:
       type: object
       properties:
@@ -3723,6 +3731,14 @@ components:
           type: string
         siteAddress:
           type: ["string", "null"]
+        siteLatitude:
+          type: ["number", "null"]
+          minimum: -90
+          maximum: 90
+        siteLongitude:
+          type: ["number", "null"]
+          minimum: -180
+          maximum: 180
         windowQty:
           type: integer
           minimum: 0
@@ -3740,7 +3756,7 @@ components:
           type: ["string", "null"]
         drawingUrl:
           type: ["string", "null"]
-      required: [orderId, clientName, locationName, siteAddress, windowQty, teamName, subteamName, scheduledDate, actualSquareFootage, drawingFilename, drawingUrl]
+      required: [orderId, clientName, locationName, siteAddress, siteLatitude, siteLongitude, windowQty, teamName, subteamName, scheduledDate, actualSquareFootage, drawingFilename, drawingUrl]
     InstallationOrderUpdate:
       type: object
       properties:
@@ -3951,6 +3967,14 @@ components:
           type: ["string", "null"]
         siteAddress:
           type: ["string", "null"]
+        siteLatitude:
+          type: ["number", "null"]
+          minimum: -90
+          maximum: 90
+        siteLongitude:
+          type: ["number", "null"]
+          minimum: -180
+          maximum: 180
         clientGstin:
           type: ["string", "null"]
         locationCode:
@@ -3991,6 +4015,8 @@ components:
         - clientPhone
         - clientAddress
         - siteAddress
+        - siteLatitude
+        - siteLongitude
         - clientGstin
         - locationCode
         - locationName
@@ -4033,6 +4059,14 @@ components:
           type: string
           minLength: 3
           maxLength: 500
+        siteLatitude:
+          type: ["number", "null"]
+          minimum: -90
+          maximum: 90
+        siteLongitude:
+          type: ["number", "null"]
+          minimum: -180
+          maximum: 180
         notes:
           type: ["string", "null"]
           maxLength: 2000
@@ -4050,6 +4084,14 @@ components:
           type: string
           minLength: 3
           maxLength: 500
+        siteLatitude:
+          type: ["number", "null"]
+          minimum: -90
+          maximum: 90
+        siteLongitude:
+          type: ["number", "null"]
+          minimum: -180
+          maximum: 180
         isActive:
           type: boolean
         notes:

@@ -184,6 +184,8 @@ function orderResponse(order: OrderDocument) {
     clientPhone: order.clientPhone,
     clientAddress: order.clientAddress,
     siteAddress: order.siteAddress?.trim() || order.clientAddress?.trim() || null,
+    siteLatitude: order.siteLatitude ?? null,
+    siteLongitude: order.siteLongitude ?? null,
     clientGstin: order.clientGstin,
     locationCode: order.locationCode,
     locationName: order.locationName,
@@ -578,6 +580,12 @@ router.post(
       res.status(400).json({ error: "Enter a site address with at least 3 characters." });
       return;
     }
+    const siteLatitude = parsed.data.siteLatitude ?? null;
+    const siteLongitude = parsed.data.siteLongitude ?? null;
+    if ((siteLatitude === null) !== (siteLongitude === null)) {
+      res.status(400).json({ error: "Choose both map coordinates or clear the selected pin." });
+      return;
+    }
     const quotation = await getQuotations(db).findOne({ _id: parsed.data.quotationId });
     if (!quotation || quotation.archivedAt) {
       res.status(404).json({ error: "Choose an active quotation for this order." });
@@ -646,6 +654,8 @@ router.post(
       locationCode: normalizedLocationCode,
       locationName: location.name,
       siteAddress,
+      siteLatitude,
+      siteLongitude,
       quotationId: quotation._id,
       quotationNo: quotation.quoteNo,
       needsReview: false,
@@ -718,6 +728,8 @@ router.patch(
       parsed.data.notes === undefined &&
       parsed.data.locationCode === undefined &&
       parsed.data.siteAddress === undefined &&
+      parsed.data.siteLatitude === undefined &&
+      parsed.data.siteLongitude === undefined &&
       parsed.data.isActive === undefined
     ) {
       res.status(400).json({ error: "Provide an order status, notes, or active-state update." });
@@ -756,6 +768,16 @@ router.patch(
       res.status(404).json({ error: "Order not found." });
       return;
     }
+    if (parsed.data.siteLatitude !== undefined || parsed.data.siteLongitude !== undefined) {
+      const siteLatitude = parsed.data.siteLatitude !== undefined ? parsed.data.siteLatitude : before.siteLatitude ?? null;
+      const siteLongitude = parsed.data.siteLongitude !== undefined ? parsed.data.siteLongitude : before.siteLongitude ?? null;
+      if ((siteLatitude === null) !== (siteLongitude === null)) {
+        res.status(400).json({ error: "Choose both map coordinates or clear the selected pin." });
+        return;
+      }
+      updates.siteLatitude = siteLatitude;
+      updates.siteLongitude = siteLongitude;
+    }
     if (parsed.data.locationCode !== undefined) {
       const locationCode = normalizeLocationCode(parsed.data.locationCode);
       if (locationCode !== normalizeLocationCode(before.locationCode)) {
@@ -793,6 +815,8 @@ router.patch(
       actor &&
       (before.locationCode !== order.locationCode ||
         before.siteAddress !== order.siteAddress ||
+        before.siteLatitude !== order.siteLatitude ||
+        before.siteLongitude !== order.siteLongitude ||
         before.status !== order.status ||
         before.notes !== order.notes ||
         activeStateChanged)
@@ -802,6 +826,7 @@ router.patch(
           ? `location to ${order.locationCode} · ${order.locationName}`
           : "",
         before.siteAddress !== order.siteAddress ? "site address" : "",
+        before.siteLatitude !== order.siteLatitude || before.siteLongitude !== order.siteLongitude ? "map pin" : "",
         before.status !== order.status ? `status to ${order.status}` : "",
         before.notes !== order.notes ? "internal notes" : "",
         (before.isActive !== false) !== (order.isActive !== false)

@@ -1,0 +1,12 @@
+.order-map-picker .leaflet-pane {
+  z-index: 1 !important;
+}
+
+.order-map-picker .leaflet-top,
+.order-map-picker .leaflet-bottom {
+  z-index: 2 !important;
+}
+
+.order-map-picker .leaflet-control {
+  z-index: 2 !important;
+}
