@@ -25,16 +25,16 @@
   --destructive-foreground: 42 46% 99%;
   --popover: 42 46% 99%;
   --popover-foreground: 197 36% 18%;
-  /* Navigation uses a fixed dark palette, independent of workspace appearance. */
-  --sidebar-bg: #102a31;
-  --sidebar-bg-hover: #193b42;
-  --sidebar-text: #edf7f5;
-  --sidebar-text-muted: #aec4c5;
-  --sidebar-active-bg: #1c625c;
-  --sidebar-active-text: #f3fffc;
-  --sidebar-border: #2b4b52;
-  --sidebar-flyout-bg: #102a31;
-  --sidebar-flyout-shadow: 0 24px 60px rgb(0 0 0 / 0.38);
+  /* Navigation keeps the earlier light palette, independent of workspace appearance. */
+  --sidebar-bg: hsl(42 33% 96%);
+  --sidebar-bg-hover: hsl(188 32% 92%);
+  --sidebar-text: hsl(213 32% 17%);
+  --sidebar-text-muted: hsl(213 20% 43%);
+  --sidebar-active-bg: hsl(172 66% 86%);
+  --sidebar-active-text: hsl(204 37% 11%);
+  --sidebar-border: hsl(39 23% 86%);
+  --sidebar-flyout-bg: hsl(42 33% 96%);
+  --sidebar-flyout-shadow: 0 24px 60px rgb(15 23 42 / 0.14);
   --hero-foreground: 197 36% 18%;
   --hero-muted-foreground: 198 15% 45%;
   --hero-kicker: 168 58% 35%;
