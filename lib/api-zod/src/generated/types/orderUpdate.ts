@@ -5,11 +5,33 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ClientType } from './clientType';
 import type { OrderStatus } from './orderStatus';
 
 export interface OrderUpdate {
-  /** @minLength 1 */
-  quotationId?: string;
+  /** @nullable */
+  quotationId?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  clientName?: string;
+  clientType?: ClientType;
+  /**
+     * @maxLength 30
+     * @nullable
+     */
+  clientPhone?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  clientAddress?: string | null;
+  /**
+     * @maxLength 15
+     * @nullable
+     */
+  clientGstin?: string | null;
   status?: OrderStatus;
   /**
      * @minLength 2

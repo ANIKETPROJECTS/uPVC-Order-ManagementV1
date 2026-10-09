@@ -1499,6 +1499,14 @@ export const UpdateOrderParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const updateOrderBodyClientNameMin = 2;
+export const updateOrderBodyClientNameMax = 120;
+
+export const updateOrderBodyClientPhoneMax = 30;
+
+export const updateOrderBodyClientAddressMax = 500;
+
+export const updateOrderBodyClientGstinMax = 15;
 
 export const updateOrderBodyLocationNameMin = 2;
 export const updateOrderBodyLocationNameMax = 120;
@@ -1520,7 +1528,12 @@ export const updateOrderBodyNotesMax = 2000;
 
 
 export const UpdateOrderBody = zod.object({
-  "quotationId": zod.string().min(1).optional(),
+  "quotationId": zod.string().nullish(),
+  "clientName": zod.string().min(updateOrderBodyClientNameMin).max(updateOrderBodyClientNameMax).optional(),
+  "clientType": zod.enum(['Project', 'Retail']).optional(),
+  "clientPhone": zod.string().max(updateOrderBodyClientPhoneMax).nullish(),
+  "clientAddress": zod.string().max(updateOrderBodyClientAddressMax).nullish(),
+  "clientGstin": zod.string().max(updateOrderBodyClientGstinMax).nullish(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
   "locationName": zod.string().min(updateOrderBodyLocationNameMin).max(updateOrderBodyLocationNameMax).optional(),
   "locationCode": zod.string().min(updateOrderBodyLocationCodeMin).max(updateOrderBodyLocationCodeMax).optional(),

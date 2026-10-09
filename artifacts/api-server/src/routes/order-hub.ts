@@ -826,6 +826,11 @@ router.patch(
     if (
       parsed.data.status === undefined &&
       parsed.data.notes === undefined &&
+      parsed.data.clientName === undefined &&
+      parsed.data.clientType === undefined &&
+      parsed.data.clientPhone === undefined &&
+      parsed.data.clientAddress === undefined &&
+      parsed.data.clientGstin === undefined &&
       parsed.data.locationCode === undefined &&
       parsed.data.siteAddress === undefined &&
       parsed.data.siteLatitude === undefined &&
@@ -855,6 +860,26 @@ router.patch(
     }
     if (parsed.data.notes !== undefined) {
       updates.notes = parsed.data.notes?.trim() || null;
+    }
+    if (parsed.data.clientName !== undefined) {
+      const clientName = parsed.data.clientName.trim();
+      if (clientName.length < 2) {
+        res.status(400).json({ error: "Enter a client name with at least 2 characters." });
+        return;
+      }
+      updates.clientName = clientName;
+    }
+    if (parsed.data.clientType !== undefined) {
+      updates.clientType = parsed.data.clientType;
+    }
+    if (parsed.data.clientPhone !== undefined) {
+      updates.clientPhone = parsed.data.clientPhone?.trim() || null;
+    }
+    if (parsed.data.clientAddress !== undefined) {
+      updates.clientAddress = parsed.data.clientAddress?.trim() || null;
+    }
+    if (parsed.data.clientGstin !== undefined) {
+      updates.clientGstin = parsed.data.clientGstin?.trim().toUpperCase() || null;
     }
     if (parsed.data.siteAddress !== undefined) {
       const siteAddress = parsed.data.siteAddress.trim();
@@ -904,35 +929,40 @@ router.patch(
         updates.locationName = location.name;
       }
     }
-    if (parsed.data.quotationId !== undefined) {
-      if (before.quotationId && before.quotationId !== parsed.data.quotationId) {
-        res.status(409).json({ error: "This order already has a linked quotation." });
-        return;
-      }
-      const quotation = await getQuotations(db).findOne({ _id: parsed.data.quotationId });
-      if (!quotation || quotation.archivedAt) {
+    const targetQuotationId = parsed.data.quotationId !== undefined
+      ? parsed.data.quotationId
+      : parsed.data.clientType !== undefined
+        ? before.quotationId ?? null
+        : undefined;
+    if (targetQuotationId !== undefined) {
+      const linkedQuotation = targetQuotationId
+        ? await getQuotations(db).findOne({ _id: targetQuotationId })
+        : null;
+      if (targetQuotationId && (!linkedQuotation || linkedQuotation.archivedAt)) {
         res.status(404).json({ error: "Choose an active quotation for this order." });
         return;
       }
-      if (quotation.sampleOnly) {
+      if (linkedQuotation?.sampleOnly) {
         res.status(400).json({ error: "Sample quotations cannot be linked to an order." });
         return;
       }
-      if (quotation.clientId !== before.clientId) {
+      if (linkedQuotation && linkedQuotation.clientId !== before.clientId) {
         res.status(400).json({ error: "Choose a quotation linked to this order's client." });
         return;
       }
-      if (await getOrders(db).findOne({ quotationId: quotation._id, _id: { $ne: before._id } })) {
+      if (linkedQuotation && await getOrders(db).findOne({ quotationId: linkedQuotation._id, _id: { $ne: before._id } })) {
         res.status(409).json({ error: "This quotation is already linked to another order." });
         return;
       }
       const client = await getClients(db).findOne({ _id: before.clientId });
-      const clientType = before.clientType ?? client?.type;
-      if (clientType !== "Project" && clientType !== "Retail") {
-        res.status(409).json({ error: "Set this client's type to Project or Retail before linking a quotation." });
+      const clientType = parsed.data.clientType ?? before.clientType ?? client?.type;
+      if (linkedQuotation && clientType !== "Project" && clientType !== "Retail") {
+        res.status(409).json({ error: "Set this order's client type to Project or Retail before linking a quotation." });
         return;
       }
-      const generatedOrderId = formatQuotationOrderId(clientType, quotation.quoteNo);
+      const generatedOrderId = linkedQuotation
+        ? formatQuotationOrderId(clientType, linkedQuotation.quoteNo)
+        : `TMP-${String(before.sequenceNo).padStart(6, "0")}`;
       if (!generatedOrderId) {
         res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
         return;
@@ -942,10 +972,9 @@ router.patch(
         return;
       }
       updates.orderId = generatedOrderId;
-      updates.quotationId = quotation._id;
-      updates.quotationNo = quotation.quoteNo;
-      updates.clientType = clientType;
-      updates.needsReview = false;
+      updates.quotationId = linkedQuotation?._id ?? null;
+      updates.quotationNo = linkedQuotation?.quoteNo ?? null;
+      if (linkedQuotation && clientType) updates.clientType = clientType;
       updates.lots = (before.lots ?? []).map((lot) => ({
         ...lot,
         lotId: formatLotId(generatedOrderId, lot.sequence),

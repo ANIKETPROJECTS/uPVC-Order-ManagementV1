@@ -4097,8 +4097,22 @@ components:
       type: object
       properties:
         quotationId:
+          type: ["string", "null"]
+        clientName:
           type: string
-          minLength: 1
+          minLength: 2
+          maxLength: 120
+        clientType:
+          $ref: "#/components/schemas/ClientType"
+        clientPhone:
+          type: ["string", "null"]
+          maxLength: 30
+        clientAddress:
+          type: ["string", "null"]
+          maxLength: 500
+        clientGstin:
+          type: ["string", "null"]
+          maxLength: 15
         status:
           $ref: "#/components/schemas/OrderStatus"
         locationName:
