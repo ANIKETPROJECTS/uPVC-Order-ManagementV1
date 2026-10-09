@@ -21,12 +21,14 @@ import {
 import {
   getListClientsQueryKey,
   getListOrdersQueryKey,
+  getGetDispatchSummaryQueryKey,
   getListQuotationsQueryKey,
   OrderStatus,
   useCreateOrder,
   useDeleteOrder,
   useListClients,
   useListOrders,
+  useGetDispatchSummary,
   useListQuotations,
   useUpdateOrder,
 } from '@workspace/api-client-react';
@@ -595,6 +597,8 @@ export default function OrderHubPage({ user }: { user: User }) {
   const orderParams = useMemo(() => ({ q: search || undefined, status: status === 'all' ? undefined : status as Status, clientId: clientId === 'all' ? undefined : clientId, locationName: locationName.trim() || undefined, from: from || undefined, to: to || undefined, includeInactive: showInactive }), [search, status, clientId, locationName, from, to, showInactive]);
   const clients = useListClients(clientParams, { query: { queryKey: getListClientsQueryKey(clientParams) } });
   const orders = useListOrders(orderParams, { query: { queryKey: getListOrdersQueryKey(orderParams) } });
+  const dispatchSummary = useGetDispatchSummary({ query: { queryKey: getGetDispatchSummaryQueryKey(), enabled: user.roleId === 'master-admin' || ['view', 'edit'].includes(user.permissions?.dispatch || '') } });
+  const dispatchForOrder = (orderRecordId: string) => dispatchSummary.data?.orders.find((item) => item.orderRecordId === orderRecordId);
   const deleteOrder = useDeleteOrder();
   const updateOrder = useUpdateOrder();
   const orderActionsPending = deleteOrder.isPending || updateOrder.isPending;
@@ -708,6 +712,7 @@ export default function OrderHubPage({ user }: { user: User }) {
                     <div className="pr-3"><p className="uppercase tracking-wider text-muted-foreground">City / location</p><p className="mt-1 font-medium">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-mobile-site-${order.id}`} /></div>
                     <div className="pl-3"><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div>
                   </div>
+                  {(() => { const summary = dispatchForOrder(order.id); const count = summary?.lots.reduce((total, lot) => total + lot.dispatchCount, 0) ?? 0; const latest = summary?.lots.map((lot) => lot.latestDispatchCode).filter(Boolean).slice(-1)[0]; return <Link href={`/order-hub/${order.id}?tab=dispatches`} className="block rounded-lg border border-primary/10 bg-primary/[.035] px-3 py-2 text-[10px] hover:border-primary/30" data-testid={`link-order-dispatches-mobile-${order.id}`}><span className="font-bold text-primary">{count} dispatch records</span><span className="text-muted-foreground">{latest ? ` · Latest ${latest}` : ' · No dispatch yet'}</span></Link>; })()}
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
                     <span className="text-[10px] text-muted-foreground">{order.clientPhone || 'No phone recorded'}</span>
                     <OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} />
@@ -715,13 +720,14 @@ export default function OrderHubPage({ user }: { user: User }) {
                 </article>
               ))}
             </div>
-            <table className="hidden w-full min-w-[900px] border-collapse text-left text-xs md:table">
+            <table className="hidden w-full min-w-[1020px] border-collapse text-left text-xs md:table">
               <thead className="border-b border-border bg-muted/35 text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
                 <tr>
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Order</th>
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Client</th>
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Location</th>
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Status</th>
+                  <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Dispatches</th>
                   <th className="border-b border-r border-border/80 px-4 py-3 font-bold">Created</th>
                   <th className="border-b border-border/80 px-4 py-3 text-right font-bold">Actions</th>
                 </tr>
@@ -738,6 +744,7 @@ export default function OrderHubPage({ user }: { user: User }) {
                     <td className="border-b border-r border-border/70 px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td>
                     <td className="border-b border-r border-border/70 px-4 py-3.5"><p className="font-semibold">{order.locationName}</p><SiteLocation address={order.siteAddress} latitude={order.siteLatitude} longitude={order.siteLongitude} compact testId={`order-table-site-${order.id}`} /></td>
                     <td className="border-b border-r border-border/70 px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
+                    <td className="border-b border-r border-border/70 px-4 py-3.5">{(() => { const summary = dispatchForOrder(order.id); const latest = summary?.lots.map((lot) => lot.latestDispatchCode).filter(Boolean).slice(-1)[0]; const count = summary?.lots.reduce((total, lot) => total + lot.dispatchCount, 0) ?? 0; return <Link href={`/order-hub/${order.id}?tab=dispatches`} className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline" data-testid={`link-order-dispatches-${order.id}`}>{count} records{latest ? ` · ${latest}` : ''}</Link>; })()}</td>
                     <td className="border-b border-r border-border/70 px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td>
                     <td className="border-b border-border/70 px-4 py-3.5"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>
                   </tr>

@@ -123,6 +123,8 @@ function dispatchResponse(dispatch: DispatchRecordDocument) {
     lotSequence: dispatch.lotSequence,
     dispatchNo: dispatch.dispatchNo,
     dispatchCode: dispatch.dispatchCode,
+    legacyDispatchCodes: dispatch.legacyDispatchCodes ?? [],
+    legacyLotIds: dispatch.legacyLotIds ?? [],
     dispatchNote: dispatch.dispatchNote ?? null,
     status: dispatch.status,
     plannedAt: iso(dispatch.plannedAt),
@@ -150,8 +152,14 @@ function dispatchResponse(dispatch: DispatchRecordDocument) {
   };
 }
 
-function sharedResponse(dispatch: DispatchRecordDocument) {
+async function sharedResponse(db: Db, dispatch: DispatchRecordDocument) {
+  const events = await getActivityEvents(db)
+    .find({ entityType: "dispatch", dispatchId: dispatch._id })
+    .sort({ createdAt: 1 })
+    .toArray();
   return {
+    id: dispatch._id,
+    orderRecordId: dispatch.orderRecordId,
     dispatchCode: dispatch.dispatchCode,
     orderId: dispatch.orderId,
     clientName: dispatch.clientName,
@@ -160,6 +168,16 @@ function sharedResponse(dispatch: DispatchRecordDocument) {
     plannedAt: iso(dispatch.plannedAt),
     dispatchedAt: iso(dispatch.dispatchedAt),
     deliveredAt: iso(dispatch.deliveredAt),
+    returnedAt: iso(dispatch.returnedAt),
+    createdAt: dispatch.createdAt.toISOString(),
+    dispatchNote: dispatch.dispatchNote ?? null,
+    statusHistory: events.map((event) => ({
+      id: event._id,
+      eventType: event.eventType,
+      message: event.message,
+      actorName: event.actorName,
+      createdAt: event.createdAt.toISOString(),
+    })),
     locationName: dispatch.locationName,
     siteAddress: dispatch.siteAddress ?? null,
     siteLatitude: dispatch.siteLatitude ?? null,
@@ -221,6 +239,7 @@ async function recordEvent(
   await getOrderActivity(db).insertOne({
     _id: activityId,
     orderRecordId: dispatch.orderRecordId,
+    dispatchId: dispatch._id,
     actorId: actor.id,
     actorName: actor.name,
     action,
@@ -328,6 +347,7 @@ function dispatchContentHash(dispatch: DispatchRecordDocument): string {
     plannedAt: dispatch.plannedAt,
     dispatchedAt: dispatch.dispatchedAt,
     deliveredAt: dispatch.deliveredAt,
+    dispatchNote: dispatch.dispatchNote,
     locationName: dispatch.locationName,
     siteAddress: dispatch.siteAddress,
     vehicleNumber: dispatch.vehicleNumber,
@@ -495,8 +515,28 @@ router.get("/dispatches/summary", async (req, res): Promise<void> => {
     rows.push(record);
     byOrder.set(record.orderRecordId, rows);
   }
+  const lotsWithActiveDispatch = new Set(records.map((record) => record.lotRecordId));
+  const readyLotsAwaitingDispatch = [];
+  for (const order of orders) {
+    if (order.status === "installed") continue;
+    for (const lot of order.lots ?? []) {
+      if (lotsWithActiveDispatch.has(lot._id)) continue;
+      const windows = await getLotWindows(db, order, lot);
+      if (!checkLotReadiness(windows).ready) continue;
+      readyLotsAwaitingDispatch.push({
+        orderRecordId: order._id,
+        orderId: order.orderId,
+        clientName: order.clientName,
+        lotRecordId: lot._id,
+        lotId: lot.lotId,
+        locationName: order.locationName,
+        windowsCount: windows.length,
+      });
+    }
+  }
   res.json(GetDispatchSummaryResponse.parse({
     orders: orders.map((order) => orderSummaryResponse(order, byOrder.get(order._id) ?? [])),
+    readyLotsAwaitingDispatch,
     statusCounts: statusCounts(records),
   }));
 });
@@ -509,6 +549,10 @@ router.post("/dispatches", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  if ((parsed.data.siteLatitude == null) !== (parsed.data.siteLongitude == null)) {
+    res.status(400).json({ error: "Choose both map coordinates or clear the selected pin." });
+    return;
+  }
   const db = await getMongoDb();
   const order = await getOrders(db).findOne({ _id: parsed.data.orderRecordId });
   if (!order) {
@@ -518,6 +562,16 @@ router.post("/dispatches", async (req, res): Promise<void> => {
   const lot = (order.lots ?? []).find((item) => item._id === parsed.data.lotRecordId);
   if (!lot) {
     res.status(404).json({ error: "Lot not found on this order." });
+    return;
+  }
+  const initialLatitude = parsed.data.siteLatitude === undefined
+    ? order.siteLatitude ?? null
+    : parsed.data.siteLatitude;
+  const initialLongitude = parsed.data.siteLongitude === undefined
+    ? order.siteLongitude ?? null
+    : parsed.data.siteLongitude;
+  if ((initialLatitude === null) !== (initialLongitude === null)) {
+    res.status(409).json({ error: "The order's saved map pin is incomplete. Update the order location before dispatch." });
     return;
   }
   const windows = await getLotWindows(db, order, lot);
@@ -557,6 +611,15 @@ router.post("/dispatches", async (req, res): Promise<void> => {
         ? currentLot.lotId
         : formatLegacyLotId(currentOrder.orderId, currentLot.sequence);
       const legacyDispatchCode = `${legacyLotId}-D${dispatchNo}`;
+      const siteLatitude = parsed.data.siteLatitude === undefined
+        ? currentOrder.siteLatitude ?? null
+        : parsed.data.siteLatitude;
+      const siteLongitude = parsed.data.siteLongitude === undefined
+        ? currentOrder.siteLongitude ?? null
+        : parsed.data.siteLongitude;
+      if ((siteLatitude === null) !== (siteLongitude === null)) {
+        throw new Error("The order's saved map pin is incomplete. Update the order location before dispatch.");
+      }
       const record: DispatchRecordDocument = {
         _id: randomUUID(),
         orderRecordId: currentOrder._id,
@@ -575,14 +638,16 @@ router.post("/dispatches", async (req, res): Promise<void> => {
         dispatchedAt: null,
         deliveredAt: null,
         returnedAt: null,
-        locationName: currentOrder.locationName,
-        siteAddress: currentOrder.siteAddress ?? null,
-        siteLatitude: currentOrder.siteLatitude ?? null,
-        siteLongitude: currentOrder.siteLongitude ?? null,
-        vehicleNumber: null,
-        driverName: null,
-        driverPhone: null,
-        challanNumber: null,
+        locationName: parsed.data.locationName?.trim() || currentOrder.locationName,
+        siteAddress: parsed.data.siteAddress === undefined
+          ? currentOrder.siteAddress ?? null
+          : textOrNull(parsed.data.siteAddress),
+        siteLatitude,
+        siteLongitude,
+        vehicleNumber: textOrNull(parsed.data.vehicleNumber),
+        driverName: textOrNull(parsed.data.driverName),
+        driverPhone: textOrNull(parsed.data.driverPhone),
+        challanNumber: textOrNull(parsed.data.challanNumber),
         windowsSnapshot: toDispatchWindowSnapshot(latestWindows),
         qrToken: randomUUID(),
         qrRevokedAt: null,
@@ -610,6 +675,10 @@ router.post("/dispatches", async (req, res): Promise<void> => {
     if (error instanceof Error && error.message === "Dispatch readiness override was not authorized.") {
       return;
     }
+    if (error instanceof Error && error.message === "The order's saved map pin is incomplete. Update the order location before dispatch.") {
+      res.status(409).json({ error: error.message });
+      return;
+    }
     throw error;
   }
   const refreshed = await refreshOrderDispatchSummary(db, created.orderRecordId, actor.id, now);
@@ -633,16 +702,20 @@ router.get("/dispatches/by-token/:token", async (req, res): Promise<void> => {
     return;
   }
   const db = await getMongoDb();
-  const dispatch = await getDispatchRecords(db).findOne({
-    qrToken: parsed.data.token,
-    qrRevokedAt: null,
-    status: { $ne: "cancelled" },
-  });
+  const dispatch = await getDispatchRecords(db).findOne({ qrToken: parsed.data.token });
   if (!dispatch) {
-    res.status(404).json({ error: "This dispatch QR is invalid or has been revoked." });
+    res.status(404).json({ error: "This dispatch QR is invalid." });
     return;
   }
-  res.json(GetDispatchByTokenResponse.parse(sharedResponse(dispatch)));
+  if (dispatch.status === "cancelled" || dispatch.qrRevokedAt) {
+    res.status(410).json({
+      error: dispatch.status === "cancelled"
+        ? "This dispatch was cancelled and its QR has been revoked."
+        : "This dispatch QR has been revoked.",
+    });
+    return;
+  }
+  res.json(GetDispatchByTokenResponse.parse(await sharedResponse(db, dispatch)));
 });
 
 router.get("/dispatches/:id/qr.png", async (req, res): Promise<void> => {

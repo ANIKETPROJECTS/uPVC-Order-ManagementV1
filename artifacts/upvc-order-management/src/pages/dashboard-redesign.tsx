@@ -9,10 +9,10 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
-  getGetOperationsDashboardQueryKey, useGetDashboardPreferences, useGetOperationsDashboard,
+  getGetDispatchSummaryQueryKey, getGetOperationsDashboardQueryKey, getListDispatchRecordsQueryKey, useGetDashboardPreferences, useGetDispatchSummary, useGetOperationsDashboard, useListDispatchRecords,
   useUpdateDashboardPreferences,
 } from '@workspace/api-client-react';
-import type { GetOperationsDashboardParams, OperationsDashboard, User } from '@workspace/api-client-react';
+import type { DashboardAttentionItem, GetOperationsDashboardParams, OperationsDashboard, User } from '@workspace/api-client-react';
 import {
   Area, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
@@ -25,6 +25,7 @@ type Filters = GetOperationsDashboardParams;
 type RangePreset = 'today' | 'yesterday' | 'last7' | 'last30' | 'last90' | 'last6' | 'thisMonth' | 'lastMonth' | 'thisFY' | 'custom';
 
 const DEFAULT_REFRESH_SECONDS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const presetOptions: Array<{ value: RangePreset; label: string }> = [
   { value: 'today', label: 'Today' },
   { value: 'yesterday', label: 'Yesterday' },
@@ -38,6 +39,16 @@ const presetOptions: Array<{ value: RangePreset; label: string }> = [
   { value: 'custom', label: 'Custom range' },
 ];
 type DashboardPermission = keyof OperationsDashboard['permissions'];
+function dispatchActivityTitle(action: string, summary: string, dispatchCode: string) {
+  if (action === 'dispatch.created') return `Dispatch ${dispatchCode} created`;
+  if (action === 'dispatch.cancelled') return `Dispatch ${dispatchCode} cancelled`;
+  if (action === 'dispatch.updated') return `Dispatch ${dispatchCode} updated`;
+  if (action === 'dispatch.status_changed') {
+    const status = summary.match(/\bto\s+(planned|dispatched|delivered|returned|cancelled)\b/i)?.[1]?.toLowerCase();
+    if (status) return `Dispatch ${dispatchCode} ${status === 'dispatched' ? 'dispatched' : status}`;
+  }
+  return summary;
+}
 type DashboardWidgetDefinition = {
   id: string;
   title: string;
@@ -495,6 +506,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [widgetDrawerOpen, setWidgetDrawerOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const dispatchAccess = user.roleId === 'master-admin' || ['view', 'edit'].includes(user.permissions?.dispatch || '');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const trendChartRef = useRef<HTMLDivElement>(null);
   const stageChartRef = useRef<HTMLDivElement>(null);
@@ -509,6 +521,8 @@ export default function DashboardRedesign({ user }: { user: User }) {
       refetchOnWindowFocus: true,
     },
   });
+  const dispatchRecordQuery = useListDispatchRecords(undefined, { query: { enabled: dispatchAccess, queryKey: getListDispatchRecordsQueryKey() } });
+  const dispatchSummaryQuery = useGetDispatchSummary({ query: { enabled: dispatchAccess, queryKey: getGetDispatchSummaryQueryKey() } });
   const widgetPreferencesQuery = useGetDashboardPreferences();
   const widgetPreferencesMutation = useUpdateDashboardPreferences();
   const [widgetPreferences, setWidgetPreferences] = useState<DashboardWidgetPreferences>(() => normalizeWidgetPreferences());
@@ -643,13 +657,43 @@ export default function DashboardRedesign({ user }: { user: User }) {
   const balanceSpark = trend.map((point) => point.outstandingBalance ?? 0);
   const installedSpark = trend.map((point) => point.installedOrders);
   const ordersHref = makeDashboardHref('/order-hub', filters);
+  const dispatchRecords = dispatchRecordQuery.data?.records ?? [];
+  const readyDispatchLots = dispatchSummaryQuery.data?.readyLotsAwaitingDispatch ?? [];
+  const dispatchStatusCount = (status: 'planned' | 'dispatched' | 'delivered' | 'returned') =>
+    dispatchSummaryQuery.data?.statusCounts[status] ?? dispatchRecords.filter((record) => record.status === status).length;
+  const oldPlannedDispatches = dispatchRecords.filter((record) => record.status === 'planned'
+    && Date.parse(record.plannedAt || record.createdAt) < Date.now() - DAY_MS);
+  const longInTransitDispatches = dispatchRecords.filter((record) => record.status === 'dispatched'
+    && Date.parse(record.dispatchedAt || record.createdAt) < Date.now() - 3 * DAY_MS);
+  const dispatchAttention: DashboardAttentionItem[] = [];
+  if (readyDispatchLots.length) dispatchAttention.push({
+    id: 'dispatch-ready-lots',
+    title: 'Ready lots not yet dispatched',
+    description: 'Production-ready lots have no dispatch record yet.',
+    count: readyDispatchLots.length,
+    amount: null,
+    href: '/dispatch',
+    severity: 'warning',
+  });
+  if (oldPlannedDispatches.length || longInTransitDispatches.length) dispatchAttention.push({
+    id: 'dispatch-overdue-handoffs',
+    title: 'Dispatches need follow-up',
+    description: `${oldPlannedDispatches.length} planned over 1 day · ${longInTransitDispatches.length} in transit over 3 days.`,
+    count: oldPlannedDispatches.length + longInTransitDispatches.length,
+    amount: null,
+    href: '/dispatch',
+    severity: oldPlannedDispatches.length + longInTransitDispatches.length > 0 ? 'warning' : 'success',
+  });
   const activeFilterCount = [
     filters.q, filters.stage, filters.clientId, filters.locationCode, filters.installerId,
     filters.paymentStatus, filters.assignment, filters.glassStatus,
   ].filter(Boolean).length
     + (filters.compare ? 1 : 0)
     + (filters.from !== dateRangeFor('last30').from || filters.to !== dateRangeFor('last30').to ? 1 : 0);
-  const activeAttention = (data?.attention ?? []).slice().sort((a, b) =>
+  const activeAttention = [
+    ...(data?.attention ?? []).filter((item) => item.id !== 'pending-dispatch'),
+    ...(dispatchAccess ? dispatchAttention : []),
+  ].slice().sort((a, b) =>
     Number(a.count === 0) - Number(b.count === 0)
     || severityOrder[a.severity] - severityOrder[b.severity]
     || b.count - a.count
@@ -661,6 +705,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
     permissions?.orders && errorFor('orders'),
     permissions?.finance && errorFor('finance'),
     permissions?.dispatch && errorFor('dispatch'),
+    permissions?.dispatch && dispatchSummaryQuery.isError && 'Dispatch ready-lot summary unavailable.',
     permissions?.installation && errorFor('installation'),
     permissions?.glass && errorFor('glass'),
     permissions?.approvals && errorFor('approvals'),
@@ -1050,9 +1095,9 @@ export default function DashboardRedesign({ user }: { user: User }) {
                 <section className="dashboard-card h-full min-w-0 rounded-[20px] border border-border/80 bg-card p-4 shadow-sm md:p-5" data-dashboard-widget="activity" style={{ order: widgetOrder('activity') }}>
                   <SectionHeading eyebrow="Live activity" title="Latest changes" icon={Activity} action={<span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-2.5 py-1 text-[9px] font-semibold text-emerald-700 dark:text-emerald-300"><i className={`size-1.5 rounded-full ${refreshSeconds ? 'animate-pulse bg-emerald-500' : 'bg-amber-500'}`} />{refreshSeconds ? 'Live' : 'Paused'}</span>} />
                   {loading || errorFor('activity') ? <SectionState loading={loading} error={errorFor('activity')} empty={false} retry={refresh} /> : activity.length ? <div className="max-h-[320px] space-y-1 overflow-y-auto pr-1">
-                    {activity.slice(0, 12).map((item) => <Link key={item.id} href={makeDashboardHref(`/order-hub/${encodeURIComponent(item.orderRecordId)}`, filters)} className="flex min-w-0 items-center gap-3 rounded-xl px-2 py-2.5 text-left transition hover:bg-primary/[.04]" data-testid={`button-activity-${item.id}`}>
+                    {activity.slice(0, 12).map((item) => <Link key={item.id} href={item.dispatchRecordId ? `/dispatch?record=${encodeURIComponent(item.dispatchRecordId)}` : makeDashboardHref(`/order-hub/${encodeURIComponent(item.orderRecordId)}`, filters)} className="flex min-w-0 items-center gap-3 rounded-xl px-2 py-2.5 text-left transition hover:bg-primary/[.04]" data-testid={`button-activity-${item.id}`}>
                       <ActionIcon action={item.action} />
-                      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{item.summary}</span><span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{item.actorName} · {item.clientName} · {item.orderId}</span></span>
+                      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{item.dispatchCode ? dispatchActivityTitle(item.action, item.summary, item.dispatchCode) : item.summary}</span><span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{item.actorName} · {item.clientName} · {item.orderId}</span></span>
                       <time className="shrink-0 text-[9px] text-muted-foreground" dateTime={new Date(item.createdAt).toISOString()}>{relativeTime(item.createdAt)}</time>
                     </Link>)}
                   </div> : <SectionState loading={false} error={null} empty retry={refresh} emptyTitle="No activity in this period" />}
@@ -1126,8 +1171,15 @@ export default function DashboardRedesign({ user }: { user: User }) {
 
             {((permissions?.dispatch && isWidgetVisible('dispatch')) || (permissions?.orders && isWidgetVisible('top-clients'))) && <div className="dashboard-dispatch-row grid min-w-0 grid-cols-12 gap-4">
               {permissions?.dispatch && isWidgetVisible('dispatch') && <DashboardWidgetBoundary name="Dispatch queue" widgetId="dispatch" onRetry={refresh}>
-                <CompactPanel dataWidgetId="dispatch" style={{ order: widgetOrder('dispatch') }} title="Dispatch queue" eyebrow="Dispatch" icon={Truck} count={formatNumber(data?.dispatchQueue.length)} href={makeDashboardHref('/dispatch', filters)} hrefLabel="Open dispatch">
-                  {loading || errorFor('dispatch') || errorFor('orders') ? <SectionState loading={loading} error={errorFor('dispatch') || errorFor('orders')} empty={false} retry={refresh} /> : data?.dispatchQueue.length ? <div className="space-y-1">{data.dispatchQueue.slice(0, 4).map((order) => <button type="button" key={order.id} onClick={() => setLocation(makeDashboardHref('/dispatch', filters))} className="flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-primary/[.04]" data-testid={`button-dispatch-order-${order.id}`}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground"><Truck size={14} /></span><span className="min-w-0 flex-1"><span className="block truncate font-mono text-[10px] font-semibold text-primary">{order.orderId}</span><span className="mt-0.5 block truncate text-[10px]">{order.clientName} · {order.locationName}</span></span><span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-1 text-[9px] font-semibold capitalize text-amber-700 dark:text-amber-300">{order.dispatchStatus.replaceAll('_', ' ')}</span></button>)}</div> : <SectionState loading={false} error={null} empty retry={refresh} emptyTitle="No dispatch orders in view" emptyDetail="Orders needing dispatch will appear here." />}
+                <CompactPanel dataWidgetId="dispatch" style={{ order: widgetOrder('dispatch') }} title="Dispatch queue" eyebrow="Lot handoffs" icon={Truck} count={formatNumber(readyDispatchLots.length + dispatchStatusCount('planned') + dispatchStatusCount('dispatched'))} href="/dispatch" hrefLabel="Open dispatch register">
+                  {dispatchRecordQuery.isLoading || dispatchSummaryQuery.isLoading ? <SectionState loading empty={false} retry={() => { void dispatchRecordQuery.refetch(); void dispatchSummaryQuery.refetch(); }} /> : dispatchRecordQuery.isError || dispatchSummaryQuery.isError ? <SectionState loading={false} error="Dispatch records or ready lots could not be loaded." empty={false} retry={() => { void dispatchRecordQuery.refetch(); void dispatchSummaryQuery.refetch(); }} /> : <div className="space-y-2">
+                    <div className="grid grid-cols-4 gap-1.5" aria-label="Dispatch pipeline" data-testid="dashboard-dispatch-pipeline">
+                      {([{ status: 'planned', label: 'Planned' }, { status: 'dispatched', label: 'In transit' }, { status: 'delivered', label: 'Delivered' }, { status: 'returned', label: 'Returned' }] as const).map(({ status, label }) => <div key={status} className="min-w-0 rounded-lg bg-muted/50 px-2 py-1.5 text-center"><span className="block truncate text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span><span className="font-mono text-xs font-bold">{formatNumber(dispatchStatusCount(status))}</span></div>)}
+                    </div>
+                    {dispatchRecords.filter((record) => record.status === 'planned' || record.status === 'dispatched').slice(0, 3).map((record) => <button type="button" key={record.id} onClick={() => setLocation(`/dispatch?record=${encodeURIComponent(record.id)}`)} className="flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-primary/[.04]" data-testid={`button-dispatch-record-${record.id}`}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground"><Truck size={14} /></span><span className="min-w-0 flex-1"><span className="block truncate font-mono text-[10px] font-semibold text-primary">{record.dispatchCode}</span><span className="mt-0.5 block truncate text-[10px]">{record.clientName} · {record.lotId} · {record.locationName}</span></span><span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold capitalize ${record.status === 'dispatched' ? 'bg-sky-500/10 text-sky-800 dark:text-sky-300' : 'bg-amber-500/10 text-amber-800 dark:text-amber-300'}`}>{record.status === 'dispatched' ? 'In transit' : record.status}</span></button>)}
+                    {readyDispatchLots.slice(0, 3).map((lot) => <button type="button" key={lot.lotRecordId} onClick={() => setLocation(`/dispatch?create=1&orderRecordId=${encodeURIComponent(lot.orderRecordId)}&lotRecordId=${encodeURIComponent(lot.lotRecordId)}`)} className="flex w-full min-w-0 items-center gap-3 rounded-lg border border-dashed border-emerald-500/30 bg-emerald-500/[.035] px-2 py-2 text-left transition hover:bg-emerald-500/[.07]" data-testid={`button-ready-dispatch-lot-${lot.lotRecordId}`}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><PackageCheck size={14} /></span><span className="min-w-0 flex-1"><span className="block truncate font-mono text-[10px] font-semibold text-primary">{lot.orderId} · {lot.lotId}</span><span className="mt-0.5 block truncate text-[10px]">{lot.clientName} · {lot.locationName}</span></span><span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-1 text-[9px] font-semibold text-emerald-800 dark:text-emerald-300">Create</span></button>)}
+                    {!dispatchRecords.length && !readyDispatchLots.length && <SectionState loading={false} error={null} empty retry={() => { void dispatchRecordQuery.refetch(); void dispatchSummaryQuery.refetch(); }} emptyTitle="No dispatches in this queue" emptyDetail="Ready lots and planned or in-transit handoffs will appear here." />}
+                  </div>}
                 </CompactPanel>
               </DashboardWidgetBoundary>}
               {permissions?.orders && isWidgetVisible('top-clients') && <DashboardWidgetBoundary name="Top clients" widgetId="top-clients" onRetry={refresh}>

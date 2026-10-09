@@ -16,6 +16,20 @@ export function getDispatchScanUrl(orderRecordId: string): string {
   return new URL(path, window.location.origin).toString();
 }
 
+export function getDispatchShareTokenFromQr(value: string): string | null {
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    const segments = url.pathname.split('/').filter(Boolean);
+    const index = segments.lastIndexOf('dispatch');
+    if (index < 0 || segments[index + 1] !== 'share' || index + 2 !== segments.length) return null;
+    const token = decodeURIComponent(segments[index + 2]);
+    return token && !token.includes('/') ? token : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getDispatchRecordIdFromQr(value: string): string | null {
   try {
     const url = new URL(value, window.location.origin);

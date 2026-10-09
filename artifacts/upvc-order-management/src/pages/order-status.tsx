@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'wouter';
-import { ArrowLeft, CircleAlert, LockKeyhole, Save } from 'lucide-react';
+import { ArrowLeft, CircleAlert, LockKeyhole, Save, Truck } from 'lucide-react';
 import {
   getGetPaymentOverviewQueryKey,
   getGetOrderQueryKey,
@@ -25,8 +25,6 @@ const STATUS_OPTIONS: { value: Status; label: string }[] = [
   { value: OrderStatus.confirmed, label: 'Confirmed' },
   { value: OrderStatus.in_production, label: 'In production' },
   { value: OrderStatus.ready, label: 'Ready' },
-  { value: OrderStatus.dispatched, label: 'Dispatched' },
-  { value: OrderStatus.installed, label: 'Installed' },
 ];
 
 function statusLabel(status: string) {
@@ -48,7 +46,7 @@ export default function OrderStatusPage({ user }: { user: User }) {
   const record = order.data;
 
   useEffect(() => {
-    if (record) setSelectedStatus(record.status);
+    if (record) setSelectedStatus(record.status === OrderStatus.dispatched || record.status === OrderStatus.installed ? '' : record.status);
   }, [record?.id, record?.status]);
 
   const saveStatus = () => {
@@ -150,6 +148,10 @@ export default function OrderStatusPage({ user }: { user: User }) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-start gap-3 rounded-lg border border-primary/15 bg-primary/[.04] p-3 text-xs leading-5" data-testid="notice-qr-dispatch-workflow">
+              <Truck size={16} className="mt-0.5 shrink-0 text-primary" />
+              <span>Dispatch and installation are tracked separately from the order lifecycle. <Link href="/dispatch" className="font-bold text-primary underline underline-offset-2" data-testid="link-qr-dispatch-workflow">Create or manage a dispatch</Link>.</span>
             </div>
             <div className="flex justify-end">
               <Button

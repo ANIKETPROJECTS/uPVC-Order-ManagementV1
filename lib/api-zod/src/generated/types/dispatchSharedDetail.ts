@@ -6,9 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DispatchRecordStatus } from './dispatchRecordStatus';
+import type { DispatchStatusHistoryEntry } from './dispatchStatusHistoryEntry';
 import type { DispatchWindowSnapshot } from './dispatchWindowSnapshot';
 
 export interface DispatchSharedDetail {
+  id: string;
+  orderRecordId: string;
   dispatchCode: string;
   orderId: string;
   clientName: string;
@@ -20,6 +23,12 @@ export interface DispatchSharedDetail {
   dispatchedAt: Date | null;
   /** @nullable */
   deliveredAt: Date | null;
+  /** @nullable */
+  returnedAt: Date | null;
+  createdAt: Date;
+  /** @nullable */
+  dispatchNote: string | null;
+  statusHistory: DispatchStatusHistoryEntry[];
   locationName: string;
   /** @nullable */
   siteAddress: string | null;

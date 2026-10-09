@@ -329,7 +329,7 @@ export interface OrderDocumentMetadataDocument {
   dispatchId?: string | null; documentVersion?: number | null; contentHash?: string | null;
 }
 export interface OrderActivityDocument {
-  _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
+  _id: string; orderRecordId: string; dispatchId?: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
 }
 export type DispatchRecordStatus = "planned" | "dispatched" | "delivered" | "returned" | "cancelled";
 export interface DispatchWindowSnapshotDocument {

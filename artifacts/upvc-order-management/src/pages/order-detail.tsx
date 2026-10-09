@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   Settings2,
   Trash2,
+  Truck,
   Upload,
   Wrench,
 } from 'lucide-react';
@@ -38,6 +39,8 @@ import {
   getDownloadOrderDocumentQueryKey,
   getGetPaymentOverviewQueryKey,
   getGetOrderQueryKey,
+  getListDispatchRecordsQueryKey,
+  getGetDispatchChallanPdfQueryKey,
   getListQuotationsQueryKey,
   getListOrderDocumentCategoriesQueryKey,
   getListOrderActivityQueryKey,
@@ -67,6 +70,8 @@ import {
   useDeleteOrderDocumentCategory,
   useDownloadOrderDocument,
   useGetOrder,
+  useListDispatchRecords,
+  useGetDispatchChallanPdf,
   useListOrderActivity,
   useListOrderDocumentCategories,
   useListOrderDocuments,
@@ -89,6 +94,7 @@ import {
 } from '@workspace/api-client-react';
 import type {
   Order,
+  DispatchRecord,
   OrderDocument,
   OrderDocumentCategory,
   OrderDocumentCategoryConfig,
@@ -186,7 +192,8 @@ function DetailError({ onRetry }: { onRetry: () => void }) {
   return <div className="flex min-h-[520px] items-center justify-center" data-testid="state-order-detail-error"><div className="max-w-sm rounded-2xl border border-destructive/20 bg-card p-7 text-center"><CircleAlert className="mx-auto text-destructive" size={28} /><h2 className="mt-4 font-display text-lg font-bold">Order record unavailable</h2><p className="mt-2 text-sm text-muted-foreground">We couldn't load this central order record.</p><Button onClick={onRetry} variant="outline" size="sm" className="mt-5" data-testid="button-retry-order-detail"><RefreshCw size={13} /> Try again</Button></div></div>;
 }
 
-function fillTemplate(template: string, order: Order) {
+function fillTemplate(template: string, order: Order, dispatches: DispatchRecord[]) {
+  const dispatch = [...dispatches].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
   const values: Record<string, string> = {
     clientName: order.clientName,
     orderId: order.orderId,
@@ -194,25 +201,32 @@ function fillTemplate(template: string, order: Order) {
     status: statusLabel(order.status),
     locationCode: order.locationCode,
     createdAt: dateLabel(order.createdAt),
+    dispatch_code: dispatch?.dispatchCode || '{{dispatch_code}} (not available yet)',
+    lot_no: dispatch?.lotId || '{{lot_no}} (not available yet)',
+    vehicle_no: dispatch?.vehicleNumber || '{{vehicle_no}} (not available yet)',
   };
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => values[key] ?? `{{${key}}}`);
 }
 
-function MessagePreview({ order, templates, canEdit }: { order: Order; templates: { status: Status; label: string; template: string }[]; canEdit: boolean }) {
+function MessagePreview({ order, templates, dispatches, canEdit }: { order: Order; templates: { status: Status; label: string; template: string }[]; dispatches: DispatchRecord[]; canEdit: boolean }) {
   const { toast } = useToast();
   const template = templates.find((item) => item.status === order.status);
-  const initialMessage = template ? fillTemplate(template.template, order) : 'No centrally stored message template is available for this stage.';
+  const initialMessage = template ? fillTemplate(template.template, order, dispatches) : 'No centrally stored message template is available for this stage.';
   const [message, setMessage] = useState(initialMessage);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   useEffect(() => setMessage(initialMessage), [initialMessage]);
+  const insertVariable = (key: string) => {
+    const resolved = fillTemplate(`{{${key}}}`, order, dispatches);
+    setMessage((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${resolved}`);
+  };
   const copy = async () => {
     await navigator.clipboard.writeText(message);
     setCopied(true);
     toast({ title: 'Message copied', description: 'The stage message is on your clipboard.' });
     window.setTimeout(() => setCopied(false), 1800);
   };
-  return <Card className="border-border/80"><CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Stage communication</p><CardTitle className="mt-1 text-base">Message preview</CardTitle><p className="mt-1 text-xs text-muted-foreground">{template ? `Centrally stored · ${template.label}` : 'Template not configured for this stage'}</p></div><MessageSquareText size={18} className="text-primary" /></div></CardHeader><CardContent><Textarea value={message} onChange={(event) => setMessage(event.target.value)} readOnly={!editing || !canEdit} rows={6} className="resize-y text-sm leading-6" data-testid="textarea-order-message" /><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className="text-[10px] text-muted-foreground">Variables resolve from this order. One-off edits are not saved.</p><div className="flex gap-2">{canEdit && <Button type="button" size="sm" variant="outline" onClick={() => setEditing((value) => !value)} data-testid="button-edit-order-message"><Pencil size={13} /> {editing ? 'Lock message' : 'Edit copy'}</Button>}<Button type="button" size="sm" onClick={copy} data-testid="button-copy-order-message">{copied ? <ClipboardCheck size={13} /> : <Clipboard size={13} />} {copied ? 'Copied' : 'Copy message'}</Button></div></div></CardContent></Card>;
+  return <Card className="border-border/80"><CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Stage communication</p><CardTitle className="mt-1 text-base">Message preview</CardTitle><p className="mt-1 text-xs text-muted-foreground">{template ? `Centrally stored · ${template.label}` : 'Template not configured for this stage'}</p></div><MessageSquareText size={18} className="text-primary" /></div></CardHeader><CardContent><Textarea value={message} onChange={(event) => setMessage(event.target.value)} readOnly={!editing || !canEdit} rows={6} className="resize-y text-sm leading-6" data-testid="textarea-order-message" /><div className="mt-2 flex flex-wrap gap-1.5">{['dispatch_code', 'lot_no', 'vehicle_no'].map((key) => <Button key={key} type="button" size="sm" variant="outline" className="h-7 px-2 text-[9px]" disabled={!editing || !canEdit} onClick={() => insertVariable(key)} data-testid={`button-insert-preview-${key}`}>+ {key}</Button>)}</div><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className="text-[10px] text-muted-foreground">Dispatch values resolve from the latest dispatch. Missing details remain clearly marked.</p><div className="flex gap-2">{canEdit && <Button type="button" size="sm" variant="outline" onClick={() => setEditing((value) => !value)} data-testid="button-edit-order-message"><Pencil size={13} /> {editing ? 'Lock message' : 'Edit copy'}</Button>}<Button type="button" size="sm" onClick={copy} data-testid="button-copy-order-message">{copied ? <ClipboardCheck size={13} /> : <Clipboard size={13} />} {copied ? 'Copied' : 'Copy message'}</Button></div></div></CardContent></Card>;
 }
 
 function SummaryStat({ label, value, detail, testId }: { label: string; value: string; detail: string; testId: string }) {
@@ -772,7 +786,20 @@ function WindowSelectField({ control, name, label, options, disabled, testId }: 
   return <FormField control={control} name={name} render={({ field }) => <FormItem><FormLabel>{label}</FormLabel><Select value={field.value} onValueChange={field.onChange} disabled={disabled}><FormControl><SelectTrigger data-testid={testId}><SelectValue /></SelectTrigger></FormControl><SelectContent>{options.map((item) => <SelectItem value={item.value} key={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />;
 }
 
-function WindowsPanel({ orderId, user }: { orderId: string; user: User }) {
+function DispatchesPanel({ order, records, loading, error, onRetry, user }: { order: Order; records: DispatchRecord[]; loading: boolean; error: boolean; onRetry: () => void; user: User }) {
+  const canCreate = user.roleId === 'master-admin' || user.permissions?.['dispatch.create'] === 'edit' || user.permissions?.dispatch === 'edit';
+  const canView = user.roleId === 'master-admin' || ['view', 'edit'].includes(user.permissions?.dispatch || '') || ['view', 'edit'].includes(user.permissions?.['dispatch.view'] || '');
+  const date = (value: string | null) => value ? dateLabel(value) : 'Not recorded';
+  return <Card className="border-border/80" data-testid="card-order-dispatches"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">Lot handoffs</p><CardTitle className="mt-1 text-base">Dispatches <span className="font-mono text-xs font-normal text-muted-foreground">{records.length} record{records.length === 1 ? '' : 's'}</span></CardTitle><p className="mt-1 text-xs text-muted-foreground">Each record preserves its own status, whole-lot snapshot and transport history.</p></div>{canCreate && <Link href={`/dispatch?orderRecordId=${encodeURIComponent(order.id)}&create=1`} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-[11px] font-bold text-primary-foreground" data-testid="link-create-order-dispatch"><Plus size={13} /> Create dispatch</Link>}</CardHeader><CardContent>
+    {loading ? <div className="space-y-2" data-testid="state-order-dispatches-loading"><div className="h-20 animate-pulse rounded-xl bg-muted" /><div className="h-20 animate-pulse rounded-xl bg-muted/70" /></div> : error ? <InlineError onRetry={onRetry} label="Dispatch records could not be loaded." testId="state-order-dispatches-error" /> : !canView ? <ZeroState icon={ShieldCheck} title="Dispatch access required" description="Your role cannot view dispatch records." testId="state-order-dispatches-access" /> : !records.length ? <ZeroState icon={Truck} title="No dispatches for this order" description={canCreate ? 'Create the first whole-lot dispatch when a lot is ready.' : 'No dispatch record has been created for this order.'} testId="state-order-dispatches-empty" /> : <div className="space-y-4">{order.lots.map((lot) => {
+      const lotRecords = records.filter((item) => item.lotRecordId === lot.id).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      if (!lotRecords.length) return null;
+      return <section key={lot.id} className="rounded-xl border border-border/70 bg-background p-3 sm:p-4" data-testid={`section-dispatch-lot-${lot.id}`}><div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2"><div><p className="text-xs font-bold">{lot.lotId}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{lotRecords.length} dispatch{lotRecords.length === 1 ? '' : 'es'} · latest {lotRecords[0].dispatchCode}</p></div>{canCreate && <Link href={`/dispatch?orderRecordId=${encodeURIComponent(order.id)}&create=1`} className="text-[10px] font-bold text-primary hover:underline" data-testid={`link-create-lot-dispatch-${lot.id}`}>Create another dispatch</Link>}</div><div className="divide-y divide-border/50">{lotRecords.map((item) => <article key={item.id} className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" data-testid={`row-order-dispatch-${item.id}`}><div className="min-w-0"><p className="font-mono text-xs font-bold text-primary">{item.dispatchCode}</p><p className="mt-1 text-[10px] text-muted-foreground">{item.status} · planned {date(item.plannedAt)} · dispatched {date(item.dispatchedAt)} · delivered {date(item.deliveredAt)}</p><p className="mt-1 truncate text-[10px] text-muted-foreground">{item.vehicleNumber || 'Vehicle not recorded'} · {item.challanNumber || 'Challan not recorded'}{item.dispatchNote ? ` · ${item.dispatchNote}` : ''}</p></div><div className="flex gap-1"><Link href={`/dispatch?record=${encodeURIComponent(item.id)}`} className="inline-flex h-8 items-center rounded-md border border-input px-2 text-[10px] font-semibold hover:bg-muted" data-testid={`link-view-dispatch-${item.id}`}>View record</Link><Link href={`/dispatch?record=${encodeURIComponent(item.id)}&qr=1`} className="inline-flex h-8 items-center rounded-md border border-input px-2 text-[10px] font-semibold hover:bg-muted" data-testid={`link-dispatch-qr-${item.id}`}>QR</Link><Link href={`/dispatch?record=${encodeURIComponent(item.id)}&challan=1`} className="inline-flex h-8 items-center rounded-md border border-input px-2 text-[10px] font-semibold hover:bg-muted" data-testid={`link-dispatch-challan-${item.id}`}>Challan</Link></div></article>)}</div></section>;
+    })}</div>}
+  </CardContent></Card>;
+}
+
+function WindowsPanel({ orderId, user, dispatches, defaultLotRecordId, canReadDispatch }: { orderId: string; user: User; dispatches: DispatchRecord[]; defaultLotRecordId?: string; canReadDispatch: boolean }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const query = useListOrderWindows(orderId, { query: { queryKey: getListOrderWindowsQueryKey(orderId) } });
@@ -787,7 +814,7 @@ function WindowsPanel({ orderId, user }: { orderId: string; user: User }) {
     if (!globalThis.confirm(`Archive window ${window.windowNo}?`)) return;
     archive.mutate({ id: orderId, windowId: window.id }, { onSuccess: () => { toast({ title: 'Window archived' }); void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Window could not be archived', variant: 'destructive' as const }) });
   };
-  return <Card className="border-border/80" data-testid="card-order-windows"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Manufacturing register</p><CardTitle className="mt-1 text-base">Windows <span className="font-mono text-xs font-normal text-muted-foreground">{windows.length} · {readyCount} fully ready</span></CardTitle><p className="mt-1 text-xs text-muted-foreground">Measurements, frame, shutter, and glass state per opening.</p></div>{canMeasure && <Button size="sm" onClick={openAdd} data-testid="button-add-window"><Plus size={14} /> Add window</Button>}</CardHeader><CardContent>{query.isLoading ? <div className="space-y-3" data-testid="state-windows-loading">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Windows could not be loaded." testId="state-windows-error" /> : windows.length === 0 ? <ZeroState icon={Wrench} title="No window records yet" description={canMeasure ? 'Add the first opening to begin the manufacturing register.' : 'No window records have been persisted for this order.'} testId="state-windows-empty" /> : <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Window</th><th className="px-3 py-3">Dimensions</th><th className="px-3 py-3">Area</th><th className="px-3 py-3">Frame</th><th className="px-3 py-3">Shutter</th><th className="px-3 py-3">Glass</th><th className="px-3 py-3 text-right">Actions</th></tr></thead><tbody>{windows.map((item) => <tr key={item.id} className="group border-b border-border/50 last:border-0" data-testid={`row-window-${item.id}`}><td className="px-3 py-3"><p className="font-semibold" data-testid={`text-window-no-${item.id}`}>{item.windowNo}</p><p className="mt-1 text-[11px] text-muted-foreground">{item.windowType}</p>{item.pendingReason && <p className="mt-1 max-w-[180px] truncate text-[10px] text-amber-700" title={item.pendingReason}>{item.pendingReason}</p>}</td><td className="px-3 py-3 font-mono text-[11px]">{item.widthMm} × {item.heightMm} mm</td><td className="px-3 py-3 font-mono">{item.sqFt.toFixed(2)} sq ft</td><td className="px-3 py-3"><ReadinessPill value={item.frameStatus} /></td><td className="px-3 py-3"><ReadinessPill value={item.shutterStatus} /></td><td className="px-3 py-3"><GlassPill value={item.glassStatus} /></td><td className="px-3 py-3"><div className="flex justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"><Button variant="ghost" size="icon" disabled={!canMeasure && !hasPermission(user, 'window-readiness') && !hasPermission(user, 'glass-procurement')} onClick={() => { setEditingWindow(item); setDialogOpen(true); }} data-testid={`button-edit-window-${item.id}`}><Pencil size={14} /></Button>{canMeasure && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => archiveWindow(item)} data-testid={`button-archive-window-${item.id}`}><Archive size={14} /></Button>}</div></td></tr>)}</tbody></table></div>}</CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>;
+  return <Card className="border-border/80" data-testid="card-order-windows"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Manufacturing register</p><CardTitle className="mt-1 text-base">Windows <span className="font-mono text-xs font-normal text-muted-foreground">{windows.length} · {readyCount} fully ready</span></CardTitle><p className="mt-1 text-xs text-muted-foreground">Measurements, frame, shutter, glass, and latest dispatch by lot.</p></div>{canMeasure && <Button size="sm" onClick={openAdd} data-testid="button-add-window"><Plus size={14} /> Add window</Button>}</CardHeader><CardContent>{query.isLoading ? <div className="space-y-3" data-testid="state-windows-loading">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Windows could not be loaded." testId="state-windows-error" /> : windows.length === 0 ? <ZeroState icon={Wrench} title="No window records yet" description={canMeasure ? 'Add the first opening to begin the manufacturing register.' : 'No window records have been persisted for this order.'} testId="state-windows-empty" /> : <div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Window</th><th className="px-3 py-3">Dimensions</th><th className="px-3 py-3">Area</th><th className="px-3 py-3">Frame</th><th className="px-3 py-3">Shutter</th><th className="px-3 py-3">Glass</th><th className="px-3 py-3">Dispatch</th><th className="px-3 py-3 text-right">Actions</th></tr></thead><tbody>{windows.map((item) => { const latest = dispatches.filter((dispatch) => dispatch.lotRecordId === item.lotRecordId || (!item.lotRecordId && dispatch.lotRecordId === defaultLotRecordId)).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0]; return <tr key={item.id} className="group border-b border-border/50 last:border-0" data-testid={`row-window-${item.id}`}><td className="px-3 py-3"><p className="font-semibold" data-testid={`text-window-no-${item.id}`}>{item.windowNo}</p><p className="mt-1 text-[11px] text-muted-foreground">{item.windowType}</p>{item.pendingReason && <p className="mt-1 max-w-[180px] truncate text-[10px] text-amber-700" title={item.pendingReason}>{item.pendingReason}</p>}</td><td className="px-3 py-3 font-mono text-[11px]">{item.widthMm} × {item.heightMm} mm</td><td className="px-3 py-3 font-mono">{item.sqFt.toFixed(2)} sq ft</td><td className="px-3 py-3"><ReadinessPill value={item.frameStatus} /></td><td className="px-3 py-3"><ReadinessPill value={item.shutterStatus} /></td><td className="px-3 py-3"><GlassPill value={item.glassStatus} /></td><td className="px-3 py-3"><span className="font-mono text-[10px]" data-testid={`text-window-dispatch-${item.id}`}>{canReadDispatch ? latest?.dispatchCode || 'Not dispatched' : 'Restricted'}</span></td><td className="px-3 py-3"><div className="flex justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"><Button variant="ghost" size="icon" disabled={!canMeasure && !hasPermission(user, 'window-readiness') && !hasPermission(user, 'glass-procurement')} onClick={() => { setEditingWindow(item); setDialogOpen(true); }} data-testid={`button-edit-window-${item.id}`}><Pencil size={14} /></Button>{canMeasure && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => archiveWindow(item)} data-testid={`button-archive-window-${item.id}`}><Archive size={14} /></Button>}</div></td></tr>; })}</tbody></table></div>}</CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>;
 }
 
 function ReadinessPill({ value }: { value: string }) {
@@ -1050,6 +1077,27 @@ function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; 
       </div>
     </div>}
   </div>;
+}
+
+function DispatchChallanDocuments({ records, user }: { records: DispatchRecord[]; user: User }) {
+  const canView = user.roleId === 'master-admin' || ['view', 'edit'].includes(user.permissions?.dispatch || '') || ['view', 'edit'].includes(user.permissions?.['dispatch.view'] || '');
+  return <Card className="border-border/80" data-testid="card-dispatch-challan-documents"><CardHeader className="pb-3"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">Dispatch paperwork</p><CardTitle className="text-base">Challans <span className="font-mono text-xs font-normal text-muted-foreground">{records.filter((record) => record.status !== 'cancelled').length}</span></CardTitle><p className="mt-1 text-xs text-muted-foreground">PDF challans are generated from each dispatch record and are not copied into the order document archive.</p></CardHeader><CardContent>{!canView ? <ZeroState icon={ShieldCheck} title="Dispatch access required" description="Your role cannot access dispatch challans." testId="state-dispatch-challans-access" /> : !records.length ? <ZeroState icon={FileText} title="No challans yet" description="A dispatch challan will appear here after a dispatch record is created." testId="state-dispatch-challans-empty" /> : <div className="divide-y divide-border/60">{records.filter((record) => record.status !== 'cancelled').map((record) => <ChallanDownloadRow key={record.id} record={record} />)}</div>}</CardContent></Card>;
+}
+
+function ChallanDownloadRow({ record }: { record: DispatchRecord }) {
+  const { toast } = useToast();
+  const query = useGetDispatchChallanPdf(record.id, { query: { enabled: false, queryKey: getGetDispatchChallanPdfQueryKey(record.id) } });
+  const download = async () => {
+    const result = await query.refetch();
+    if (!result.data) { toast({ title: 'Challan unavailable', description: 'Try again from the dispatch register.', variant: 'destructive' }); return; }
+    const url = URL.createObjectURL(result.data);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${record.dispatchCode}-challan.pdf`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return <div className="flex flex-wrap items-center justify-between gap-2 py-3" data-testid={`row-dispatch-challan-${record.id}`}><div><p className="font-mono text-xs font-bold text-primary">{record.dispatchCode}</p><p className="mt-1 text-[10px] text-muted-foreground">{record.lotId} · {record.status} · {record.challanNumber || 'No external challan number'}</p></div><Button type="button" size="sm" variant="outline" disabled={query.isFetching} onClick={() => void download()} data-testid={`button-download-order-challan-${record.id}`}><Download size={13} /> {query.isFetching ? 'Preparing…' : 'Download PDF'}</Button></div>;
 }
 
 function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
@@ -1462,6 +1510,8 @@ export default function OrderDetailPage({ user }: { user: User }) {
   const templates = useListOrderMessageTemplates({ query: { queryKey: getListOrderMessageTemplatesQueryKey() } });
   const record = order.data;
   const windows = useListOrderWindows(id, { query: { queryKey: getListOrderWindowsQueryKey(id) } });
+  const dispatchQuery = useListDispatchRecords({ orderRecordId: id }, { query: { enabled: Boolean(id) && (hasPermission(user, 'dispatch', 'view') || ['view', 'edit'].includes(user.permissions?.['dispatch.view'] || '')), queryKey: getListDispatchRecordsQueryKey({ orderRecordId: id }) } });
+  const orderDispatches = dispatchQuery.data?.records ?? [];
   const payments = useListOrderPayments(id, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderPaymentsQueryKey(id) } });
   const orderRefunds = useListOrderRefunds(id, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderRefundsQueryKey(id) } });
   const canReadOrder = hasPermission(user, 'order-hub', 'view');
@@ -1474,17 +1524,35 @@ export default function OrderDetailPage({ user }: { user: User }) {
   if (order.isError || !record) return <AppShell user={user} title="Order detail" eyebrow="Central order register"><DetailError onRetry={() => void order.refetch()} /></AppShell>;
   if (!canReadOrder) return <AppShell user={user} title="Order detail" eyebrow="Central order register"><ZeroState icon={CircleAlert} title="Order access is restricted" description="You need order-hub view access to open this order record." testId="state-order-access-restricted" /></AppShell>;
   const timeline = STATUS_OPTIONS.map((item, index) => ({ ...item, active: STATUS_OPTIONS.findIndex((status) => status.value === record.status) >= index, current: item.value === record.status }));
+  const canReadDispatch = hasPermission(user, 'dispatch', 'view') || ['view', 'edit'].includes(user.permissions?.['dispatch.view'] || '');
+  const dispatchedLotIds = new Set(orderDispatches.filter((item) => item.status === 'dispatched' || item.status === 'delivered' || item.status === 'returned').map((item) => item.lotRecordId));
   return <AppShell user={user} title={record.orderId} eyebrow="Module 2 · order record"><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-order-hub"><ArrowLeft size={15} /> Back to order hub</Link><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full bg-primary" /> <span>Last updated {dateLabel(record.updatedAt)}</span></div></div>
     <section className="order-hub-accent relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header"><div className="absolute right-10 top-8 h-28 w-28 rounded-full border border-sidebar-primary/20" /><div className="relative flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="min-w-0"><p className="break-all font-mono text-xs font-bold tracking-[0.13em] text-sidebar-primary" data-testid="text-order-id">{record.orderId}</p><h2 className="mt-3 break-words font-display text-2xl font-bold tracking-[-0.04em] sm:text-3xl md:text-4xl" data-testid="text-order-client">{record.clientName}</h2><p className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70"><span className="break-words">{record.locationName}</span> <span className="text-white/40">·</span> <span>created {dateLabel(record.createdAt)}</span></p></div><span className={`inline-flex w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusTone(record.status)}`} data-testid="status-order-detail">{statusLabel(record.status)}</span></div></section>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Windows" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Total area" value={`${summary.sqFt.toFixed(2)} sq ft`} detail="Summed from window records" testId="text-summary-area" /><SummaryStat label="Glass state" value={summary.glass} detail="Aggregate procurement state" testId="text-summary-glass" /><SummaryStat label="Paid" value={hasPermission(user, 'payments', 'view') ? plainInr(received) : 'Restricted'} detail="Received receipts less refunds" testId="text-summary-received" /></div>
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6" data-testid="section-order-lifecycle"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-base font-bold">Where this order is now</h2></div><span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span></div><div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">{timeline.map((item, index) => <div key={item.value} className="relative min-w-0" data-testid={`timeline-stage-${item.value}`}>{index < timeline.length - 1 && <div aria-hidden="true" className={`absolute left-7 -right-4 top-3.5 z-0 hidden h-px lg:block ${item.active ? 'bg-primary/35' : 'bg-border'}`} />}<span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.current ? 'border-primary bg-primary text-primary-foreground' : item.active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}>{item.current ? <Check size={13} /> : String(index + 1).padStart(2, '0')}</span><p className={`mt-2 min-h-8 text-[10px] font-bold leading-4 ${item.active ? 'text-primary' : 'text-muted-foreground'}`}>{item.label}</p></div>)}</div></section>
-    <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : new URLSearchParams(window.location.search).get('tab') === 'grievances' ? 'grievances' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-5"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="grievances" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-grievances">Grievances</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
+     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6" data-testid="section-order-lifecycle">
+       <div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-base font-bold">Where this order is now</h2></div><span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span></div>
+       <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">
+         {timeline.map((item, index) => <div key={item.value} className="relative min-w-0" data-testid={`timeline-stage-${item.value}`}>
+           {index < timeline.length - 1 && <div aria-hidden="true" className={`absolute left-7 -right-4 top-3.5 z-0 hidden h-px lg:block ${item.active ? 'bg-primary/35' : 'bg-border'}`} />}
+           <span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.current ? 'border-primary bg-primary text-primary-foreground' : item.active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}>{item.current ? <Check size={13} /> : String(index + 1).padStart(2, '0')}</span>
+           <p className={`mt-2 min-h-8 text-[10px] font-bold leading-4 ${item.active ? 'text-primary' : 'text-muted-foreground'}`}>{item.label}</p>
+           {item.value === OrderStatus.dispatched && canReadDispatch && <span className="mt-1 block break-words text-[9px] font-medium leading-4 text-muted-foreground" data-testid="timeline-dispatch-summary">
+             {record.lots.map((lot) => {
+               const latest = orderDispatches.filter((dispatch) => dispatch.lotRecordId === lot.id).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+               return `${lot.lotId} ${latest ? `${latest.dispatchCode} ${latest.status}` : 'not dispatched'}`;
+             }).join(' · ')}
+           </span>}
+         </div>)}
+       </div>
+       <div className="mt-4 rounded-xl border border-primary/15 bg-primary/[.035] p-3" data-testid="summary-order-dispatched-lots"><p className="text-xs font-bold">Lots dispatched <span className="font-mono text-primary">{canReadDispatch ? `${dispatchedLotIds.size}/${record.lots.length}` : 'Restricted'}</span></p>{canReadDispatch && <div className="mt-2 flex flex-wrap gap-2">{record.lots.map((lot) => { const latest = orderDispatches.filter((item) => item.lotRecordId === lot.id).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0]; return <span key={lot.id} className="rounded-md border border-border bg-card px-2 py-1 text-[10px]"><b>{lot.lotId}</b> · {latest?.dispatchCode || 'Not dispatched'} · {latest?.status || 'no record'}</span>; })}</div>}</div>
+     </section>
+    <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : new URLSearchParams(window.location.search).get('tab') === 'dispatches' ? 'dispatches' : new URLSearchParams(window.location.search).get('tab') === 'grievances' ? 'grievances' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-6"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="dispatches" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-dispatches">Dispatches</TabsTrigger><TabsTrigger value="grievances" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-grievances">Grievances</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
       <TabsContent value="details" className="space-y-5">
         <OrderQrCard orderId={record.orderId} orderRecordId={record.id} />
         <OrderLotsCard order={record} user={user} id={id} />
         <OrderRecordCard order={record} user={user} id={id} />
-        <WindowsPanel orderId={id} user={user} />
+        <WindowsPanel orderId={id} user={user} dispatches={orderDispatches} defaultLotRecordId={record.lots[0]?.id} canReadDispatch={canReadDispatch} />
         <LifecycleMessageTemplates
           templates={templates.data || []}
           canEdit={user.roleId === 'master-admin'}
@@ -1492,10 +1560,11 @@ export default function OrderDetailPage({ user }: { user: User }) {
           error={templates.isError}
           onRetry={() => void templates.refetch()}
         />
-        <MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} />
+        <MessagePreview order={record} templates={templates.data || []} dispatches={orderDispatches} canEdit={hasPermission(user, 'order-hub')} />
       </TabsContent>
       <TabsContent value="billing" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><OrderPaymentFlagsPanel orderId={id} user={user} /><PaymentsPanel orderId={id} user={user} order={record} /></TabsContent>
-      <TabsContent value="documents"><DocumentsPanel orderId={id} user={user} /></TabsContent>
+      <TabsContent value="documents" className="space-y-5"><DocumentsPanel orderId={id} user={user} /><DispatchChallanDocuments records={orderDispatches} user={user} /></TabsContent>
+      <TabsContent value="dispatches"><DispatchesPanel order={record} records={orderDispatches} loading={dispatchQuery.isLoading} error={dispatchQuery.isError} onRetry={() => void dispatchQuery.refetch()} user={user} /></TabsContent>
       <TabsContent value="grievances"><GrievancesPanel order={record} user={user} /></TabsContent>
       <TabsContent value="activity"><ActivityPanel orderId={id} /></TabsContent>
     </Tabs>

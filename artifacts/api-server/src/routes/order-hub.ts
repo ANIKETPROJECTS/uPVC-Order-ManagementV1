@@ -558,9 +558,21 @@ router.get("/orders", async (req, res): Promise<void> => {
     }
     filter.createdAt = dateFilter;
   }
+  const db = await getMongoDb();
   const query = parsed.data.q?.trim();
   if (query) {
     const matcher = new RegExp(escapeRegex(query), "i");
+    const dispatchOrderIds = await getDispatchRecords(db)
+      .find({
+        $or: [
+          { dispatchCode: matcher },
+          { legacyDispatchCodes: matcher },
+          { lotId: matcher },
+          { legacyLotIds: matcher },
+        ],
+      })
+      .project<{ orderRecordId: string }>({ orderRecordId: 1 })
+      .toArray();
     filter.$or = [
       { orderId: matcher },
       { legacyOrderId: matcher },
@@ -571,9 +583,12 @@ router.get("/orders", async (req, res): Promise<void> => {
       { clientPhone: matcher },
       { siteAddress: matcher },
       { locationName: matcher },
+      ...(dispatchOrderIds.length
+        ? [{ _id: { $in: [...new Set(dispatchOrderIds.map((dispatch) => dispatch.orderRecordId))] } }]
+        : []),
     ];
   }
-  const orders = await getOrders(await getMongoDb())
+  const orders = await getOrders(db)
     .find(filter)
     .sort({ createdAt: -1, sequenceNo: -1 })
     .toArray();

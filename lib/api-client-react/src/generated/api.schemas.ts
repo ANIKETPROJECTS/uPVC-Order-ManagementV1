@@ -407,6 +407,24 @@ export interface OrderDispatchSummary {
   lots: LotDispatchSummary[];
 }
 
+export interface DispatchReadyLotSummary {
+  orderRecordId: string;
+  orderId: string;
+  clientName: string;
+  lotRecordId: string;
+  lotId: string;
+  locationName: string;
+  windowsCount: number;
+}
+
+export interface DispatchStatusHistoryEntry {
+  id: string;
+  eventType: string;
+  message: string;
+  actorName: string;
+  createdAt: string;
+}
+
 export interface DispatchStatusCounts {
   total: number;
   planned: number;
@@ -426,6 +444,8 @@ export interface DispatchRecord {
   lotSequence: number;
   dispatchNo: number;
   dispatchCode: string;
+  legacyDispatchCodes: string[];
+  legacyLotIds: string[];
   /** @nullable */
   dispatchNote: string | null;
   status: DispatchRecordStatus;
@@ -470,6 +490,8 @@ export interface DispatchRecord {
 }
 
 export interface DispatchSharedDetail {
+  id: string;
+  orderRecordId: string;
   dispatchCode: string;
   orderId: string;
   clientName: string;
@@ -481,6 +503,12 @@ export interface DispatchSharedDetail {
   dispatchedAt: string | null;
   /** @nullable */
   deliveredAt: string | null;
+  /** @nullable */
+  returnedAt: string | null;
+  createdAt: string;
+  /** @nullable */
+  dispatchNote: string | null;
+  statusHistory: DispatchStatusHistoryEntry[];
   locationName: string;
   /** @nullable */
   siteAddress: string | null;
@@ -507,6 +535,7 @@ export interface DispatchRecordListResponse {
 
 export interface DispatchSummaryResponse {
   orders: OrderDispatchSummary[];
+  readyLotsAwaitingDispatch: DispatchReadyLotSummary[];
   statusCounts: DispatchStatusCounts;
 }
 
@@ -527,6 +556,48 @@ export interface CreateDispatchRecordInput {
      * @nullable
      */
   overrideReason?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  locationName?: string;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  siteAddress?: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude?: number | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  vehicleNumber?: string | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  driverName?: string | null;
+  /**
+     * @maxLength 60
+     * @nullable
+     */
+  driverPhone?: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  challanNumber?: string | null;
 }
 
 export interface UpdateDispatchRecordInput {
@@ -1756,6 +1827,10 @@ export interface DashboardActivityItem {
   clientName: string;
   action: string;
   summary: string;
+  /** @nullable */
+  dispatchRecordId: string | null;
+  /** @nullable */
+  dispatchCode: string | null;
   actorName: string;
   createdAt: string;
 }

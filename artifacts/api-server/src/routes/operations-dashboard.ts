@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import {
   getClients,
+  getDispatchRecords,
   getGlassTrackingOrders,
   getInstallationTeams,
   getInstallations,
@@ -26,6 +27,7 @@ import {
   getQuotations,
   getUsers,
   type InstallationDocument,
+  type DispatchRecordDocument,
   type OrderDocument,
   type PermissionMap,
   type QuotationDocument,
@@ -819,6 +821,37 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
       [],
     )
     : [];
+  const dispatchActivityRows = activityRows.filter((item) => item.action.toLowerCase().startsWith("dispatch"));
+  const activityDispatchIds = [...new Set(dispatchActivityRows.map((item) => item.dispatchId).filter((id): id is string => Boolean(id)))];
+  const activityDispatchCodes = [...new Set(dispatchActivityRows.flatMap((item) =>
+    item.summary.match(/[A-Z0-9]+-L0*\d+-D\d+/g) ?? [],
+  ))];
+  const activityDispatchQuery: Filter<DispatchRecordDocument>[] = [];
+  if (activityDispatchIds.length) activityDispatchQuery.push({ _id: { $in: activityDispatchIds } });
+  if (activityDispatchCodes.length) {
+    activityDispatchQuery.push({
+      $or: [
+        { dispatchCode: { $in: activityDispatchCodes } },
+        { legacyDispatchCodes: { $in: activityDispatchCodes } },
+      ],
+    });
+  }
+  const activityDispatchRecords = canViewDispatch && activityDispatchQuery.length
+    ? await safeRead(
+      req,
+      "activity",
+      sectionErrors,
+      () => getDispatchRecords(db).find({ $or: activityDispatchQuery }).toArray(),
+      [],
+    )
+    : [];
+  const activityDispatchById = new Map(activityDispatchRecords.map((record) => [record._id, record]));
+  const activityDispatchByCode = new Map(
+    activityDispatchRecords.flatMap((record) => [
+      [record.dispatchCode.toUpperCase(), record] as const,
+      ...(record.legacyDispatchCodes ?? []).map((code) => [code.toUpperCase(), record] as const),
+    ]),
+  );
   const activityOrderIds = [...new Set(activityRows.map((item) => item.orderRecordId))];
   const activityOrders = activityOrderIds.length
     ? await safeRead(
@@ -917,6 +950,14 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
     .flatMap((item) => {
       const order = orderById.get(item.orderRecordId);
       if (!order) return [];
+      const isDispatchActivity = item.action.toLowerCase().startsWith("dispatch");
+      const activityCode = isDispatchActivity
+        ? item.summary.match(/[A-Z0-9]+-L0*\d+-D\d+/)?.[0]?.toUpperCase()
+        : undefined;
+      const dispatchRecord = isDispatchActivity
+        ? (item.dispatchId ? activityDispatchById.get(item.dispatchId) : undefined)
+          ?? (activityCode ? activityDispatchByCode.get(activityCode) : undefined)
+        : undefined;
       return [{
         id: item._id,
         orderRecordId: item.orderRecordId,
@@ -924,6 +965,8 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
         clientName: order.clientName,
         action: item.action,
         summary: item.summary,
+        dispatchRecordId: dispatchRecord?._id ?? null,
+        dispatchCode: dispatchRecord?.dispatchCode ?? null,
         actorName: item.actorName,
         createdAt: item.createdAt.toISOString(),
       }];

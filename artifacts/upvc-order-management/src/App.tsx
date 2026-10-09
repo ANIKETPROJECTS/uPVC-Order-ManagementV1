@@ -19,6 +19,7 @@ import OrderHubPage from '@/pages/order-hub';
 import OrderDetailPage from '@/pages/order-detail';
 import OrderScannerPage from '@/pages/order-scanner';
 import DispatchPage from '@/pages/dispatch';
+import DispatchSharePage from '@/pages/dispatch-share';
 import InstallationPage from '@/pages/installation';
 import InstallationTeamsPage from '@/pages/installation-teams';
 import OrderStatusPage from '@/pages/order-status';
@@ -39,6 +40,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
   return <Switch>
     <Route path="/" component={() => <DashboardPage user={user} />} />
     <Route path="/dispatch" component={() => <DispatchPage user={user} />} />
+    <Route path="/dispatch/share/:token" component={() => <DispatchSharePage user={user} />} />
     <Route path="/installation" component={() => <InstallationPage user={user} />} />
     <Route path="/installation/teams" component={() => <InstallationTeamsPage user={user} />} />
     <Route path="/order-scanner" component={() => <OrderScannerPage user={user} />} />

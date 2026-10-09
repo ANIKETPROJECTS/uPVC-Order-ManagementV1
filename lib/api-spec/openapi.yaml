@@ -1116,6 +1116,8 @@ paths:
           description: Dispatch view access required
         "404":
           description: Dispatch QR is invalid or revoked
+        "410":
+          description: Dispatch record is cancelled or its QR was revoked
   /dispatches/{id}:
     get:
       operationId: getDispatchRecord
@@ -3985,6 +3987,39 @@ components:
           items:
             $ref: "#/components/schemas/LotDispatchSummary"
       required: [orderRecordId, orderId, clientName, dispatchStatus, totalLots, dispatchedLots, deliveredLots, activeDispatches, lots]
+    DispatchReadyLotSummary:
+      type: object
+      properties:
+        orderRecordId:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        lotRecordId:
+          type: string
+        lotId:
+          type: string
+        locationName:
+          type: string
+        windowsCount:
+          type: integer
+      required: [orderRecordId, orderId, clientName, lotRecordId, lotId, locationName, windowsCount]
+    DispatchStatusHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        eventType:
+          type: string
+        message:
+          type: string
+        actorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, eventType, message, actorName, createdAt]
     DispatchStatusCounts:
       type: object
       properties:
@@ -4022,6 +4057,14 @@ components:
           type: integer
         dispatchCode:
           type: string
+        legacyDispatchCodes:
+          type: array
+          items:
+            type: string
+        legacyLotIds:
+          type: array
+          items:
+            type: string
         dispatchNote:
           type: ["string", "null"]
         status:
@@ -4080,10 +4123,14 @@ components:
           format: date-time
         cancelReason:
           type: ["string", "null"]
-      required: [id, orderRecordId, orderId, clientName, lotRecordId, lotId, lotSequence, dispatchNo, dispatchCode, dispatchNote, status, plannedAt, dispatchedAt, deliveredAt, returnedAt, locationName, siteAddress, siteLatitude, siteLongitude, vehicleNumber, driverName, driverPhone, challanNumber, windowsSnapshot, qrRevokedAt, overrideReason, createdBy, createdAt, updatedBy, updatedAt, cancelledBy, cancelledAt, cancelReason]
+      required: [id, orderRecordId, orderId, clientName, lotRecordId, lotId, lotSequence, dispatchNo, dispatchCode, legacyDispatchCodes, legacyLotIds, dispatchNote, status, plannedAt, dispatchedAt, deliveredAt, returnedAt, locationName, siteAddress, siteLatitude, siteLongitude, vehicleNumber, driverName, driverPhone, challanNumber, windowsSnapshot, qrRevokedAt, overrideReason, createdBy, createdAt, updatedBy, updatedAt, cancelledBy, cancelledAt, cancelReason]
     DispatchSharedDetail:
       type: object
       properties:
+        id:
+          type: string
+        orderRecordId:
+          type: string
         dispatchCode:
           type: string
         orderId:
@@ -4103,6 +4150,18 @@ components:
         deliveredAt:
           type: ["string", "null"]
           format: date-time
+        returnedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        dispatchNote:
+          type: ["string", "null"]
+        statusHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatchStatusHistoryEntry"
         locationName:
           type: string
         siteAddress:
@@ -4123,7 +4182,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DispatchWindowSnapshot"
-      required: [dispatchCode, orderId, clientName, lotId, status, plannedAt, dispatchedAt, deliveredAt, locationName, siteAddress, siteLatitude, siteLongitude, vehicleNumber, driverName, driverPhone, challanNumber, windowsSnapshot]
+      required: [id, orderRecordId, dispatchCode, orderId, clientName, lotId, status, plannedAt, dispatchedAt, deliveredAt, returnedAt, createdAt, dispatchNote, statusHistory, locationName, siteAddress, siteLatitude, siteLongitude, vehicleNumber, driverName, driverPhone, challanNumber, windowsSnapshot]
     DispatchRecordListResponse:
       type: object
       properties:
@@ -4145,9 +4204,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/OrderDispatchSummary"
+        readyLotsAwaitingDispatch:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatchReadyLotSummary"
         statusCounts:
           $ref: "#/components/schemas/DispatchStatusCounts"
-      required: [orders, statusCounts]
+      required: [orders, readyLotsAwaitingDispatch, statusCounts]
     CreateDispatchRecordInput:
       type: object
       properties:
@@ -4166,6 +4229,33 @@ components:
         overrideReason:
           type: ["string", "null"]
           maxLength: 1000
+        locationName:
+          type: string
+          minLength: 2
+          maxLength: 160
+        siteAddress:
+          type: ["string", "null"]
+          maxLength: 1000
+        siteLatitude:
+          type: ["number", "null"]
+          minimum: -90
+          maximum: 90
+        siteLongitude:
+          type: ["number", "null"]
+          minimum: -180
+          maximum: 180
+        vehicleNumber:
+          type: ["string", "null"]
+          maxLength: 100
+        driverName:
+          type: ["string", "null"]
+          maxLength: 160
+        driverPhone:
+          type: ["string", "null"]
+          maxLength: 60
+        challanNumber:
+          type: ["string", "null"]
+          maxLength: 100
       required: [orderRecordId, lotRecordId]
     UpdateDispatchRecordInput:
       type: object
@@ -5774,12 +5864,16 @@ components:
           type: string
         summary:
           type: string
+        dispatchRecordId:
+          type: ["string", "null"]
+        dispatchCode:
+          type: ["string", "null"]
         actorName:
           type: string
         createdAt:
           type: string
           format: date-time
-      required: [id, orderRecordId, orderId, clientName, action, summary, actorName, createdAt]
+      required: [id, orderRecordId, orderId, clientName, action, summary, dispatchRecordId, dispatchCode, actorName, createdAt]
     DashboardRecentOrder:
       type: object
       properties:

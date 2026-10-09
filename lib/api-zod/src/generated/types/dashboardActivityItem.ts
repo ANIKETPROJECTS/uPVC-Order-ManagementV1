@@ -13,6 +13,10 @@ export interface DashboardActivityItem {
   clientName: string;
   action: string;
   summary: string;
+  /** @nullable */
+  dispatchRecordId: string | null;
+  /** @nullable */
+  dispatchCode: string | null;
   actorName: string;
   createdAt: Date;
 }

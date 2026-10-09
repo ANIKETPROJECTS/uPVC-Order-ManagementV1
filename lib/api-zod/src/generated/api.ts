@@ -443,6 +443,8 @@ export const GetOperationsDashboardResponse = zod.object({
   "clientName": zod.string(),
   "action": zod.string(),
   "summary": zod.string(),
+  "dispatchRecordId": zod.string().nullable(),
+  "dispatchCode": zod.string().nullable(),
   "actorName": zod.string(),
   "createdAt": zod.coerce.date()
 })),
@@ -1770,6 +1772,8 @@ export const ListDispatchRecordsResponse = zod.object({
   "lotSequence": zod.number().int(),
   "dispatchNo": zod.number().int(),
   "dispatchCode": zod.string(),
+  "legacyDispatchCodes": zod.array(zod.string()),
+  "legacyLotIds": zod.array(zod.string()),
   "dispatchNote": zod.string().nullable(),
   "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
   "plannedAt": zod.coerce.date().nullable(),
@@ -1843,6 +1847,25 @@ export const createDispatchRecordBodyDispatchNoteMax = 1000;
 
 export const createDispatchRecordBodyOverrideReasonMax = 1000;
 
+export const createDispatchRecordBodyLocationNameMin = 2;
+export const createDispatchRecordBodyLocationNameMax = 160;
+
+export const createDispatchRecordBodySiteAddressMax = 1000;
+
+export const createDispatchRecordBodySiteLatitudeMin = -90;
+export const createDispatchRecordBodySiteLatitudeMax = 90;
+
+export const createDispatchRecordBodySiteLongitudeMin = -180;
+export const createDispatchRecordBodySiteLongitudeMax = 180;
+
+export const createDispatchRecordBodyVehicleNumberMax = 100;
+
+export const createDispatchRecordBodyDriverNameMax = 160;
+
+export const createDispatchRecordBodyDriverPhoneMax = 60;
+
+export const createDispatchRecordBodyChallanNumberMax = 100;
+
 
 
 export const CreateDispatchRecordBody = zod.object({
@@ -1850,7 +1873,15 @@ export const CreateDispatchRecordBody = zod.object({
   "lotRecordId": zod.string().min(1),
   "dispatchNote": zod.string().max(createDispatchRecordBodyDispatchNoteMax).nullish(),
   "plannedAt": zod.coerce.date().nullish(),
-  "overrideReason": zod.string().max(createDispatchRecordBodyOverrideReasonMax).nullish()
+  "overrideReason": zod.string().max(createDispatchRecordBodyOverrideReasonMax).nullish(),
+  "locationName": zod.string().min(createDispatchRecordBodyLocationNameMin).max(createDispatchRecordBodyLocationNameMax).optional(),
+  "siteAddress": zod.string().max(createDispatchRecordBodySiteAddressMax).nullish(),
+  "siteLatitude": zod.number().min(createDispatchRecordBodySiteLatitudeMin).max(createDispatchRecordBodySiteLatitudeMax).nullish(),
+  "siteLongitude": zod.number().min(createDispatchRecordBodySiteLongitudeMin).max(createDispatchRecordBodySiteLongitudeMax).nullish(),
+  "vehicleNumber": zod.string().max(createDispatchRecordBodyVehicleNumberMax).nullish(),
+  "driverName": zod.string().max(createDispatchRecordBodyDriverNameMax).nullish(),
+  "driverPhone": zod.string().max(createDispatchRecordBodyDriverPhoneMax).nullish(),
+  "challanNumber": zod.string().max(createDispatchRecordBodyChallanNumberMax).nullish()
 })
 
 export const CreateDispatchRecordResponse = zod.object({
@@ -1863,6 +1894,8 @@ export const CreateDispatchRecordResponse = zod.object({
   "lotSequence": zod.number().int(),
   "dispatchNo": zod.number().int(),
   "dispatchCode": zod.string(),
+  "legacyDispatchCodes": zod.array(zod.string()),
+  "legacyLotIds": zod.array(zod.string()),
   "dispatchNote": zod.string().nullable(),
   "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
   "plannedAt": zod.coerce.date().nullable(),
@@ -1922,6 +1955,15 @@ export const GetDispatchSummaryResponse = zod.object({
   "latestDispatchCode": zod.string().nullable()
 }))
 })),
+  "readyLotsAwaitingDispatch": zod.array(zod.object({
+  "orderRecordId": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "lotRecordId": zod.string(),
+  "lotId": zod.string(),
+  "locationName": zod.string(),
+  "windowsCount": zod.number().int()
+})),
   "statusCounts": zod.object({
   "total": zod.number().int(),
   "planned": zod.number().int(),
@@ -1941,6 +1983,8 @@ export const GetDispatchByTokenParams = zod.object({
 })
 
 export const GetDispatchByTokenResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
   "dispatchCode": zod.string(),
   "orderId": zod.string(),
   "clientName": zod.string(),
@@ -1949,6 +1993,16 @@ export const GetDispatchByTokenResponse = zod.object({
   "plannedAt": zod.coerce.date().nullable(),
   "dispatchedAt": zod.coerce.date().nullable(),
   "deliveredAt": zod.coerce.date().nullable(),
+  "returnedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "dispatchNote": zod.string().nullable(),
+  "statusHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "eventType": zod.string(),
+  "message": zod.string(),
+  "actorName": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
   "locationName": zod.string(),
   "siteAddress": zod.string().nullable(),
   "siteLatitude": zod.number().nullable(),
@@ -1988,6 +2042,8 @@ export const GetDispatchRecordResponse = zod.object({
   "lotSequence": zod.number().int(),
   "dispatchNo": zod.number().int(),
   "dispatchCode": zod.string(),
+  "legacyDispatchCodes": zod.array(zod.string()),
+  "legacyLotIds": zod.array(zod.string()),
   "dispatchNote": zod.string().nullable(),
   "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
   "plannedAt": zod.coerce.date().nullable(),
@@ -2082,6 +2138,8 @@ export const UpdateDispatchRecordResponse = zod.object({
   "lotSequence": zod.number().int(),
   "dispatchNo": zod.number().int(),
   "dispatchCode": zod.string(),
+  "legacyDispatchCodes": zod.array(zod.string()),
+  "legacyLotIds": zod.array(zod.string()),
   "dispatchNote": zod.string().nullable(),
   "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
   "plannedAt": zod.coerce.date().nullable(),
@@ -2145,6 +2203,8 @@ export const CancelDispatchRecordResponse = zod.object({
   "lotSequence": zod.number().int(),
   "dispatchNo": zod.number().int(),
   "dispatchCode": zod.string(),
+  "legacyDispatchCodes": zod.array(zod.string()),
+  "legacyLotIds": zod.array(zod.string()),
   "dispatchNote": zod.string().nullable(),
   "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
   "plannedAt": zod.coerce.date().nullable(),

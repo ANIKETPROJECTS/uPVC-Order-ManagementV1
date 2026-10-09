@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { DispatchReadyLotSummary } from './dispatchReadyLotSummary';
 import type { DispatchStatusCounts } from './dispatchStatusCounts';
 import type { OrderDispatchSummary } from './orderDispatchSummary';
 
 export interface DispatchSummaryResponse {
   orders: OrderDispatchSummary[];
+  readyLotsAwaitingDispatch: DispatchReadyLotSummary[];
   statusCounts: DispatchStatusCounts;
 }

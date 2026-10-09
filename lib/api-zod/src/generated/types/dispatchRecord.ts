@@ -18,6 +18,8 @@ export interface DispatchRecord {
   lotSequence: number;
   dispatchNo: number;
   dispatchCode: string;
+  legacyDispatchCodes: string[];
+  legacyLotIds: string[];
   /** @nullable */
   dispatchNote: string | null;
   status: DispatchRecordStatus;

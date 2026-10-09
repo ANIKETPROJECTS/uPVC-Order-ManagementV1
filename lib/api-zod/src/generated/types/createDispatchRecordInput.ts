@@ -23,4 +23,46 @@ export interface CreateDispatchRecordInput {
      * @nullable
      */
   overrideReason?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  locationName?: string;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  siteAddress?: string | null;
+  /**
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  siteLatitude?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  siteLongitude?: number | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  vehicleNumber?: string | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  driverName?: string | null;
+  /**
+     * @maxLength 60
+     * @nullable
+     */
+  driverPhone?: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  challanNumber?: string | null;
 }
