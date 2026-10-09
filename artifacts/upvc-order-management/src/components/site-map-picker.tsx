@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './site-map-picker.css';
@@ -105,8 +105,7 @@ export function SiteMapPicker({
     }
   }, [latitude, longitude]);
 
-  const searchAddress = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const searchAddress = async () => {
     const query = searchText.trim();
     if (!query) {
       setSearchError('Enter an address or place name to search.');
@@ -159,20 +158,26 @@ export function SiteMapPicker({
         {hasPin && <Button type="button" size="sm" variant="ghost" className="h-8 text-[10px] text-muted-foreground" onClick={onClear} data-testid={`${testId}-clear`}><Trash2 size={12} />Clear pin</Button>}
       </div>
 
-      <form className="mt-3 flex gap-2" onSubmit={searchAddress}>
+      <div className="mt-3 flex gap-2">
         <Input
           value={searchText}
           onChange={(event) => { setSearchText(event.target.value); setSearchError(''); }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              if (!searching) void searchAddress();
+            }
+          }}
           placeholder="Search a street, building, or place in India"
           aria-label="Search for a map location"
           className="h-9 text-xs"
           data-testid={`${testId}-search`}
         />
-        <Button type="submit" variant="outline" size="sm" className="h-9 shrink-0" disabled={searching} data-testid={`${testId}-search-submit`}>
+        <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => void searchAddress()} disabled={searching} data-testid={`${testId}-search-submit`}>
           {searching ? <LoaderCircle size={14} className="animate-spin" /> : <Search size={14} />}
           <span className="sr-only">Search map</span>
         </Button>
-      </form>
+      </div>
       {searchError && <p className="mt-2 text-[10px] leading-4 text-destructive" role="status" data-testid={`${testId}-search-error`}>{searchError}</p>}
 
       <div className="mt-3 h-64 overflow-hidden rounded-lg border border-border/70 bg-muted/30 sm:h-72" data-testid={`${testId}-map`}>
