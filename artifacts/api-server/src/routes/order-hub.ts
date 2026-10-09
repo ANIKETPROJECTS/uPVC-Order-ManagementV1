@@ -613,12 +613,8 @@ router.post(
       res.status(400).json({ error: "Enter the client name and choose Project or Retail." });
       return;
     }
-    if (isManualClient && parsed.data.quotationId) {
-      res.status(400).json({ error: "Create this manually entered client order first, then link its quotation from the order screen." });
-      return;
-    }
 
-    const existingClient = parsed.data.clientId
+    let existingClient = parsed.data.clientId
       ? await getClients(db).findOne({ _id: parsed.data.clientId, isActive: true })
       : null;
     if (parsed.data.clientId && !existingClient) {
@@ -645,6 +641,25 @@ router.post(
       if (quotation.sampleOnly) {
         res.status(400).json({ error: "Sample quotations cannot be used to create an order." });
         return;
+      }
+      if (isManualClient) {
+        const quotationClient = quotation.clientId
+          ? await getClients(db).findOne({ _id: quotation.clientId, isActive: true })
+          : null;
+        if (
+          !quotationClient ||
+          quotationClient.name.trim().toLocaleLowerCase() !== manualName.toLocaleLowerCase()
+        ) {
+          res.status(400).json({
+            error: "The selected quotation must belong to the manually entered client. Enter that client's saved name or choose the existing client.",
+          });
+          return;
+        }
+        if (quotationClient.type && quotationClient.type !== parsed.data.clientType) {
+          res.status(409).json({ error: "The selected quotation client's type does not match the chosen Project or Retail type." });
+          return;
+        }
+        existingClient = quotationClient;
       }
       if (quotation.clientId !== existingClient?._id) {
         res.status(400).json({ error: "Choose a quotation linked to the selected client." });
@@ -682,9 +697,9 @@ router.post(
     const clientId = existingClient?._id ?? randomUUID();
     const clientPrefix = existingClient?.prefix ?? await generateClientPrefix(db);
     const clientName = existingClient?.name ?? manualName;
-    const clientPhone = existingClient?.phone ?? parsed.data.clientPhone?.trim() ?? "";
-    const clientAddress = existingClient?.address ?? parsed.data.clientAddress?.trim() ?? "";
-    const clientGstin = existingClient?.gstin ?? parsed.data.clientGstin?.trim().toUpperCase() ?? null;
+    const clientPhone = parsed.data.clientPhone?.trim() || existingClient?.phone || "";
+    const clientAddress = parsed.data.clientAddress?.trim() || existingClient?.address || "";
+    const clientGstin = parsed.data.clientGstin?.trim().toUpperCase() || existingClient?.gstin || null;
     const client: ClientDocument = existingClient
       ? { ...existingClient, type: clientType }
       : {

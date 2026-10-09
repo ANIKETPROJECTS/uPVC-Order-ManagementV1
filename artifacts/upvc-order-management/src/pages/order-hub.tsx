@@ -195,13 +195,20 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
   const selectedClient = clients.find((client) => client.id === form.watch('clientId'));
   const clientName = form.watch('clientName') || '';
   const clientType = clientMode === 'manual' ? form.watch('clientType') : selectedClient?.type ?? form.watch('clientType');
+  const clientAddress = clientMode === 'manual' ? form.watch('clientAddress') || '' : selectedClient?.address || '';
+  const sameAsClientAddress = form.watch('sameAsClientAddress');
   const locationName = form.watch('locationName') || '';
   const siteAddress = form.watch('siteAddress');
   const siteLatitude = form.watch('siteLatitude');
   const siteLongitude = form.watch('siteLongitude');
+  const manualMatchingClient = clients.find((client) =>
+    client.isActive &&
+    client.name.trim().toLocaleLowerCase() === clientName.trim().toLocaleLowerCase() &&
+    (!client.type || !clientType || client.type === clientType),
+  );
+  const quotationClientId = clientMode === 'existing' ? selectedClient?.id : manualMatchingClient?.id;
   const clientQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
-    clientMode === 'existing' &&
-    quotation.clientId === selectedClient?.id &&
+    quotation.clientId === quotationClientId &&
     !quotation.sampleOnly &&
     /^QT-\d+$/i.test(quotation.quoteNo.trim()),
   );
@@ -253,7 +260,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
             clientAddress: values.clientAddress?.trim() || null,
             clientGstin: values.clientGstin?.trim().toUpperCase() || null,
           }),
-      ...(values.clientMode === 'existing' && values.quotationId ? { quotationId: values.quotationId } : {}),
+      ...(values.quotationId ? { quotationId: values.quotationId } : {}),
       locationName: values.locationName.trim(),
       siteAddress: values.siteAddress.trim(),
       siteLatitude: values.siteLatitude,
@@ -280,9 +287,9 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Create central order</DialogTitle>
+          <DialogTitle>Create Client &amp; Order</DialogTitle>
           <DialogDescription>Enter a client and job site. A quotation can be linked now or added later from the order page.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -296,12 +303,14 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
                 form.setValue('clientAddress', '');
                 form.setValue('clientGstin', '');
                 form.setValue('quotationId', '');
+                form.setValue('sameAsClientAddress', false);
               }} data-testid="button-existing-client">Choose existing client</Button>
               <Button type="button" variant={clientMode === 'manual' ? 'default' : 'ghost'} onClick={() => {
                 form.setValue('clientMode', 'manual', { shouldValidate: true });
                 form.setValue('clientId', '');
                 form.setValue('quotationId', '');
                 form.setValue('siteAddress', '');
+                form.setValue('sameAsClientAddress', false);
                 form.setValue('siteLatitude', null);
                 form.setValue('siteLongitude', null);
               }} data-testid="button-manual-client">Enter new client</Button>
@@ -354,14 +363,20 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
                   <FormField control={form.control} name="clientName" render={({ field }) => (
                     <FormItem className="sm:col-span-2">
                       <FormLabel>Client / company name</FormLabel>
-                      <FormControl><Input {...field} value={field.value || ''} placeholder="e.g. Meridian Habitat" data-testid="input-order-client-name" /></FormControl>
+                      <FormControl><Input {...field} value={field.value || ''} onChange={(event) => {
+                        field.onChange(event);
+                        form.setValue('quotationId', '');
+                      }} placeholder="e.g. Meridian Habitat" data-testid="input-order-client-name" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="clientType" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Client type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue('quotationId', '');
+                      }} value={field.value || ''}>
                         <FormControl><SelectTrigger data-testid="select-order-client-type"><SelectValue placeholder="Choose Project or Retail" /></SelectTrigger></FormControl>
                         <SelectContent><SelectItem value="Project">Project</SelectItem><SelectItem value="Retail">Retail</SelectItem></SelectContent>
                       </Select>
@@ -378,7 +393,10 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
                   <FormField control={form.control} name="clientAddress" render={({ field }) => (
                     <FormItem className="sm:col-span-2">
                       <FormLabel>Client address <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
-                      <FormControl><Textarea {...field} value={field.value || ''} rows={2} placeholder="Billing or registered address" data-testid="input-order-client-address" /></FormControl>
+                      <FormControl><Textarea {...field} value={field.value || ''} onChange={(event) => {
+                        field.onChange(event);
+                        if (form.getValues('sameAsClientAddress')) form.setValue('siteAddress', event.target.value, { shouldValidate: true, shouldDirty: true });
+                      }} rows={2} placeholder="Billing or registered address" data-testid="input-order-client-address" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -429,9 +447,42 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
               </>
             )}
             {clientMode === 'manual' && (
-              <p className="rounded-lg border border-border bg-muted/25 px-3 py-2.5 text-xs text-muted-foreground">
-                The client profile will be saved with this order. Create a quotation for the client later, then link it from the order page.
-              </p>
+              <div className="space-y-2">
+                <FormField control={form.control} name="quotationId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quotation <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
+                      value={field.value || 'none'}
+                      disabled={!manualMatchingClient || quotationsQuery.isLoading}
+                    >
+                      <FormControl><SelectTrigger data-testid="select-manual-order-quotation"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Create without a quotation</SelectItem>
+                        {clientQuotations.map((quotation) => (
+                          <SelectItem key={quotation.id} value={quotation.id}>{quotation.quoteNo} · {quotation.projectName || quotation.customerName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <p className="rounded-lg border border-border bg-muted/25 px-3 py-2.5 text-xs text-muted-foreground">
+                  {manualMatchingClient
+                    ? `A matching saved client profile was found. Linking a quotation will use that profile and its client type (${manualMatchingClient.type || clientType}).`
+                    : 'If this client already has a saved quotation, enter the matching client name and type to link it now. Otherwise the new client profile will be saved without a quotation, which you can link later.'}
+                </p>
+                {manualMatchingClient && quotationsQuery.isLoading && <p className="text-xs text-muted-foreground" role="status">Loading this client’s quotations…</p>}
+                {manualMatchingClient && quotationsQuery.isError && (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs" role="alert">
+                    <span>Quotations could not be loaded. You can still create the order without one.</span>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void quotationsQuery.refetch()}>Retry</Button>
+                  </div>
+                )}
+                {manualMatchingClient && !quotationsQuery.isLoading && !quotationsQuery.isError && clientQuotations.length === 0 && (
+                  <p className="text-xs text-muted-foreground" role="status">No QT-numbered quotations are available for this client.</p>
+                )}
+              </div>
             )}
             <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs" data-testid="text-order-id-preview">
               {previewId ? (
@@ -458,8 +509,9 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
               <FormItem>
                 <FormLabel>Order site address</FormLabel>
                 <FormControl>
-                  <Textarea
+                    <Textarea
                     {...field}
+                      disabled={sameAsClientAddress}
                     onChange={(event) => {
                       field.onChange(event);
                       if (form.getValues('siteLatitude') !== null || form.getValues('siteLongitude') !== null) {
@@ -478,6 +530,26 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
                 <FormMessage />
               </FormItem>
             )} />
+            <div className="flex items-start gap-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+              <Checkbox
+                id="order-site-same-as-client"
+                checked={sameAsClientAddress}
+                onCheckedChange={(checked) => {
+                  const useClientAddress = checked === true;
+                  form.setValue('sameAsClientAddress', useClientAddress, { shouldDirty: true });
+                  if (useClientAddress) {
+                    form.setValue('siteAddress', clientAddress, { shouldValidate: true, shouldDirty: true });
+                    form.setValue('siteLatitude', null, { shouldDirty: true });
+                    form.setValue('siteLongitude', null, { shouldDirty: true });
+                  }
+                }}
+                data-testid="checkbox-order-site-same-as-client"
+              />
+              <div>
+                <label htmlFor="order-site-same-as-client" className="cursor-pointer text-xs font-medium">Order site address is same as client address</label>
+                <p className="mt-1 text-[10px] text-muted-foreground">When checked, the site address follows the client address entered above or saved on the selected client.</p>
+              </div>
+            </div>
             <SiteMapPicker
               address={siteAddress}
               latitude={siteLatitude}
@@ -485,7 +557,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
               onSelect={(point) => {
                 form.setValue('siteLatitude', point.latitude, { shouldValidate: true, shouldDirty: true });
                 form.setValue('siteLongitude', point.longitude, { shouldValidate: true, shouldDirty: true });
-                if (point.address) form.setValue('siteAddress', point.address, { shouldValidate: true, shouldDirty: true });
+                if (point.address && !form.getValues('sameAsClientAddress')) form.setValue('siteAddress', point.address, { shouldValidate: true, shouldDirty: true });
               }}
               onClear={() => {
                 form.setValue('siteLatitude', null, { shouldValidate: true, shouldDirty: true });
@@ -561,7 +633,7 @@ export default function OrderHubPage({ user }: { user: User }) {
   };
   const clearFilters = () => { setSearch(''); setStatus('all'); setClientId('all'); setLocationName(''); setFrom(''); setTo(''); };
 
-  return <AppShell user={user} title="Order hub" eyebrow="Orders · central register"><div className="space-y-6">
+  return <AppShell user={user} title="Client & Orders" eyebrow="Central order register"><div className="space-y-6">
     <section className="order-hub-accent animate-enter-up relative overflow-hidden rounded-2xl p-6 text-white shadow-sm md:p-8">
       <div className="absolute right-9 top-7 h-24 w-24 rounded-full border border-sidebar-primary/20" />
       <div className="absolute right-16 top-14 h-10 w-10 rounded-full border border-accent/30" />
