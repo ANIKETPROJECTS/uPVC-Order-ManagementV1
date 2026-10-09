@@ -13,8 +13,8 @@ import { Router, type Response } from "express";
 import {
   getInstallationTeams,
   getInstallations,
-  getMongoClient,
   getMongoDb,
+  runWithMongoTransactionIfSupported,
   type InstallationSubteamDocument,
   type InstallationTeamDocument,
 } from "../lib/mongo";
@@ -212,34 +212,29 @@ router.patch("/installation/teams/:id", async (req, res): Promise<void> => {
       updatedBy: actor.id,
       updatedAt,
     };
-    const session = (await getMongoClient()).startSession();
-    try {
-      await session.withTransaction(async () => {
-        if (removedSubteams.length) {
-          await getInstallations(db).updateMany(
-            {
-              teamId: existing._id,
-              subteamId: { $in: removedSubteams.map((subteam) => subteam._id) },
-              installationStatus: { $ne: "installed" },
+    await runWithMongoTransactionIfSupported(async (session) => {
+      if (removedSubteams.length) {
+        await getInstallations(db).updateMany(
+          {
+            teamId: existing._id,
+            subteamId: { $in: removedSubteams.map((subteam) => subteam._id) },
+            installationStatus: { $ne: "installed" },
+          },
+          {
+            $unset: {
+              teamId: "",
+              teamNameSnapshot: "",
+              subteamId: "",
+              subteamNameSnapshot: "",
+              shareToken: "",
             },
-            {
-              $unset: {
-                teamId: "",
-                teamNameSnapshot: "",
-                subteamId: "",
-                subteamNameSnapshot: "",
-                shareToken: "",
-              },
-              $set: { assignedMembers: [], updatedBy: actor.id, updatedAt },
-            },
-            { session },
-          );
-        }
-        await teams.updateOne({ _id: existing._id }, { $set: update }, { session });
-      });
-    } finally {
-      await session.endSession();
-    }
+            $set: { assignedMembers: [], updatedBy: actor.id, updatedAt },
+          },
+          { session },
+        );
+      }
+      await teams.updateOne({ _id: existing._id }, { $set: update }, { session });
+    });
     const updated = await teams.findOne({ _id: existing._id });
     if (!updated) {
       res.status(404).json({ error: "Installation team not found." });
@@ -268,9 +263,8 @@ router.delete("/installation/teams/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Installation team not found." });
     return;
   }
-  const session = (await getMongoClient()).startSession();
   try {
-    await session.withTransaction(async () => {
+    await runWithMongoTransactionIfSupported(async (session) => {
       await getInstallations(db).updateMany(
         { teamId: team._id, installationStatus: { $ne: "installed" } },
         {
@@ -297,8 +291,6 @@ router.delete("/installation/teams/:id", async (req, res): Promise<void> => {
   } catch (error) {
     if (sendTeamError(res, error)) return;
     throw error;
-  } finally {
-    await session.endSession();
   }
   res.status(204).send();
 });

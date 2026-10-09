@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
-import { GridFSBucket, MongoClient, type Collection, type Db } from "mongodb";
+import { GridFSBucket, MongoClient, type ClientSession, type Collection, type Db } from "mongodb";
 import { logger } from "./logger";
 import {
   formatLotId,
@@ -26,6 +26,7 @@ const databaseName =
   "upvc_order_management";
 const mongoClient = new MongoClient(mongoUri);
 let clientPromise: Promise<MongoClient> | undefined;
+let transactionsSupportedPromise: Promise<boolean> | undefined;
 
 export type PermissionLevel = "none" | "view" | "edit";
 export type PermissionMap = Record<string, PermissionLevel>;
@@ -635,6 +636,31 @@ interface CounterDocument {
 export function getMongoClient(): Promise<MongoClient> {
   clientPromise ??= mongoClient.connect();
   return clientPromise;
+}
+
+/**
+ * Run a multi-document operation transactionally when the MongoDB topology
+ * supports transactions. Standalone MongoDB accepts sessions but rejects
+ * transactions, so use the same session without starting a transaction there.
+ */
+export async function runWithMongoTransactionIfSupported<T>(
+  operation: (session: ClientSession) => Promise<T>,
+): Promise<T> {
+  const client = await getMongoClient();
+  const session = client.startSession();
+  try {
+    transactionsSupportedPromise ??= client.db("admin").command({ hello: 1 }).then((hello) =>
+      typeof hello.setName === "string" ||
+      hello.msg === "isdbgrid" ||
+      hello.serviceId != null,
+    );
+    if (!await transactionsSupportedPromise) {
+      return await operation(session);
+    }
+    return await session.withTransaction(() => operation(session)) as T;
+  } finally {
+    await session.endSession();
+  }
 }
 
 export async function getMongoDb(): Promise<Db> {

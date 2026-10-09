@@ -25,12 +25,12 @@ import { Router } from "express";
 import {
   getInstallationTeams,
   getInstallations,
-  getMongoClient,
   getMongoDb,
   getOrderActivity,
   getOrderGrievances,
   getOrderWindows,
   getOrders,
+  runWithMongoTransactionIfSupported,
   type InstallationSubteamDocument,
   type InstallationDocument,
   type InstallationTeamDocument,
@@ -459,13 +459,12 @@ router.patch("/installation/orders/:id/assignment", async (req, res): Promise<vo
   if (!actor) return;
 
   const db = await getMongoDb();
-  const session = (await getMongoClient()).startSession();
   const scheduledDate = body.data.scheduledDate.toISOString().slice(0, 10);
   let updatedOrder: OrderDocument | null = null;
   let updatedInstallation: InstallationDocument | null = null;
   let assignedTeam: InstallationTeamDocument | null = null;
   try {
-    await session.withTransaction(async () => {
+    await runWithMongoTransactionIfSupported(async (session) => {
       const order = await getOrders(db).findOne(
         { _id: params.data.id, dispatchStatus: "delivered" },
         { session },
@@ -559,8 +558,6 @@ router.patch("/installation/orders/:id/assignment", async (req, res): Promise<vo
       return;
     }
     throw error;
-  } finally {
-    await session.endSession();
   }
 
   const savedOrder = updatedOrder as OrderDocument | null;
@@ -589,9 +586,8 @@ router.delete("/installation/orders/:id/assignment", async (req, res): Promise<v
   if (!actor) return;
 
   const db = await getMongoDb();
-  const session = (await getMongoClient()).startSession();
   try {
-    await session.withTransaction(async () => {
+    await runWithMongoTransactionIfSupported(async (session) => {
       const orders = getOrders(db);
       const order = await orders.findOne(
         { _id: params.data.id, dispatchStatus: "delivered" },
@@ -661,8 +657,6 @@ router.delete("/installation/orders/:id/assignment", async (req, res): Promise<v
       return;
     }
     throw error;
-  } finally {
-    await session.endSession();
   }
 
   res.status(204).send();
@@ -687,14 +681,13 @@ router.patch("/installation/orders/:id", async (req, res): Promise<void> => {
   }
 
   const db = await getMongoDb();
-  const session = (await getMongoClient()).startSession();
   let updatedOrder: OrderDocument | null = null;
   let updatedInstallation: InstallationDocument | null = null;
   const now = new Date();
   const installationDate = body.data.installationDate.toISOString().slice(0, 10);
 
   try {
-    await session.withTransaction(async () => {
+    await runWithMongoTransactionIfSupported(async (session) => {
       const orders = getOrders(db);
       const order = await orders.findOne(
         { _id: params.data.id, dispatchStatus: "delivered" },
@@ -770,8 +763,6 @@ router.patch("/installation/orders/:id", async (req, res): Promise<void> => {
       return;
     }
     throw error;
-  } finally {
-    await session.endSession();
   }
 
   const savedOrder = updatedOrder as OrderDocument | null;
@@ -831,7 +822,6 @@ router.post("/orders/:id/grievances", async (req, res): Promise<void> => {
   }
 
   const db = await getMongoDb();
-  const session = (await getMongoClient()).startSession();
   const grievanceId = randomUUID();
   const now = new Date();
   const item: OrderGrievanceDocument = {
@@ -847,7 +837,7 @@ router.post("/orders/:id/grievances", async (req, res): Promise<void> => {
   };
 
   try {
-    await session.withTransaction(async () => {
+    await runWithMongoTransactionIfSupported(async (session) => {
       const order = await getOrders(db).findOne({ _id: params.data.id }, { session });
       if (!order) throw new InstallationConflict("Order not found.");
       if (order.status !== "installed") {
@@ -871,8 +861,6 @@ router.post("/orders/:id/grievances", async (req, res): Promise<void> => {
       return;
     }
     throw error;
-  } finally {
-    await session.endSession();
   }
 
   res.status(201).json(CreateOrderGrievanceResponse.parse(grievanceResponse(item)));
