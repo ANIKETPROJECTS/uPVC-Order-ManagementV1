@@ -559,7 +559,10 @@ router.post("/quotations", async (req, res): Promise<void> => {
       { $inc: { value: 1 }, $set: { updatedAt: new Date() } },
       { returnDocument: "after", upsert: true },
     );
-    const sequenceNo = counter?.value ?? 499;
+    if (!counter || !Number.isSafeInteger(counter.value) || counter.value < 1) {
+      throw new Error("The quotation sequence counter could not be allocated.");
+    }
+    const sequenceNo = counter.value;
     const now = new Date();
     const document: QuotationDocument = {
       _id: randomUUID(),

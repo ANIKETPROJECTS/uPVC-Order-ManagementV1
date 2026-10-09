@@ -266,15 +266,10 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
   const now = new Date();
   const { clientName, location, windowQty, totalSqFt, glassType } = parsed.data;
   const counters = getCounters(db);
-  await counters.updateOne(
-    { _id: "quotation-request-sequence" },
-    { $setOnInsert: { _id: "quotation-request-sequence", value: 0, updatedAt: now } },
-    { upsert: true },
-  );
   const counter = await counters.findOneAndUpdate(
     { _id: "quotation-request-sequence" },
     { $inc: { value: 1 }, $set: { updatedAt: now } },
-    { returnDocument: "after" },
+    { returnDocument: "after", upsert: true },
   );
   if (!counter) {
     res.status(503).json({ error: "A quotation request ID could not be allocated." });

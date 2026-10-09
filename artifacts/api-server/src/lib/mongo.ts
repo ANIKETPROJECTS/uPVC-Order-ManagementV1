@@ -753,6 +753,7 @@ async function migrateMeasurementSheetIds(db: Db, now: Date): Promise<void> {
   const migrations = db.collection<MeasurementMigrationDocument>("system_migrations");
   const counters = getCounters(db);
   const records = getMeasurementRecords(db);
+  if (await records.countDocuments({}) === 0) return;
   try {
     await migrations.updateOne(
       { _id: measurementSheetMigrationId },
@@ -866,6 +867,7 @@ async function migrateMeasurementSheetIds(db: Db, now: Date): Promise<void> {
 async function migrateMeasurementSheetIdsToFullYear(db: Db, now: Date): Promise<void> {
   const migrations = db.collection<MeasurementMigrationDocument>("system_migrations");
   const records = getMeasurementRecords(db);
+  if (await records.countDocuments({}) === 0) return;
   try {
     await migrations.updateOne(
       { _id: measurementSheetFullYearMigrationId },
@@ -968,6 +970,7 @@ async function migrateOrderIds(db: Db, now: Date): Promise<void> {
     .find({})
     .sort({ createdAt: 1, sequenceNo: 1, _id: 1 })
     .toArray();
+  if (orders.length === 0) return;
   const nextByCounter = new Map<string, number>();
   const planned = orders.map((order) => {
     const dateKey = orderDateKey(order.createdAt);
@@ -1039,6 +1042,7 @@ async function migrateQuotationOrderIds(db: Db, now: Date): Promise<void> {
     getClients(db).find({}).toArray(),
     getQuotations(db).find({}).toArray(),
   ]);
+  if (orders.length === 0) return;
   const clientById = new Map(clients.map((client) => [client._id, client]));
   const quotationById = new Map(quotations.map((quotation) => [quotation._id, quotation]));
 
@@ -1246,8 +1250,6 @@ export async function initializeMongo(): Promise<void> {
   const chatMessages = getChatMessages(db);
   const clients = getClients(db);
   const locations = getOrderLocations(db);
-  const orders = getOrders(db);
-  const counters = getCounters(db);
   const orderWindows = getOrderWindows(db);
   const glassTrackingOrders = getGlassTrackingOrders(db);
   const glassTrackingWorkbookImports = getGlassTrackingWorkbookImports(db);
@@ -1375,21 +1377,6 @@ export async function initializeMongo(): Promise<void> {
   ]);
 
   const now = new Date();
-  await getCounters(db).updateOne(
-    { _id: "quotation-sequence" },
-    { $setOnInsert: { _id: "quotation-sequence", value: 498, updatedAt: now } },
-    { upsert: true },
-  );
-  await getCounters(db).updateOne(
-    { _id: "quotation-rate-sequence" },
-    { $setOnInsert: { _id: "quotation-rate-sequence", value: 999, updatedAt: now } },
-    { upsert: true },
-  );
-  await getCounters(db).updateOne(
-    { _id: "quotation-request-sequence" },
-    { $setOnInsert: { _id: "quotation-request-sequence", value: 0, updatedAt: now } },
-    { upsert: true },
-  );
 
   const profileRates = new Map(
     (await windowProfiles.find({}).toArray()).map((profile) => [
@@ -1439,18 +1426,6 @@ export async function initializeMongo(): Promise<void> {
       );
     }
   }
-
-  await counters.updateOne(
-    { _id: "orderSequence" },
-    { $setOnInsert: { value: 0, updatedAt: now } },
-    { upsert: true },
-  );
-  const highestOrder = await orders.find().sort({ sequenceNo: -1 }).limit(1).next();
-  await counters.updateOne(
-    { _id: "orderSequence" },
-    { $max: { value: highestOrder?.sequenceNo ?? 0 }, $set: { updatedAt: now } },
-    { upsert: true },
-  );
 
   await migrateQuotationOrderIds(db, now);
   await migrateOrderIds(db, now);
