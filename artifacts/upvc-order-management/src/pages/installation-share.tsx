@@ -2,6 +2,7 @@ import { ArrowDownToLine, CalendarDays, MapPin, PackageOpen, PanelsTopLeft, Rule
 import { useGetPublicInstallationShare, getGetPublicInstallationShareQueryKey } from '@workspace/api-client-react';
 import { useRoute } from 'wouter';
 import { Button } from '@/components/ui/button';
+import { SiteLocation } from '@/components/site-location';
 
 const displayDate = (value: string | null) => {
   if (!value) return 'Date to be confirmed';
@@ -13,7 +14,13 @@ export default function PublicInstallationSharePage() {
   const [, params] = useRoute('/installation/share/:token');
   const token = params?.token || '';
   const query = useGetPublicInstallationShare(token, {
-    query: { enabled: Boolean(token), queryKey: getGetPublicInstallationShareQueryKey(token), retry: false },
+    query: {
+      enabled: Boolean(token),
+      queryKey: getGetPublicInstallationShareQueryKey(token),
+      retry: false,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    },
   });
   const job = query.data;
 
@@ -40,6 +47,13 @@ export default function PublicInstallationSharePage() {
               <span className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/[.08] px-3 py-2 text-xs font-semibold"><CalendarDays size={14} />{displayDate(job.scheduledDate)}</span>
               <span className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/[.08] px-3 py-2 text-xs font-semibold"><PanelsTopLeft size={14} />{job.windowQty} {job.windowQty === 1 ? 'window' : 'windows'}</span>
             </div>
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-2xl border border-[hsl(39_25%_84%)] bg-[hsl(42_46%_99%)] p-5 sm:p-6" data-testid="panel-public-installation-location">
+          <p className="text-[10px] font-bold uppercase tracking-[.15em] text-[hsl(168_58%_35%)]">Site location</p>
+          <div className="mt-3">
+            <SiteLocation address={job.siteAddress || job.locationName} showMap testId="public-installation-site-location" />
           </div>
         </section>
 

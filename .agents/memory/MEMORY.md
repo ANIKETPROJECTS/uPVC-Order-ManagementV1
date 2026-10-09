@@ -24,3 +24,4 @@
 - [Mongo reset scope](mongo-reset-scope.md) — explicitly authorized resets preserve user accounts and role access; verify the intended database before clearing operational records.
 - [Manual demo data only](manual-demo-data.md) — never seed business records automatically; create samples only through an explicitly requested one-time operation.
 - [Standalone MongoDB support](standalone-mongo.md) — the connected MongoDB is standalone; Installation writes must not require replica-set transactions.
+- [Order-specific site addresses](order-site-addresses.md) — capture the installation address per order; the client address is only a default and legacy fallback.

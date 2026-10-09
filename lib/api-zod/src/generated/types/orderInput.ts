@@ -17,6 +17,11 @@ export interface OrderInput {
      */
   locationCode: string;
   /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  siteAddress: string;
+  /**
      * @maxLength 2000
      * @nullable
      */

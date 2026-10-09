@@ -30,6 +30,8 @@ export interface Order {
   /** @nullable */
   clientAddress: string | null;
   /** @nullable */
+  siteAddress: string | null;
+  /** @nullable */
   clientGstin: string | null;
   locationCode: string;
   locationName: string;

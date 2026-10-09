@@ -40,6 +40,7 @@ import {
   getListOrderDocumentCategoriesQueryKey,
   getListOrderActivityQueryKey,
   getListOrderGrievancesQueryKey,
+  getListInstallationOrdersQueryKey,
   getListOrderDocumentsQueryKey,
   getListOrderMessageTemplatesQueryKey,
   getListOrderPaymentFlagsQueryKey,
@@ -98,6 +99,7 @@ import type {
 } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { OrderQrCard } from '@/components/order-qr-card';
+import { SiteLocation } from '@/components/site-location';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -212,6 +214,7 @@ function SummaryStat({ label, value, detail, testId }: { label: string; value: s
 
 const detailSchema = z.object({
   locationCode: z.string().min(2).max(5),
+  siteAddress: z.string().trim().min(3, 'Enter the order’s site address.').max(500, 'Keep the address under 500 characters.'),
   status: z.string(),
   notes: z.string().max(2000).nullable().optional(),
 });
@@ -225,7 +228,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   const [editing, setEditing] = useState(
     () => new URLSearchParams(window.location.search).get('edit') === 'true',
   );
-  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { locationCode: order.locationCode, status: order.status, notes: order.notes || '' } });
+  const form = useForm<z.infer<typeof detailSchema>>({ resolver: zodResolver(detailSchema), defaultValues: { locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', status: order.status, notes: order.notes || '' } });
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.has('edit')) {
@@ -237,13 +240,14 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   useEffect(() => {
     if (initializedForId.current !== order.id) {
       initializedForId.current = order.id;
-      form.reset({ locationCode: order.locationCode, status: order.status, notes: order.notes || '' });
+      form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', status: order.status, notes: order.notes || '' });
     }
-  }, [form, order.id, order.locationCode, order.notes, order.status]);
-  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationCode: values.locationCode, status: values.status as Status, notes: values.notes || null } }, {
+  }, [form, order.id, order.locationCode, order.siteAddress, order.clientAddress, order.notes, order.status]);
+  const save = (values: z.infer<typeof detailSchema>) => update.mutate({ id: order.id, data: { locationCode: values.locationCode, siteAddress: values.siteAddress.trim(), status: values.status as Status, notes: values.notes || null } }, {
     onSuccess: (updated) => {
       queryClient.setQueryData(getGetOrderQueryKey(id), updated);
       void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getListInstallationOrdersQueryKey() });
       void queryClient.invalidateQueries({ queryKey: getGetPaymentOverviewQueryKey() });
       void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(id) });
       setEditing(false);
@@ -260,7 +264,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
         {canEdit && (
           <Button variant="outline" size="sm" onClick={() => {
             setEditing((value) => !value);
-            form.reset({ locationCode: order.locationCode, status: order.status, notes: order.notes || '' });
+            form.reset({ locationCode: order.locationCode, siteAddress: order.siteAddress || order.clientAddress || '', status: order.status, notes: order.notes || '' });
           }} data-testid="button-toggle-order-edit">
             <Pencil size={13} /> {editing ? 'Cancel' : 'Edit record'}
           </Button>
@@ -282,6 +286,15 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
                       )}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="siteAddress" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Order site address</FormLabel>
+                  <FormControl><Textarea {...field} rows={3} maxLength={500} placeholder="Building, street, area, city, state, PIN code" data-testid="input-edit-order-site-address" /></FormControl>
+                  <p className="text-[10px] leading-4 text-muted-foreground">This address belongs to this order; changing it won’t change the client’s saved address.</p>
+                  {field.value.trim().length >= 3 && <SiteLocation address={field.value} compact testId="preview-edit-order-site-address" />}
                   <FormMessage />
                 </FormItem>
               )} />
@@ -316,6 +329,10 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Client contact</p>
               <p className="mt-2 text-sm font-semibold" data-testid="text-client-phone">{order.clientPhone || 'Not provided'}</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground" data-testid="text-client-address">{order.clientAddress || 'No address on record'}</p>
+            </div>
+            <div className="order-rule pl-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Order site address</p>
+              <SiteLocation address={order.siteAddress || order.clientAddress} testId="order-site-location" />
             </div>
             <div className="order-rule pl-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Tax identity</p>

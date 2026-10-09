@@ -14,6 +14,11 @@ export interface OrderUpdate {
      * @maxLength 5
      */
   locationCode?: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  siteAddress?: string;
   isActive?: boolean;
   /**
      * @maxLength 2000

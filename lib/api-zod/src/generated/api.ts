@@ -1321,6 +1321,7 @@ export const ListOrdersResponseItem = zod.object({
   "clientPrefix": zod.string(),
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1344,6 +1345,9 @@ export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
 export const createOrderBodyLocationCodeMin = 2;
 export const createOrderBodyLocationCodeMax = 5;
 
+export const createOrderBodySiteAddressMin = 3;
+export const createOrderBodySiteAddressMax = 500;
+
 export const createOrderBodyNotesMax = 2000;
 
 
@@ -1352,6 +1356,7 @@ export const CreateOrderBody = zod.object({
   "clientId": zod.string().min(1),
   "quotationId": zod.string().min(1),
   "locationCode": zod.string().min(createOrderBodyLocationCodeMin).max(createOrderBodyLocationCodeMax),
+  "siteAddress": zod.string().min(createOrderBodySiteAddressMin).max(createOrderBodySiteAddressMax),
   "notes": zod.string().max(createOrderBodyNotesMax).nullish()
 })
 
@@ -1378,6 +1383,7 @@ export const CreateOrderResponse = zod.object({
   "clientPrefix": zod.string(),
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1422,6 +1428,7 @@ export const GetOrderResponse = zod.object({
   "clientPrefix": zod.string(),
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1446,6 +1453,9 @@ export const UpdateOrderParams = zod.object({
 export const updateOrderBodyLocationCodeMin = 2;
 export const updateOrderBodyLocationCodeMax = 5;
 
+export const updateOrderBodySiteAddressMin = 3;
+export const updateOrderBodySiteAddressMax = 500;
+
 export const updateOrderBodyNotesMax = 2000;
 
 
@@ -1453,6 +1463,7 @@ export const updateOrderBodyNotesMax = 2000;
 export const UpdateOrderBody = zod.object({
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
   "locationCode": zod.string().min(updateOrderBodyLocationCodeMin).max(updateOrderBodyLocationCodeMax).optional(),
+  "siteAddress": zod.string().min(updateOrderBodySiteAddressMin).max(updateOrderBodySiteAddressMax).optional(),
   "isActive": zod.boolean().optional(),
   "notes": zod.string().max(updateOrderBodyNotesMax).nullish()
 })
@@ -1480,6 +1491,7 @@ export const UpdateOrderResponse = zod.object({
   "clientPrefix": zod.string(),
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1524,6 +1536,7 @@ export const DeleteOrderResponse = zod.object({
   "clientPrefix": zod.string(),
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1568,6 +1581,7 @@ export const AddOrderLotResponse = zod.object({
   "clientPrefix": zod.string(),
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -1635,6 +1649,7 @@ export const ListInstallationOrdersResponseItem = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "siteAddress": zod.string().nullable(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "installationStatus": zod.enum(['pending', 'issue', 'installed']),
@@ -1681,6 +1696,7 @@ export const GetPublicInstallationShareResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "siteAddress": zod.string().nullable(),
   "windowQty": zod.number().int().min(getPublicInstallationShareResponseWindowQtyMin),
   "teamName": zod.string(),
   "subteamName": zod.string().nullable(),
@@ -1775,6 +1791,7 @@ export const UpdateInstallationOrderResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "siteAddress": zod.string().nullable(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "installationStatus": zod.enum(['pending', 'issue', 'installed']),
@@ -1962,6 +1979,7 @@ export const AssignInstallationOrderResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "siteAddress": zod.string().nullable(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "installationStatus": zod.enum(['pending', 'issue', 'installed']),
@@ -5182,6 +5200,7 @@ export const UpdateOrderBillingResponse = zod.object({
   "clientPrefix": zod.string(),
   "clientPhone": zod.string().nullable(),
   "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),

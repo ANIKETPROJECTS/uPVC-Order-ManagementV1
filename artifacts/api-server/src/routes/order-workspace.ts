@@ -703,7 +703,7 @@ router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {
 router.get("/orders/:id/windows", async (req, res): Promise<void> => {
   const p = ListOrderWindowsParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
   if (!(await context(req, res)) || !(await orderExists(p.data.id, res))) return;
-  const rows = await getOrderWindows(await getMongoDb()).find({ orderRecordId: p.data.id, archivedAt: { $exists: false } }).sort({ windowNo: 1 }).toArray();
+  const rows = await getOrderWindows(await getMongoDb()).find({ orderRecordId: p.data.id, archivedAt: null }).sort({ windowNo: 1 }).toArray();
   res.json(ListOrderWindowsResponse.parse(rows.map(windowResponse)));
 });
 router.post("/orders/:id/windows", async (req, res): Promise<void> => {
@@ -718,7 +718,7 @@ router.post("/orders/:id/windows", async (req, res): Promise<void> => {
 router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> => {
   const p = UpdateOrderWindowParams.safeParse(req.params), b = UpdateOrderWindowBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
   const actor = await context(req, res); if (!actor) return;
-  const db = await getMongoDb(); const old = await getOrderWindows(db).findOne({ _id: p.data.windowId, orderRecordId: p.data.id, archivedAt: { $exists: false } }); if (!old) { res.status(404).json({ error: "Window not found." }); return; }
+  const db = await getMongoDb(); const old = await getOrderWindows(db).findOne({ _id: p.data.windowId, orderRecordId: p.data.id, archivedAt: null }); if (!old) { res.status(404).json({ error: "Window not found." }); return; }
   const keys = Object.keys(b.data); const measurement = keys.some(k => ["windowNo", "widthMm", "heightMm", "windowType"].includes(k)); const readiness = keys.some(k => ["frameStatus", "shutterStatus", "pendingReason"].includes(k)); const glass = keys.includes("glassStatus");
   if (keys.length === 0) { res.status(400).json({ error: "At least one window field must be provided." }); return; }
   if (measurement && !requireModuleEdit(actor, res, "measurements")) return;
@@ -733,7 +733,7 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
 });
 router.delete("/orders/:id/windows/:windowId", async (req, res): Promise<void> => {
   const p = ArchiveOrderWindowParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } const actor = await context(req, res, "measurements", true); if (!actor || !(await orderExists(p.data.id, res))) return;
-  const db = await getMongoDb(); const w = await getOrderWindows(db).findOne({ _id: p.data.windowId, orderRecordId: p.data.id, archivedAt: { $exists: false } }); if (!w) { res.status(404).json({ error: "Window not found." }); return; }
+  const db = await getMongoDb(); const w = await getOrderWindows(db).findOne({ _id: p.data.windowId, orderRecordId: p.data.id, archivedAt: null }); if (!w) { res.status(404).json({ error: "Window not found." }); return; }
   await getOrderWindows(db).updateOne({ _id: w._id }, { $set: { archivedAt: new Date(), updatedAt: new Date(), updatedBy: actor.id } }); await event(p.data.id, actor, "window.archived", `Archived window ${w.windowNo}.`); res.status(204).send();
 });
 
@@ -1232,7 +1232,7 @@ router.get("/payments/overview", async (req, res): Promise<void> => {
     && (progressByOrder.get(order._id)?.balance ?? 0) > 0);
   const activeWindows = await getOrderWindows(db).find({
     orderRecordId: { $in: outstandingOrders.map((order) => order._id) },
-    archivedAt: { $exists: false },
+    archivedAt: null,
   }).toArray();
   const windowsByOrder = new Map<string, OrderWindowDocument[]>();
   for (const window of activeWindows) {

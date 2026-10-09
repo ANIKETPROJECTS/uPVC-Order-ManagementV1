@@ -183,6 +183,7 @@ function orderResponse(order: OrderDocument) {
     clientPrefix: order.clientPrefix,
     clientPhone: order.clientPhone,
     clientAddress: order.clientAddress,
+    siteAddress: order.siteAddress?.trim() || order.clientAddress?.trim() || null,
     clientGstin: order.clientGstin,
     locationCode: order.locationCode,
     locationName: order.locationName,
@@ -572,6 +573,11 @@ router.post(
       res.status(409).json({ error: "Choose Project or Retail for this client before creating an order." });
       return;
     }
+    const siteAddress = parsed.data.siteAddress.trim();
+    if (siteAddress.length < 3) {
+      res.status(400).json({ error: "Enter a site address with at least 3 characters." });
+      return;
+    }
     const quotation = await getQuotations(db).findOne({ _id: parsed.data.quotationId });
     if (!quotation || quotation.archivedAt) {
       res.status(404).json({ error: "Choose an active quotation for this order." });
@@ -639,6 +645,7 @@ router.post(
       clientGstin: client.gstin,
       locationCode: normalizedLocationCode,
       locationName: location.name,
+      siteAddress,
       quotationId: quotation._id,
       quotationNo: quotation.quoteNo,
       needsReview: false,
@@ -710,6 +717,7 @@ router.patch(
       parsed.data.status === undefined &&
       parsed.data.notes === undefined &&
       parsed.data.locationCode === undefined &&
+      parsed.data.siteAddress === undefined &&
       parsed.data.isActive === undefined
     ) {
       res.status(400).json({ error: "Provide an order status, notes, or active-state update." });
@@ -733,6 +741,14 @@ router.patch(
     }
     if (parsed.data.notes !== undefined) {
       updates.notes = parsed.data.notes?.trim() || null;
+    }
+    if (parsed.data.siteAddress !== undefined) {
+      const siteAddress = parsed.data.siteAddress.trim();
+      if (siteAddress.length < 3) {
+        res.status(400).json({ error: "Enter a site address with at least 3 characters." });
+        return;
+      }
+      updates.siteAddress = siteAddress;
     }
     const db = await getMongoDb();
     const before = await getOrders(db).findOne({ _id: params.data.id });
@@ -776,6 +792,7 @@ router.patch(
       before &&
       actor &&
       (before.locationCode !== order.locationCode ||
+        before.siteAddress !== order.siteAddress ||
         before.status !== order.status ||
         before.notes !== order.notes ||
         activeStateChanged)
@@ -784,6 +801,7 @@ router.patch(
         before.locationCode !== order.locationCode
           ? `location to ${order.locationCode} · ${order.locationName}`
           : "",
+        before.siteAddress !== order.siteAddress ? "site address" : "",
         before.status !== order.status ? `status to ${order.status}` : "",
         before.notes !== order.notes ? "internal notes" : "",
         (before.isActive !== false) !== (order.isActive !== false)

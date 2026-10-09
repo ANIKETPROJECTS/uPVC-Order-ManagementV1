@@ -59,6 +59,7 @@ function installationResponse(
     orderId: order.orderId,
     clientName: order.clientName,
     locationName: order.locationName,
+    siteAddress: order.siteAddress?.trim() || order.clientAddress?.trim() || null,
     orderStatus: order.status,
     dispatchStatus: order.dispatchStatus ?? "pending_dispatch",
     installationStatus: installation?.installationStatus ?? (order.status === "installed" ? "installed" : "pending"),
@@ -218,13 +219,14 @@ router.get("/installation/share/:token", async (req, res): Promise<void> => {
   const subteam = team?.subteams.find((candidate: InstallationSubteamDocument) => candidate._id === installation.subteamId);
   const windowQty = await getOrderWindows(db).countDocuments({
     orderRecordId: order._id,
-    archivedAt: { $exists: false },
+    archivedAt: null,
   });
   res.setHeader("Cache-Control", "no-store");
   res.json(GetPublicInstallationShareResponse.parse({
     orderId: order.orderId,
     clientName: order.clientName,
     locationName: order.locationName,
+    siteAddress: order.siteAddress?.trim() || order.clientAddress?.trim() || null,
     windowQty,
     teamName: team?.name ?? installation.teamNameSnapshot ?? "Installation team",
     subteamName: subteam?.name ?? installation.subteamNameSnapshot ?? null,
@@ -430,7 +432,7 @@ router.get("/installation/orders", async (req, res): Promise<void> => {
   const teams = await getInstallationTeams(db).find().toArray();
   const windows = await getOrderWindows(db).find({
     orderRecordId: { $in: orders.map((order) => order._id) },
-    archivedAt: { $exists: false },
+    archivedAt: null,
   }).toArray();
   const installationsByOrder = new Map(installations.map((item) => [item.orderRecordId, item]));
   const teamsById = new Map(teams.map((team) => [team._id, team]));

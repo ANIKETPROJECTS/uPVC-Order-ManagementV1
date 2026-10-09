@@ -10,6 +10,8 @@ export interface PublicInstallationShare {
   orderId: string;
   clientName: string;
   locationName: string;
+  /** @nullable */
+  siteAddress: string | null;
   /** @minimum 0 */
   windowQty: number;
   teamName: string;

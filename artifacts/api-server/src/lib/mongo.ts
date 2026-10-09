@@ -187,6 +187,7 @@ export interface OrderDocument {
   clientPrefix: string;
   clientPhone: string | null;
   clientAddress: string | null;
+  siteAddress?: string | null;
   clientGstin: string | null;
   locationCode: string;
   locationName: string;

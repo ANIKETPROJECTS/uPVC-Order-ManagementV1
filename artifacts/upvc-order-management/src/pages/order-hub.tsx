@@ -49,6 +49,7 @@ import {
 } from '@workspace/api-client-react';
 import type { Client, Order, OrderLocation, OrderMessageTemplate, Quotation, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
+import { SiteLocation } from '@/components/site-location';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -159,6 +160,7 @@ const orderSchema = z.object({
   clientId: z.string().min(1, 'Select a client.'),
   quotationId: z.string().min(1, 'Select a quotation before creating the order.'),
   locationCode: z.string().min(2, 'Select a location.'),
+  siteAddress: z.string().trim().min(3, 'Enter the order’s site address.').max(500, 'Keep the address under 500 characters.'),
   notes: z.string().max(2000).optional(),
 });
 const templateSchema = z.object({ template: z.string().min(10, 'Message template is too short.') });
@@ -287,9 +289,10 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
   });
   const form = useForm<z.infer<typeof orderSchema>>({
     resolver: zodResolver(orderSchema),
-    defaultValues: { clientId: '', quotationId: '', locationCode: '', notes: '' },
+    defaultValues: { clientId: '', quotationId: '', locationCode: '', siteAddress: '', notes: '' },
   });
   const selectedClient = clients.find((client) => client.id === form.watch('clientId'));
+  const siteAddress = form.watch('siteAddress');
   const clientQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
     quotation.clientId === selectedClient?.id &&
     !quotation.sampleOnly &&
@@ -298,11 +301,11 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
   const selectedQuotation = clientQuotations.find((quotation) => quotation.id === form.watch('quotationId'));
   const previewId = orderIdPreview(selectedClient?.type ?? null, selectedQuotation?.quoteNo);
   const canCreate =
-    Boolean(selectedClient?.type && selectedQuotation && form.watch('locationCode')) &&
+    Boolean(selectedClient?.type && selectedQuotation && form.watch('locationCode') && siteAddress.trim().length >= 3) &&
     !create.isPending;
 
   useEffect(() => {
-    if (open) form.reset({ clientId: '', quotationId: '', locationCode: '', notes: '' });
+    if (open) form.reset({ clientId: '', quotationId: '', locationCode: '', siteAddress: '', notes: '' });
   }, [open, form]);
 
   const submit = (values: z.infer<typeof orderSchema>) => {
@@ -315,7 +318,7 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
       return;
     }
     create.mutate(
-      { data: { ...values, notes: values.notes || null } },
+      { data: { ...values, siteAddress: values.siteAddress.trim(), notes: values.notes || null } },
       {
         onSuccess: (order) => {
           void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
@@ -347,6 +350,7 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
                   onValueChange={(value) => {
                     field.onChange(value);
                     form.setValue('quotationId', '', { shouldValidate: true });
+                    form.setValue('siteAddress', clients.find((client) => client.id === value)?.address || '', { shouldValidate: true });
                   }}
                   value={field.value}
                 >
@@ -429,6 +433,23 @@ function NewOrderDialog({ open, onOpenChange, clients, locations, onDone, onEdit
                     ))}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="siteAddress" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Order site address</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Building, street, area, city, state, PIN code"
+                    data-testid="input-order-site-address"
+                  />
+                </FormControl>
+                <p className="text-[10px] leading-4 text-muted-foreground">Starts with the client address. Update it if this order’s installation site is different; the address will open directly in Google Maps.</p>
+                {siteAddress.trim().length >= 3 && <SiteLocation address={siteAddress} compact testId="preview-order-site-address" />}
                 <FormMessage />
               </FormItem>
             )} />
@@ -596,7 +617,7 @@ export default function OrderHubPage({ user }: { user: User }) {
                     <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-mobile-${order.id}`}>{statusLabel(order.status)}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-[10px]">
-                    <div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p></div>
+                     <div><p className="uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 font-mono font-bold">{order.locationCode} <span className="font-sans font-normal text-muted-foreground">{order.locationName}</span></p><SiteLocation address={order.siteAddress} compact testId={`order-mobile-site-${order.id}`} /></div>
                     <div><p className="uppercase tracking-wider text-muted-foreground">Created</p><p className="mt-1 font-medium">{shortDate(order.createdAt)}</p></div>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
@@ -627,7 +648,7 @@ export default function OrderHubPage({ user }: { user: User }) {
                       {order.needsReview && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900" data-testid={`badge-order-review-${order.id}`}>Needs review</span>}
                     </td>
                     <td className="px-4 py-3.5"><p className="font-semibold">{order.clientName}</p><p className="mt-1 text-[10px] text-muted-foreground">{order.clientPrefix}{order.clientPhone ? ` · ${order.clientPhone}` : ''}</p></td>
-                    <td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p></td>
+                    <td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold">{order.locationCode}</span><p className="mt-1 text-[10px] text-muted-foreground">{order.locationName}</p><SiteLocation address={order.siteAddress} compact testId={`order-table-site-${order.id}`} /></td>
                     <td className="px-4 py-3.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(order.status)}`} data-testid={`status-order-${order.id}`}>{statusLabel(order.status)}</span></td>
                     <td className="px-4 py-3.5 text-muted-foreground">{shortDate(order.createdAt)}<p className="mt-1 text-[10px]">{order.createdBy}</p></td>
                     <td className="px-4 py-3.5"><OrderRowActions order={order} canEdit={canEdit} pending={orderActionsPending} onArchive={archiveOrder} onRestore={restoreOrder} /></td>

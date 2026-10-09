@@ -3659,6 +3659,8 @@ components:
           type: string
         locationName:
           type: string
+        siteAddress:
+          type: ["string", "null"]
         orderStatus:
           $ref: "#/components/schemas/OrderStatus"
         dispatchStatus:
@@ -3700,7 +3702,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, installationStatus, installationDate, issueReason, windowQty, teamId, teamName, subteamId, subteamName, scheduledDate, assignedMembers, actualSquareFootage, shareToken, drawingFilename, drawingSizeBytes, updatedAt]
+      required: [id, orderId, clientName, locationName, siteAddress, orderStatus, dispatchStatus, installationStatus, installationDate, issueReason, windowQty, teamId, teamName, subteamId, subteamName, scheduledDate, assignedMembers, actualSquareFootage, shareToken, drawingFilename, drawingSizeBytes, updatedAt]
     InstallationDrawing:
       type: object
       properties:
@@ -3719,6 +3721,8 @@ components:
           type: string
         locationName:
           type: string
+        siteAddress:
+          type: ["string", "null"]
         windowQty:
           type: integer
           minimum: 0
@@ -3736,7 +3740,7 @@ components:
           type: ["string", "null"]
         drawingUrl:
           type: ["string", "null"]
-      required: [orderId, clientName, locationName, windowQty, teamName, subteamName, scheduledDate, actualSquareFootage, drawingFilename, drawingUrl]
+      required: [orderId, clientName, locationName, siteAddress, windowQty, teamName, subteamName, scheduledDate, actualSquareFootage, drawingFilename, drawingUrl]
     InstallationOrderUpdate:
       type: object
       properties:
@@ -3945,6 +3949,8 @@ components:
           type: ["string", "null"]
         clientAddress:
           type: ["string", "null"]
+        siteAddress:
+          type: ["string", "null"]
         clientGstin:
           type: ["string", "null"]
         locationCode:
@@ -3984,6 +3990,7 @@ components:
         - clientPrefix
         - clientPhone
         - clientAddress
+        - siteAddress
         - clientGstin
         - locationCode
         - locationName
@@ -4022,10 +4029,14 @@ components:
           type: string
           minLength: 2
           maxLength: 5
+        siteAddress:
+          type: string
+          minLength: 3
+          maxLength: 500
         notes:
           type: ["string", "null"]
           maxLength: 2000
-      required: [clientId, quotationId, locationCode]
+      required: [clientId, quotationId, locationCode, siteAddress]
     OrderUpdate:
       type: object
       properties:
@@ -4035,6 +4046,10 @@ components:
           type: string
           minLength: 2
           maxLength: 5
+        siteAddress:
+          type: string
+          minLength: 3
+          maxLength: 500
         isActive:
           type: boolean
         notes:

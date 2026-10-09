@@ -15,6 +15,8 @@ export interface InstallationOrder {
   orderId: string;
   clientName: string;
   locationName: string;
+  /** @nullable */
+  siteAddress: string | null;
   orderStatus: OrderStatus;
   dispatchStatus: DispatchStatus;
   installationStatus: InstallationStatus;
