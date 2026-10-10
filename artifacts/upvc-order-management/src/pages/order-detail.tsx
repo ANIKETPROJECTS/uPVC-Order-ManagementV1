@@ -51,6 +51,8 @@ import {
   getListPaymentFlagsQueryKey,
   getListOrderWindowsQueryKey,
   getListOrdersQueryKey,
+  getListDispatchOrdersQueryKey,
+  getGetGlassTrackingQueryKey,
   useAddOrderLot,
   OrderGlassStatus,
   OrderPaymentMethod,
@@ -67,6 +69,9 @@ import {
   useDeleteOrderDocumentCategory,
   useDownloadOrderDocument,
   useGetOrder,
+  useGetGlassTracking,
+  useListDispatchOrders,
+  useListInstallationOrders,
   useListOrderActivity,
   useListOrderDocumentCategories,
   useListOrderDocuments,
@@ -1455,6 +1460,64 @@ function ZeroState({ icon: Icon, title, description, testId }: { icon: typeof Fi
   return <div className="rounded-xl border border-dashed border-border bg-muted/15 px-5 py-10 text-center" data-testid={testId}><Icon className="mx-auto text-muted-foreground/60" size={25} /><p className="mt-3 text-sm font-semibold">{title}</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{description}</p></div>;
 }
 
+function OrderDeliveryPanels({ orderRecordId, createdAt, user }: { orderRecordId: string; createdAt: string; user: User }) {
+  const canViewDispatch = hasPermission(user, 'dispatch', 'view');
+  const canViewInstallation = hasPermission(user, 'installation', 'view');
+  const canViewGlass = hasPermission(user, 'glass-procurement', 'view');
+  const dispatchesQuery = useListDispatchOrders({ query: { enabled: canViewDispatch, queryKey: getListDispatchOrdersQueryKey(), refetchInterval: 10_000 } });
+  const installationQuery = useListInstallationOrders({ query: { enabled: canViewInstallation, queryKey: getListInstallationOrdersQueryKey(), refetchInterval: 10_000 } });
+  const glassQuery = useGetGlassTracking({ query: { enabled: canViewGlass, queryKey: getGetGlassTrackingQueryKey(), refetchInterval: 15_000 } });
+  const dispatchOrder = dispatchesQuery.data?.find((item) => item.id === orderRecordId);
+  const installation = installationQuery.data?.find((item) => item.id === orderRecordId);
+  const glass = glassQuery.data?.find((item) => item.orderRecordId === orderRecordId);
+  const dispatchEvents = [...(dispatchOrder?.dispatches ?? [])].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+  const glassPending = Math.max(0, (glass?.ordered ?? 0) - (glass?.received ?? 0) - (glass?.broken ?? 0));
+  const dispatchStatus = dispatchOrder?.dispatchStatus ?? 'pending_dispatch';
+  const installationStatus = installation?.installationStatus ?? 'pending';
+  const deliveryLabel = (value: string) => value === 'pending_dispatch' ? 'Pending dispatch' : value === 'dispatched' ? 'Dispatched' : value === 'delivered' ? 'Delivered' : readable(value);
+  const installationLabel = (value: string) => value === 'pending' ? 'Awaiting installation' : value === 'issue' ? 'Follow-up required' : 'Installed';
+
+  return <div className="space-y-4" data-testid="section-order-delivery-summary">
+    {canViewGlass && <Card className="border-border/80" data-testid="card-order-glass-quantities">
+      <CardHeader className="pb-3"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Glass tracking</p><CardTitle className="mt-1 text-base">Pane quantities</CardTitle><p className="mt-1 text-xs text-muted-foreground">Counts from this order’s glass register.</p></CardHeader>
+      <CardContent>
+        {glassQuery.isLoading ? <div className="h-16 animate-pulse rounded-xl bg-muted/50" data-testid="state-order-glass-loading" /> : glassQuery.isError ? <InlineError onRetry={() => void glassQuery.refetch()} label="Glass quantities could not be loaded." testId="state-order-glass-error" /> : !glass ? <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground" data-testid="state-order-glass-empty">No glass quantities have been recorded for this order.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryStat label="Ordered" value={String(glass.ordered)} detail="Glass panes ordered" testId="text-order-glass-ordered" />
+          <SummaryStat label="Received" value={String(glass.received)} detail="Intact panes received" testId="text-order-glass-received" />
+          <SummaryStat label="Broken" value={String(glass.broken)} detail="Broken panes recorded" testId="text-order-glass-broken" />
+          <SummaryStat label="Pending" value={String(glassPending)} detail="Ordered, not yet received or broken" testId="text-order-glass-pending" />
+        </div>}
+      </CardContent>
+    </Card>}
+    <Card className="border-border/80" data-testid="card-order-delivery-timeline">
+      <CardHeader className="pb-3"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Fulfillment timeline</p><CardTitle className="mt-1 text-base">Dispatch and installation</CardTitle><p className="mt-1 text-xs text-muted-foreground">Current stage and latest recorded activity for this order.</p></CardHeader>
+      <CardContent className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-border/70 bg-muted/15 p-4" data-testid="section-order-dispatch-timeline">
+          <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold">Dispatch</p><span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-bold">{canViewDispatch ? deliveryLabel(dispatchStatus) : 'Restricted'}</span></div>
+          {!canViewDispatch ? <p className="mt-3 text-xs text-muted-foreground">Dispatch view access is required to see handoff history.</p>
+            : dispatchesQuery.isLoading ? <div className="mt-3 h-12 animate-pulse rounded-lg bg-muted/60" />
+              : dispatchesQuery.isError ? <p className="mt-3 text-xs text-destructive">Dispatch history could not be loaded.</p>
+                : dispatchEvents.length ? <ol className="mt-3 space-y-3">{dispatchEvents.map((dispatch) => <li key={dispatch.id} className="flex items-start gap-3 border-l border-primary/25 pl-3" data-testid={`timeline-dispatch-${dispatch.id}`}><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" /><div className="min-w-0"><p className="text-xs font-semibold">{dispatch.code}{dispatch.lotId ? ` · ${dispatch.lotId}` : ''} · {deliveryLabel(dispatch.dispatchStatus)}</p><p className="mt-1 text-[10px] text-muted-foreground">{dispatch.windowIds.length} windows · {dateLabel(dispatch.updatedAt)}</p></div></li>)}</ol>
+                  : <p className="mt-3 text-xs text-muted-foreground">No dispatch batches recorded yet. Order created {dateLabel(createdAt)}.</p>}
+        </section>
+        <section className="rounded-xl border border-border/70 bg-muted/15 p-4" data-testid="section-order-installation-timeline">
+          <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold">Installation</p><span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-bold">{canViewInstallation ? installationLabel(installationStatus) : 'Restricted'}</span></div>
+          {!canViewInstallation ? <p className="mt-3 text-xs text-muted-foreground">Installation view access is required to see scheduling and completion.</p>
+            : installationQuery.isLoading ? <div className="mt-3 h-12 animate-pulse rounded-lg bg-muted/60" />
+              : installationQuery.isError ? <p className="mt-3 text-xs text-destructive">Installation history could not be loaded.</p>
+                : installation ? <div className="mt-3 space-y-2 text-xs">
+                  {installation.scheduledDate && <p><span className="font-semibold">Scheduled visit:</span> {dateLabel(installation.scheduledDate)}</p>}
+                  {installation.installationDate && <p><span className="font-semibold">Completed:</span> {dateLabel(installation.installationDate)}</p>}
+                  {installation.issueReason && <p className="text-amber-800"><span className="font-semibold">Follow-up:</span> {installation.issueReason}</p>}
+                  <p className="text-[10px] text-muted-foreground">Updated {dateLabel(installation.updatedAt)}</p>
+                </div>
+                  : <p className="mt-3 text-xs text-muted-foreground">{dispatchStatus === 'delivered' ? 'No installation schedule has been recorded yet.' : 'Installation tracking becomes available after the order is delivered.'}</p>}
+        </section>
+      </CardContent>
+    </Card>
+  </div>;
+}
+
 export default function OrderDetailPage({ user }: { user: User }) {
   const params = useParams<{ id: string }>();
   const id = params.id || '';
@@ -1478,6 +1541,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
     <div className="flex flex-wrap items-center justify-between gap-3"><Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-order-hub"><ArrowLeft size={15} /> Back to order hub</Link><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full bg-primary" /> <span>Last updated {dateLabel(record.updatedAt)}</span></div></div>
     <section className="order-hub-accent relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header"><div className="absolute right-10 top-8 h-28 w-28 rounded-full border border-sidebar-primary/20" /><div className="relative flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="min-w-0"><p className="break-all font-mono text-xs font-bold tracking-[0.13em] text-sidebar-primary" data-testid="text-order-id">{record.orderId}</p><h2 className="mt-3 break-words font-display text-2xl font-bold tracking-[-0.04em] sm:text-3xl md:text-4xl" data-testid="text-order-client">{record.clientName}</h2><p className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70"><span className="break-words">{record.locationName}</span> <span className="text-white/40">·</span> <span>created {dateLabel(record.createdAt)}</span></p></div><span className={`inline-flex w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusTone(record.status)}`} data-testid="status-order-detail">{statusLabel(record.status)}</span></div></section>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Windows" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Total area" value={`${summary.sqFt.toFixed(2)} sq ft`} detail="Summed from window records" testId="text-summary-area" /><SummaryStat label="Glass state" value={summary.glass} detail="Aggregate procurement state" testId="text-summary-glass" /><SummaryStat label="Paid" value={hasPermission(user, 'payments', 'view') ? plainInr(received) : 'Restricted'} detail="Received receipts less refunds" testId="text-summary-received" /></div>
+     <OrderDeliveryPanels orderRecordId={record.id} createdAt={record.createdAt} user={user} />
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6" data-testid="section-order-lifecycle"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-base font-bold">Where this order is now</h2></div><span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span></div><div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">{timeline.map((item, index) => <div key={item.value} className="relative min-w-0" data-testid={`timeline-stage-${item.value}`}>{index < timeline.length - 1 && <div aria-hidden="true" className={`absolute left-7 -right-4 top-3.5 z-0 hidden h-px lg:block ${item.active ? 'bg-primary/35' : 'bg-border'}`} />}<span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.current ? 'border-primary bg-primary text-primary-foreground' : item.active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}>{item.current ? <Check size={13} /> : String(index + 1).padStart(2, '0')}</span><p className={`mt-2 min-h-8 text-[10px] font-bold leading-4 ${item.active ? 'text-primary' : 'text-muted-foreground'}`}>{item.label}</p></div>)}</div></section>
     <Tabs key={id} defaultValue={new URLSearchParams(window.location.search).get('tab') === 'documents' ? 'documents' : new URLSearchParams(window.location.search).get('tab') === 'grievances' ? 'grievances' : 'details'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-5"><TabsTrigger value="details" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-details">Order Details</TabsTrigger><TabsTrigger value="billing" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-billing-payment">Billing &amp; Payment</TabsTrigger><TabsTrigger value="documents" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-documents">Order Documents</TabsTrigger><TabsTrigger value="grievances" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-order-grievances">Grievances</TabsTrigger><TabsTrigger value="activity" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-user-log">User Log</TabsTrigger></TabsList>
       <TabsContent value="details" className="space-y-5">
