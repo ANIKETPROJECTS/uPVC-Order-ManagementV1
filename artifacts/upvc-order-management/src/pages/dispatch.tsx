@@ -206,7 +206,13 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
     if (!order) { setDraft([]); setLocalError(''); return; }
     setDraft(order.dispatches.length
       ? order.dispatches.map((dispatch) => ({ id: dispatch.id, code: dispatch.code, lotId: dispatch.lotId, windowIds: [...dispatch.windowIds], dispatchStatus: dispatch.dispatchStatus }))
-      : [{ code: 'D1', lotId: order.lots[0]?.lotId ?? null, windowIds: [], dispatchStatus: order.dispatchStatus }]);
+      : [{
+        code: 'D1',
+        lotId: order.lots[0]?.lotId ?? (order.clientType === 'Project' ? `${order.orderId}-L01` : null),
+        createLot: order.clientType === 'Project' && order.lots.length === 0,
+        windowIds: [],
+        dispatchStatus: DispatchStatus.pending_dispatch,
+      }]);
     setLocalError('');
   }, [order]);
   const batches = useMemo(() => {
@@ -236,6 +242,18 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
     setDraft((rows) => [...rows, { code, lotId: lot.lotId, windowIds: [], dispatchStatus: DispatchStatus.pending_dispatch }]);
     setLocalError('');
   };
+  const createLotInBatch = (code: string) => {
+    if (!order) return;
+    const highestSequence = Math.max(
+      0,
+      ...order.lots.map((lot) => lot.sequence),
+      ...draft.filter((item) => item.createLot && item.lotId).map((item) => Number(item.lotId?.match(/-L0*(\d+)$/i)?.[1]) || 0),
+    );
+    const sequence = highestSequence + 1;
+    const lotId = `${order.orderId}-L${String(sequence).padStart(2, '0')}`;
+    setDraft((rows) => [...rows, { code, lotId, createLot: true, windowIds: [], dispatchStatus: DispatchStatus.pending_dispatch }]);
+    setLocalError('');
+  };
   const updateBatchCode = (oldCode: string, newCode: string) => {
     setDraft((rows) => rows.map((row) => row.code.toUpperCase() === oldCode ? { ...row, code: newCode.toUpperCase() } : row));
   };
@@ -263,11 +281,16 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
         <div className="space-y-3">
           {batches.map((batch) => {
             const batchLocked = batch.rows.some(({ dispatch }) => dispatch.dispatchStatus !== DispatchStatus.pending_dispatch);
+            const includedExistingLots = new Set(batch.rows.filter(({ dispatch }) => !dispatch.createLot).map(({ dispatch }) => dispatch.lotId));
+            const hasAvailableExistingLot = order.lots.some((lot) => !includedExistingLots.has(lot.lotId));
             return <section key={batch.code} className="rounded-xl border border-border/80 bg-background p-4" data-testid={`dispatch-batch-${batch.code}`}>
               <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/60 pb-3">
                 <label className="w-40 space-y-1.5 text-xs font-semibold">Dispatch batch / D-number<input value={batch.code} disabled={!canEdit || batchLocked} onChange={(event) => updateBatchCode(batch.code, event.target.value)} className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm" placeholder="D1" /></label>
                 <p className="pb-2 text-xs text-muted-foreground">{batch.rows.length} lot{batch.rows.length === 1 ? '' : 's'} · each lot keeps its own status</p>
-                {order.lots.length > batch.rows.length && <Button type="button" size="sm" variant="outline" disabled={!canEdit || batchLocked} onClick={() => addLotToBatch(batch.code)}>+ Add lot to {batch.code}</Button>}
+                <div className="flex flex-wrap gap-2">
+                  {hasAvailableExistingLot && <Button type="button" size="sm" variant="outline" disabled={!canEdit} onClick={() => addLotToBatch(batch.code)}>+ Add existing lot</Button>}
+                  {order.clientType === 'Project' && <Button type="button" size="sm" variant="outline" disabled={!canEdit} onClick={() => createLotInBatch(batch.code)}>+ Create another lot</Button>}
+                </div>
               </div>
               <div className="mt-3 space-y-3">
                 {batch.rows.map(({ dispatch, index }) => {
@@ -277,9 +300,11 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
                   const assignmentLocked = dispatch.dispatchStatus !== DispatchStatus.pending_dispatch;
                   return <div key={dispatch.id ?? `new-${batch.code}-${index}`} className="rounded-lg border border-border/65 bg-muted/15 p-3" data-testid={`dispatch-plan-item-${index}`}>
                     <div className="grid gap-3 md:grid-cols-[minmax(145px,1fr)_minmax(170px,1fr)_auto] md:items-end">
-                      <label className="space-y-1.5 text-xs font-semibold">Lot<select value={dispatch.lotId ?? ''} disabled={!canEdit || assignmentLocked || order.lots.length === 0} onChange={(event) => update(index, { lotId: event.target.value || null })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
-                        {order.lots.length ? order.lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>Lot L{lot.sequence}</option>) : <option value="">Order dispatch</option>}
-                      </select></label>
+                      {dispatch.createLot
+                        ? <div className="space-y-1.5 text-xs font-semibold"><span>New lot</span><div className="flex h-10 items-center rounded-lg border border-primary/25 bg-primary/5 px-3 font-mono text-sm text-primary">Lot L{dispatch.lotId?.match(/-L0*(\d+)$/i)?.[1]} · created on save</div></div>
+                        : <label className="space-y-1.5 text-xs font-semibold">Lot<select value={dispatch.lotId ?? ''} disabled={!canEdit || assignmentLocked || order.lots.length === 0} onChange={(event) => update(index, { lotId: event.target.value || null })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                          {order.lots.length ? order.lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>Lot L{lot.sequence}</option>) : <option value="">Order dispatch</option>}
+                        </select></label>}
                       <label className="space-y-1.5 text-xs font-semibold">This lot’s status<select value={dispatch.dispatchStatus} disabled={!canEdit} onChange={(event) => update(index, { dispatchStatus: event.target.value as StatusValue })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
                         {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
                       </select></label>
@@ -380,7 +405,7 @@ export default function DispatchPage({ user }: { user: User }) {
         queryClient.setQueryData<DispatchOrder[]>(getListDispatchOrdersQueryKey(), (current) => current?.map((item) => item.id === updated.id ? updated : item));
         void queryClient.invalidateQueries({ queryKey: getListDispatchOrdersQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getListInstallationOrdersQueryKey() });
-        toast({ title: 'Dispatch plan saved', description: `${updated.orderId} · ${updated.dispatches.length} dispatch(es)` });
+        toast({ title: 'Dispatch plan saved', description: `${updated.orderId} · ${new Set(updated.dispatches.map((dispatch) => dispatch.code)).size} batch(es) · ${updated.dispatches.length} lot(s)` });
         setActiveOrder(null);
       },
       onError: () => toast({ title: 'Dispatch plan could not be saved', description: 'Refresh the dispatch register and try again.', variant: 'destructive' }),

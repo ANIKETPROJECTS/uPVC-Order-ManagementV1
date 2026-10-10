@@ -17,8 +17,10 @@ import {
   getUsers,
   type DispatchStatus,
   type OrderDocument,
+  type OrderLotDocument,
   type OrderWindowDocument,
 } from "../lib/mongo";
+import { formatLotId } from "../lib/order-identifiers";
 import { randomUUID } from "node:crypto";
 
 const router = Router();
@@ -77,6 +79,7 @@ function dispatchOrderResponse(order: OrderDocument, windows: OrderWindowDocumen
     orderId: order.orderId,
     clientName: order.clientName,
     locationName: order.locationName,
+    clientType: order.clientType ?? ((order.lots?.length ?? 0) > 0 ? "Project" : "Retail"),
     orderStatus: order.status,
     dispatchStatus: aggregateStatus(dispatches, order.dispatchStatus),
     lots: (order.lots ?? []).map((lot) => ({ lotId: lot.lotId, sequence: lot.sequence })),
@@ -151,8 +154,39 @@ router.patch(
     const codes = new Set<string>();
     const selectedWindows = new Set<string>();
     const oldDispatches = order.dispatches ?? [];
+    const isProject = order.clientType === "Project" || (order.lots?.length ?? 0) > 0;
+    const now = new Date();
+    const nextLots = [...(order.lots ?? [])];
+    const newLotsByDraftId = new Map<string, OrderLotDocument>();
+    let nextLotSequence = Math.max(
+      order.nextLotSequence ?? 1,
+      nextLots.reduce((highest, lot) => Math.max(highest, lot.sequence), 0) + 1,
+    );
+    for (const dispatch of body.data.dispatches) {
+      if (!dispatch.createLot) continue;
+      if (!isProject || !dispatch.lotId || dispatch.id) {
+        res.status(400).json({ error: "Only project orders can add a new lot to a dispatch batch." });
+        return;
+      }
+      if (!newLotsByDraftId.has(dispatch.lotId)) {
+        const lot: OrderLotDocument = {
+          _id: randomUUID(),
+          sequence: nextLotSequence,
+          lotId: formatLotId(order.orderId, nextLotSequence),
+          createdBy: userId,
+          createdAt: now,
+        };
+        nextLots.push(lot);
+        newLotsByDraftId.set(dispatch.lotId, lot);
+        nextLotSequence += 1;
+      }
+    }
+    const planItems = body.data.dispatches.map((dispatch) => {
+      const createdLot = dispatch.createLot ? newLotsByDraftId.get(dispatch.lotId ?? "") : undefined;
+      return { ...dispatch, lotId: createdLot?.lotId ?? dispatch.lotId, createLot: false };
+    });
     for (const current of oldDispatches) {
-      const incoming = body.data.dispatches.find((item) => item.id === current._id);
+      const incoming = planItems.find((item) => item.id === current._id);
       const assignmentsChanged = incoming && (
         incoming.code.toUpperCase() !== current.code
         || incoming.lotId !== current.lotId
@@ -164,10 +198,9 @@ router.patch(
       }
     }
     const existingWindowIds = new Set(oldDispatches.flatMap((dispatch) => dispatch.windowIds));
-    for (const dispatch of body.data.dispatches) {
-      const isProject = order.clientType === "Project" || (order.lots?.length ?? 0) > 0;
+    for (const dispatch of planItems) {
       if (isProject) {
-        if (!dispatch.lotId || !(order.lots ?? []).some((lot) => lot.lotId === dispatch.lotId)) {
+        if (!dispatch.lotId || !nextLots.some((lot) => lot.lotId === dispatch.lotId)) {
           res.status(400).json({ error: "Choose a valid project lot for each dispatch." });
           return;
         }
@@ -204,8 +237,7 @@ router.patch(
       return;
     }
 
-    const now = new Date();
-    const dispatches = body.data.dispatches.map((input) => {
+    const dispatches = planItems.map((input) => {
       const current = input.id ? oldDispatches.find((dispatch) => dispatch._id === input.id) : undefined;
       return {
         _id: current?._id ?? randomUUID(),
@@ -222,9 +254,22 @@ router.patch(
     const revisionFilter = revision === 0
       ? { $or: [{ dispatchPlanRevision: 0 }, { dispatchPlanRevision: { $exists: false } }] }
       : { dispatchPlanRevision: revision };
+    const lotSequenceFilter = newLotsByDraftId.size > 0
+      ? order.nextLotSequence === undefined
+        ? { nextLotSequence: { $exists: false as const } }
+        : { nextLotSequence: order.nextLotSequence }
+      : {};
+    const planSet = {
+      dispatches,
+      dispatchStatus: nextStatus,
+      dispatchPlanRevision: revision + 1,
+      updatedAt: now,
+      updatedBy: userId,
+      ...(newLotsByDraftId.size > 0 ? { lots: nextLots, nextLotSequence } : {}),
+    };
     const update = await orders.updateOne(
-      { _id: order._id, ...revisionFilter },
-      { $set: { dispatches, dispatchStatus: nextStatus, dispatchPlanRevision: revision + 1, updatedAt: now, updatedBy: userId } },
+      { _id: order._id, ...revisionFilter, ...lotSequenceFilter },
+      { $set: planSet },
     );
     if (!update.matchedCount) {
       res.status(409).json({ error: "This dispatch plan changed elsewhere. Refresh and try again." });

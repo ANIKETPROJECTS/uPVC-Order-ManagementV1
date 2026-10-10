@@ -1704,6 +1704,7 @@ export const ListDispatchOrdersResponseItem = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "clientType": zod.enum(['Project', 'Retail']),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "lots": zod.array(zod.object({
@@ -1750,6 +1751,7 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "clientType": zod.enum(['Project', 'Retail']),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "lots": zod.array(zod.object({
@@ -1795,6 +1797,7 @@ export const UpdateDispatchOrderPlanBody = zod.object({
   "id": zod.string().optional(),
   "code": zod.string().regex(updateDispatchOrderPlanBodyDispatchesItemCodeRegExp),
   "lotId": zod.string().nullable(),
+  "createLot": zod.boolean().optional(),
   "windowIds": zod.array(zod.string()),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered'])
 }))
@@ -1805,6 +1808,7 @@ export const UpdateDispatchOrderPlanResponse = zod.object({
   "orderId": zod.string(),
   "clientName": zod.string(),
   "locationName": zod.string(),
+  "clientType": zod.enum(['Project', 'Retail']),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
   "lots": zod.array(zod.object({

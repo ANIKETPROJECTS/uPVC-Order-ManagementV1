@@ -3665,6 +3665,8 @@ components:
           type: string
         locationName:
           type: string
+        clientType:
+          $ref: "#/components/schemas/ClientType"
         orderStatus:
           $ref: "#/components/schemas/OrderStatus"
         dispatchStatus:
@@ -3689,7 +3691,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, lots, dispatches, windows, dispatchPlanRevision, createdAt, updatedAt]
+      required: [id, orderId, clientName, locationName, clientType, orderStatus, dispatchStatus, lots, dispatches, windows, dispatchPlanRevision, createdAt, updatedAt]
     DispatchLot:
       type: object
       properties:
@@ -3746,6 +3748,8 @@ components:
           pattern: "^D[1-9][0-9]*$"
         lotId:
           type: [string, "null"]
+        createLot:
+          type: boolean
         windowIds:
           type: array
           items:

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ClientType } from './clientType';
 import type { DispatchLot } from './dispatchLot';
 import type { DispatchRecord } from './dispatchRecord';
 import type { DispatchStatus } from './dispatchStatus';
@@ -16,6 +17,7 @@ export interface DispatchOrder {
   orderId: string;
   clientName: string;
   locationName: string;
+  clientType: ClientType;
   orderStatus: OrderStatus;
   dispatchStatus: DispatchStatus;
   lots: DispatchLot[];

@@ -9,4 +9,4 @@ Keep `dispatchStatus` on the order as a compatibility summary for existing deliv
 
 **Why:** MongoDB is standalone in this project, so a shipment and its parent-order status must be changed atomically without transactions. Existing installation eligibility also depends on the order-level delivery status.
 
-**How to apply:** When changing dispatch data, update the embedded plan and its aggregate status in one order-document write. Preserve stable order IDs and guard plan edits against stale revisions.
+**How to apply:** When adding a project lot from dispatch planning, allocate its next L-number and save the new lot, embedded plan, and aggregate status in the same compare-and-set order-document write. Preserve stable order IDs and guard plan edits against stale revisions.

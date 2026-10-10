@@ -348,6 +348,7 @@ export interface DispatchOrder {
   orderId: string;
   clientName: string;
   locationName: string;
+  clientType: ClientType;
   orderStatus: OrderStatus;
   dispatchStatus: DispatchStatus;
   lots: DispatchLot[];
@@ -364,6 +365,7 @@ export interface DispatchPlanItem {
   code: string;
   /** @nullable */
   lotId: string | null;
+  createLot?: boolean;
   windowIds: string[];
   dispatchStatus: DispatchStatus;
 }
