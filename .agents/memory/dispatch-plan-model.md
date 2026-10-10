@@ -3,7 +3,7 @@ name: Dispatch plan model
 description: Persistent choices for lot-wise dispatch records and the legacy order-level status.
 ---
 
-Store dispatches inside the order document. Each entry carries its editable D-number, optional project lot, selected window IDs, independent status, and timestamps. Derive the displayed tracking ID from the stable order ID, lot ID (when present), and dispatch number; do not replace the order's canonical ID.
+Store dispatch lot entries inside the order document. Entries sharing a D-number belong to the same dispatch batch; each project lot in that batch keeps its own selected window IDs and independent status. Derive the displayed tracking ID from the stable order ID, normalized lot sequence (when present), and batch D-number; do not replace the order's canonical ID.
 
 Keep `dispatchStatus` on the order as a compatibility summary for existing delivery and installation flows: it is delivered only when every dispatch is delivered; dispatched when at least one dispatch has progressed beyond pending; otherwise pending. Order-level QR status changes intentionally apply the selected status to every embedded dispatch.
 

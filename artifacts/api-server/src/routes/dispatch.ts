@@ -63,6 +63,13 @@ function aggregateStatus(dispatches: NonNullable<OrderDocument["dispatches"]>, l
   return "pending_dispatch";
 }
 
+function dispatchTrackingId(order: OrderDocument, lotId: string | null, code: string): string {
+  if (!lotId) return `${order.orderId}-${code}`;
+  const sequence = order.lots?.find((lot) => lot.lotId === lotId)?.sequence
+    ?? Number(lotId.match(/-L0*(\d+)$/i)?.[1]);
+  return sequence ? `${order.orderId}-L${sequence}-${code}` : `${lotId}-${code}`;
+}
+
 function dispatchOrderResponse(order: OrderDocument, windows: OrderWindowDocument[] = []) {
   const dispatches = order.dispatches ?? [];
   return {
@@ -76,7 +83,7 @@ function dispatchOrderResponse(order: OrderDocument, windows: OrderWindowDocumen
     dispatches: dispatches.map((dispatch) => ({
       id: dispatch._id,
       code: dispatch.code,
-      trackingId: `${dispatch.lotId ?? order.orderId}-${dispatch.code}`,
+      trackingId: dispatchTrackingId(order, dispatch.lotId, dispatch.code),
       lotId: dispatch.lotId,
       windowIds: dispatch.windowIds,
       dispatchStatus: dispatch.dispatchStatus,
@@ -228,7 +235,9 @@ router.patch(
     const actor = await getUsers(db).findOne({ _id: userId, status: "active" });
     await getOrderActivity(db).insertOne({
       _id: randomUUID(), orderRecordId: order._id, actorId: userId, actorName: actor?.name ?? "Team member",
-      action: "dispatch.plan_updated", summary: `Updated dispatch plan for ${order.orderId} with ${dispatches.length} dispatch(es).`, createdAt: now,
+      action: "dispatch.plan_updated",
+      summary: `Updated ${new Set(dispatches.map((dispatch) => dispatch.code)).size} dispatch batch(es) across ${dispatches.length} lot entry/entries for ${order.orderId}.`,
+      createdAt: now,
     });
     const allWindows = await getOrderWindows(db).find({ orderRecordId: order._id, archivedAt: null }).toArray();
     res.json(UpdateDispatchOrderPlanResponse.parse(dispatchOrderResponse(updated, allWindows)));

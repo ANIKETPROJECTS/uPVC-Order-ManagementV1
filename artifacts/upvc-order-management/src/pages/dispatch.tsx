@@ -60,6 +60,12 @@ function dispatchLabel(status: string) {
   return STATUS_OPTIONS.find((item) => item.value === status)?.label || status.replaceAll('_', ' ');
 }
 
+function dispatchTrackingId(order: DispatchOrder, lotId: string | null, code: string) {
+  if (!lotId) return `${order.orderId}-${code}`;
+  const sequence = order.lots.find((lot) => lot.lotId === lotId)?.sequence ?? Number(lotId.match(/-L0*(\d+)$/i)?.[1]);
+  return sequence ? `${order.orderId}-L${sequence}-${code}` : `${lotId}-${code}`;
+}
+
 function orderTone(status: string) {
   const tones: Record<string, string> = {
     quotation_stage: 'bg-stone-100 text-stone-700',
@@ -203,20 +209,41 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
       : [{ code: 'D1', lotId: order.lots[0]?.lotId ?? null, windowIds: [], dispatchStatus: order.dispatchStatus }]);
     setLocalError('');
   }, [order]);
+  const batches = useMemo(() => {
+    const grouped = new Map<string, { code: string; rows: { dispatch: DispatchPlanItem; index: number }[] }>();
+    draft.forEach((dispatch, index) => {
+      const code = dispatch.code.toUpperCase();
+      const batch = grouped.get(code) ?? { code, rows: [] };
+      batch.rows.push({ dispatch, index });
+      grouped.set(code, batch);
+    });
+    return [...grouped.values()].sort((a, b) => Number(a.code.slice(1)) - Number(b.code.slice(1)));
+  }, [draft]);
   const assignedElsewhere = (index: number) => new Set(draft.flatMap((dispatch, other) => other === index ? [] : dispatch.windowIds));
   const update = (index: number, patch: Partial<DispatchPlanItem>) => setDraft((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
   const addDispatch = () => {
     if (!order) return;
     const lotId = order.lots[0]?.lotId ?? null;
-    const used = draft.filter((item) => item.lotId === lotId).map((item) => Number(item.code.slice(1)) || 0);
+    const used = draft.map((item) => Number(item.code.slice(1)) || 0);
     const next = Math.max(0, ...used) + 1;
     setDraft((rows) => [...rows, { code: `D${next}`, lotId, windowIds: [], dispatchStatus: DispatchStatus.pending_dispatch }]);
+  };
+  const addLotToBatch = (code: string) => {
+    if (!order) return;
+    const includedLots = new Set(draft.filter((item) => item.code.toUpperCase() === code).map((item) => item.lotId));
+    const lot = order.lots.find((candidate) => !includedLots.has(candidate.lotId));
+    if (!lot) { setLocalError('Every lot is already included in this dispatch batch.'); return; }
+    setDraft((rows) => [...rows, { code, lotId: lot.lotId, windowIds: [], dispatchStatus: DispatchStatus.pending_dispatch }]);
+    setLocalError('');
+  };
+  const updateBatchCode = (oldCode: string, newCode: string) => {
+    setDraft((rows) => rows.map((row) => row.code.toUpperCase() === oldCode ? { ...row, code: newCode.toUpperCase() } : row));
   };
   const invalid = draft.some((dispatch) => !/^D[1-9]\d*$/.test(dispatch.code) || dispatch.windowIds.length === 0)
     || draft.some((dispatch, index) => draft.slice(0, index).some((other) => other.lotId === dispatch.lotId && other.code.toUpperCase() === dispatch.code.toUpperCase()));
   const save = () => {
     if (!order) return;
-    if (invalid) { setLocalError('Give each dispatch a unique D-number and assign at least one ready window.'); return; }
+    if (invalid) { setLocalError('Use a valid D-number, include each lot only once per batch, and assign at least one ready window to each lot.'); return; }
     setLocalError('');
     onSave(order, draft);
   };
@@ -225,41 +252,49 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
       <DialogHeader>
         <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Truck size={19} /></div>
         <DialogTitle>Manage dispatches</DialogTitle>
-        <DialogDescription>{order ? `${order.orderId} · ${order.clientName}. Create separate lot-wise handoffs and assign only windows marked ready.` : 'Manage order dispatches.'}</DialogDescription>
+        <DialogDescription>{order ? `${order.orderId} · ${order.clientName}. Each D-number is a dispatch batch; add multiple lots and manage each lot’s windows and status independently.` : 'Manage order dispatches.'}</DialogDescription>
       </DialogHeader>
       {order && <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/25 p-3">
           <div><p className="font-mono text-sm font-bold">{order.orderId}</p><p className="mt-1 text-xs text-muted-foreground">{order.locationName} · {order.windows.filter((window) => window.ready).length} ready windows</p></div>
-          <Button type="button" size="sm" onClick={addDispatch}><Truck size={14} /> Add dispatch</Button>
+          <Button type="button" size="sm" onClick={addDispatch}><Truck size={14} /> Add dispatch batch</Button>
         </div>
-        {draft.length === 0 && <div className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">No dispatches. Add one to plan a delivery handoff.</div>}
+        {draft.length === 0 && <div className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">No dispatch batches. Add one to plan a delivery handoff.</div>}
         <div className="space-y-3">
-          {draft.map((dispatch, index) => {
-            const unavailable = assignedElsewhere(index);
-            const choices = order.windows.filter((window) => window.ready && (!unavailable.has(window.id) || dispatch.windowIds.includes(window.id)));
-            const tracking = `${dispatch.lotId ?? order.orderId}-${dispatch.code.toUpperCase()}`;
-            const assignmentLocked = dispatch.dispatchStatus !== DispatchStatus.pending_dispatch;
-            return <section key={dispatch.id ?? `new-${index}`} className="rounded-xl border border-border/80 bg-background p-4" data-testid={`dispatch-plan-item-${index}`}>
-              <div className="grid gap-3 md:grid-cols-[minmax(100px,.7fr)_minmax(160px,1fr)_minmax(170px,1fr)_auto] md:items-end">
-                <label className="space-y-1.5 text-xs font-semibold">Dispatch number<input value={dispatch.code} disabled={!canEdit || assignmentLocked} onChange={(event) => update(index, { code: event.target.value.toUpperCase() })} className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm" placeholder="D1" /></label>
-                <label className="space-y-1.5 text-xs font-semibold">Lot<select value={dispatch.lotId ?? ''} disabled={!canEdit || assignmentLocked || order.lots.length === 0} onChange={(event) => update(index, { lotId: event.target.value || null })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
-                  {order.lots.length ? order.lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>{lot.lotId}</option>) : <option value="">Order dispatch</option>}
-                </select></label>
-                <label className="space-y-1.5 text-xs font-semibold">Dispatch status<select value={dispatch.dispatchStatus} disabled={!canEdit} onChange={(event) => update(index, { dispatchStatus: event.target.value as StatusValue })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
-                  {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-                </select></label>
-                <Button type="button" variant="outline" className="text-destructive" disabled={!canEdit || assignmentLocked} title={assignmentLocked ? 'Shipped dispatch records cannot be removed' : 'Remove pending dispatch'} onClick={() => setDraft((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}><X size={14} /> Remove</Button>
+          {batches.map((batch) => {
+            const batchLocked = batch.rows.some(({ dispatch }) => dispatch.dispatchStatus !== DispatchStatus.pending_dispatch);
+            return <section key={batch.code} className="rounded-xl border border-border/80 bg-background p-4" data-testid={`dispatch-batch-${batch.code}`}>
+              <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/60 pb-3">
+                <label className="w-40 space-y-1.5 text-xs font-semibold">Dispatch batch / D-number<input value={batch.code} disabled={!canEdit || batchLocked} onChange={(event) => updateBatchCode(batch.code, event.target.value)} className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm" placeholder="D1" /></label>
+                <p className="pb-2 text-xs text-muted-foreground">{batch.rows.length} lot{batch.rows.length === 1 ? '' : 's'} · each lot keeps its own status</p>
+                {order.lots.length > batch.rows.length && <Button type="button" size="sm" variant="outline" disabled={!canEdit || batchLocked} onClick={() => addLotToBatch(batch.code)}>+ Add lot to {batch.code}</Button>}
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
-                <p className="font-mono text-xs font-bold text-primary">{tracking}</p>
-                <p className="text-[11px] text-muted-foreground">{dispatch.windowIds.length} selected · {choices.length} ready and available</p>
+              <div className="mt-3 space-y-3">
+                {batch.rows.map(({ dispatch, index }) => {
+                  const unavailable = assignedElsewhere(index);
+                  const choices = order.windows.filter((window) => window.ready && (!unavailable.has(window.id) || dispatch.windowIds.includes(window.id)));
+                  const tracking = dispatchTrackingId(order, dispatch.lotId, batch.code);
+                  const assignmentLocked = dispatch.dispatchStatus !== DispatchStatus.pending_dispatch;
+                  return <div key={dispatch.id ?? `new-${batch.code}-${index}`} className="rounded-lg border border-border/65 bg-muted/15 p-3" data-testid={`dispatch-plan-item-${index}`}>
+                    <div className="grid gap-3 md:grid-cols-[minmax(145px,1fr)_minmax(170px,1fr)_auto] md:items-end">
+                      <label className="space-y-1.5 text-xs font-semibold">Lot<select value={dispatch.lotId ?? ''} disabled={!canEdit || assignmentLocked || order.lots.length === 0} onChange={(event) => update(index, { lotId: event.target.value || null })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                        {order.lots.length ? order.lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>Lot L{lot.sequence}</option>) : <option value="">Order dispatch</option>}
+                      </select></label>
+                      <label className="space-y-1.5 text-xs font-semibold">This lot’s status<select value={dispatch.dispatchStatus} disabled={!canEdit} onChange={(event) => update(index, { dispatchStatus: event.target.value as StatusValue })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                        {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+                      </select></label>
+                      <Button type="button" variant="outline" className="text-destructive" disabled={!canEdit || assignmentLocked} title={assignmentLocked ? 'Shipped lot records cannot be removed' : 'Remove pending lot from this batch'} onClick={() => setDraft((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}><X size={14} /> Remove lot</Button>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3"><p className="font-mono text-xs font-bold text-primary">{tracking}</p><p className="text-[11px] text-muted-foreground">{dispatch.windowIds.length} selected · {choices.length} ready and available</p></div>
+                    {choices.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {choices.map((window) => <label key={window.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-background px-3 py-2 text-xs hover:bg-muted/40">
+                        <input type="checkbox" disabled={!canEdit || assignmentLocked} checked={dispatch.windowIds.includes(window.id)} onChange={(event) => update(index, { windowIds: event.target.checked ? [...dispatch.windowIds, window.id] : dispatch.windowIds.filter((id) => id !== window.id) })} />
+                        <span className="font-semibold">{window.windowNo}</span><span className="text-muted-foreground">{window.widthMm} × {window.heightMm} mm</span>
+                      </label>)}
+                    </div> : <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">No unassigned windows are ready. A window is ready when frame and shutter are ready and glass is received.</p>}
+                  </div>;
+                })}
               </div>
-              {choices.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {choices.map((window) => <label key={window.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-xs hover:bg-muted/40">
-                  <input type="checkbox" disabled={!canEdit || assignmentLocked} checked={dispatch.windowIds.includes(window.id)} onChange={(event) => update(index, { windowIds: event.target.checked ? [...dispatch.windowIds, window.id] : dispatch.windowIds.filter((id) => id !== window.id) })} />
-                  <span className="font-semibold">{window.windowNo}</span><span className="text-muted-foreground">{window.widthMm} × {window.heightMm} mm</span>
-                </label>)}
-              </div> : <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">No unassigned windows are ready. A window is ready when frame and shutter are ready and glass is received.</p>}
             </section>;
           })}
         </div>
@@ -432,23 +467,29 @@ export default function DispatchPage({ user }: { user: User }) {
           </div> : viewMode === 'grid' ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="grid-dispatch-orders">
             {filteredOrders.map((order) => <DispatchGridCard key={order.id} order={order} canViewOrderHub={canViewOrderHub} canEdit={canEdit} busy={updatePlan.isPending} onShowQr={() => setQrOrder(order)} onUpdate={() => setActiveOrder(order)} />)}
           </div> : viewMode === 'tree' ? <div className="space-y-3" data-testid="tree-dispatch-orders">
-            {filteredOrders.map((order) => <article key={order.id} className="rounded-xl border border-border/75 bg-background p-4" data-testid={`tree-dispatch-order-${order.id}`}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0"><p className="font-mono text-sm font-bold text-primary">{order.orderId}</p><p className="mt-1 text-xs font-semibold">{order.clientName} <span className="text-muted-foreground">· {order.locationName}</span></p></div>
-                <div className="flex items-center gap-2"><StatusPill status={order.dispatchStatus} /><Button type="button" size="sm" variant="outline" disabled={!canEdit || updatePlan.isPending} onClick={() => setActiveOrder(order)}>{canEdit ? 'Manage dispatches' : 'View'}</Button></div>
-              </div>
-              <div className="ml-2 mt-3 space-y-2 border-l-2 border-primary/20 pl-4">
-                {(order.lots.length ? order.lots : [{ lotId: '', sequence: 0 }]).map((lot) => {
-                  const lotDispatches = order.dispatches.filter((dispatch) => dispatch.lotId === (lot.lotId || null));
-                  return <section key={lot.lotId || 'order-level'} className="rounded-lg bg-muted/25 p-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{lot.lotId || 'Order dispatches'}</p>
-                    {lotDispatches.length ? <div className="mt-2 space-y-2">{lotDispatches.map((dispatch) => <div key={dispatch.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-background px-3 py-2">
-                      <div><p className="font-mono text-xs font-bold">{dispatch.trackingId}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{dispatch.windowIds.length} selected windows</p></div><StatusPill status={dispatch.dispatchStatus} />
-                    </div>)}</div> : <p className="mt-2 text-xs text-muted-foreground">No dispatches in this lot yet.</p>}
-                  </section>;
-                })}
-              </div>
-            </article>)}
+            {filteredOrders.map((order) => {
+              const batches = new Map<string, typeof order.dispatches>();
+              order.dispatches.forEach((dispatch) => {
+                const rows = batches.get(dispatch.code) ?? [];
+                rows.push(dispatch);
+                batches.set(dispatch.code, rows);
+              });
+              return <article key={order.id} className="rounded-xl border border-border/75 bg-background p-4" data-testid={`tree-dispatch-order-${order.id}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0"><p className="font-mono text-sm font-bold text-primary">{order.orderId}</p><p className="mt-1 text-xs font-semibold">{order.clientName} <span className="text-muted-foreground">· {order.locationName}</span></p></div>
+                  <div className="flex items-center gap-2"><StatusPill status={order.dispatchStatus} /><Button type="button" size="sm" variant="outline" disabled={!canEdit || updatePlan.isPending} onClick={() => setActiveOrder(order)}>{canEdit ? 'Manage dispatches' : 'View'}</Button></div>
+                </div>
+                <div className="ml-2 mt-3 space-y-2 border-l-2 border-primary/20 pl-4">
+                  {[...batches].sort(([left], [right]) => Number(left.slice(1)) - Number(right.slice(1))).map(([code, records]) => <section key={code} className="rounded-lg bg-muted/25 p-3" data-testid={`tree-dispatch-batch-${code}`}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dispatch batch {code} · {records.length} lot{records.length === 1 ? '' : 's'}</p>
+                    <div className="mt-2 space-y-2">{records.map((dispatch) => <div key={dispatch.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-background px-3 py-2">
+                      <div><p className="font-mono text-xs font-bold">{dispatch.trackingId}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{order.lots.find((lot) => lot.lotId === dispatch.lotId) ? `Lot L${order.lots.find((lot) => lot.lotId === dispatch.lotId)?.sequence}` : 'Order-level'} · {dispatch.windowIds.length} windows</p></div><StatusPill status={dispatch.dispatchStatus} />
+                    </div>)}</div>
+                  </section>)}
+                  {!batches.size && <p className="rounded-lg bg-muted/25 p-3 text-xs text-muted-foreground">No dispatch batches planned.</p>}
+                </div>
+              </article>;
+            })}
           </div> : <div className="space-y-2" data-testid="list-dispatch-orders">
             {filteredOrders.map((order) => <article key={order.id} className={`group grid gap-3 rounded-xl border border-border/75 bg-background px-3.5 py-3 transition duration-200 hover:border-primary/25 hover:bg-primary/[0.018] hover:shadow-sm lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`} data-testid={`row-dispatch-order-${order.id}`}>
             <div className="min-w-0">
