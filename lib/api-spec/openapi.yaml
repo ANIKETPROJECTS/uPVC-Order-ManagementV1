@@ -990,6 +990,40 @@ paths:
           description: Dispatch edit access required
         "404":
           description: Order not found
+  /dispatch/orders/{id}/plan:
+    patch:
+      operationId: updateDispatchOrderPlan
+      tags: [dispatch]
+      summary: Create, edit, or remove dispatches and assign ready windows
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DispatchPlanUpdate"
+      responses:
+        "200":
+          description: Updated dispatch plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DispatchOrder"
+        "400":
+          description: Invalid dispatch plan
+        "401":
+          description: Sign in required
+        "403":
+          description: Dispatch edit access required
+        "404":
+          description: Order not found
+        "409":
+          description: Dispatch plan changed or selected windows are unavailable
   /installation/orders:
     get:
       operationId: listInstallationOrders
@@ -3635,13 +3669,100 @@ components:
           $ref: "#/components/schemas/OrderStatus"
         dispatchStatus:
           $ref: "#/components/schemas/DispatchStatus"
+        lots:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatchLot"
+        dispatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatchRecord"
+        windows:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatchWindow"
+        dispatchPlanRevision:
+          type: integer
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, createdAt, updatedAt]
+      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, lots, dispatches, windows, dispatchPlanRevision, createdAt, updatedAt]
+    DispatchLot:
+      type: object
+      properties:
+        lotId:
+          type: string
+        sequence:
+          type: integer
+      required: [lotId, sequence]
+    DispatchWindow:
+      type: object
+      properties:
+        id:
+          type: string
+        windowNo:
+          type: string
+        widthMm:
+          type: number
+        heightMm:
+          type: number
+        ready:
+          type: boolean
+      required: [id, windowNo, widthMm, heightMm, ready]
+    DispatchRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        trackingId:
+          type: string
+        lotId:
+          type: [string, "null"]
+        windowIds:
+          type: array
+          items:
+            type: string
+        dispatchStatus:
+          $ref: "#/components/schemas/DispatchStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, code, trackingId, lotId, windowIds, dispatchStatus, createdAt, updatedAt]
+    DispatchPlanItem:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+          pattern: "^D[1-9][0-9]*$"
+        lotId:
+          type: [string, "null"]
+        windowIds:
+          type: array
+          items:
+            type: string
+        dispatchStatus:
+          $ref: "#/components/schemas/DispatchStatus"
+      required: [code, lotId, windowIds, dispatchStatus]
+    DispatchPlanUpdate:
+      type: object
+      properties:
+        expectedRevision:
+          type: integer
+        dispatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatchPlanItem"
+      required: [expectedRevision, dispatches]
     DispatchStatusUpdate:
       type: object
       properties:

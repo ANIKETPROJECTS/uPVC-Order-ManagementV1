@@ -9,6 +9,7 @@ import {
   CircleAlert,
   Clock3,
   Grid2X2,
+  GitBranch,
   List,
   MapPin,
   PackageCheck,
@@ -24,9 +25,10 @@ import {
   getListDispatchOrdersQueryKey,
   getListInstallationOrdersQueryKey,
   useListDispatchOrders,
+  useUpdateDispatchOrderPlan,
   useUpdateDispatchOrderStatus,
 } from '@workspace/api-client-react';
-import type { DispatchOrder, User } from '@workspace/api-client-react';
+import type { DispatchOrder, DispatchPlanItem, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -35,7 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 
 type StatusValue = (typeof DispatchStatus)[keyof typeof DispatchStatus];
 type SortValue = 'updated-desc' | 'updated-asc' | 'order-id' | 'client';
-type ViewMode = 'list' | 'grid';
+type ViewMode = 'list' | 'grid' | 'tree';
 
 const STATUS_OPTIONS: { value: StatusValue; label: string; tone: string; dot: string }[] = [
   { value: DispatchStatus.pending_dispatch, label: 'Pending Dispatch', tone: 'bg-amber-100 text-amber-900 ring-amber-200', dot: 'bg-amber-500' },
@@ -128,7 +130,7 @@ function DispatchGridCard({ order, canViewOrderHub, canEdit, busy, onShowQr, onU
     <div className="mt-3 text-[10px] text-muted-foreground"><span className="font-bold uppercase tracking-wider">Updated</span><span className="ml-2" title={formatUpdated(order.updatedAt)}>{formatUpdated(order.updatedAt)}</span></div>
     <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-border/60 pt-4">
       <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-[10px]" onClick={onShowQr} aria-label={`Show QR for ${order.orderId}`} data-testid={`button-show-qr-${order.id}`}><QrCode size={13} /><span className="hidden sm:inline">QR</span></Button>
-      <Button type="button" size="sm" className="h-8 px-2 text-[10px]" disabled={!canEdit || busy} onClick={onUpdate} title={canEdit ? 'Change dispatch status' : 'View-only access'} data-testid={`button-change-status-${order.id}`}>{canEdit ? 'Update' : 'View'}<ArrowRight size={12} /></Button>
+      <Button type="button" size="sm" className="h-8 px-2 text-[10px]" disabled={!canEdit || busy} onClick={onUpdate} title={canEdit ? 'Manage lots, windows, and dispatches' : 'View-only access'} data-testid={`button-change-status-${order.id}`}>{canEdit ? 'Update' : 'View'}<ArrowRight size={12} /></Button>
     </div>
   </article>;
 }
@@ -146,28 +148,32 @@ function StatusDialog({ order, canEdit, busy, error, onClose, onSave }: {
     if (order) setNextStatus(order.dispatchStatus);
   }, [order]);
   const isOpen = Boolean(order);
-  const changed = Boolean(order && nextStatus !== order.dispatchStatus);
+  const changed = Boolean(order && (nextStatus !== order.dispatchStatus || order.dispatches.some((dispatch) => dispatch.dispatchStatus !== nextStatus)));
   return <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-    <DialogContent className="max-w-md">
+    <DialogContent className="max-w-2xl">
       <DialogHeader>
         <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Truck size={19} /></div>
-        <DialogTitle>Update dispatch status</DialogTitle>
-        <DialogDescription>{order ? `Change the delivery handoff for ${order.orderId}. Production status is shown separately and will not be changed.` : 'Choose a dispatch state.'}</DialogDescription>
+        <DialogTitle>Update all dispatch statuses</DialogTitle>
+        <DialogDescription>{order ? `Set one status for every dispatch under ${order.orderId}. Production status is not changed.` : 'Choose a dispatch state.'}</DialogDescription>
       </DialogHeader>
       {order && <div className="space-y-4">
         <div className="rounded-xl border border-border/80 bg-muted/30 p-3">
           <div className="font-mono text-sm font-bold tracking-tight">{order.orderId}</div>
           <div className="mt-1 text-xs text-muted-foreground">{order.clientName} <span className="px-1">·</span> {order.locationName}</div>
-          <div className="mt-3 flex flex-wrap items-center gap-2"><StatusPill status={order.dispatchStatus} /><span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Current</span></div>
+          <div className="mt-3 flex flex-wrap items-center gap-2"><StatusPill status={order.dispatchStatus} /><span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Overall status</span></div>
+          <div className="mt-3 space-y-1.5 border-t border-border/60 pt-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dispatches updated together</p>
+            {order.dispatches.length ? order.dispatches.map((dispatch) => <div key={dispatch.id} className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-mono font-semibold">{dispatch.trackingId}</span><span className="text-muted-foreground">{dispatch.windowIds.length} windows · {dispatchLabel(dispatch.dispatchStatus)}</span></div>) : <p className="text-xs text-muted-foreground">No dispatch plan has been saved yet.</p>}
+          </div>
         </div>
         {!canEdit ? <div className="flex gap-3 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-950"><ShieldCheck size={16} className="mt-0.5 shrink-0" /><span>Your dispatch access is view-only. Ask an administrator for edit permission to make changes.</span></div> : <>
           <label className="block space-y-1.5 text-xs font-semibold text-foreground" htmlFor="dispatch-status-select">
-            New dispatch status
+            New status for every dispatch
             <select id="dispatch-status-select" value={nextStatus} onChange={(event) => setNextStatus(event.target.value as StatusValue)} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium shadow-sm" data-testid="select-dispatch-status">
               {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
-          {error && <p role="alert" className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-xs text-destructive"><CircleAlert size={15} className="mt-0.5 shrink-0" />Status could not be saved. Check the connection and try again.</p>}
+          {error && <p role="alert" className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-xs text-destructive"><CircleAlert size={15} className="mt-0.5 shrink-0" />Status could not be saved. Refresh and try again.</p>}
         </>}
       </div>}
       <DialogFooter>
@@ -175,6 +181,93 @@ function StatusDialog({ order, canEdit, busy, error, onClose, onSave }: {
         {canEdit && order && <Button type="button" disabled={!changed || busy} onClick={() => onSave(order.id, nextStatus)} data-testid="button-save-dispatch-status">
           {busy ? 'Saving…' : <><Check size={15} /> Save status</>}
         </Button>}
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}
+
+function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
+  order: DispatchOrder | null;
+  canEdit: boolean;
+  busy: boolean;
+  error: boolean;
+  onClose: () => void;
+  onSave: (order: DispatchOrder, dispatches: DispatchPlanItem[]) => void;
+}) {
+  const [draft, setDraft] = useState<DispatchPlanItem[]>([]);
+  const [localError, setLocalError] = useState('');
+  useEffect(() => {
+    if (!order) { setDraft([]); setLocalError(''); return; }
+    setDraft(order.dispatches.length
+      ? order.dispatches.map((dispatch) => ({ id: dispatch.id, code: dispatch.code, lotId: dispatch.lotId, windowIds: [...dispatch.windowIds], dispatchStatus: dispatch.dispatchStatus }))
+      : [{ code: 'D1', lotId: order.lots[0]?.lotId ?? null, windowIds: [], dispatchStatus: order.dispatchStatus }]);
+    setLocalError('');
+  }, [order]);
+  const assignedElsewhere = (index: number) => new Set(draft.flatMap((dispatch, other) => other === index ? [] : dispatch.windowIds));
+  const update = (index: number, patch: Partial<DispatchPlanItem>) => setDraft((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
+  const addDispatch = () => {
+    if (!order) return;
+    const lotId = order.lots[0]?.lotId ?? null;
+    const used = draft.filter((item) => item.lotId === lotId).map((item) => Number(item.code.slice(1)) || 0);
+    const next = Math.max(0, ...used) + 1;
+    setDraft((rows) => [...rows, { code: `D${next}`, lotId, windowIds: [], dispatchStatus: DispatchStatus.pending_dispatch }]);
+  };
+  const invalid = draft.some((dispatch) => !/^D[1-9]\d*$/.test(dispatch.code) || dispatch.windowIds.length === 0)
+    || draft.some((dispatch, index) => draft.slice(0, index).some((other) => other.lotId === dispatch.lotId && other.code.toUpperCase() === dispatch.code.toUpperCase()));
+  const save = () => {
+    if (!order) return;
+    if (invalid) { setLocalError('Give each dispatch a unique D-number and assign at least one ready window.'); return; }
+    setLocalError('');
+    onSave(order, draft);
+  };
+  return <Dialog open={Boolean(order)} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <DialogContent className="w-[min(96vw,78rem)] max-w-6xl max-h-[92dvh] overflow-y-auto">
+      <DialogHeader>
+        <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Truck size={19} /></div>
+        <DialogTitle>Manage dispatches</DialogTitle>
+        <DialogDescription>{order ? `${order.orderId} · ${order.clientName}. Create separate lot-wise handoffs and assign only windows marked ready.` : 'Manage order dispatches.'}</DialogDescription>
+      </DialogHeader>
+      {order && <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/25 p-3">
+          <div><p className="font-mono text-sm font-bold">{order.orderId}</p><p className="mt-1 text-xs text-muted-foreground">{order.locationName} · {order.windows.filter((window) => window.ready).length} ready windows</p></div>
+          <Button type="button" size="sm" onClick={addDispatch}><Truck size={14} /> Add dispatch</Button>
+        </div>
+        {draft.length === 0 && <div className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">No dispatches. Add one to plan a delivery handoff.</div>}
+        <div className="space-y-3">
+          {draft.map((dispatch, index) => {
+            const unavailable = assignedElsewhere(index);
+            const choices = order.windows.filter((window) => window.ready && (!unavailable.has(window.id) || dispatch.windowIds.includes(window.id)));
+            const tracking = `${dispatch.lotId ?? order.orderId}-${dispatch.code.toUpperCase()}`;
+            const assignmentLocked = dispatch.dispatchStatus !== DispatchStatus.pending_dispatch;
+            return <section key={dispatch.id ?? `new-${index}`} className="rounded-xl border border-border/80 bg-background p-4" data-testid={`dispatch-plan-item-${index}`}>
+              <div className="grid gap-3 md:grid-cols-[minmax(100px,.7fr)_minmax(160px,1fr)_minmax(170px,1fr)_auto] md:items-end">
+                <label className="space-y-1.5 text-xs font-semibold">Dispatch number<input value={dispatch.code} disabled={!canEdit || assignmentLocked} onChange={(event) => update(index, { code: event.target.value.toUpperCase() })} className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm" placeholder="D1" /></label>
+                <label className="space-y-1.5 text-xs font-semibold">Lot<select value={dispatch.lotId ?? ''} disabled={!canEdit || assignmentLocked || order.lots.length === 0} onChange={(event) => update(index, { lotId: event.target.value || null })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                  {order.lots.length ? order.lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>{lot.lotId}</option>) : <option value="">Order dispatch</option>}
+                </select></label>
+                <label className="space-y-1.5 text-xs font-semibold">Dispatch status<select value={dispatch.dispatchStatus} disabled={!canEdit} onChange={(event) => update(index, { dispatchStatus: event.target.value as StatusValue })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                  {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+                </select></label>
+                <Button type="button" variant="outline" className="text-destructive" disabled={!canEdit || assignmentLocked} title={assignmentLocked ? 'Shipped dispatch records cannot be removed' : 'Remove pending dispatch'} onClick={() => setDraft((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}><X size={14} /> Remove</Button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
+                <p className="font-mono text-xs font-bold text-primary">{tracking}</p>
+                <p className="text-[11px] text-muted-foreground">{dispatch.windowIds.length} selected · {choices.length} ready and available</p>
+              </div>
+              {choices.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {choices.map((window) => <label key={window.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-xs hover:bg-muted/40">
+                  <input type="checkbox" disabled={!canEdit || assignmentLocked} checked={dispatch.windowIds.includes(window.id)} onChange={(event) => update(index, { windowIds: event.target.checked ? [...dispatch.windowIds, window.id] : dispatch.windowIds.filter((id) => id !== window.id) })} />
+                  <span className="font-semibold">{window.windowNo}</span><span className="text-muted-foreground">{window.widthMm} × {window.heightMm} mm</span>
+                </label>)}
+              </div> : <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">No unassigned windows are ready. A window is ready when frame and shutter are ready and glass is received.</p>}
+            </section>;
+          })}
+        </div>
+        {(localError || error) && <p role="alert" className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-xs text-destructive"><CircleAlert size={15} className="mt-0.5 shrink-0" />{localError || 'Dispatches could not be saved. Refresh and try again.'}</p>}
+      </div>}
+      <DialogFooter className="sticky bottom-0 bg-background py-2">
+        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        {canEdit && order && <Button type="button" disabled={busy} onClick={save} data-testid="button-save-dispatch-plan">{busy ? 'Saving…' : <><Check size={15} /> Save dispatch plan</>}</Button>}
       </DialogFooter>
     </DialogContent>
   </Dialog>;
@@ -194,11 +287,13 @@ export default function DispatchPage({ user }: { user: User }) {
     query: { queryKey: getListDispatchOrdersQueryKey(), enabled: canView },
   });
   const updateStatus = useUpdateDispatchOrderStatus();
+  const updatePlan = useUpdateDispatchOrderPlan();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sort, setSort] = useState<SortValue>('updated-desc');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [activeOrder, setActiveOrder] = useState<DispatchOrder | null>(null);
+  const [bulkOrder, setBulkOrder] = useState<DispatchOrder | null>(null);
   const [qrOrder, setQrOrder] = useState<DispatchOrder | null>(null);
   const handledScanRef = useRef<string | null>(null);
 
@@ -209,7 +304,7 @@ export default function DispatchPage({ user }: { user: User }) {
     handledScanRef.current = recordId;
     const match = ordersQuery.data.find((order) => order.id === recordId);
     if (match) {
-      setActiveOrder(match);
+      setBulkOrder(match);
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
     } else {
       toast({ title: 'Order not found in dispatch', description: 'This QR code did not match a live dispatch record.' });
@@ -239,8 +334,21 @@ export default function DispatchPage({ user }: { user: User }) {
         void queryClient.invalidateQueries({ queryKey: getListDispatchOrdersQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getListInstallationOrdersQueryKey() });
         toast({ title: 'Dispatch status updated', description: `${updated.orderId} · ${dispatchLabel(updated.dispatchStatus)}` });
+        setBulkOrder(null);
+      },
+    });
+  };
+  const savePlan = (order: DispatchOrder, dispatches: DispatchPlanItem[]) => {
+    if (!canEdit) return;
+    updatePlan.mutate({ id: order.id, data: { expectedRevision: order.dispatchPlanRevision, dispatches } }, {
+      onSuccess: (updated) => {
+        queryClient.setQueryData<DispatchOrder[]>(getListDispatchOrdersQueryKey(), (current) => current?.map((item) => item.id === updated.id ? updated : item));
+        void queryClient.invalidateQueries({ queryKey: getListDispatchOrdersQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getListInstallationOrdersQueryKey() });
+        toast({ title: 'Dispatch plan saved', description: `${updated.orderId} · ${updated.dispatches.length} dispatch(es)` });
         setActiveOrder(null);
       },
+      onError: () => toast({ title: 'Dispatch plan could not be saved', description: 'Refresh the dispatch register and try again.', variant: 'destructive' }),
     });
   };
   const clearFilters = () => { setSearch(''); setStatusFilter('all'); };
@@ -304,6 +412,7 @@ export default function DispatchPage({ user }: { user: User }) {
               <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-background p-1" role="group" aria-label="Dispatch register view">
                 <Button type="button" variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')} aria-label="List view" aria-pressed={viewMode === 'list'} title="List view" data-testid="button-dispatch-list-view"><List size={15} /></Button>
                 <Button type="button" variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} title="Grid view" data-testid="button-dispatch-grid-view"><Grid2X2 size={15} /></Button>
+                <Button type="button" variant={viewMode === 'tree' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('tree')} aria-label="Dispatch tree view" aria-pressed={viewMode === 'tree'} title="Dispatch tree" data-testid="button-dispatch-tree-view"><GitBranch size={15} /></Button>
               </div>
               {(search || statusFilter !== 'all') && <Button type="button" variant="ghost" size="sm" className="h-10 text-xs" onClick={clearFilters} data-testid="button-clear-dispatch-filters"><X size={14} /> Clear</Button>}
             </div>
@@ -321,7 +430,25 @@ export default function DispatchPage({ user }: { user: User }) {
           </div> : filteredOrders.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-dispatch-empty">
             <div><div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-primary"><PackageCheck size={20} /></div><h3 className="mt-3 font-display text-sm font-bold">{orders.length ? 'No orders match these filters' : 'No dispatch records yet'}</h3><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{orders.length ? 'Try a different search or status filter, or clear your filters.' : 'Orders will appear here with a separate dispatch status so delivery handoffs can be tracked.'}</p>{orders.length > 0 && <Button type="button" size="sm" variant="outline" className="mt-4" onClick={clearFilters} data-testid="button-empty-clear-filters">Clear filters</Button>}</div>
           </div> : viewMode === 'grid' ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="grid-dispatch-orders">
-            {filteredOrders.map((order) => <DispatchGridCard key={order.id} order={order} canViewOrderHub={canViewOrderHub} canEdit={canEdit} busy={updateStatus.isPending} onShowQr={() => setQrOrder(order)} onUpdate={() => setActiveOrder(order)} />)}
+            {filteredOrders.map((order) => <DispatchGridCard key={order.id} order={order} canViewOrderHub={canViewOrderHub} canEdit={canEdit} busy={updatePlan.isPending} onShowQr={() => setQrOrder(order)} onUpdate={() => setActiveOrder(order)} />)}
+          </div> : viewMode === 'tree' ? <div className="space-y-3" data-testid="tree-dispatch-orders">
+            {filteredOrders.map((order) => <article key={order.id} className="rounded-xl border border-border/75 bg-background p-4" data-testid={`tree-dispatch-order-${order.id}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0"><p className="font-mono text-sm font-bold text-primary">{order.orderId}</p><p className="mt-1 text-xs font-semibold">{order.clientName} <span className="text-muted-foreground">· {order.locationName}</span></p></div>
+                <div className="flex items-center gap-2"><StatusPill status={order.dispatchStatus} /><Button type="button" size="sm" variant="outline" disabled={!canEdit || updatePlan.isPending} onClick={() => setActiveOrder(order)}>{canEdit ? 'Manage dispatches' : 'View'}</Button></div>
+              </div>
+              <div className="ml-2 mt-3 space-y-2 border-l-2 border-primary/20 pl-4">
+                {(order.lots.length ? order.lots : [{ lotId: '', sequence: 0 }]).map((lot) => {
+                  const lotDispatches = order.dispatches.filter((dispatch) => dispatch.lotId === (lot.lotId || null));
+                  return <section key={lot.lotId || 'order-level'} className="rounded-lg bg-muted/25 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{lot.lotId || 'Order dispatches'}</p>
+                    {lotDispatches.length ? <div className="mt-2 space-y-2">{lotDispatches.map((dispatch) => <div key={dispatch.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-background px-3 py-2">
+                      <div><p className="font-mono text-xs font-bold">{dispatch.trackingId}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{dispatch.windowIds.length} selected windows</p></div><StatusPill status={dispatch.dispatchStatus} />
+                    </div>)}</div> : <p className="mt-2 text-xs text-muted-foreground">No dispatches in this lot yet.</p>}
+                  </section>;
+                })}
+              </div>
+            </article>)}
           </div> : <div className="space-y-2" data-testid="list-dispatch-orders">
             {filteredOrders.map((order) => <article key={order.id} className={`group grid gap-3 rounded-xl border border-border/75 bg-background px-3.5 py-3 transition duration-200 hover:border-primary/25 hover:bg-primary/[0.018] hover:shadow-sm lg:items-center lg:gap-2.5 lg:px-4 ${DISPATCH_REGISTER_COLUMNS}`} data-testid={`row-dispatch-order-${order.id}`}>
             <div className="min-w-0">
@@ -341,7 +468,7 @@ export default function DispatchPage({ user }: { user: User }) {
               <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground lg:hidden">Actions</span>
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-[10px]" onClick={() => setQrOrder(order)} aria-label={`Show QR for ${order.orderId}`} data-testid={`button-show-qr-${order.id}`}><QrCode size={13} /><span className="hidden sm:inline">QR</span></Button>
-                <Button type="button" size="sm" className="h-8 px-2 text-[10px]" disabled={!canEdit || updateStatus.isPending} onClick={() => setActiveOrder(order)} title={canEdit ? 'Change dispatch status' : 'View-only access'} data-testid={`button-change-status-${order.id}`}>{canEdit ? 'Update' : 'View'}<ArrowRight size={12} /></Button>
+                <Button type="button" size="sm" className="h-8 px-2 text-[10px]" disabled={!canEdit || updatePlan.isPending} onClick={() => setActiveOrder(order)} title={canEdit ? 'Manage lots, windows, and dispatches' : 'View-only access'} data-testid={`button-change-status-${order.id}`}>{canEdit ? 'Update' : 'View'}<ArrowRight size={12} /></Button>
               </div>
             </div>
             </article>)}
@@ -353,14 +480,15 @@ export default function DispatchPage({ user }: { user: User }) {
       </section>
     </div>
 
-    <StatusDialog order={activeOrder} canEdit={canEdit} busy={updateStatus.isPending} error={updateStatus.isError} onClose={() => { setActiveOrder(null); updateStatus.reset(); }} onSave={saveStatus} />
+    <DispatchPlanDialog order={activeOrder} canEdit={canEdit} busy={updatePlan.isPending} error={updatePlan.isError} onClose={() => { setActiveOrder(null); updatePlan.reset(); }} onSave={savePlan} />
+    <StatusDialog order={bulkOrder} canEdit={canEdit} busy={updateStatus.isPending} error={updateStatus.isError} onClose={() => { setBulkOrder(null); updateStatus.reset(); }} onSave={saveStatus} />
     <Dialog open={Boolean(qrOrder)} onOpenChange={(open) => { if (!open) setQrOrder(null); }}>
       <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Dispatch QR code</DialogTitle><DialogDescription>{qrOrder ? `Scan to open dispatch status for ${qrOrder.orderId}.` : 'Order dispatch QR code.'}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Dispatch QR code</DialogTitle><DialogDescription>{qrOrder ? `Scan to update every dispatch for ${qrOrder.orderId} together.` : 'Order dispatch QR code.'}</DialogDescription></DialogHeader>
         {qrOrder && <div className="flex flex-col items-center rounded-xl border border-border/70 bg-muted/20 p-5">
           <div className="rounded-xl bg-white p-3 shadow-sm"><QRCodeCanvas value={getDispatchScanUrl(qrOrder.id)} size={208} level="M" includeMargin /></div>
           <p className="mt-4 font-mono text-sm font-bold">{qrOrder.orderId}</p><p className="mt-1 text-xs text-muted-foreground">{qrOrder.clientName} · {qrOrder.locationName}</p><div className="mt-3"><StatusPill status={qrOrder.dispatchStatus} /></div>
-          <p className="mt-3 max-w-[250px] text-center text-[10px] leading-4 text-muted-foreground">This code opens the dispatch status flow. Updating still requires dispatch edit permission.</p>
+          <p className="mt-3 max-w-[250px] text-center text-[10px] leading-4 text-muted-foreground">This order-level code opens a bulk status update for every dispatch. Dispatch edit permission is required.</p>
         </div>}
         <DialogFooter><Button type="button" variant="outline" onClick={() => setQrOrder(null)} data-testid="button-close-dispatch-qr">Close</Button></DialogFooter>
       </DialogContent>

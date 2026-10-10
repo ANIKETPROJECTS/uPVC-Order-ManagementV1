@@ -176,6 +176,17 @@ export interface OrderLotDocument {
   createdAt: Date;
 }
 
+export interface OrderDispatchDocument {
+  _id: string;
+  code: string;
+  lotId: string | null;
+  windowIds: string[];
+  dispatchStatus: DispatchStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  updatedBy: string;
+}
+
 export interface OrderDocument {
   _id: string;
   orderId: string;
@@ -198,6 +209,8 @@ export interface OrderDocument {
   needsReview?: boolean;
   lots?: OrderLotDocument[];
   nextLotSequence?: number;
+  dispatches?: OrderDispatchDocument[];
+  dispatchPlanRevision?: number;
   status: OrderStatus;
   isActive?: boolean;
   dispatchStatus?: DispatchStatus;

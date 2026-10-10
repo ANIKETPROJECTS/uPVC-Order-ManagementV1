@@ -318,6 +318,31 @@ export const DispatchStatus = {
   delivered: 'delivered',
 } as const;
 
+export interface DispatchLot {
+  lotId: string;
+  sequence: number;
+}
+
+export interface DispatchRecord {
+  id: string;
+  code: string;
+  trackingId: string;
+  /** @nullable */
+  lotId: string | null;
+  windowIds: string[];
+  dispatchStatus: DispatchStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DispatchWindow {
+  id: string;
+  windowNo: string;
+  widthMm: number;
+  heightMm: number;
+  ready: boolean;
+}
+
 export interface DispatchOrder {
   id: string;
   orderId: string;
@@ -325,8 +350,27 @@ export interface DispatchOrder {
   locationName: string;
   orderStatus: OrderStatus;
   dispatchStatus: DispatchStatus;
+  lots: DispatchLot[];
+  dispatches: DispatchRecord[];
+  windows: DispatchWindow[];
+  dispatchPlanRevision: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DispatchPlanItem {
+  id?: string;
+  /** @pattern ^D[1-9][0-9]*$ */
+  code: string;
+  /** @nullable */
+  lotId: string | null;
+  windowIds: string[];
+  dispatchStatus: DispatchStatus;
+}
+
+export interface DispatchPlanUpdate {
+  expectedRevision: number;
+  dispatches: DispatchPlanItem[];
 }
 
 export interface DispatchStatusUpdate {

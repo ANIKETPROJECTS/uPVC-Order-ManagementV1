@@ -5,7 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { DispatchLot } from './dispatchLot';
+import type { DispatchRecord } from './dispatchRecord';
 import type { DispatchStatus } from './dispatchStatus';
+import type { DispatchWindow } from './dispatchWindow';
 import type { OrderStatus } from './orderStatus';
 
 export interface DispatchOrder {
@@ -15,6 +18,10 @@ export interface DispatchOrder {
   locationName: string;
   orderStatus: OrderStatus;
   dispatchStatus: DispatchStatus;
+  lots: DispatchLot[];
+  dispatches: DispatchRecord[];
+  windows: DispatchWindow[];
+  dispatchPlanRevision: number;
   createdAt: Date;
   updatedAt: Date;
 }

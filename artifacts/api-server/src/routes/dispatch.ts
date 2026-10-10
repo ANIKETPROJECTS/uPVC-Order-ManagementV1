@@ -1,5 +1,8 @@
 import {
   ListDispatchOrdersResponse,
+  UpdateDispatchOrderPlanBody,
+  UpdateDispatchOrderPlanParams,
+  UpdateDispatchOrderPlanResponse,
   UpdateDispatchOrderStatusBody,
   UpdateDispatchOrderStatusParams,
   UpdateDispatchOrderStatusResponse,
@@ -9,9 +12,12 @@ import {
   getOrderActivity,
   getMongoDb,
   getOrders,
+  getOrderWindows,
   getPublicUser,
   getUsers,
+  type DispatchStatus,
   type OrderDocument,
+  type OrderWindowDocument,
 } from "../lib/mongo";
 import { randomUUID } from "node:crypto";
 
@@ -50,14 +56,41 @@ function requireDispatchPermission(required: "view" | "edit"): RequestHandler {
   };
 }
 
-function dispatchOrderResponse(order: OrderDocument) {
+function aggregateStatus(dispatches: NonNullable<OrderDocument["dispatches"]>, legacy?: DispatchStatus): DispatchStatus {
+  if (dispatches.length === 0) return legacy ?? "pending_dispatch";
+  if (dispatches.every((dispatch) => dispatch.dispatchStatus === "delivered")) return "delivered";
+  if (dispatches.some((dispatch) => dispatch.dispatchStatus !== "pending_dispatch")) return "dispatched";
+  return "pending_dispatch";
+}
+
+function dispatchOrderResponse(order: OrderDocument, windows: OrderWindowDocument[] = []) {
+  const dispatches = order.dispatches ?? [];
   return {
     id: order._id,
     orderId: order.orderId,
     clientName: order.clientName,
     locationName: order.locationName,
     orderStatus: order.status,
-    dispatchStatus: order.dispatchStatus ?? "pending_dispatch",
+    dispatchStatus: aggregateStatus(dispatches, order.dispatchStatus),
+    lots: (order.lots ?? []).map((lot) => ({ lotId: lot.lotId, sequence: lot.sequence })),
+    dispatches: dispatches.map((dispatch) => ({
+      id: dispatch._id,
+      code: dispatch.code,
+      trackingId: `${dispatch.lotId ?? order.orderId}-${dispatch.code}`,
+      lotId: dispatch.lotId,
+      windowIds: dispatch.windowIds,
+      dispatchStatus: dispatch.dispatchStatus,
+      createdAt: dispatch.createdAt.toISOString(),
+      updatedAt: dispatch.updatedAt.toISOString(),
+    })),
+    windows: windows.map((window) => ({
+      id: window._id,
+      windowNo: window.windowNo,
+      widthMm: window.widthMm,
+      heightMm: window.heightMm,
+      ready: window.frameStatus === "ready" && window.shutterStatus === "ready" && window.glassStatus === "received",
+    })),
+    dispatchPlanRevision: order.dispatchPlanRevision ?? 0,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
   };
@@ -67,11 +100,138 @@ router.get(
   "/dispatch/orders",
   requireDispatchPermission("view"),
   async (_req, res): Promise<void> => {
-    const orders = await getOrders(await getMongoDb())
+    const db = await getMongoDb();
+    const orders = await getOrders(db)
       .find({})
       .sort({ updatedAt: -1, createdAt: -1 })
       .toArray();
-    res.json(ListDispatchOrdersResponse.parse(orders.map(dispatchOrderResponse)));
+    const windows = await getOrderWindows(db)
+      .find({ orderRecordId: { $in: orders.map((order) => order._id) }, archivedAt: null })
+      .toArray();
+    const windowsByOrder = new Map<string, typeof windows>();
+    for (const window of windows) {
+      const group = windowsByOrder.get(window.orderRecordId) ?? [];
+      group.push(window);
+      windowsByOrder.set(window.orderRecordId, group);
+    }
+    res.json(ListDispatchOrdersResponse.parse(orders.map((order) => dispatchOrderResponse(order, windowsByOrder.get(order._id) ?? []))));
+  },
+);
+
+router.patch(
+  "/dispatch/orders/:id/plan",
+  requireDispatchPermission("edit"),
+  async (req, res): Promise<void> => {
+    const params = UpdateDispatchOrderPlanParams.safeParse(req.params);
+    const body = UpdateDispatchOrderPlanBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: !params.success ? params.error.message : body.success ? "" : body.error.message });
+      return;
+    }
+    const userId = req.session.userId;
+    if (!userId) { res.status(401).json({ error: "Sign in to continue." }); return; }
+
+    const db = await getMongoDb();
+    const orders = getOrders(db);
+    const order = await orders.findOne({ _id: params.data.id });
+    if (!order) { res.status(404).json({ error: "Order not found." }); return; }
+    const revision = order.dispatchPlanRevision ?? 0;
+    if (body.data.expectedRevision !== revision) {
+      res.status(409).json({ error: "This dispatch plan changed elsewhere. Refresh and try again." });
+      return;
+    }
+
+    const codes = new Set<string>();
+    const selectedWindows = new Set<string>();
+    const oldDispatches = order.dispatches ?? [];
+    for (const current of oldDispatches) {
+      const incoming = body.data.dispatches.find((item) => item.id === current._id);
+      const assignmentsChanged = incoming && (
+        incoming.code.toUpperCase() !== current.code
+        || incoming.lotId !== current.lotId
+        || [...incoming.windowIds].sort().join("|") !== [...current.windowIds].sort().join("|")
+      );
+      if (current.dispatchStatus !== "pending_dispatch" && (!incoming || assignmentsChanged)) {
+        res.status(409).json({ error: "Dispatched or delivered records are locked. Only their status can be changed." });
+        return;
+      }
+    }
+    const existingWindowIds = new Set(oldDispatches.flatMap((dispatch) => dispatch.windowIds));
+    for (const dispatch of body.data.dispatches) {
+      const isProject = order.clientType === "Project" || (order.lots?.length ?? 0) > 0;
+      if (isProject) {
+        if (!dispatch.lotId || !(order.lots ?? []).some((lot) => lot.lotId === dispatch.lotId)) {
+          res.status(400).json({ error: "Choose a valid project lot for each dispatch." });
+          return;
+        }
+      } else if (dispatch.lotId !== null) {
+        res.status(400).json({ error: "Retail dispatches cannot be assigned to a project lot." });
+        return;
+      }
+      const codeKey = `${dispatch.lotId ?? "order"}:${dispatch.code.toUpperCase()}`;
+      if (codes.has(codeKey)) { res.status(400).json({ error: "Dispatch numbers must be unique within each lot." }); return; }
+      codes.add(codeKey);
+      for (const windowId of dispatch.windowIds) {
+        if (selectedWindows.has(windowId)) { res.status(400).json({ error: "A window can only be assigned to one dispatch at a time." }); return; }
+        selectedWindows.add(windowId);
+      }
+      if (dispatch.id && !oldDispatches.some((current) => current._id === dispatch.id)) {
+        res.status(400).json({ error: "A dispatch in this plan is no longer available." });
+        return;
+      }
+    }
+
+    const windows = await getOrderWindows(db).find({
+      orderRecordId: order._id,
+      _id: { $in: [...selectedWindows] },
+      archivedAt: null,
+    }).toArray();
+    if (windows.length !== selectedWindows.size) {
+      res.status(409).json({ error: "One or more selected windows are no longer available." });
+      return;
+    }
+    const notReady = windows.find((window) => !existingWindowIds.has(window._id)
+      && (window.frameStatus !== "ready" || window.shutterStatus !== "ready" || window.glassStatus !== "received"));
+    if (notReady) {
+      res.status(409).json({ error: `Window ${notReady.windowNo} is not ready for dispatch.` });
+      return;
+    }
+
+    const now = new Date();
+    const dispatches = body.data.dispatches.map((input) => {
+      const current = input.id ? oldDispatches.find((dispatch) => dispatch._id === input.id) : undefined;
+      return {
+        _id: current?._id ?? randomUUID(),
+        code: input.code.toUpperCase(),
+        lotId: input.lotId,
+        windowIds: input.windowIds,
+        dispatchStatus: input.dispatchStatus,
+        createdAt: current?.createdAt ?? now,
+        updatedAt: now,
+        updatedBy: userId,
+      };
+    });
+    const nextStatus = aggregateStatus(dispatches);
+    const revisionFilter = revision === 0
+      ? { $or: [{ dispatchPlanRevision: 0 }, { dispatchPlanRevision: { $exists: false } }] }
+      : { dispatchPlanRevision: revision };
+    const update = await orders.updateOne(
+      { _id: order._id, ...revisionFilter },
+      { $set: { dispatches, dispatchStatus: nextStatus, dispatchPlanRevision: revision + 1, updatedAt: now, updatedBy: userId } },
+    );
+    if (!update.matchedCount) {
+      res.status(409).json({ error: "This dispatch plan changed elsewhere. Refresh and try again." });
+      return;
+    }
+    const updated = await orders.findOne({ _id: order._id });
+    if (!updated) { res.status(404).json({ error: "Order not found." }); return; }
+    const actor = await getUsers(db).findOne({ _id: userId, status: "active" });
+    await getOrderActivity(db).insertOne({
+      _id: randomUUID(), orderRecordId: order._id, actorId: userId, actorName: actor?.name ?? "Team member",
+      action: "dispatch.plan_updated", summary: `Updated dispatch plan for ${order.orderId} with ${dispatches.length} dispatch(es).`, createdAt: now,
+    });
+    const allWindows = await getOrderWindows(db).find({ orderRecordId: order._id, archivedAt: null }).toArray();
+    res.json(UpdateDispatchOrderPlanResponse.parse(dispatchOrderResponse(updated, allWindows)));
   },
 );
 
@@ -96,19 +256,33 @@ router.patch(
 
     const db = await getMongoDb();
     const orders = getOrders(db);
+    const order = await orders.findOne({ _id: params.data.id });
+    if (!order) { res.status(404).json({ error: "Order not found." }); return; }
     const updatedAt = new Date();
+    const dispatches = (order.dispatches ?? []).map((dispatch) => ({
+      ...dispatch,
+      dispatchStatus: body.data.dispatchStatus,
+      updatedAt,
+      updatedBy: userId,
+    }));
+    const revision = order.dispatchPlanRevision ?? 0;
+    const revisionFilter = revision === 0
+      ? { $or: [{ dispatchPlanRevision: 0 }, { dispatchPlanRevision: { $exists: false } }] }
+      : { dispatchPlanRevision: revision };
     const result = await orders.updateOne(
-      { _id: params.data.id },
+      { _id: params.data.id, ...revisionFilter },
       {
         $set: {
+          dispatches,
           dispatchStatus: body.data.dispatchStatus,
           updatedAt,
           updatedBy: userId,
+          dispatchPlanRevision: revision + 1,
         },
       },
     );
     if (!result.matchedCount) {
-      res.status(404).json({ error: "Order not found." });
+      res.status(409).json({ error: "The dispatch plan changed elsewhere. Refresh and try again." });
       return;
     }
 
@@ -124,10 +298,11 @@ router.patch(
       actorId: userId,
       actorName: actor?.name ?? "Team member",
       action: "dispatch.status_set",
-      summary: `Set dispatch status for ${updated.orderId} to ${updated.dispatchStatus ?? "pending_dispatch"}.`,
+      summary: `Set every dispatch for ${updated.orderId} to ${body.data.dispatchStatus}.`,
       createdAt: updatedAt,
     });
-    res.json(UpdateDispatchOrderStatusResponse.parse(dispatchOrderResponse(updated)));
+    const windows = await getOrderWindows(db).find({ orderRecordId: updated._id, archivedAt: null }).toArray();
+    res.json(UpdateDispatchOrderStatusResponse.parse(dispatchOrderResponse(updated, windows)));
   },
 );
 

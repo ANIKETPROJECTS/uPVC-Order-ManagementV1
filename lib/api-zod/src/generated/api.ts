@@ -1706,6 +1706,28 @@ export const ListDispatchOrdersResponseItem = zod.object({
   "locationName": zod.string(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "lots": zod.array(zod.object({
+  "lotId": zod.string(),
+  "sequence": zod.number().int()
+})),
+  "dispatches": zod.array(zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "trackingId": zod.string(),
+  "lotId": zod.string().nullable(),
+  "windowIds": zod.array(zod.string()),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "windows": zod.array(zod.object({
+  "id": zod.string(),
+  "windowNo": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "ready": zod.boolean()
+})),
+  "dispatchPlanRevision": zod.number().int(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -1730,6 +1752,83 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
   "locationName": zod.string(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "lots": zod.array(zod.object({
+  "lotId": zod.string(),
+  "sequence": zod.number().int()
+})),
+  "dispatches": zod.array(zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "trackingId": zod.string(),
+  "lotId": zod.string().nullable(),
+  "windowIds": zod.array(zod.string()),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "windows": zod.array(zod.object({
+  "id": zod.string(),
+  "windowNo": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "ready": zod.boolean()
+})),
+  "dispatchPlanRevision": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Create, edit, or remove dispatches and assign ready windows
+ */
+export const UpdateDispatchOrderPlanParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateDispatchOrderPlanBodyDispatchesItemCodeRegExp = new RegExp('^D[1-9][0-9]*$');
+
+
+export const UpdateDispatchOrderPlanBody = zod.object({
+  "expectedRevision": zod.number().int(),
+  "dispatches": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "code": zod.string().regex(updateDispatchOrderPlanBodyDispatchesItemCodeRegExp),
+  "lotId": zod.string().nullable(),
+  "windowIds": zod.array(zod.string()),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered'])
+}))
+})
+
+export const UpdateDispatchOrderPlanResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "lots": zod.array(zod.object({
+  "lotId": zod.string(),
+  "sequence": zod.number().int()
+})),
+  "dispatches": zod.array(zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "trackingId": zod.string(),
+  "lotId": zod.string().nullable(),
+  "windowIds": zod.array(zod.string()),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "windows": zod.array(zod.object({
+  "id": zod.string(),
+  "windowNo": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "ready": zod.boolean()
+})),
+  "dispatchPlanRevision": zod.number().int(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
