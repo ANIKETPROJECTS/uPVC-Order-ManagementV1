@@ -127,18 +127,9 @@ export function LifecycleMessageTemplates({ templates, canEdit, loading, error, 
                 )}
               />
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-2">
-                  <p className="text-[10px] leading-4 text-muted-foreground">
-                    <span className="font-semibold text-foreground">Variables:</span> {'{{clientName}}'} · {'{{orderId}}'} · {'{{locationName}}'} · {'{{status}}'} · {'{{dispatch_code}}'} · {'{{lot_no}}'} · {'{{vehicle_no}}'}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5" aria-label="Insert dispatch template variable">
-                    {['dispatch_code', 'lot_no', 'vehicle_no'].map((variable) => <Button key={variable} type="button" size="sm" variant="outline" className="h-7 px-2 text-[9px]" disabled={!canEdit} onClick={() => {
-                      const current = form.getValues('template');
-                      const token = `{{${variable}}}`;
-                      form.setValue('template', `${current}${current && !current.endsWith(' ') ? ' ' : ''}${token}`, { shouldDirty: true, shouldValidate: true });
-                    }} data-testid={`button-insert-template-${variable}`}>+ {variable}</Button>)}
-                  </div>
-                </div>
+                <p className="text-[10px] leading-4 text-muted-foreground">
+                  <span className="font-semibold text-foreground">Variables:</span> {'{{clientName}}'} · {'{{orderId}}'} · {'{{locationName}}'} · {'{{status}}'}
+                </p>
                 {canEdit && (
                   <Button type="submit" size="sm" disabled={update.isPending} data-testid="button-save-template">
                     {update.isPending ? 'Saving…' : 'Save shared template'}

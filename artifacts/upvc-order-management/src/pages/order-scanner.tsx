@@ -8,7 +8,7 @@ import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getDispatchRecordIdFromQr, getDispatchShareTokenFromQr, getOrderRecordIdFromQr } from '@/lib/order-qr';
+import { getDispatchRecordIdFromQr, getOrderRecordIdFromQr } from '@/lib/order-qr';
 
 type ScannerError = {
   kind: 'camera' | 'qr';
@@ -24,7 +24,7 @@ export default function OrderScannerPage({ user }: { user: User }) {
   const orderPermission = user.permissions?.['order-hub'];
   const dispatchPermission = user.permissions?.dispatch;
   const canViewOrders = user.roleId === 'master-admin' || orderPermission === 'view' || orderPermission === 'edit';
-  const canViewDispatch = user.roleId === 'master-admin' || dispatchPermission === 'view' || dispatchPermission === 'edit' || user.permissions?.['dispatch.view'] === 'view' || user.permissions?.['dispatch.view'] === 'edit';
+  const canViewDispatch = user.roleId === 'master-admin' || dispatchPermission === 'view' || dispatchPermission === 'edit';
   const canView = canViewOrders || canViewDispatch;
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<ScannerError | null>(null);
@@ -68,20 +68,6 @@ export default function OrderScannerPage({ user }: { user: User }) {
       const reader = new BrowserQRCodeReader();
       const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result, _decodeError, activeControls) => {
         if (!result || handledResultRef.current) return;
-        const dispatchToken = getDispatchShareTokenFromQr(result.getText());
-        if (dispatchToken) {
-          if (!canViewDispatch) {
-            setError({ kind: 'qr', message: 'Dispatch view access is required to open this dispatch QR.' });
-            return;
-          }
-          handledResultRef.current = true;
-          activeControls.stop();
-          controlsRef.current = null;
-          setScanning(false);
-          setError(null);
-          setLocation(`/dispatch/share/${encodeURIComponent(dispatchToken)}`);
-          return;
-        }
         const dispatchRecordId = getDispatchRecordIdFromQr(result.getText());
         if (dispatchRecordId) {
           if (!canViewDispatch) {
@@ -161,7 +147,7 @@ export default function OrderScannerPage({ user }: { user: User }) {
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order lookup</p>
               <CardTitle className="mt-1">Scan an order or dispatch QR</CardTitle>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Point your camera at an order QR to open its status page, or a dispatch QR to open its protected lot handoff. Status changes are made in the dispatch register.
+                  Point your camera at an order QR to open its status page, or a dispatch QR to open the dispatch status action. Your role permissions control which records you can update.
                 </p>
               </div>
               <ScanLine size={22} className="shrink-0 text-primary" aria-hidden="true" />

@@ -9,8 +9,6 @@ import type { OrderGlassStatus } from './orderGlassStatus';
 import type { OrderWindowReadiness } from './orderWindowReadiness';
 
 export interface OrderWindowUpdate {
-  /** @minLength 1 */
-  lotRecordId?: string;
   /**
      * @minLength 1
      * @maxLength 20

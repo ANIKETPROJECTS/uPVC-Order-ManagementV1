@@ -172,7 +172,6 @@ export interface OrderLotDocument {
   _id: string;
   sequence: number;
   lotId: string;
-  legacyLotId?: string | null;
   createdBy: string;
   createdAt: Date;
 }
@@ -202,7 +201,6 @@ export interface OrderDocument {
   status: OrderStatus;
   isActive?: boolean;
   dispatchStatus?: DispatchStatus;
-  dispatchLifecyclePreviousStatus?: OrderStatus | null;
   notes: string | null;
   orderValue?: number | null;
   createdBy: string;
@@ -214,7 +212,7 @@ export interface OrderDocument {
 export type WindowReadiness = "pending" | "in_progress" | "ready";
 export type GlassStatus = "pending" | "partial" | "received";
 export interface OrderWindowDocument {
-  _id: string; orderRecordId: string; lotRecordId?: string | null; windowNo: string; widthMm: number; heightMm: number;
+  _id: string; orderRecordId: string; windowNo: string; widthMm: number; heightMm: number;
   windowType: string; frameStatus: WindowReadiness; shutterStatus: WindowReadiness;
   glassStatus: GlassStatus; pendingReason: string | null; sqFt: number;
   createdBy: string; createdAt: Date; updatedBy: string; updatedAt: Date; archivedAt?: Date | null;
@@ -326,116 +324,9 @@ export interface OrderDocumentCategoryDocument {
 export interface OrderDocumentMetadataDocument {
   _id: string; orderRecordId: string; quotationRequestId?: string | null; filename: string; category: DocumentCategory;
   contentType: string; sizeBytes: number; gridFsId: string | null; storagePath?: string | null; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
-  dispatchId?: string | null; documentVersion?: number | null; contentHash?: string | null;
 }
 export interface OrderActivityDocument {
-  _id: string; orderRecordId: string; dispatchId?: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
-}
-export type DispatchRecordStatus = "planned" | "dispatched" | "delivered" | "returned" | "cancelled";
-export interface DispatchWindowSnapshotDocument {
-  windowId: string;
-  windowNo: string;
-  widthMm: number;
-  heightMm: number;
-  windowType: string;
-  sqFt: number;
-  frameStatus: WindowReadiness;
-  shutterStatus: WindowReadiness;
-  glassStatus: GlassStatus;
-}
-export interface DispatchRecordDocument {
-  _id: string;
-  orderRecordId: string;
-  orderId: string;
-  clientName: string;
-  lotRecordId: string;
-  lotId: string;
-  lotSequence: number;
-  legacyLotIds?: string[];
-  legacyDispatchCodes?: string[];
-  dispatchNo: number;
-  dispatchCode: string;
-  dispatchNote: string | null;
-  status: DispatchRecordStatus;
-  plannedAt: Date | null;
-  dispatchedAt: Date | null;
-  deliveredAt: Date | null;
-  returnedAt: Date | null;
-  locationName: string;
-  siteAddress: string | null;
-  siteLatitude: number | null;
-  siteLongitude: number | null;
-  vehicleNumber: string | null;
-  driverName: string | null;
-  driverPhone: string | null;
-  challanNumber: string | null;
-  windowsSnapshot: DispatchWindowSnapshotDocument[];
-  qrToken: string;
-  qrRevokedAt: Date | null;
-  overrideReason: string | null;
-  createdBy: string;
-  createdAt: Date;
-  updatedBy: string;
-  updatedAt: Date;
-  cancelledBy: string | null;
-  cancelledAt: Date | null;
-  cancelReason: string | null;
-  migrationRunId?: string | null;
-}
-export interface DispatchLockDocument {
-  _id: string;
-  ownerToken: string;
-  leaseUntil: Date;
-}
-export interface ActivityEventDocument {
-  _id: string;
-  entityType: "order" | "dispatch";
-  orderRecordId: string;
-  dispatchId?: string | null;
-  eventType: string;
-  actorId: string;
-  actorName: string;
-  message: string;
-  metadata?: Record<string, unknown>;
-  createdAt: Date;
-}
-export interface DispatchMigrationRunDocument {
-  _id: string;
-  state: "running" | "complete" | "reverted";
-  startedAt: Date;
-  completedAt?: Date | null;
-  revertedAt?: Date | null;
-  backupConfirmedAt: Date;
-}
-export interface DispatchMigrationJournalDocument {
-  _id: string;
-  runId: string;
-  orderRecordId: string;
-  shouldBackfillDispatch?: boolean;
-  previousOrder: {
-    lots?: OrderLotDocument[];
-    nextLotSequence?: number;
-    status: OrderStatus;
-    dispatchStatus?: DispatchStatus;
-    dispatchLifecyclePreviousStatus?: OrderStatus | null;
-    updatedAt?: Date;
-    updatedBy?: string;
-  };
-  previousWindows: Array<{
-    windowId: string;
-    lotRecordId?: string | null;
-    appliedLotRecordId?: string | null;
-  }>;
-  appliedOrder?: {
-    lots?: OrderLotDocument[];
-    nextLotSequence?: number;
-    status: OrderStatus;
-    dispatchStatus?: DispatchStatus;
-    dispatchLifecyclePreviousStatus?: OrderStatus | null;
-    updatedAt?: Date;
-    updatedBy?: string;
-  };
-  createdDispatchIds: string[];
+  _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
 }
 export type InstallationStatus = "pending" | "issue" | "installed";
 export interface InstallationAssignedMemberDocument {
@@ -834,11 +725,6 @@ export function getOrderPaymentFlags(db: Db) { return db.collection<OrderPayment
 export function getOrderDocumentCategories(db: Db) { return db.collection<OrderDocumentCategoryDocument>("order_document_categories"); }
 export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }
 export function getOrderActivity(db: Db) { return db.collection<OrderActivityDocument>("order_activity"); }
-export function getDispatchRecords(db: Db) { return db.collection<DispatchRecordDocument>("dispatch_records"); }
-export function getDispatchLocks(db: Db) { return db.collection<DispatchLockDocument>("dispatch_locks"); }
-export function getActivityEvents(db: Db) { return db.collection<ActivityEventDocument>("activity_events"); }
-export function getDispatchMigrationRuns(db: Db) { return db.collection<DispatchMigrationRunDocument>("dispatch_migration_runs"); }
-export function getDispatchMigrationJournal(db: Db) { return db.collection<DispatchMigrationJournalDocument>("dispatch_migration_journal"); }
 export function getInstallations(db: Db) { return db.collection<InstallationDocument>("installations"); }
 export function getInstallationTeams(db: Db) { return db.collection<InstallationTeamDocument>("installation_teams"); }
 export function getOrderGrievances(db: Db) { return db.collection<OrderGrievanceDocument>("order_grievances"); }
@@ -1407,9 +1293,6 @@ export async function initializeMongo(): Promise<void> {
   const paymentFlags = getOrderPaymentFlags(db);
   const orderDocumentMetadata = getOrderDocumentMetadata(db);
   const orderActivity = getOrderActivity(db);
-  const dispatchRecords = getDispatchRecords(db);
-  const activityEvents = getActivityEvents(db);
-  const dispatchMigrationJournal = getDispatchMigrationJournal(db);
   const windowProfiles = getWindowProfiles(db);
   const quotations = getQuotations(db);
   const appNotifications = getAppNotifications(db);
@@ -1462,7 +1345,6 @@ export async function initializeMongo(): Promise<void> {
     orders.createIndex({ legacyOrderId: 1 }, { name: "orders_by_legacy_id" }),
     orders.createIndex({ quotationId: 1 }, { name: "orders_by_quotation" }),
     orders.createIndex({ "lots.lotId": 1 }, { name: "orders_by_lot_id" }),
-    orders.createIndex({ "lots.legacyLotId": 1 }, { name: "orders_by_legacy_lot_id" }),
     orders.createIndex({ sequenceNo: 1 }, { unique: true, name: "order_sequence_unique" }),
     orders.createIndex({ clientId: 1, createdAt: -1 }, { name: "orders_by_client_date" }),
     orders.createIndex({ status: 1, createdAt: -1 }, { name: "orders_by_status_date" }),
@@ -1478,54 +1360,7 @@ export async function initializeMongo(): Promise<void> {
     paymentFlags.createIndex({ createdAt: -1, _id: 1 }, { name: "payment_flags_by_created_date" }),
     paymentFlags.createIndex({ orderRecordId: 1, createdAt: -1, _id: 1 }, { name: "payment_flags_by_order_created_date" }),
     orderDocumentMetadata.createIndex({ orderRecordId: 1, uploadedAt: -1 }, { name: "documents_by_order" }),
-    orderDocumentMetadata.createIndex(
-      { dispatchId: 1, documentVersion: 1 },
-      {
-        unique: true,
-        name: "dispatch_challan_version_unique",
-        partialFilterExpression: {
-          dispatchId: { $type: "string" },
-          documentVersion: { $type: "number" },
-        },
-      },
-    ),
     orderActivity.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "activity_by_order" }),
-    dispatchRecords.createIndex(
-      { lotRecordId: 1, dispatchNo: 1 },
-      { unique: true, name: "dispatch_number_per_lot_unique" },
-    ),
-    dispatchRecords.createIndex(
-      { dispatchCode: 1 },
-      { unique: true, name: "dispatch_code_unique" },
-    ),
-    dispatchRecords.createIndex(
-      { qrToken: 1 },
-      { unique: true, name: "dispatch_qr_token_unique" },
-    ),
-    dispatchRecords.createIndex(
-      { orderRecordId: 1, createdAt: -1 },
-      { name: "dispatch_records_by_order_date" },
-    ),
-    dispatchRecords.createIndex(
-      { legacyDispatchCodes: 1 },
-      { name: "dispatch_records_by_legacy_code" },
-    ),
-    dispatchRecords.createIndex(
-      { legacyLotIds: 1 },
-      { name: "dispatch_records_by_legacy_lot" },
-    ),
-    dispatchRecords.createIndex(
-      { migrationRunId: 1 },
-      { name: "dispatch_records_by_migration_run" },
-    ),
-    activityEvents.createIndex(
-      { orderRecordId: 1, createdAt: -1 },
-      { name: "activity_events_by_order_date" },
-    ),
-    dispatchMigrationJournal.createIndex(
-      { runId: 1, orderRecordId: 1 },
-      { unique: true, name: "dispatch_migration_journal_order_unique" },
-    ),
     windowProfiles.createIndex(
       { codeUpper: 1 },
       {

@@ -443,8 +443,6 @@ export const GetOperationsDashboardResponse = zod.object({
   "clientName": zod.string(),
   "action": zod.string(),
   "summary": zod.string(),
-  "dispatchRecordId": zod.string().nullable(),
-  "dispatchCode": zod.string().nullable(),
   "actorName": zod.string(),
   "createdAt": zod.coerce.date()
 })),
@@ -1699,17 +1697,6 @@ export const AddOrderLotResponse = zod.object({
 
 
 /**
- * @summary Remove an unused lot without reusing its sequence number
- */
-export const DeleteOrderLotParams = zod.object({
-  "id": zod.coerce.string(),
-  "lotId": zod.coerce.string()
-})
-
-export const DeleteOrderLotResponse = zod.void()
-
-
-/**
  * @summary List orders for dispatch tracking
  */
 export const ListDispatchOrdersResponseItem = zod.object({
@@ -1746,520 +1733,6 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
-
-
-/**
- * @summary List lot dispatch records and derived order summaries
- */
-export const listDispatchRecordsQueryQMax = 160;
-
-
-
-export const ListDispatchRecordsQueryParams = zod.object({
-  "orderRecordId": zod.coerce.string().optional(),
-  "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']).optional(),
-  "q": zod.coerce.string().max(listDispatchRecordsQueryQMax).optional()
-})
-
-export const ListDispatchRecordsResponse = zod.object({
-  "records": zod.array(zod.object({
-  "id": zod.string(),
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "lotRecordId": zod.string(),
-  "lotId": zod.string(),
-  "lotSequence": zod.number().int(),
-  "dispatchNo": zod.number().int(),
-  "dispatchCode": zod.string(),
-  "legacyDispatchCodes": zod.array(zod.string()),
-  "legacyLotIds": zod.array(zod.string()),
-  "dispatchNote": zod.string().nullable(),
-  "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
-  "plannedAt": zod.coerce.date().nullable(),
-  "dispatchedAt": zod.coerce.date().nullable(),
-  "deliveredAt": zod.coerce.date().nullable(),
-  "returnedAt": zod.coerce.date().nullable(),
-  "locationName": zod.string(),
-  "siteAddress": zod.string().nullable(),
-  "siteLatitude": zod.number().nullable(),
-  "siteLongitude": zod.number().nullable(),
-  "vehicleNumber": zod.string().nullable(),
-  "driverName": zod.string().nullable(),
-  "driverPhone": zod.string().nullable(),
-  "challanNumber": zod.string().nullable(),
-  "windowsSnapshot": zod.array(zod.object({
-  "windowId": zod.string(),
-  "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
-  "sqFt": zod.number(),
-  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "glassStatus": zod.enum(['pending', 'partial', 'received'])
-})),
-  "qrRevokedAt": zod.coerce.date().nullable(),
-  "overrideReason": zod.string().nullable(),
-  "createdBy": zod.string(),
-  "createdAt": zod.coerce.date(),
-  "updatedBy": zod.string(),
-  "updatedAt": zod.coerce.date(),
-  "cancelledBy": zod.string().nullable(),
-  "cancelledAt": zod.coerce.date().nullable(),
-  "cancelReason": zod.string().nullable()
-})),
-  "orderSummaries": zod.array(zod.object({
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
-  "totalLots": zod.number().int(),
-  "dispatchedLots": zod.number().int(),
-  "deliveredLots": zod.number().int(),
-  "activeDispatches": zod.number().int(),
-  "lots": zod.array(zod.object({
-  "lotRecordId": zod.string(),
-  "lotId": zod.string(),
-  "lotSequence": zod.number().int(),
-  "dispatchStatus": zod.enum(['not_dispatched', 'dispatched', 'delivered']),
-  "dispatchCount": zod.number().int(),
-  "latestDispatchCode": zod.string().nullable()
-}))
-})),
-  "statusCounts": zod.object({
-  "total": zod.number().int(),
-  "planned": zod.number().int(),
-  "dispatched": zod.number().int(),
-  "delivered": zod.number().int(),
-  "returned": zod.number().int(),
-  "cancelled": zod.number().int()
-})
-})
-
-
-/**
- * @summary Create a whole-lot dispatch record
- */
-
-
-export const createDispatchRecordBodyDispatchNoteMax = 1000;
-
-export const createDispatchRecordBodyOverrideReasonMax = 1000;
-
-export const createDispatchRecordBodyLocationNameMin = 2;
-export const createDispatchRecordBodyLocationNameMax = 160;
-
-export const createDispatchRecordBodySiteAddressMax = 1000;
-
-export const createDispatchRecordBodySiteLatitudeMin = -90;
-export const createDispatchRecordBodySiteLatitudeMax = 90;
-
-export const createDispatchRecordBodySiteLongitudeMin = -180;
-export const createDispatchRecordBodySiteLongitudeMax = 180;
-
-export const createDispatchRecordBodyVehicleNumberMax = 100;
-
-export const createDispatchRecordBodyDriverNameMax = 160;
-
-export const createDispatchRecordBodyDriverPhoneMax = 60;
-
-export const createDispatchRecordBodyChallanNumberMax = 100;
-
-
-
-export const CreateDispatchRecordBody = zod.object({
-  "orderRecordId": zod.string().min(1),
-  "lotRecordId": zod.string().min(1),
-  "dispatchNote": zod.string().max(createDispatchRecordBodyDispatchNoteMax).nullish(),
-  "plannedAt": zod.coerce.date().nullish(),
-  "overrideReason": zod.string().max(createDispatchRecordBodyOverrideReasonMax).nullish(),
-  "locationName": zod.string().min(createDispatchRecordBodyLocationNameMin).max(createDispatchRecordBodyLocationNameMax).optional(),
-  "siteAddress": zod.string().max(createDispatchRecordBodySiteAddressMax).nullish(),
-  "siteLatitude": zod.number().min(createDispatchRecordBodySiteLatitudeMin).max(createDispatchRecordBodySiteLatitudeMax).nullish(),
-  "siteLongitude": zod.number().min(createDispatchRecordBodySiteLongitudeMin).max(createDispatchRecordBodySiteLongitudeMax).nullish(),
-  "vehicleNumber": zod.string().max(createDispatchRecordBodyVehicleNumberMax).nullish(),
-  "driverName": zod.string().max(createDispatchRecordBodyDriverNameMax).nullish(),
-  "driverPhone": zod.string().max(createDispatchRecordBodyDriverPhoneMax).nullish(),
-  "challanNumber": zod.string().max(createDispatchRecordBodyChallanNumberMax).nullish()
-})
-
-export const CreateDispatchRecordResponse = zod.object({
-  "id": zod.string(),
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "lotRecordId": zod.string(),
-  "lotId": zod.string(),
-  "lotSequence": zod.number().int(),
-  "dispatchNo": zod.number().int(),
-  "dispatchCode": zod.string(),
-  "legacyDispatchCodes": zod.array(zod.string()),
-  "legacyLotIds": zod.array(zod.string()),
-  "dispatchNote": zod.string().nullable(),
-  "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
-  "plannedAt": zod.coerce.date().nullable(),
-  "dispatchedAt": zod.coerce.date().nullable(),
-  "deliveredAt": zod.coerce.date().nullable(),
-  "returnedAt": zod.coerce.date().nullable(),
-  "locationName": zod.string(),
-  "siteAddress": zod.string().nullable(),
-  "siteLatitude": zod.number().nullable(),
-  "siteLongitude": zod.number().nullable(),
-  "vehicleNumber": zod.string().nullable(),
-  "driverName": zod.string().nullable(),
-  "driverPhone": zod.string().nullable(),
-  "challanNumber": zod.string().nullable(),
-  "windowsSnapshot": zod.array(zod.object({
-  "windowId": zod.string(),
-  "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
-  "sqFt": zod.number(),
-  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "glassStatus": zod.enum(['pending', 'partial', 'received'])
-})),
-  "qrRevokedAt": zod.coerce.date().nullable(),
-  "overrideReason": zod.string().nullable(),
-  "createdBy": zod.string(),
-  "createdAt": zod.coerce.date(),
-  "updatedBy": zod.string(),
-  "updatedAt": zod.coerce.date(),
-  "cancelledBy": zod.string().nullable(),
-  "cancelledAt": zod.coerce.date().nullable(),
-  "cancelReason": zod.string().nullable()
-})
-
-
-/**
- * @summary Get derived lot and order dispatch summaries
- */
-export const GetDispatchSummaryResponse = zod.object({
-  "orders": zod.array(zod.object({
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
-  "totalLots": zod.number().int(),
-  "dispatchedLots": zod.number().int(),
-  "deliveredLots": zod.number().int(),
-  "activeDispatches": zod.number().int(),
-  "lots": zod.array(zod.object({
-  "lotRecordId": zod.string(),
-  "lotId": zod.string(),
-  "lotSequence": zod.number().int(),
-  "dispatchStatus": zod.enum(['not_dispatched', 'dispatched', 'delivered']),
-  "dispatchCount": zod.number().int(),
-  "latestDispatchCode": zod.string().nullable()
-}))
-})),
-  "readyLotsAwaitingDispatch": zod.array(zod.object({
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "lotRecordId": zod.string(),
-  "lotId": zod.string(),
-  "locationName": zod.string(),
-  "windowsCount": zod.number().int()
-})),
-  "statusCounts": zod.object({
-  "total": zod.number().int(),
-  "planned": zod.number().int(),
-  "dispatched": zod.number().int(),
-  "delivered": zod.number().int(),
-  "returned": zod.number().int(),
-  "cancelled": zod.number().int()
-})
-})
-
-
-/**
- * @summary Load protected read-only dispatch details by QR token
- */
-export const GetDispatchByTokenParams = zod.object({
-  "token": zod.coerce.string()
-})
-
-export const GetDispatchByTokenResponse = zod.object({
-  "id": zod.string(),
-  "orderRecordId": zod.string(),
-  "dispatchCode": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "lotId": zod.string(),
-  "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
-  "plannedAt": zod.coerce.date().nullable(),
-  "dispatchedAt": zod.coerce.date().nullable(),
-  "deliveredAt": zod.coerce.date().nullable(),
-  "returnedAt": zod.coerce.date().nullable(),
-  "createdAt": zod.coerce.date(),
-  "dispatchNote": zod.string().nullable(),
-  "statusHistory": zod.array(zod.object({
-  "id": zod.string(),
-  "eventType": zod.string(),
-  "message": zod.string(),
-  "actorName": zod.string(),
-  "createdAt": zod.coerce.date()
-})),
-  "locationName": zod.string(),
-  "siteAddress": zod.string().nullable(),
-  "siteLatitude": zod.number().nullable(),
-  "siteLongitude": zod.number().nullable(),
-  "vehicleNumber": zod.string().nullable(),
-  "driverName": zod.string().nullable(),
-  "driverPhone": zod.string().nullable(),
-  "challanNumber": zod.string().nullable(),
-  "windowsSnapshot": zod.array(zod.object({
-  "windowId": zod.string(),
-  "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
-  "sqFt": zod.number(),
-  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "glassStatus": zod.enum(['pending', 'partial', 'received'])
-}))
-})
-
-
-/**
- * @summary Get one dispatch record
- */
-export const GetDispatchRecordParams = zod.object({
-  "id": zod.coerce.string()
-})
-
-export const GetDispatchRecordResponse = zod.object({
-  "id": zod.string(),
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "lotRecordId": zod.string(),
-  "lotId": zod.string(),
-  "lotSequence": zod.number().int(),
-  "dispatchNo": zod.number().int(),
-  "dispatchCode": zod.string(),
-  "legacyDispatchCodes": zod.array(zod.string()),
-  "legacyLotIds": zod.array(zod.string()),
-  "dispatchNote": zod.string().nullable(),
-  "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
-  "plannedAt": zod.coerce.date().nullable(),
-  "dispatchedAt": zod.coerce.date().nullable(),
-  "deliveredAt": zod.coerce.date().nullable(),
-  "returnedAt": zod.coerce.date().nullable(),
-  "locationName": zod.string(),
-  "siteAddress": zod.string().nullable(),
-  "siteLatitude": zod.number().nullable(),
-  "siteLongitude": zod.number().nullable(),
-  "vehicleNumber": zod.string().nullable(),
-  "driverName": zod.string().nullable(),
-  "driverPhone": zod.string().nullable(),
-  "challanNumber": zod.string().nullable(),
-  "windowsSnapshot": zod.array(zod.object({
-  "windowId": zod.string(),
-  "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
-  "sqFt": zod.number(),
-  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "glassStatus": zod.enum(['pending', 'partial', 'received'])
-})),
-  "qrRevokedAt": zod.coerce.date().nullable(),
-  "overrideReason": zod.string().nullable(),
-  "createdBy": zod.string(),
-  "createdAt": zod.coerce.date(),
-  "updatedBy": zod.string(),
-  "updatedAt": zod.coerce.date(),
-  "cancelledBy": zod.string().nullable(),
-  "cancelledAt": zod.coerce.date().nullable(),
-  "cancelReason": zod.string().nullable()
-})
-
-
-/**
- * @summary Update dispatch details or advance its status
- */
-export const UpdateDispatchRecordParams = zod.object({
-  "id": zod.coerce.string()
-})
-
-export const updateDispatchRecordBodyDispatchNoteMax = 1000;
-
-export const updateDispatchRecordBodyLocationNameMin = 2;
-export const updateDispatchRecordBodyLocationNameMax = 160;
-
-export const updateDispatchRecordBodySiteAddressMax = 1000;
-
-export const updateDispatchRecordBodySiteLatitudeMin = -90;
-export const updateDispatchRecordBodySiteLatitudeMax = 90;
-
-export const updateDispatchRecordBodySiteLongitudeMin = -180;
-export const updateDispatchRecordBodySiteLongitudeMax = 180;
-
-export const updateDispatchRecordBodyVehicleNumberMax = 80;
-
-export const updateDispatchRecordBodyDriverNameMax = 160;
-
-export const updateDispatchRecordBodyDriverPhoneMax = 40;
-
-export const updateDispatchRecordBodyChallanNumberMax = 100;
-
-export const updateDispatchRecordBodyOverrideReasonMax = 1000;
-
-
-
-export const UpdateDispatchRecordBody = zod.object({
-  "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']).optional(),
-  "dispatchNote": zod.string().max(updateDispatchRecordBodyDispatchNoteMax).nullish(),
-  "plannedAt": zod.coerce.date().nullish(),
-  "locationName": zod.string().min(updateDispatchRecordBodyLocationNameMin).max(updateDispatchRecordBodyLocationNameMax).optional(),
-  "siteAddress": zod.string().max(updateDispatchRecordBodySiteAddressMax).nullish(),
-  "siteLatitude": zod.number().min(updateDispatchRecordBodySiteLatitudeMin).max(updateDispatchRecordBodySiteLatitudeMax).nullish(),
-  "siteLongitude": zod.number().min(updateDispatchRecordBodySiteLongitudeMin).max(updateDispatchRecordBodySiteLongitudeMax).nullish(),
-  "vehicleNumber": zod.string().max(updateDispatchRecordBodyVehicleNumberMax).nullish(),
-  "driverName": zod.string().max(updateDispatchRecordBodyDriverNameMax).nullish(),
-  "driverPhone": zod.string().max(updateDispatchRecordBodyDriverPhoneMax).nullish(),
-  "challanNumber": zod.string().max(updateDispatchRecordBodyChallanNumberMax).nullish(),
-  "overrideReason": zod.string().max(updateDispatchRecordBodyOverrideReasonMax).nullish()
-})
-
-export const UpdateDispatchRecordResponse = zod.object({
-  "id": zod.string(),
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "lotRecordId": zod.string(),
-  "lotId": zod.string(),
-  "lotSequence": zod.number().int(),
-  "dispatchNo": zod.number().int(),
-  "dispatchCode": zod.string(),
-  "legacyDispatchCodes": zod.array(zod.string()),
-  "legacyLotIds": zod.array(zod.string()),
-  "dispatchNote": zod.string().nullable(),
-  "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
-  "plannedAt": zod.coerce.date().nullable(),
-  "dispatchedAt": zod.coerce.date().nullable(),
-  "deliveredAt": zod.coerce.date().nullable(),
-  "returnedAt": zod.coerce.date().nullable(),
-  "locationName": zod.string(),
-  "siteAddress": zod.string().nullable(),
-  "siteLatitude": zod.number().nullable(),
-  "siteLongitude": zod.number().nullable(),
-  "vehicleNumber": zod.string().nullable(),
-  "driverName": zod.string().nullable(),
-  "driverPhone": zod.string().nullable(),
-  "challanNumber": zod.string().nullable(),
-  "windowsSnapshot": zod.array(zod.object({
-  "windowId": zod.string(),
-  "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
-  "sqFt": zod.number(),
-  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "glassStatus": zod.enum(['pending', 'partial', 'received'])
-})),
-  "qrRevokedAt": zod.coerce.date().nullable(),
-  "overrideReason": zod.string().nullable(),
-  "createdBy": zod.string(),
-  "createdAt": zod.coerce.date(),
-  "updatedBy": zod.string(),
-  "updatedAt": zod.coerce.date(),
-  "cancelledBy": zod.string().nullable(),
-  "cancelledAt": zod.coerce.date().nullable(),
-  "cancelReason": zod.string().nullable()
-})
-
-
-/**
- * @summary Cancel a dispatch and revoke its QR token
- */
-export const CancelDispatchRecordParams = zod.object({
-  "id": zod.coerce.string()
-})
-
-export const cancelDispatchRecordBodyReasonMin = 2;
-export const cancelDispatchRecordBodyReasonMax = 500;
-
-
-
-export const CancelDispatchRecordBody = zod.object({
-  "reason": zod.string().min(cancelDispatchRecordBodyReasonMin).max(cancelDispatchRecordBodyReasonMax)
-})
-
-export const CancelDispatchRecordResponse = zod.object({
-  "id": zod.string(),
-  "orderRecordId": zod.string(),
-  "orderId": zod.string(),
-  "clientName": zod.string(),
-  "lotRecordId": zod.string(),
-  "lotId": zod.string(),
-  "lotSequence": zod.number().int(),
-  "dispatchNo": zod.number().int(),
-  "dispatchCode": zod.string(),
-  "legacyDispatchCodes": zod.array(zod.string()),
-  "legacyLotIds": zod.array(zod.string()),
-  "dispatchNote": zod.string().nullable(),
-  "status": zod.enum(['planned', 'dispatched', 'delivered', 'returned', 'cancelled']),
-  "plannedAt": zod.coerce.date().nullable(),
-  "dispatchedAt": zod.coerce.date().nullable(),
-  "deliveredAt": zod.coerce.date().nullable(),
-  "returnedAt": zod.coerce.date().nullable(),
-  "locationName": zod.string(),
-  "siteAddress": zod.string().nullable(),
-  "siteLatitude": zod.number().nullable(),
-  "siteLongitude": zod.number().nullable(),
-  "vehicleNumber": zod.string().nullable(),
-  "driverName": zod.string().nullable(),
-  "driverPhone": zod.string().nullable(),
-  "challanNumber": zod.string().nullable(),
-  "windowsSnapshot": zod.array(zod.object({
-  "windowId": zod.string(),
-  "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
-  "sqFt": zod.number(),
-  "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
-  "glassStatus": zod.enum(['pending', 'partial', 'received'])
-})),
-  "qrRevokedAt": zod.coerce.date().nullable(),
-  "overrideReason": zod.string().nullable(),
-  "createdBy": zod.string(),
-  "createdAt": zod.coerce.date(),
-  "updatedBy": zod.string(),
-  "updatedAt": zod.coerce.date(),
-  "cancelledBy": zod.string().nullable(),
-  "cancelledAt": zod.coerce.date().nullable(),
-  "cancelReason": zod.string().nullable()
-})
-
-
-/**
- * @summary Get the dispatch QR code image
- */
-export const GetDispatchQrPngParams = zod.object({
-  "id": zod.coerce.string()
-})
-
-export const GetDispatchQrPngResponse = zod.unknown()
-
-
-/**
- * @summary Generate or download the current versioned dispatch challan
- */
-export const GetDispatchChallanPdfParams = zod.object({
-  "id": zod.coerce.string()
-})
-
-export const GetDispatchChallanPdfResponse = zod.unknown()
 
 
 /**
@@ -5229,7 +4702,6 @@ export const ListOrderWindowsParams = zod.object({
 export const ListOrderWindowsResponseItem = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
-  "lotRecordId": zod.string().nullable(),
   "windowNo": zod.string(),
   "widthMm": zod.number(),
   "heightMm": zod.number(),
@@ -5252,7 +4724,6 @@ export const CreateOrderWindowParams = zod.object({
   "id": zod.coerce.string()
 })
 
-
 export const createOrderWindowBodyWindowNoMax = 20;
 
 export const createOrderWindowBodyWidthMmExclusiveMin = 0;
@@ -5268,7 +4739,6 @@ export const createOrderWindowBodyPendingReasonMax = 500;
 
 
 export const CreateOrderWindowBody = zod.object({
-  "lotRecordId": zod.string().min(1).optional(),
   "windowNo": zod.string().min(1).max(createOrderWindowBodyWindowNoMax),
   "widthMm": zod.number().gt(createOrderWindowBodyWidthMmExclusiveMin).max(createOrderWindowBodyWidthMmMax),
   "heightMm": zod.number().gt(createOrderWindowBodyHeightMmExclusiveMin).max(createOrderWindowBodyHeightMmMax),
@@ -5282,7 +4752,6 @@ export const CreateOrderWindowBody = zod.object({
 export const CreateOrderWindowResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
-  "lotRecordId": zod.string().nullable(),
   "windowNo": zod.string(),
   "widthMm": zod.number(),
   "heightMm": zod.number(),
@@ -5305,7 +4774,6 @@ export const UpdateOrderWindowParams = zod.object({
   "windowId": zod.coerce.string()
 })
 
-
 export const updateOrderWindowBodyWindowNoMax = 20;
 
 export const updateOrderWindowBodyWidthMmExclusiveMin = 0;
@@ -5321,7 +4789,6 @@ export const updateOrderWindowBodyPendingReasonMax = 500;
 
 
 export const UpdateOrderWindowBody = zod.object({
-  "lotRecordId": zod.string().min(1).optional(),
   "windowNo": zod.string().min(1).max(updateOrderWindowBodyWindowNoMax).optional(),
   "widthMm": zod.number().gt(updateOrderWindowBodyWidthMmExclusiveMin).max(updateOrderWindowBodyWidthMmMax).optional(),
   "heightMm": zod.number().gt(updateOrderWindowBodyHeightMmExclusiveMin).max(updateOrderWindowBodyHeightMmMax).optional(),
@@ -5335,7 +4802,6 @@ export const UpdateOrderWindowBody = zod.object({
 export const UpdateOrderWindowResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
-  "lotRecordId": zod.string().nullable(),
   "windowNo": zod.string(),
   "widthMm": zod.number(),
   "heightMm": zod.number(),

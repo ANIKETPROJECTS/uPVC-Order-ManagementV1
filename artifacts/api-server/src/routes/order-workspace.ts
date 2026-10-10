@@ -84,7 +84,7 @@ async function orderExists(id: string, res: Parameters<RequestHandler>[1]) {
 async function event(orderRecordId: string, actor: UserContext, action: string, summary: string) {
   await getOrderActivity(await getMongoDb()).insertOne({ _id: randomUUID(), orderRecordId, actorId: actor.id, actorName: actor.name, action, summary, createdAt: new Date() });
 }
-const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, lotRecordId: w.lotRecordId ?? null, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
+const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
 const paymentResponse = (p: any) => ({
   ...p,
   id: p._id,
@@ -708,15 +708,10 @@ router.get("/orders/:id/windows", async (req, res): Promise<void> => {
 });
 router.post("/orders/:id/windows", async (req, res): Promise<void> => {
   const p = CreateOrderWindowParams.safeParse(req.params), b = CreateOrderWindowBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
-  const actor = await context(req, res, "measurements", true); if (!actor) return;
-  const order = await orderExists(p.data.id, res); if (!order) return;
-  const requestedLotRecordId = b.data.lotRecordId;
-  const lotRecordId = requestedLotRecordId ?? [...(order.lots ?? [])].sort((a, z) => a.sequence - z.sequence)[0]?._id;
-  if (!lotRecordId || !(order.lots ?? []).some((lot) => lot._id === lotRecordId)) { res.status(400).json({ error: "Choose a lot that belongs to this order." }); return; }
+  const actor = await context(req, res, "measurements", true); if (!actor || !(await orderExists(p.data.id, res))) return;
   if (!hasModuleEdit(actor, "window-readiness") && (b.data.frameStatus !== "pending" || b.data.shutterStatus !== "pending" || b.data.pendingReason)) { res.status(403).json({ error: "window-readiness editing access is required to set readiness fields." }); return; }
   if (!hasModuleEdit(actor, "glass-procurement") && b.data.glassStatus !== "pending") { res.status(403).json({ error: "glass-procurement editing access is required to set glass status." }); return; }
-  const { lotRecordId: _requestedLotRecordId, ...windowFields } = b.data;
-  const now = new Date(); const w: OrderWindowDocument = { _id: randomUUID(), orderRecordId: p.data.id, lotRecordId, ...windowFields, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
+  const now = new Date(); const w: OrderWindowDocument = { _id: randomUUID(), orderRecordId: p.data.id, ...b.data, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
   try { await getOrderWindows(await getMongoDb()).insertOne(w); } catch (e) { if ((e as any)?.code === 11000) { res.status(409).json({ error: "Window number already exists for this order." }); return; } throw e; }
   await event(p.data.id, actor, "window.created", `Added window ${w.windowNo}.`); res.status(201).json(CreateOrderWindowResponse.parse(windowResponse(w)));
 });
@@ -724,16 +719,11 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
   const p = UpdateOrderWindowParams.safeParse(req.params), b = UpdateOrderWindowBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
   const actor = await context(req, res); if (!actor) return;
   const db = await getMongoDb(); const old = await getOrderWindows(db).findOne({ _id: p.data.windowId, orderRecordId: p.data.id, archivedAt: null }); if (!old) { res.status(404).json({ error: "Window not found." }); return; }
-  const order = await getOrders(db).findOne({ _id: p.data.id }); if (!order) { res.status(404).json({ error: "Order not found." }); return; }
   const keys = Object.keys(b.data); const measurement = keys.some(k => ["windowNo", "widthMm", "heightMm", "windowType"].includes(k)); const readiness = keys.some(k => ["frameStatus", "shutterStatus", "pendingReason"].includes(k)); const glass = keys.includes("glassStatus");
   if (keys.length === 0) { res.status(400).json({ error: "At least one window field must be provided." }); return; }
   if (measurement && !requireModuleEdit(actor, res, "measurements")) return;
   if (readiness && !requireModuleEdit(actor, res, "window-readiness")) return;
   if (glass && !requireModuleEdit(actor, res, "glass-procurement")) return;
-  if (b.data.lotRecordId !== undefined && b.data.lotRecordId !== (old.lotRecordId ?? [...(order.lots ?? [])].sort((a, z) => a.sequence - z.sequence)[0]?._id)) {
-    if (!(actor.masterAdmin || actor.permissions["dispatch.edit"] === "edit" || actor.permissions.dispatch === "edit")) { res.status(403).json({ error: "Dispatch editing access is required to reassign a window to another lot." }); return; }
-    if (!(order.lots ?? []).some((lot) => lot._id === b.data.lotRecordId)) { res.status(400).json({ error: "Choose a lot that belongs to this order." }); return; }
-  }
   const changedKeys = keys.filter(k => (old as any)[k] !== (b.data as any)[k]);
   if (changedKeys.length === 0) { res.json(UpdateOrderWindowResponse.parse(windowResponse(old))); return; }
   const changes = Object.fromEntries(changedKeys.map(k => [k, (b.data as any)[k]]));

@@ -8,7 +8,6 @@ import {
   CreateOrderLocationBody,
   CreateOrderLocationResponse,
   CreateOrderResponse,
-  DeleteOrderLotParams,
   DeleteOrderParams,
   DeleteOrderResponse,
   GetOrderParams,
@@ -41,12 +40,10 @@ import type { Filter } from "mongodb";
 import {
   getClients,
   getCounters,
-  getDispatchRecords,
   getMongoDb,
   getOrderLocations,
   getOrderMessageTemplates,
   getOrders,
-  getOrderWindows,
   getOrderActivity,
   getOrderPayments,
   getOrderPaymentFlags,
@@ -64,8 +61,6 @@ import {
   type OrderStatus,
 } from "../lib/mongo";
 import {
-  formatDispatchCode,
-  formatLegacyLotId,
   formatLotId,
   formatQuotationOrderId,
   normalizeLocationCode,
@@ -558,37 +553,21 @@ router.get("/orders", async (req, res): Promise<void> => {
     }
     filter.createdAt = dateFilter;
   }
-  const db = await getMongoDb();
   const query = parsed.data.q?.trim();
   if (query) {
     const matcher = new RegExp(escapeRegex(query), "i");
-    const dispatchOrderIds = await getDispatchRecords(db)
-      .find({
-        $or: [
-          { dispatchCode: matcher },
-          { legacyDispatchCodes: matcher },
-          { lotId: matcher },
-          { legacyLotIds: matcher },
-        ],
-      })
-      .project<{ orderRecordId: string }>({ orderRecordId: 1 })
-      .toArray();
     filter.$or = [
       { orderId: matcher },
       { legacyOrderId: matcher },
       { "lots.lotId": matcher },
-      { "lots.legacyLotId": matcher },
       { clientName: matcher },
       { clientPrefix: matcher },
       { clientPhone: matcher },
       { siteAddress: matcher },
       { locationName: matcher },
-      ...(dispatchOrderIds.length
-        ? [{ _id: { $in: [...new Set(dispatchOrderIds.map((dispatch) => dispatch.orderRecordId))] } }]
-        : []),
     ];
   }
-  const orders = await getOrders(db)
+  const orders = await getOrders(await getMongoDb())
     .find(filter)
     .sort({ createdAt: -1, sequenceNo: -1 })
     .toArray();
@@ -714,13 +693,16 @@ router.post(
           createdAt: now,
           updatedAt: now,
         };
-    const lots: OrderLotDocument[] = [{
-      _id: randomUUID(),
-      sequence: 1,
-      lotId: formatLotId(generatedOrderId, 1),
-      createdBy: actorId,
-      createdAt: now,
-    }];
+    const lots: OrderLotDocument[] =
+      clientType === "Project"
+        ? [{
+            _id: randomUUID(),
+            sequence: 1,
+            lotId: formatLotId(generatedOrderId, 1),
+            createdBy: actorId,
+            createdAt: now,
+          }]
+        : [];
     const order: OrderDocument = {
       _id: randomUUID(),
       orderId: generatedOrderId,
@@ -816,12 +798,6 @@ router.patch(
     const parsed = UpdateOrderBody.safeParse(req.body);
     if (!parsed.success) {
       inputError(req, res, parsed.error);
-      return;
-    }
-    if (parsed.data.status === "dispatched" || parsed.data.status === "installed") {
-      res.status(409).json({
-        error: "Dispatch and installation lifecycle stages are set by their own workflow records.",
-      });
       return;
     }
     if (
@@ -974,16 +950,10 @@ router.patch(
       updates.quotationId = linkedQuotation?._id ?? null;
       updates.quotationNo = linkedQuotation?.quoteNo ?? null;
       if (linkedQuotation && clientType) updates.clientType = clientType;
-      updates.lots = (before.lots ?? []).map((lot) => {
-        const nextLotId = formatLotId(generatedOrderId, lot.sequence);
-        return {
-          ...lot,
-          ...(lot.lotId !== nextLotId
-            ? { legacyLotId: lot.legacyLotId ?? lot.lotId ?? formatLegacyLotId(before.orderId, lot.sequence) }
-            : {}),
-          lotId: nextLotId,
-        };
-      });
+      updates.lots = (before.lots ?? []).map((lot) => ({
+        ...lot,
+        lotId: formatLotId(generatedOrderId, lot.sequence),
+      }));
     }
     const result = await getOrders(db).updateOne(
       { _id: params.data.id },
@@ -1014,38 +984,6 @@ router.patch(
           { $set: { orderId: order.orderId } },
         ),
       ]);
-      const dispatches = await getDispatchRecords(db)
-        .find({ orderRecordId: order._id })
-        .toArray();
-      await Promise.all(dispatches.map((dispatch) => {
-        const lot = order.lots?.find((item) => item._id === dispatch.lotRecordId);
-        const nextLotId = lot?.lotId ?? formatLotId(order.orderId, dispatch.lotSequence);
-        const nextDispatchCode = formatDispatchCode(
-          order.orderId,
-          dispatch.lotSequence,
-          dispatch.dispatchNo,
-        );
-        const legacyLotIds = new Set([
-          ...(dispatch.legacyLotIds ?? []),
-          ...(dispatch.lotId !== nextLotId ? [dispatch.lotId] : []),
-        ]);
-        const legacyDispatchCodes = new Set([
-          ...(dispatch.legacyDispatchCodes ?? []),
-          ...(dispatch.dispatchCode !== nextDispatchCode ? [dispatch.dispatchCode] : []),
-        ]);
-        return getDispatchRecords(db).updateOne(
-          { _id: dispatch._id },
-          {
-            $set: {
-              orderId: order.orderId,
-              lotId: nextLotId,
-              dispatchCode: nextDispatchCode,
-              legacyLotIds: [...legacyLotIds].filter((value) => value !== nextLotId),
-              legacyDispatchCodes: [...legacyDispatchCodes].filter((value) => value !== nextDispatchCode),
-            },
-          },
-        );
-      }));
     } else if (before.clientName !== order.clientName || before.locationName !== order.locationName) {
       await getOrderPaymentFlags(db).updateMany(
         { orderRecordId: order._id },
@@ -1136,16 +1074,6 @@ router.delete(
     const before = await getOrders(db).findOne({ _id: params.data.id });
     if (!before) {
       res.status(404).json({ error: "Order not found." });
-      return;
-    }
-    const dispatchCount = await getDispatchRecords(db).countDocuments({
-      orderRecordId: before._id,
-      status: { $ne: "cancelled" },
-    });
-    if (dispatchCount > 0) {
-      res.status(409).json({
-        error: "This order has a non-cancelled dispatch. Cancel those dispatches before archiving the order.",
-      });
       return;
     }
     if (before.isActive !== false) {
@@ -1239,87 +1167,6 @@ router.post(
       }
     }
     res.status(409).json({ error: "The next lot number could not be allocated. Try again." });
-  },
-);
-
-router.delete(
-  "/orders/:id/lots/:lotId",
-  requireOrderHubPermission("edit"),
-  async (req, res): Promise<void> => {
-    const params = DeleteOrderLotParams.safeParse(req.params);
-    if (!params.success) {
-      inputError(req, res, params.error);
-      return;
-    }
-    const db = await getMongoDb();
-    const order = await getOrders(db).findOne({ _id: params.data.id });
-    if (!order) {
-      res.status(404).json({ error: "Order not found." });
-      return;
-    }
-    const lot = (order.lots ?? []).find((item) =>
-      item._id === params.data.lotId || item.lotId === params.data.lotId);
-    if (!lot) {
-      res.status(404).json({ error: "Lot not found on this order." });
-      return;
-    }
-    if ((order.lots ?? []).length <= 1) {
-      res.status(409).json({ error: "Every order must keep its required default lot." });
-      return;
-    }
-    const [dispatchCount, windowCount] = await Promise.all([
-      getDispatchRecords(db).countDocuments({
-        lotRecordId: lot._id,
-        status: { $ne: "cancelled" },
-      }),
-      getOrderWindows(db).countDocuments({
-        orderRecordId: order._id,
-        lotRecordId: lot._id,
-        archivedAt: null,
-      }),
-    ]);
-    if (dispatchCount > 0) {
-      res.status(409).json({
-        error: "This lot has a non-cancelled dispatch. Cancel those dispatches before removing the lot.",
-      });
-      return;
-    }
-    if (windowCount > 0) {
-      res.status(409).json({
-        error: "Move or archive the windows assigned to this lot before removing it.",
-      });
-      return;
-    }
-    const actorId = req.session.userId;
-    if (!actorId) {
-      res.status(401).json({ error: "Sign in to continue." });
-      return;
-    }
-    const now = new Date();
-    const result = await getOrders(db).updateOne(
-      { _id: order._id, lots: { $elemMatch: { _id: lot._id } } },
-      {
-        $pull: { lots: { _id: lot._id } },
-        $set: { updatedAt: now, updatedBy: actorId },
-      },
-    );
-    if (result.modifiedCount !== 1) {
-      res.status(409).json({ error: "This lot changed while it was being removed. Refresh and try again." });
-      return;
-    }
-    const actor = await getUsers(db).findOne({ _id: actorId, status: "active" });
-    if (actor) {
-      await getOrderActivity(db).insertOne({
-        _id: randomUUID(),
-        orderRecordId: order._id,
-        actorId,
-        actorName: actor.name,
-        action: "order.lot_removed",
-        summary: `Removed unused lot ${lot.lotId} from ${order.orderId}.`,
-        createdAt: now,
-      });
-    }
-    res.status(204).send();
   },
 );
 

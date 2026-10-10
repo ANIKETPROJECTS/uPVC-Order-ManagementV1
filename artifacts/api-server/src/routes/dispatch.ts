@@ -1,16 +1,19 @@
 import {
   ListDispatchOrdersResponse,
+  UpdateDispatchOrderStatusBody,
+  UpdateDispatchOrderStatusParams,
+  UpdateDispatchOrderStatusResponse,
 } from "@workspace/api-zod";
 import { Router, type RequestHandler } from "express";
 import {
-  getDispatchRecords,
+  getOrderActivity,
   getMongoDb,
   getOrders,
   getPublicUser,
   getUsers,
   type OrderDocument,
 } from "../lib/mongo";
-import { summarizeOrderDispatches } from "../lib/dispatch-domain";
+import { randomUUID } from "node:crypto";
 
 const router = Router();
 
@@ -64,40 +67,67 @@ router.get(
   "/dispatch/orders",
   requireDispatchPermission("view"),
   async (_req, res): Promise<void> => {
-    const db = await getMongoDb();
-    const orders = await getOrders(db)
+    const orders = await getOrders(await getMongoDb())
       .find({})
       .sort({ updatedAt: -1, createdAt: -1 })
       .toArray();
-    const dispatches = orders.length
-      ? await getDispatchRecords(db).find({
-          orderRecordId: { $in: orders.map((order) => order._id) },
-        }).toArray()
-      : [];
-    const byOrderId = new Map<string, typeof dispatches>();
-    for (const dispatch of dispatches) {
-      const rows = byOrderId.get(dispatch.orderRecordId) ?? [];
-      rows.push(dispatch);
-      byOrderId.set(dispatch.orderRecordId, rows);
-    }
-    const response = orders.map((order) => ({
-      ...dispatchOrderResponse(order),
-      dispatchStatus: summarizeOrderDispatches(
-        order,
-        byOrderId.get(order._id) ?? [],
-      ).dispatchStatus,
-    }));
-    res.json(ListDispatchOrdersResponse.parse(response));
+    res.json(ListDispatchOrdersResponse.parse(orders.map(dispatchOrderResponse)));
   },
 );
 
 router.patch(
   "/dispatch/orders/:id/status",
   requireDispatchPermission("edit"),
-  async (_req, res): Promise<void> => {
-    res.status(409).json({
-      error: "Order dispatch status is derived from lot dispatch records. Use the lot dispatch workflow instead.",
+  async (req, res): Promise<void> => {
+    const params = UpdateDispatchOrderStatusParams.safeParse(req.params);
+    const body = UpdateDispatchOrderStatusBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({
+        error: !params.success ? params.error.message : body.success ? "" : body.error.message,
+      });
+      return;
+    }
+
+    const userId = req.session.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Sign in to continue." });
+      return;
+    }
+
+    const db = await getMongoDb();
+    const orders = getOrders(db);
+    const updatedAt = new Date();
+    const result = await orders.updateOne(
+      { _id: params.data.id },
+      {
+        $set: {
+          dispatchStatus: body.data.dispatchStatus,
+          updatedAt,
+          updatedBy: userId,
+        },
+      },
+    );
+    if (!result.matchedCount) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+
+    const updated = await orders.findOne({ _id: params.data.id });
+    if (!updated) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    const actor = await getUsers(db).findOne({ _id: userId, status: "active" });
+    await getOrderActivity(db).insertOne({
+      _id: randomUUID(),
+      orderRecordId: updated._id,
+      actorId: userId,
+      actorName: actor?.name ?? "Team member",
+      action: "dispatch.status_set",
+      summary: `Set dispatch status for ${updated.orderId} to ${updated.dispatchStatus ?? "pending_dispatch"}.`,
+      createdAt: updatedAt,
     });
+    res.json(UpdateDispatchOrderStatusResponse.parse(dispatchOrderResponse(updated)));
   },
 );
 
