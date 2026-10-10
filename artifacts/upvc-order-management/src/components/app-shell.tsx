@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
 import { Bell, ChevronLeft, ChevronRight, LogOut, Menu, MessageSquareText, ScanLine, Settings2, X, CheckCheck, ExternalLink } from 'lucide-react';
@@ -89,6 +89,7 @@ const iconMap: Record<string, SidebarIconName> = {
 };
 
 const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : `/${key}`;
+const SIDEBAR_SCROLL_STORAGE_KEY = 'framewise-sidebar-scroll-position';
 const isModuleActive = (key: string, location: string) => {
   const isDispatchScanner = location.startsWith('/order-scanner')
     && new URLSearchParams(window.location.search).get('flow') === 'dispatch';
@@ -114,6 +115,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const logout = useLogout();
   const isMasterAdmin = user.roleId === 'master-admin';
@@ -129,6 +131,26 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
         setLocation('/');
       },
     });
+  };
+
+  useLayoutEffect(() => {
+    const sidebar = sidebarScrollRef.current;
+    if (!sidebar) return;
+    try {
+      const savedPosition = Number(sessionStorage.getItem(SIDEBAR_SCROLL_STORAGE_KEY) || 0);
+      sidebar.scrollTop = Number.isFinite(savedPosition) ? savedPosition : 0;
+    } catch {
+      // Keep navigation usable if browser storage is unavailable.
+    }
+  }, []);
+
+  const preserveSidebarScroll = () => {
+    try {
+      sessionStorage.setItem(SIDEBAR_SCROLL_STORAGE_KEY, String(sidebarScrollRef.current?.scrollTop ?? 0));
+    } catch {
+      // Scroll position preservation is best-effort only.
+    }
+    setMobileOpen(false);
   };
 
   const isModuleVisible = (module: (typeof MODULES)[number]) => {
@@ -178,7 +200,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
       <Link
         key={module.key}
         href={path}
-        onClick={() => setMobileOpen(false)}
+        onClick={preserveSidebarScroll}
         title={collapsed ? module.short : module.label}
         aria-current={active ? 'page' : undefined}
         className={`${itemClass} ${
@@ -215,23 +237,29 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
           />
           {!collapsed && <div className="min-w-0"><p className="font-display text-sm font-bold tracking-tight">Framewise</p><p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">Order operations</p></div>}
         </div>
-        <div className="sidebar-scrollbar flex-1 overflow-y-auto px-3 py-5">
+        <div ref={sidebarScrollRef} onScroll={(event) => {
+          try {
+            sessionStorage.setItem(SIDEBAR_SCROLL_STORAGE_KEY, String(event.currentTarget.scrollTop));
+          } catch {
+            // Scroll position preservation is best-effort only.
+          }
+        }} className="sidebar-scrollbar flex-1 overflow-y-auto px-3 py-5">
           <p className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40 ${collapsed ? 'text-center' : ''}`}>{collapsed ? '•••' : 'Workspace'}</p>
           <nav className="space-y-1" aria-label="Main navigation">
-            <Link href="/" onClick={() => setMobileOpen(false)} title={collapsed ? 'Overview' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-dashboard">
+            <Link href="/" onClick={preserveSidebarScroll} title={collapsed ? 'Overview' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-dashboard">
               <SidebarSectionIcon name="overview" size={40} className="shrink-0" />
               {!collapsed && <span className="flex-1">Overview</span>}
             </Link>
-            <Link href="/communication" onClick={() => setMobileOpen(false)} title={collapsed ? 'Communication' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/communication') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-communication">
+            <Link href="/communication" onClick={preserveSidebarScroll} title={collapsed ? 'Communication' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/communication') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-communication">
               <MessageSquareText size={24} className="mx-[2px] shrink-0" />
               {!collapsed && <span className="flex-1">Communication</span>}
             </Link>
-            {canOpenOrderScanner && <Link href="/order-scanner" onClick={() => setMobileOpen(false)} title={collapsed ? 'QR scanner' : undefined} aria-current={location.startsWith('/order-scanner') ? 'page' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/order-scanner') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-order-scanner">
+            {canOpenOrderScanner && <Link href="/order-scanner" onClick={preserveSidebarScroll} title={collapsed ? 'QR scanner' : undefined} aria-current={location.startsWith('/order-scanner') ? 'page' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/order-scanner') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-order-scanner">
               <ScanLine size={24} className="mx-[2px] shrink-0" />
               {!collapsed && <span className="flex-1">QR scanner</span>}
               {collapsed && <span className="sr-only">QR scanner</span>}
             </Link>}
-            {canOpenApprovalQueue && <Link href="/quotation-approvals" onClick={() => setMobileOpen(false)} title={collapsed ? 'Quotation approvals' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/quotation-approvals') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-quotation-approvals">
+            {canOpenApprovalQueue && <Link href="/quotation-approvals" onClick={preserveSidebarScroll} title={collapsed ? 'Quotation approvals' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/quotation-approvals') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-quotation-approvals">
               <Bell size={22} className="mx-[3px] shrink-0" />
               {!collapsed && <span className="flex-1">Quotation approvals</span>}
             </Link>}
