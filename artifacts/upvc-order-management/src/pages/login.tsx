@@ -60,7 +60,7 @@ export default function LoginPage() {
               className="block w-52 max-w-full rounded-lg bg-white shadow-lg"
             />
           </div>
-          <div className="rounded-3xl bg-white/95 p-6 text-foreground shadow-2xl backdrop-blur-md sm:p-8">
+          <div data-framewise-card="" className="rounded-3xl bg-white/95 p-6 text-foreground shadow-2xl backdrop-blur-md sm:p-8">
             <div className="mb-8">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Secure staff access</p>
               <h2 className="mt-3 font-display text-4xl font-bold tracking-[-0.04em]">Good morning.</h2>

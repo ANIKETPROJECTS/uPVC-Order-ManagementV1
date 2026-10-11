@@ -4301,6 +4301,21 @@ components:
     OrderGlassStatus:
       type: string
       enum: [pending, partial, received]
+    OrderWindowPiece:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [frame, glass_shutter, mesh_shutter]
+        pieceNo:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [pending, ready]
+      required: [id, kind, pieceNo, status]
     OrderWindow:
       type: object
       properties:
@@ -4331,6 +4346,13 @@ components:
         meshShutterCount:
           type: ["integer", "null"]
           minimum: 0
+        frameCount:
+          type: integer
+          minimum: 1
+        pieces:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderWindowPiece"
         meshShutterReadyCount:
           type: ["integer", "null"]
           minimum: 0
@@ -4366,6 +4388,8 @@ components:
         - glassShutterReadyCount
         - meshShutterCount
         - meshShutterReadyCount
+        - frameCount
+        - pieces
         - lotId
         - frameStatus
         - shutterStatus
@@ -4411,6 +4435,10 @@ components:
         meshShutterCount:
           type: ["integer", "null"]
           minimum: 0
+        frameCount:
+          type: integer
+          minimum: 1
+          maximum: 100
         meshShutterReadyCount:
           type: ["integer", "null"]
           minimum: 0
@@ -4485,6 +4513,11 @@ components:
         pendingReason:
           type: ["string", "null"]
           maxLength: 500
+        pieceId:
+          type: string
+        pieceStatus:
+          type: string
+          enum: [ready]
     OrderWindowList:
       type: array
       items:

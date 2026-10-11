@@ -62,11 +62,11 @@ export function PieceQrLabelSheet({ order, windows }: { order: Order; windows: O
     return () => window.clearTimeout(timer);
   }, [printing]);
 
-  const labels = windows.flatMap((row) => [
-    { row, name: 'Frame', piece: 'frame' },
-    { row, name: 'Glass', piece: 'glass' },
-    { row, name: 'Mesh', piece: 'mesh' },
-  ]);
+  const labels = windows.flatMap((row) => row.pieces.map((piece) => ({
+    row,
+    piece,
+    name: piece.kind === 'frame' ? 'Frame' : piece.kind === 'glass_shutter' ? 'Glass shutter' : 'Mesh shutter',
+  })));
 
   return (
     <Card data-testid="card-window-qr-labels">
@@ -80,10 +80,10 @@ export function PieceQrLabelSheet({ order, windows }: { order: Order; windows: O
       {printing && (
         <CardContent id="piece-qr-print-sheet" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {labels.map(({ row, name, piece }) => (
-            <div key={`${row.id}-${piece}`} className="piece-qr-label flex flex-col items-center gap-1 border border-border p-2 text-center">
-              <QRCodeCanvas value={`FRAMEWISE_PIECE:${order.id}:${row.id}:${piece}`} size={96} includeMargin />
+            <div key={piece.id} className="piece-qr-label flex flex-col items-center gap-1 border border-border p-2 text-center">
+              <QRCodeCanvas value={`FRAMEWISE_PIECE:${order.id}:${row.id}:${piece.id}`} size={96} includeMargin />
               <strong className="text-xs">{order.orderId} · {row.windowNo}</strong>
-              <span className="text-[10px]">{name}</span>
+              <span className="text-[10px]">{name} {piece.pieceNo} · {piece.status === 'ready' ? 'Ready' : 'Pending'}</span>
             </div>
           ))}
           <style>{`@media print { body * { visibility:hidden!important } #piece-qr-print-sheet,#piece-qr-print-sheet * { visibility:visible!important } #piece-qr-print-sheet { display:grid!important; position:absolute; inset:0; padding:10mm } .piece-qr-label { break-inside:avoid } }`}</style>

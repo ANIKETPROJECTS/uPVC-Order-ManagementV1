@@ -1,0 +1,100 @@
+# Three rules for how the data links together
+
+## 1. Lots belong to the order, not to Dispatch
+
+- A lot is a group of a project's windows. The grouping must exist as soon as it is decided, before any window is ready to ship.
+- Lot assignment is a property of each window. It is set when the order, or a part of it, is planned.
+- Dispatch only **selects an existing lot** and generates a dispatch against it (D1, D2 and so on). It never creates a lot.
+- A QR scan counts toward a lot's readiness because the system already knows which lot the window belongs to.
+
+**Flow:**
+- **Order is planned:** Each window is given its lot here. W1 to W5 → Lot 1. W6 to W13 → Lot 2.
+- **Lots already exist:** QR scans count toward a lot's readiness, because the window knows its lot.
+- **Dispatch:** Selects an existing lot and generates D1, D2 against it.
+- ✗ **Dispatch never creates a lot.**
+
+## 2. One window table per order. Nothing is duplicated.
+
+- Each window has a row. Its frame and shutters sit under it. The table is filled once, by hand or from the confirmation file.
+- Every other screen reads from this table or writes to it.
+- Overview figures (window quantity, sq ft, glass status) are **counted from the table**. They are not entered anywhere else.
+- A QR scan at assembly or glazing updates the status field on the same row. Nothing needs to be kept in sync by hand.
+
+## 3. QR codes are made inside the software
+
+- Not through an external tool. A scanned QR only works if it holds an ID the system already knows.
+- The ID is created when a frame or shutter row is created in the window table.
+- Created QR codes can be printed as a batch, as a sheet of labels for the factory floor.
+- Each label should also print the Order ID, window number and piece type (Frame, Glass or Mesh) as plain text.
+
+---
+
+# Data model: every piece has its own row and QR
+
+A window must know how many pieces it has, not just whether it has a shutter.
+
+**Example: W1 · 2+1 sliding**
+- 1 window row
+- Knows its piece counts from the Window Type Library
+
+**Piece rows for W1:**
+- **Frame:** × 1 (own status, own QR) → F1
+- **Glass shutter:** × 2 (own status, own QR) → G1, G2
+- **Mesh shutter:** × 1 (own status, own QR) → M1
+
+**Notes:**
+- **Window row:** type, location, lot, plus the number of frames, glass shutters and mesh shutters.
+- **Piece rows:** one per frame, glass shutter and mesh shutter. Each has its own status field and its own QR ID.
+- **Why separate rows?** If two of three shutters are glazed and one is not, a single badge hides it. Separate rows let the screen show the real count (status rules in section 7).
+
+---
+
+# 4. From confirmation file to live table
+
+Replaces the old line that trusted the extraction fully.
+
+**Flow (5 steps):**
+1. **Upload:** Confirmation file. Excel preferred, PDF allowed.
+2. **Auto-extract:** Reads the window list. Fills frame and shutter counts from the Window Type Library.
+3. **Pending review:** Not live yet. Waits in a queue, like Rate Approval.
+4. **Two confirmations:**
+   - A. Window list matches the file?
+   - B. Frame and shutter counts correct?
+5. **Live window table:** One table per order. Only now do other screens read it.
+
+*Everything else reads from the live table. Nothing is typed in twice.*
+
+**Screens that read from the live table:**
+- **Overview stats:** Window qty, sq ft and glass status are counted from the table.
+- **Frame / shutter status:** QR scans at assembly and glazing update a status field on the row.
+- **QR labels:** IDs are created with each row, then printed in batches.
+- **Lots and Dispatch:** Each window carries its lot. Dispatch only picks one.
+
+**Confirmation A: window list**
+- Reviewer compares the extracted windows with the confirmation file.
+- Can correct a row, delete a row or add a missing one.
+- Costs one click per order.
+
+**Confirmation B: frame and shutter counts**
+- The system asks: *are these frame and shutter numbers correct?*
+- Counts come from the Window Type Library. Fixed windows may have no shutters at all.
+- Nothing is saved to the live table until both are confirmed.
+
+**Why a review step?** A misread row costs one click to fix here. Once it has become live production data it can turn into hundreds of wrong QR labels. Excel files with consistent columns are still the preferred input, because PDF layouts vary and can misread a row without warning.
+
+---
+
+# 5. Window Type Library (we will provide this)
+
+The extractor needs it to fill in frame and shutter counts.
+
+We will give the IT team a list of every window type with how many frames, glass shutters and mesh shutters it has. When the extractor reads "2+1 sliding" from the confirmation file, it looks up the type and fills the counts in. The user then confirms them (Confirmation B). The library should be editable later, so new window types can be added without a code change.
+
+| Window type | Frames | Glass shutters | Mesh shutters | QR labels |
+|---|---|---|---|---|
+| 2+1 sliding | 1 | 2 | 1 | 4 |
+| Sliding | 1 | 2 | 0 | 3 |
+| Casement | 1 | 1 | 0 | 2 |
+| Fixed | 1 | 0 | 0 | 1 |
+
+*Example only. Only the 2+1 sliding row is confirmed (2 glass shutters and 1 mesh shutter). The other rows are placeholders. We will send the real list.*

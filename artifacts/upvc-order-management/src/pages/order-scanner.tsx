@@ -70,7 +70,7 @@ export default function OrderScannerPage({ user }: { user: User }) {
       const reader = new BrowserQRCodeReader();
       const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result, _decodeError, activeControls) => {
         if (!result || handledResultRef.current) return;
-        const pieceQr = /^FRAMEWISE_PIECE:([^:]+):([^:]+):(frame|glass|mesh)$/.exec(result.getText());
+        const pieceQr = /^FRAMEWISE_PIECE:([^:]+):([^:]+):([^:]+)$/.exec(result.getText());
         if (pieceQr) {
           if (!canViewOrders) {
             setError({ kind: 'qr', message: 'Order access is required to update a window component.' });
@@ -80,16 +80,18 @@ export default function OrderScannerPage({ user }: { user: User }) {
           activeControls.stop();
           controlsRef.current = null;
           setScanning(false);
-          const [, orderId, windowId, piece] = pieceQr;
-          const data = piece === 'frame'
+          const [, orderId, windowId, pieceId] = pieceQr;
+          const data = pieceId === 'frame'
             ? { frameStatus: 'ready' as const }
-            : piece === 'glass'
+            : pieceId === 'glass'
               ? { glassStatus: 'received' as const }
-              : { shutterStatus: 'ready' as const };
+              : pieceId === 'mesh'
+                ? { shutterStatus: 'ready' as const }
+                : { pieceId, pieceStatus: 'ready' as const };
           updateWindow.mutate(
             { id: orderId, windowId, data },
             {
-              onSuccess: () => setError({ kind: 'qr', message: `${piece === 'mesh' ? 'Mesh / shutter' : piece} status updated for the scanned window.` }),
+              onSuccess: () => setError({ kind: 'qr', message: 'The scanned component status was updated.' }),
               onError: (updateError) => {
                 handledResultRef.current = false;
                 setError({ kind: 'qr', message: updateError instanceof Error ? updateError.message : 'Could not update this component. Check that your role can edit its status.' });

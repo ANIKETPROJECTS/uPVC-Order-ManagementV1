@@ -60,6 +60,11 @@ export interface OrderWindowInput {
      */
   meshShutterCount?: number | null;
   /**
+     * @minimum 1
+     * @maximum 100
+     */
+  frameCount?: number;
+  /**
      * @minimum 0
      * @nullable
      */

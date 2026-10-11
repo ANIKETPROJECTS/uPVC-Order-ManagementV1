@@ -830,6 +830,31 @@ export const OrderGlassStatus = {
   received: 'received',
 } as const;
 
+export type OrderWindowPieceKind = typeof OrderWindowPieceKind[keyof typeof OrderWindowPieceKind];
+
+
+export const OrderWindowPieceKind = {
+  frame: 'frame',
+  glass_shutter: 'glass_shutter',
+  mesh_shutter: 'mesh_shutter',
+} as const;
+
+export type OrderWindowPieceStatus = typeof OrderWindowPieceStatus[keyof typeof OrderWindowPieceStatus];
+
+
+export const OrderWindowPieceStatus = {
+  pending: 'pending',
+  ready: 'ready',
+} as const;
+
+export interface OrderWindowPiece {
+  id: string;
+  kind: OrderWindowPieceKind;
+  /** @minimum 1 */
+  pieceNo: number;
+  status: OrderWindowPieceStatus;
+}
+
 export interface OrderWindow {
   id: string;
   orderRecordId: string;
@@ -861,6 +886,9 @@ export interface OrderWindow {
      * @nullable
      */
   meshShutterCount: number | null;
+  /** @minimum 1 */
+  frameCount: number;
+  pieces: OrderWindowPiece[];
   /**
      * @minimum 0
      * @nullable
@@ -931,6 +959,11 @@ export interface OrderWindowInput {
      */
   meshShutterCount?: number | null;
   /**
+     * @minimum 1
+     * @maximum 100
+     */
+  frameCount?: number;
+  /**
      * @minimum 0
      * @nullable
      */
@@ -946,6 +979,13 @@ export interface OrderWindowInput {
      */
   pendingReason?: string | null;
 }
+
+export type OrderWindowUpdatePieceStatus = typeof OrderWindowUpdatePieceStatus[keyof typeof OrderWindowUpdatePieceStatus];
+
+
+export const OrderWindowUpdatePieceStatus = {
+  ready: 'ready',
+} as const;
 
 export interface OrderWindowUpdate {
   /**
@@ -1013,6 +1053,8 @@ export interface OrderWindowUpdate {
      * @nullable
      */
   pendingReason?: string | null;
+  pieceId?: string;
+  pieceStatus?: OrderWindowUpdatePieceStatus;
 }
 
 export type OrderWindowList = OrderWindow[];

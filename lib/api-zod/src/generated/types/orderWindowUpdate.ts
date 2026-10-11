@@ -7,6 +7,7 @@
  */
 import type { OrderGlassStatus } from './orderGlassStatus';
 import type { OrderWindowReadiness } from './orderWindowReadiness';
+import type { OrderWindowUpdatePieceStatus } from './orderWindowUpdatePieceStatus';
 
 export interface OrderWindowUpdate {
   /**
@@ -74,4 +75,6 @@ export interface OrderWindowUpdate {
      * @nullable
      */
   pendingReason?: string | null;
+  pieceId?: string;
+  pieceStatus?: OrderWindowUpdatePieceStatus;
 }

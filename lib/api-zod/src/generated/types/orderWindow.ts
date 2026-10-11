@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { OrderGlassStatus } from './orderGlassStatus';
+import type { OrderWindowPiece } from './orderWindowPiece';
 import type { OrderWindowReadiness } from './orderWindowReadiness';
 
 export interface OrderWindow {
@@ -39,6 +40,9 @@ export interface OrderWindow {
      * @nullable
      */
   meshShutterCount: number | null;
+  /** @minimum 1 */
+  frameCount: number;
+  pieces: OrderWindowPiece[];
   /**
      * @minimum 0
      * @nullable

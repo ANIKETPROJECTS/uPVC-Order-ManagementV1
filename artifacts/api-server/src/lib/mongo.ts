@@ -224,12 +224,21 @@ export interface OrderDocument {
 
 export type WindowReadiness = "pending" | "in_progress" | "ready";
 export type GlassStatus = "pending" | "partial" | "received";
+export type OrderWindowPieceKind = "frame" | "glass_shutter" | "mesh_shutter";
+export interface OrderWindowPieceDocument {
+  id: string;
+  kind: OrderWindowPieceKind;
+  pieceNo: number;
+  status: "pending" | "ready";
+}
 export interface OrderWindowDocument {
   _id: string; orderRecordId: string; windowNo: string; widthMm: number | null; heightMm: number | null;
   lotId?: string | null;
   windowType: string | null; location?: string | null; glassType?: string | null; meshType?: string | null;
+  frameCount?: number;
   glassShutterCount?: number | null; glassShutterReadyCount?: number | null;
   meshShutterCount?: number | null; meshShutterReadyCount?: number | null;
+  pieces?: OrderWindowPieceDocument[];
   frameStatus: WindowReadiness; shutterStatus: WindowReadiness;
   glassStatus: GlassStatus; pendingReason: string | null; sqFt: number | null;
   createdBy: string; createdAt: Date; updatedBy: string; updatedAt: Date; archivedAt?: Date | null;

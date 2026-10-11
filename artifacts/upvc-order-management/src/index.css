@@ -1047,6 +1047,23 @@
   .group:focus-within .hover-reveal-actions { opacity: 1; }
 }
 
+/*
+ * Operational cards are solid surfaces, independent of the page and sidebar
+ * palettes. These narrowly target card primitives and rounded, bordered panels;
+ * badges, maps, menus, and modal backdrops keep their own semantic treatments.
+ */
+[data-framewise-card],
+[class*="rounded-"][class*="border"][class*="bg-card/"]:not([class*="rounded-full"]):not([class*="absolute"]):not([class*="animate-pulse"]),
+[class*="rounded-"][class*="border"][class*="bg-background/"]:not([class*="rounded-full"]):not([class*="absolute"]):not([class*="animate-pulse"]):not([data-testid*="map"]),
+[class*="rounded-"][class*="border"][class*="bg-muted/"]:not([class*="rounded-full"]):not([class*="absolute"]):not([class*="animate-pulse"]):not([data-testid*="map"]) {
+  background-color: hsl(var(--card)) !important;
+}
+
+[data-framewise-card] {
+  border-color: hsl(var(--border));
+  box-shadow: 0 2px 8px rgb(11 28 56 / .055);
+}
+
 .confirmation-register {
   background:
     radial-gradient(ellipse at 84% 0%, hsl(var(--primary) / .09), transparent 34%),

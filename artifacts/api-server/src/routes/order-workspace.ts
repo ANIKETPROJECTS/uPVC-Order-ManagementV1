@@ -37,7 +37,7 @@ import {
 } from "@workspace/api-zod";
 import {
   getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPaymentFlags, getOrderPayments,
-  getOrderRefunds, getOrders, getOrderWindows, getGlassTrackingOrders, getGlassTrackingWorkbookImports, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderDocument, type OrderWindowDocument,
+  getOrderRefunds, getOrders, getOrderWindows, getGlassTrackingOrders, getGlassTrackingWorkbookImports, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderDocument, type OrderWindowDocument, type OrderWindowPieceDocument,
   type GlassTrackingItemDocument, type GlassTrackingOrderDocument,
   type OrderPaymentFlagDocument, type PaymentFlagActionDocument, type OrderRefundDocument,
 } from "../lib/mongo";
@@ -84,7 +84,24 @@ async function orderExists(id: string, res: Parameters<RequestHandler>[1]) {
 async function event(orderRecordId: string, actor: UserContext, action: string, summary: string) {
   await getOrderActivity(await getMongoDb()).insertOne({ _id: randomUUID(), orderRecordId, actorId: actor.id, actorName: actor.name, action, summary, createdAt: new Date() });
 }
-const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, location: w.location ?? null, glassType: w.glassType ?? null, meshType: w.meshType ?? null, glassShutterCount: w.glassShutterCount ?? null, glassShutterReadyCount: w.glassShutterReadyCount ?? null, meshShutterCount: w.meshShutterCount ?? null, meshShutterReadyCount: w.meshShutterReadyCount ?? null, lotId: w.lotId ?? null, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
+function windowPieces(w: OrderWindowDocument): OrderWindowPieceDocument[] {
+  if (w.pieces) return w.pieces;
+  const pieces: OrderWindowPieceDocument[] = [];
+  for (const [kind, count, readyCount, ready] of [
+    ["frame", w.frameCount ?? 1, 0, w.frameStatus === "ready"],
+    ["glass_shutter", w.glassShutterCount ?? 0, w.glassShutterReadyCount ?? (w.glassStatus === "received" ? w.glassShutterCount ?? 0 : 0), false],
+    ["mesh_shutter", w.meshShutterCount ?? 0, w.meshShutterReadyCount ?? 0, false],
+  ] as const) {
+    for (let pieceNo = 1; pieceNo <= count; pieceNo++) pieces.push({
+      id: `${w._id}_${kind}_${pieceNo}`,
+      kind,
+      pieceNo,
+      status: kind === "glass_shutter" ? (pieceNo <= readyCount ? "ready" : "pending") : kind === "mesh_shutter" ? (pieceNo <= readyCount ? "ready" : "pending") : ready ? "ready" : "pending",
+    });
+  }
+  return pieces;
+}
+const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, location: w.location ?? null, glassType: w.glassType ?? null, meshType: w.meshType ?? null, frameCount: w.frameCount ?? 1, glassShutterCount: w.glassShutterCount ?? null, glassShutterReadyCount: w.glassShutterReadyCount ?? null, meshShutterCount: w.meshShutterCount ?? null, meshShutterReadyCount: w.meshShutterReadyCount ?? null, pieces: windowPieces(w), lotId: w.lotId ?? null, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
 const paymentResponse = (p: any) => ({
   ...p,
   id: p._id,
@@ -715,7 +732,11 @@ router.post("/orders/:id/windows", async (req, res): Promise<void> => {
   if (order.clientType !== "Project" && b.data.lotId) { res.status(400).json({ error: "Retail order windows cannot be assigned to project lots." }); return; }
   if (!hasModuleEdit(actor, "window-readiness") && (b.data.frameStatus !== "pending" || b.data.shutterStatus !== "pending" || b.data.pendingReason)) { res.status(403).json({ error: "window-readiness editing access is required to set readiness fields." }); return; }
   if (!hasModuleEdit(actor, "glass-procurement") && b.data.glassStatus !== "pending") { res.status(403).json({ error: "glass-procurement editing access is required to set glass status." }); return; }
-   const now = new Date(); const w: OrderWindowDocument = { _id: randomUUID(), orderRecordId: p.data.id, ...b.data, location: b.data.location ?? null, glassType: b.data.glassType ?? null, meshType: b.data.meshType ?? null, glassShutterCount: b.data.glassShutterCount ?? null, glassShutterReadyCount: b.data.glassShutterReadyCount ?? 0, meshShutterCount: b.data.meshShutterCount ?? null, meshShutterReadyCount: b.data.meshShutterReadyCount ?? 0, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
+    const now = new Date(); const frameCount = b.data.frameCount ?? 1; const w: OrderWindowDocument = { _id: randomUUID(), orderRecordId: p.data.id, ...b.data, frameCount, pieces: [
+      ...Array.from({ length: frameCount }, (_, i) => ({ id: randomUUID(), kind: "frame" as const, pieceNo: i + 1, status: "pending" as const })),
+      ...Array.from({ length: b.data.glassShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "glass_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
+      ...Array.from({ length: b.data.meshShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "mesh_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
+    ], location: b.data.location ?? null, glassType: b.data.glassType ?? null, meshType: b.data.meshType ?? null, glassShutterCount: b.data.glassShutterCount ?? null, glassShutterReadyCount: b.data.glassShutterReadyCount ?? 0, meshShutterCount: b.data.meshShutterCount ?? null, meshShutterReadyCount: b.data.meshShutterReadyCount ?? 0, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
   try { await getOrderWindows(await getMongoDb()).insertOne(w); } catch (e) { if ((e as any)?.code === 11000) { res.status(409).json({ error: "Window number already exists for this order." }); return; } throw e; }
   await event(p.data.id, actor, "window.created", `Added window ${w.windowNo}.`); res.status(201).json(CreateOrderWindowResponse.parse(windowResponse(w)));
 });
@@ -723,6 +744,26 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
   const p = UpdateOrderWindowParams.safeParse(req.params), b = UpdateOrderWindowBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
   const actor = await context(req, res); if (!actor) return;
   const db = await getMongoDb(); const old = await getOrderWindows(db).findOne({ _id: p.data.windowId, orderRecordId: p.data.id, archivedAt: null }); if (!old) { res.status(404).json({ error: "Window not found." }); return; }
+  if (b.data.pieceId && b.data.pieceStatus) {
+    const pieces = windowPieces(old);
+    const piece = pieces.find((item) => item.id === b.data.pieceId);
+    if (!piece) { res.status(404).json({ error: "Piece QR does not belong to this window." }); return; }
+    if (!(piece.kind === "glass_shutter" ? requireModuleEdit(actor, res, "glass-procurement") : requireModuleEdit(actor, res, "window-readiness"))) return;
+    piece.status = b.data.pieceStatus;
+    const frames = pieces.filter((item) => item.kind === "frame");
+    const glass = pieces.filter((item) => item.kind === "glass_shutter");
+    const mesh = pieces.filter((item) => item.kind === "mesh_shutter");
+    const frameStatus: OrderWindowDocument["frameStatus"] = frames.length > 0 && frames.every((item) => item.status === "ready") ? "ready" : frames.some((item) => item.status === "ready") ? "in_progress" : "pending";
+    const shutterPieces = [...glass, ...mesh];
+    const shutterStatus: OrderWindowDocument["shutterStatus"] = shutterPieces.length > 0 && shutterPieces.every((item) => item.status === "ready") ? "ready" : shutterPieces.some((item) => item.status === "ready") ? "in_progress" : "pending";
+    const glassStatus: OrderWindowDocument["glassStatus"] = glass.length > 0 && glass.every((item) => item.status === "ready") ? "received" : glass.some((item) => item.status === "ready") ? "partial" : "pending";
+    const updates = { pieces, frameStatus, shutterStatus, glassStatus, glassShutterReadyCount: glass.filter((item) => item.status === "ready").length, meshShutterReadyCount: mesh.filter((item) => item.status === "ready").length, updatedAt: new Date(), updatedBy: actor.id };
+    await getOrderWindows(db).updateOne({ _id: old._id }, { $set: updates });
+    const updated = await getOrderWindows(db).findOne({ _id: old._id });
+    await event(p.data.id, actor, "window.piece.ready", `Marked ${piece.kind.replaceAll("_", " ")} ${piece.pieceNo} ready for ${old.windowNo}.`);
+    res.json(UpdateOrderWindowResponse.parse(windowResponse(updated!)));
+    return;
+  }
   const proposedWindow = { ...old, ...b.data };
   if ((proposedWindow.glassShutterCount != null && proposedWindow.glassShutterReadyCount != null && proposedWindow.glassShutterReadyCount > proposedWindow.glassShutterCount) || (proposedWindow.meshShutterCount != null && proposedWindow.meshShutterReadyCount != null && proposedWindow.meshShutterReadyCount > proposedWindow.meshShutterCount)) { res.status(400).json({ error: "Ready shutter counts cannot exceed total shutter counts." }); return; }
   const keys = Object.keys(b.data); const measurement = keys.some(k => ["windowNo", "widthMm", "heightMm", "windowType", "location", "glassType", "meshType"].includes(k)); const readiness = keys.some(k => ["frameStatus", "shutterStatus", "pendingReason", "glassShutterCount", "glassShutterReadyCount", "meshShutterCount", "meshShutterReadyCount"].includes(k)); const glass = keys.includes("glassStatus");

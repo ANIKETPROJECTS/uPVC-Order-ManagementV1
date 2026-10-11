@@ -4818,6 +4818,8 @@ export const listOrderWindowsResponseGlassShutterReadyCountMin = 0;
 
 export const listOrderWindowsResponseMeshShutterCountMin = 0;
 
+
+
 export const listOrderWindowsResponseMeshShutterReadyCountMin = 0;
 
 
@@ -4835,6 +4837,13 @@ export const ListOrderWindowsResponseItem = zod.object({
   "glassShutterCount": zod.number().int().min(listOrderWindowsResponseGlassShutterCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(listOrderWindowsResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(listOrderWindowsResponseMeshShutterCountMin).nullable(),
+  "frameCount": zod.number().int().min(1),
+  "pieces": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['frame', 'glass_shutter', 'mesh_shutter']),
+  "pieceNo": zod.number().int().min(1),
+  "status": zod.enum(['pending', 'ready'])
+})),
   "meshShutterReadyCount": zod.number().int().min(listOrderWindowsResponseMeshShutterReadyCountMin).nullable(),
   "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
@@ -4877,6 +4886,8 @@ export const createOrderWindowBodyGlassShutterReadyCountMin = 0;
 
 export const createOrderWindowBodyMeshShutterCountMin = 0;
 
+export const createOrderWindowBodyFrameCountMax = 100;
+
 export const createOrderWindowBodyMeshShutterReadyCountMin = 0;
 
 export const createOrderWindowBodyPendingReasonMax = 500;
@@ -4894,6 +4905,7 @@ export const CreateOrderWindowBody = zod.object({
   "glassShutterCount": zod.number().int().min(createOrderWindowBodyGlassShutterCountMin).nullish(),
   "glassShutterReadyCount": zod.number().int().min(createOrderWindowBodyGlassShutterReadyCountMin).nullish(),
   "meshShutterCount": zod.number().int().min(createOrderWindowBodyMeshShutterCountMin).nullish(),
+  "frameCount": zod.number().int().min(1).max(createOrderWindowBodyFrameCountMax).optional(),
   "meshShutterReadyCount": zod.number().int().min(createOrderWindowBodyMeshShutterReadyCountMin).nullish(),
   "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
@@ -4907,6 +4919,8 @@ export const createOrderWindowResponseGlassShutterCountMin = 0;
 export const createOrderWindowResponseGlassShutterReadyCountMin = 0;
 
 export const createOrderWindowResponseMeshShutterCountMin = 0;
+
+
 
 export const createOrderWindowResponseMeshShutterReadyCountMin = 0;
 
@@ -4925,6 +4939,13 @@ export const CreateOrderWindowResponse = zod.object({
   "glassShutterCount": zod.number().int().min(createOrderWindowResponseGlassShutterCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(createOrderWindowResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(createOrderWindowResponseMeshShutterCountMin).nullable(),
+  "frameCount": zod.number().int().min(1),
+  "pieces": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['frame', 'glass_shutter', 'mesh_shutter']),
+  "pieceNo": zod.number().int().min(1),
+  "status": zod.enum(['pending', 'ready'])
+})),
   "meshShutterReadyCount": zod.number().int().min(createOrderWindowResponseMeshShutterReadyCountMin).nullable(),
   "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
@@ -4989,7 +5010,9 @@ export const UpdateOrderWindowBody = zod.object({
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']).optional(),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']).optional(),
   "glassStatus": zod.enum(['pending', 'partial', 'received']).optional(),
-  "pendingReason": zod.string().max(updateOrderWindowBodyPendingReasonMax).nullish()
+  "pendingReason": zod.string().max(updateOrderWindowBodyPendingReasonMax).nullish(),
+  "pieceId": zod.string().optional(),
+  "pieceStatus": zod.enum(['ready']).optional()
 })
 
 export const updateOrderWindowResponseGlassShutterCountMin = 0;
@@ -4997,6 +5020,8 @@ export const updateOrderWindowResponseGlassShutterCountMin = 0;
 export const updateOrderWindowResponseGlassShutterReadyCountMin = 0;
 
 export const updateOrderWindowResponseMeshShutterCountMin = 0;
+
+
 
 export const updateOrderWindowResponseMeshShutterReadyCountMin = 0;
 
@@ -5015,6 +5040,13 @@ export const UpdateOrderWindowResponse = zod.object({
   "glassShutterCount": zod.number().int().min(updateOrderWindowResponseGlassShutterCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(updateOrderWindowResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(updateOrderWindowResponseMeshShutterCountMin).nullable(),
+  "frameCount": zod.number().int().min(1),
+  "pieces": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['frame', 'glass_shutter', 'mesh_shutter']),
+  "pieceNo": zod.number().int().min(1),
+  "status": zod.enum(['pending', 'ready'])
+})),
   "meshShutterReadyCount": zod.number().int().min(updateOrderWindowResponseMeshShutterReadyCountMin).nullable(),
   "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
