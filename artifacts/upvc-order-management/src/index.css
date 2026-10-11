@@ -260,9 +260,7 @@
 }
 
 .dashboard-page .dashboard-hero {
-  background:
-    radial-gradient(circle at 83% 8%, rgb(20 184 166 / .22), transparent 24%),
-    linear-gradient(115deg, #0B1C38 0%, #102B4A 58%, #0F766E 100%);
+  background: #0F9F8B;
   color: #f8fafc;
 }
 
@@ -293,9 +291,7 @@
 }
 
 .dark .dashboard-page .dashboard-hero {
-  background:
-    radial-gradient(circle at 83% 8%, rgb(20 184 166 / .18), transparent 24%),
-    linear-gradient(115deg, #07101e 0%, #0b1b32 58%, #0b4a46 100%);
+  background: #0F9F8B;
 }
 
 @keyframes dashboard-row-flash {
