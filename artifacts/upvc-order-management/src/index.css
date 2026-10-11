@@ -1107,6 +1107,28 @@
 .glass-spec-row:hover { background-color: hsl(var(--primary) / .035); }
 .glass-tabular { font-variant-numeric: tabular-nums; }
 
+@media screen {
+  table:not(.calendar-grid) {
+    border-collapse: collapse;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+  }
+
+  table:not(.calendar-grid) :is(th, td) {
+    border: 1px solid hsl(var(--border));
+  }
+
+  table:not(.calendar-grid) thead th {
+    background-color: hsl(var(--muted) / 0.52);
+    color: hsl(var(--foreground) / 0.82);
+    font-weight: 600;
+  }
+
+  table:not(.calendar-grid) tbody tr:hover > td {
+    background-color: hsl(var(--muted) / 0.36);
+  }
+}
+
 @media (max-width: 767px) {
   .app-grid { background-size: 26px 26px; }
   input, select, textarea { max-width: 100%; }
