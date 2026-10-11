@@ -13,7 +13,6 @@ export interface DispatchPlanItem {
   code: string;
   /** @nullable */
   lotId: string | null;
-  createLot?: boolean;
   windowIds: string[];
   dispatchStatus: DispatchStatus;
 }

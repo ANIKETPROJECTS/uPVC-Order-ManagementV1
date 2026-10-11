@@ -3707,13 +3707,15 @@ components:
           type: string
         windowNo:
           type: string
+        lotId:
+          type: [string, "null"]
         widthMm:
           type: number
         heightMm:
           type: number
         ready:
           type: boolean
-      required: [id, windowNo, widthMm, heightMm, ready]
+      required: [id, windowNo, lotId, widthMm, heightMm, ready]
     DispatchRecord:
       type: object
       properties:
@@ -3748,8 +3750,6 @@ components:
           pattern: "^D[1-9][0-9]*$"
         lotId:
           type: [string, "null"]
-        createLot:
-          type: boolean
         windowIds:
           type: array
           items:
@@ -4217,6 +4217,9 @@ components:
         notes:
           type: ["string", "null"]
           maxLength: 2000
+        initialLotCount:
+          type: integer
+          minimum: 1
       required: [locationName, siteAddress]
     OrderUpdate:
       type: object
@@ -4298,6 +4301,8 @@ components:
           type: number
         windowType:
           type: string
+        lotId:
+          type: ["string", "null"]
         frameStatus:
           $ref: "#/components/schemas/OrderWindowReadiness"
         shutterStatus:
@@ -4321,6 +4326,7 @@ components:
         - widthMm
         - heightMm
         - windowType
+        - lotId
         - frameStatus
         - shutterStatus
         - glassStatus
@@ -4347,6 +4353,8 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+        lotId:
+          type: ["string", "null"]
         frameStatus:
           $ref: "#/components/schemas/OrderWindowReadiness"
         shutterStatus:
@@ -4361,6 +4369,7 @@ components:
         - widthMm
         - heightMm
         - windowType
+        - lotId
         - frameStatus
         - shutterStatus
         - glassStatus
@@ -4383,6 +4392,8 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+        lotId:
+          type: ["string", "null"]
         frameStatus:
           $ref: "#/components/schemas/OrderWindowReadiness"
         shutterStatus:

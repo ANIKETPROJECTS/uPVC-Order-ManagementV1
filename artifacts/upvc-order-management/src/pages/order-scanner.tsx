@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDispatchRecordIdFromQr, getOrderRecordIdFromQr } from '@/lib/order-qr';
+import { useUpdateOrderWindow } from '@workspace/api-client-react';
 
 type ScannerError = {
   kind: 'camera' | 'qr';
@@ -23,6 +24,7 @@ export default function OrderScannerPage({ user }: { user: User }) {
   const lastInvalidQrRef = useRef('');
   const orderPermission = user.permissions?.['order-hub'];
   const dispatchPermission = user.permissions?.dispatch;
+  const updateWindow = useUpdateOrderWindow();
   const canViewOrders = user.roleId === 'master-admin' || orderPermission === 'view' || orderPermission === 'edit';
   const canViewDispatch = user.roleId === 'master-admin' || dispatchPermission === 'view' || dispatchPermission === 'edit';
   const canView = canViewOrders || canViewDispatch;
@@ -68,6 +70,35 @@ export default function OrderScannerPage({ user }: { user: User }) {
       const reader = new BrowserQRCodeReader();
       const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result, _decodeError, activeControls) => {
         if (!result || handledResultRef.current) return;
+        const pieceQr = /^FRAMEWISE_PIECE:([^:]+):([^:]+):(frame|glass|mesh)$/.exec(result.getText());
+        if (pieceQr) {
+          if (!canViewOrders) {
+            setError({ kind: 'qr', message: 'Order access is required to update a window component.' });
+            return;
+          }
+          handledResultRef.current = true;
+          activeControls.stop();
+          controlsRef.current = null;
+          setScanning(false);
+          const [, orderId, windowId, piece] = pieceQr;
+          const data = piece === 'frame'
+            ? { frameStatus: 'ready' as const }
+            : piece === 'glass'
+              ? { glassStatus: 'received' as const }
+              : { shutterStatus: 'ready' as const };
+          updateWindow.mutate(
+            { id: orderId, windowId, data },
+            {
+              onSuccess: () => setError({ kind: 'qr', message: `${piece === 'mesh' ? 'Mesh / shutter' : piece} status updated for the scanned window.` }),
+              onError: (updateError) => {
+                handledResultRef.current = false;
+                setError({ kind: 'qr', message: updateError instanceof Error ? updateError.message : 'Could not update this component. Check that your role can edit its status.' });
+              },
+            },
+          );
+          return;
+        }
+
         const dispatchRecordId = getDispatchRecordIdFromQr(result.getText());
         if (dispatchRecordId) {
           if (!canViewDispatch) {

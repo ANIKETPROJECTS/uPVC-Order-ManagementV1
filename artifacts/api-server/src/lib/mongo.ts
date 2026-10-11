@@ -226,6 +226,7 @@ export type WindowReadiness = "pending" | "in_progress" | "ready";
 export type GlassStatus = "pending" | "partial" | "received";
 export interface OrderWindowDocument {
   _id: string; orderRecordId: string; windowNo: string; widthMm: number; heightMm: number;
+  lotId?: string | null;
   windowType: string; frameStatus: WindowReadiness; shutterStatus: WindowReadiness;
   glassStatus: GlassStatus; pendingReason: string | null; sqFt: number;
   createdBy: string; createdAt: Date; updatedBy: string; updatedAt: Date; archivedAt?: Date | null;

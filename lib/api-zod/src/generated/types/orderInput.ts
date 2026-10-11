@@ -60,4 +60,6 @@ export interface OrderInput {
      * @nullable
      */
   notes?: string | null;
+  /** @minimum 1 */
+  initialLotCount?: number;
 }

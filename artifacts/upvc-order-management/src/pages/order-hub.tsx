@@ -146,6 +146,7 @@ const orderSchema = z.object({
   siteLatitude: z.number().min(-90).max(90).nullable(),
   siteLongitude: z.number().min(-180).max(180).nullable(),
   notes: z.string().max(2000).optional(),
+  initialLotCount: z.coerce.number().int().min(1),
 }).superRefine((values, context) => {
   if (values.clientMode === 'existing' && !values.clientId) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'Select a client.', path: ['clientId'] });
@@ -191,6 +192,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
       siteLatitude: null,
       siteLongitude: null,
       notes: '',
+      initialLotCount: 1,
     },
   });
   const clientMode = form.watch('clientMode');
@@ -234,6 +236,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
       siteLatitude: null,
       siteLongitude: null,
       notes: '',
+      initialLotCount: 1,
     });
   }, [open, form]);
 
@@ -261,6 +264,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
       siteLatitude: values.siteLatitude,
       siteLongitude: values.siteLongitude,
       notes: values.notes?.trim() || null,
+      ...(selectedType === 'Project' ? { initialLotCount: values.initialLotCount } : {}),
     };
     create.mutate(
       { data },
@@ -491,6 +495,15 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
                 </>
               )}
             </div>
+
+            {clientType === 'Project' && <FormField control={form.control} name="initialLotCount" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Project lots at creation</FormLabel>
+                <FormControl><Input {...field} type="number" min={1} step={1} data-testid="input-initial-lot-count" /></FormControl>
+                <p className="text-[10px] text-muted-foreground">Lots belong to the order. You can add more later from its order page.</p>
+                <FormMessage />
+              </FormItem>
+            )} />}
 
             <FormField control={form.control} name="locationName" render={({ field }) => (
               <FormItem>

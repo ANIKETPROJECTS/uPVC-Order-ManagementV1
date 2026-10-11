@@ -29,6 +29,8 @@ export interface OrderWindowInput {
      * @maxLength 100
      */
   windowType: string;
+  /** @nullable */
+  lotId: string | null;
   frameStatus: OrderWindowReadiness;
   shutterStatus: OrderWindowReadiness;
   glassStatus: OrderGlassStatus;

@@ -1378,6 +1378,7 @@ export const createOrderBodyNotesMax = 2000;
 
 
 
+
 export const CreateOrderBody = zod.object({
   "clientId": zod.string().min(1).optional(),
   "clientName": zod.string().min(createOrderBodyClientNameMin).max(createOrderBodyClientNameMax).optional(),
@@ -1390,7 +1391,8 @@ export const CreateOrderBody = zod.object({
   "siteAddress": zod.string().min(createOrderBodySiteAddressMin).max(createOrderBodySiteAddressMax),
   "siteLatitude": zod.number().min(createOrderBodySiteLatitudeMin).max(createOrderBodySiteLatitudeMax).nullish(),
   "siteLongitude": zod.number().min(createOrderBodySiteLongitudeMin).max(createOrderBodySiteLongitudeMax).nullish(),
-  "notes": zod.string().max(createOrderBodyNotesMax).nullish()
+  "notes": zod.string().max(createOrderBodyNotesMax).nullish(),
+  "initialLotCount": zod.number().int().min(1).optional()
 })
 
 
@@ -1724,6 +1726,7 @@ export const ListDispatchOrdersResponseItem = zod.object({
   "windows": zod.array(zod.object({
   "id": zod.string(),
   "windowNo": zod.string(),
+  "lotId": zod.string().nullable(),
   "widthMm": zod.number(),
   "heightMm": zod.number(),
   "ready": zod.boolean()
@@ -1771,6 +1774,7 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
   "windows": zod.array(zod.object({
   "id": zod.string(),
   "windowNo": zod.string(),
+  "lotId": zod.string().nullable(),
   "widthMm": zod.number(),
   "heightMm": zod.number(),
   "ready": zod.boolean()
@@ -1797,7 +1801,6 @@ export const UpdateDispatchOrderPlanBody = zod.object({
   "id": zod.string().optional(),
   "code": zod.string().regex(updateDispatchOrderPlanBodyDispatchesItemCodeRegExp),
   "lotId": zod.string().nullable(),
-  "createLot": zod.boolean().optional(),
   "windowIds": zod.array(zod.string()),
   "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered'])
 }))
@@ -1828,6 +1831,7 @@ export const UpdateDispatchOrderPlanResponse = zod.object({
   "windows": zod.array(zod.object({
   "id": zod.string(),
   "windowNo": zod.string(),
+  "lotId": zod.string().nullable(),
   "widthMm": zod.number(),
   "heightMm": zod.number(),
   "ready": zod.boolean()
@@ -4809,6 +4813,7 @@ export const ListOrderWindowsResponseItem = zod.object({
   "widthMm": zod.number(),
   "heightMm": zod.number(),
   "windowType": zod.string(),
+  "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
@@ -4846,6 +4851,7 @@ export const CreateOrderWindowBody = zod.object({
   "widthMm": zod.number().gt(createOrderWindowBodyWidthMmExclusiveMin).max(createOrderWindowBodyWidthMmMax),
   "heightMm": zod.number().gt(createOrderWindowBodyHeightMmExclusiveMin).max(createOrderWindowBodyHeightMmMax),
   "windowType": zod.string().min(1).max(createOrderWindowBodyWindowTypeMax),
+  "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
@@ -4859,6 +4865,7 @@ export const CreateOrderWindowResponse = zod.object({
   "widthMm": zod.number(),
   "heightMm": zod.number(),
   "windowType": zod.string(),
+  "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
@@ -4896,6 +4903,7 @@ export const UpdateOrderWindowBody = zod.object({
   "widthMm": zod.number().gt(updateOrderWindowBodyWidthMmExclusiveMin).max(updateOrderWindowBodyWidthMmMax).optional(),
   "heightMm": zod.number().gt(updateOrderWindowBodyHeightMmExclusiveMin).max(updateOrderWindowBodyHeightMmMax).optional(),
   "windowType": zod.string().min(1).max(updateOrderWindowBodyWindowTypeMax).optional(),
+  "lotId": zod.string().nullish(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']).optional(),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']).optional(),
   "glassStatus": zod.enum(['pending', 'partial', 'received']).optional(),
@@ -4909,6 +4917,7 @@ export const UpdateOrderWindowResponse = zod.object({
   "widthMm": zod.number(),
   "heightMm": zod.number(),
   "windowType": zod.string(),
+  "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "glassStatus": zod.enum(['pending', 'partial', 'received']),

@@ -107,6 +107,7 @@ import type {
 import { AppShell } from '@/components/app-shell';
 import { LifecycleMessageTemplates } from '@/components/lifecycle-message-templates';
 import { OrderQrCard } from '@/components/order-qr-card';
+import { PieceQrLabelSheet, ProjectLotAssignmentPanel } from '@/components/order-window-operations';
 import { SiteLocation } from '@/components/site-location';
 import { SiteMapPicker } from '@/components/site-map-picker';
 import { Button } from '@/components/ui/button';
@@ -667,7 +668,7 @@ function OrderLotsCard({ order, user, id }: { order: Order; user: User; id: stri
   const canEdit = hasPermission(user, 'order-hub');
   const addLot = useAddOrderLot();
   const lots = [...(order.lots ?? [])].sort((left, right) => left.sequence - right.sequence);
-  const canManageLots = canEdit && !order.needsReview && Boolean(order.clientType && order.quotationId);
+  const canManageLots = canEdit && !order.needsReview && order.clientType === 'Project';
 
   const onSuccess = (updated: Order, message: string) => {
     queryClient.setQueryData(getGetOrderQueryKey(id), updated);
@@ -738,6 +739,7 @@ const windowSchema = z.object({
   widthMm: z.coerce.number().positive('Enter a width').max(10000),
   heightMm: z.coerce.number().positive('Enter a height').max(10000),
   windowType: z.string().min(1, 'Window type is required').max(100),
+  lotId: z.string().nullable(),
   frameStatus: z.string(),
   shutterStatus: z.string(),
   glassStatus: z.string(),
@@ -750,23 +752,25 @@ function WindowDialog({ orderId, window, user, open, onOpenChange, onComplete }:
   const canMeasure = hasPermission(user, 'measurements');
   const canReadiness = hasPermission(user, 'window-readiness');
   const canGlass = hasPermission(user, 'glass-procurement');
+  const canAssignLot = hasPermission(user, 'order-hub');
   const create = useCreateOrderWindow();
   const update = useUpdateOrderWindow();
-  const form = useForm<WindowFormValues>({ resolver: zodResolver(windowSchema), defaultValues: { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' } });
+  const form = useForm<WindowFormValues>({ resolver: zodResolver(windowSchema), defaultValues: { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', lotId: null, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' } });
   useEffect(() => {
-    if (open) form.reset(window ? { windowNo: window.windowNo, widthMm: window.widthMm, heightMm: window.heightMm, windowType: window.windowType, frameStatus: window.frameStatus, shutterStatus: window.shutterStatus, glassStatus: window.glassStatus, pendingReason: window.pendingReason || '' } : { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' });
+    if (open) form.reset(window ? { windowNo: window.windowNo, widthMm: window.widthMm, heightMm: window.heightMm, windowType: window.windowType, lotId: window.lotId, frameStatus: window.frameStatus, shutterStatus: window.shutterStatus, glassStatus: window.glassStatus, pendingReason: window.pendingReason || '' } : { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', lotId: null, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' });
   }, [form, open, window]);
   const save = (values: WindowFormValues) => {
     const options = { onSuccess: () => { toast({ title: window ? 'Window updated' : 'Window added', description: 'The order window record is now current.' }); onOpenChange(false); onComplete(); }, onError: () => toast({ title: 'Window could not be saved', description: 'Check your permissions and the entered values.', variant: 'destructive' as const }) };
     if (window) {
       const data = {
         ...(canMeasure ? { windowNo: values.windowNo, widthMm: values.widthMm, heightMm: values.heightMm, windowType: values.windowType } : {}),
+        ...(canAssignLot ? { lotId: values.lotId } : {}),
         ...(canReadiness ? { frameStatus: values.frameStatus as Readiness, shutterStatus: values.shutterStatus as Readiness, pendingReason: values.pendingReason || null } : {}),
         ...(canGlass ? { glassStatus: values.glassStatus as GlassStatus } : {}),
       };
       update.mutate({ id: orderId, windowId: window.id, data }, options);
     } else if (canMeasure) {
-      create.mutate({ id: orderId, data: { windowNo: values.windowNo, widthMm: values.widthMm, heightMm: values.heightMm, windowType: values.windowType, frameStatus: (canReadiness ? values.frameStatus : OrderWindowReadiness.pending) as Readiness, shutterStatus: (canReadiness ? values.shutterStatus : OrderWindowReadiness.pending) as Readiness, glassStatus: (canGlass ? values.glassStatus : OrderGlassStatus.pending) as GlassStatus, pendingReason: canReadiness ? values.pendingReason || null : null } }, options);
+      create.mutate({ id: orderId, data: { windowNo: values.windowNo, widthMm: values.widthMm, heightMm: values.heightMm, windowType: values.windowType, lotId: values.lotId, frameStatus: (canReadiness ? values.frameStatus : OrderWindowReadiness.pending) as Readiness, shutterStatus: (canReadiness ? values.shutterStatus : OrderWindowReadiness.pending) as Readiness, glassStatus: (canGlass ? values.glassStatus : OrderGlassStatus.pending) as GlassStatus, pendingReason: canReadiness ? values.pendingReason || null : null } }, options);
     }
   };
   const pending = create.isPending || update.isPending;
@@ -1549,6 +1553,8 @@ export default function OrderDetailPage({ user }: { user: User }) {
         <OrderLotsCard order={record} user={user} id={id} />
         <OrderRecordCard order={record} user={user} id={id} />
         <WindowsPanel orderId={id} user={user} />
+         <ProjectLotAssignmentPanel order={record} windows={windowRows} user={user} />
+         <PieceQrLabelSheet order={record} windows={windowRows} />
         <LifecycleMessageTemplates
           templates={templates.data || []}
           canEdit={user.roleId === 'master-admin'}

@@ -338,6 +338,8 @@ export interface DispatchRecord {
 export interface DispatchWindow {
   id: string;
   windowNo: string;
+  /** @nullable */
+  lotId: string | null;
   widthMm: number;
   heightMm: number;
   ready: boolean;
@@ -365,7 +367,6 @@ export interface DispatchPlanItem {
   code: string;
   /** @nullable */
   lotId: string | null;
-  createLot?: boolean;
   windowIds: string[];
   dispatchStatus: DispatchStatus;
 }
@@ -713,6 +714,8 @@ export interface OrderInput {
      * @nullable
      */
   notes?: string | null;
+  /** @minimum 1 */
+  initialLotCount?: number;
 }
 
 /**
@@ -822,6 +825,8 @@ export interface OrderWindow {
   widthMm: number;
   heightMm: number;
   windowType: string;
+  /** @nullable */
+  lotId: string | null;
   frameStatus: OrderWindowReadiness;
   shutterStatus: OrderWindowReadiness;
   glassStatus: OrderGlassStatus;
@@ -853,6 +858,8 @@ export interface OrderWindowInput {
      * @maxLength 100
      */
   windowType: string;
+  /** @nullable */
+  lotId: string | null;
   frameStatus: OrderWindowReadiness;
   shutterStatus: OrderWindowReadiness;
   glassStatus: OrderGlassStatus;
@@ -884,6 +891,8 @@ export interface OrderWindowUpdate {
      * @maxLength 100
      */
   windowType?: string;
+  /** @nullable */
+  lotId?: string | null;
   frameStatus?: OrderWindowReadiness;
   shutterStatus?: OrderWindowReadiness;
   glassStatus?: OrderGlassStatus;

@@ -208,8 +208,7 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
       ? order.dispatches.map((dispatch) => ({ id: dispatch.id, code: dispatch.code, lotId: dispatch.lotId, windowIds: [...dispatch.windowIds], dispatchStatus: dispatch.dispatchStatus }))
       : [{
         code: 'D1',
-        lotId: order.lots[0]?.lotId ?? (order.clientType === 'Project' ? `${order.orderId}-L01` : null),
-        createLot: order.clientType === 'Project' && order.lots.length === 0,
+        lotId: order.lots[0]?.lotId ?? null,
         windowIds: [],
         dispatchStatus: DispatchStatus.pending_dispatch,
       }]);
@@ -242,18 +241,6 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
     setDraft((rows) => [...rows, { code, lotId: lot.lotId, windowIds: [], dispatchStatus: DispatchStatus.pending_dispatch }]);
     setLocalError('');
   };
-  const createLotInBatch = (code: string) => {
-    if (!order) return;
-    const highestSequence = Math.max(
-      0,
-      ...order.lots.map((lot) => lot.sequence),
-      ...draft.filter((item) => item.createLot && item.lotId).map((item) => Number(item.lotId?.match(/-L0*(\d+)$/i)?.[1]) || 0),
-    );
-    const sequence = highestSequence + 1;
-    const lotId = `${order.orderId}-L${String(sequence).padStart(2, '0')}`;
-    setDraft((rows) => [...rows, { code, lotId, createLot: true, windowIds: [], dispatchStatus: DispatchStatus.pending_dispatch }]);
-    setLocalError('');
-  };
   const updateBatchCode = (oldCode: string, newCode: string) => {
     setDraft((rows) => rows.map((row) => row.code.toUpperCase() === oldCode ? { ...row, code: newCode.toUpperCase() } : row));
   };
@@ -261,6 +248,7 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
     || draft.some((dispatch, index) => draft.slice(0, index).some((other) => other.lotId === dispatch.lotId && other.code.toUpperCase() === dispatch.code.toUpperCase()));
   const save = () => {
     if (!order) return;
+    if (order.clientType === 'Project' && order.lots.length === 0) { setLocalError('Create project lots from the order page before planning a dispatch. Dispatches can only select existing lots.'); return; }
     if (invalid) { setLocalError('Use a valid D-number, include each lot only once per batch, and assign at least one ready window to each lot.'); return; }
     setLocalError('');
     onSave(order, draft);
@@ -277,11 +265,12 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
           <div><p className="font-mono text-sm font-bold">{order.orderId}</p><p className="mt-1 text-xs text-muted-foreground">{order.locationName} · {order.windows.filter((window) => window.ready).length} ready windows</p></div>
           <Button type="button" size="sm" onClick={addDispatch}><Truck size={14} /> Add dispatch batch</Button>
         </div>
+        {order.clientType === 'Project' && order.lots.length === 0 && <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">This project has no lots yet. Add them from its order page; Dispatch only selects existing lots.</p>}
         {draft.length === 0 && <div className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">No dispatch batches. Add one to plan a delivery handoff.</div>}
         <div className="space-y-3">
           {batches.map((batch) => {
             const batchLocked = batch.rows.some(({ dispatch }) => dispatch.dispatchStatus !== DispatchStatus.pending_dispatch);
-            const includedExistingLots = new Set(batch.rows.filter(({ dispatch }) => !dispatch.createLot).map(({ dispatch }) => dispatch.lotId));
+            const includedExistingLots = new Set(batch.rows.map(({ dispatch }) => dispatch.lotId));
             const hasAvailableExistingLot = order.lots.some((lot) => !includedExistingLots.has(lot.lotId));
             return <section key={batch.code} className="rounded-xl border border-border/80 bg-background p-4" data-testid={`dispatch-batch-${batch.code}`}>
               <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/60 pb-3">
@@ -289,22 +278,19 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
                 <p className="pb-2 text-xs text-muted-foreground">{batch.rows.length} lot{batch.rows.length === 1 ? '' : 's'} · each lot keeps its own status</p>
                 <div className="flex flex-wrap gap-2">
                   {hasAvailableExistingLot && <Button type="button" size="sm" variant="outline" disabled={!canEdit} onClick={() => addLotToBatch(batch.code)}>+ Add existing lot</Button>}
-                  {order.clientType === 'Project' && <Button type="button" size="sm" variant="outline" disabled={!canEdit} onClick={() => createLotInBatch(batch.code)}>+ Create another lot</Button>}
                 </div>
               </div>
               <div className="mt-3 space-y-3">
                 {batch.rows.map(({ dispatch, index }) => {
                   const unavailable = assignedElsewhere(index);
-                  const choices = order.windows.filter((window) => window.ready && (!unavailable.has(window.id) || dispatch.windowIds.includes(window.id)));
+                  const choices = order.windows.filter((window) => window.ready && (order.clientType !== 'Project' || window.lotId === dispatch.lotId) && (!unavailable.has(window.id) || dispatch.windowIds.includes(window.id)));
                   const tracking = dispatchTrackingId(order, dispatch.lotId, batch.code);
                   const assignmentLocked = dispatch.dispatchStatus !== DispatchStatus.pending_dispatch;
                   return <div key={dispatch.id ?? `new-${batch.code}-${index}`} className="rounded-lg border border-border/65 bg-muted/15 p-3" data-testid={`dispatch-plan-item-${index}`}>
                     <div className="grid gap-3 md:grid-cols-[minmax(145px,1fr)_minmax(170px,1fr)_auto] md:items-end">
-                      {dispatch.createLot
-                        ? <div className="space-y-1.5 text-xs font-semibold"><span>New lot</span><div className="flex h-10 items-center rounded-lg border border-primary/25 bg-primary/5 px-3 font-mono text-sm text-primary">Lot L{dispatch.lotId?.match(/-L0*(\d+)$/i)?.[1]} · created on save</div></div>
-                        : <label className="space-y-1.5 text-xs font-semibold">Lot<select value={dispatch.lotId ?? ''} disabled={!canEdit || assignmentLocked || order.lots.length === 0} onChange={(event) => update(index, { lotId: event.target.value || null })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
-                          {order.lots.length ? order.lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>Lot L{lot.sequence}</option>) : <option value="">Order dispatch</option>}
-                        </select></label>}
+                      <label className="space-y-1.5 text-xs font-semibold">Existing lot<select value={dispatch.lotId ?? ''} disabled={!canEdit || assignmentLocked || order.lots.length === 0} onChange={(event) => update(index, { lotId: event.target.value || null })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                        <option value="">Choose an order lot</option>{order.lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>Lot L{lot.sequence}</option>)}
+                      </select></label>
                       <label className="space-y-1.5 text-xs font-semibold">This lot’s status<select value={dispatch.dispatchStatus} disabled={!canEdit} onChange={(event) => update(index, { dispatchStatus: event.target.value as StatusValue })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
                         {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
                       </select></label>
@@ -316,7 +302,7 @@ function DispatchPlanDialog({ order, canEdit, busy, error, onClose, onSave }: {
                         <input type="checkbox" disabled={!canEdit || assignmentLocked} checked={dispatch.windowIds.includes(window.id)} onChange={(event) => update(index, { windowIds: event.target.checked ? [...dispatch.windowIds, window.id] : dispatch.windowIds.filter((id) => id !== window.id) })} />
                         <span className="font-semibold">{window.windowNo}</span><span className="text-muted-foreground">{window.widthMm} × {window.heightMm} mm</span>
                       </label>)}
-                    </div> : <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">No unassigned windows are ready. A window is ready when frame and shutter are ready and glass is received.</p>}
+                    </div> : <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">No ready windows are assigned to this lot, or they are already in another dispatch. A window is ready when frame and shutter are ready and glass is received.</p>}
                   </div>;
                 })}
               </div>

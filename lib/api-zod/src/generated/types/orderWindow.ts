@@ -15,6 +15,8 @@ export interface OrderWindow {
   widthMm: number;
   heightMm: number;
   windowType: string;
+  /** @nullable */
+  lotId: string | null;
   frameStatus: OrderWindowReadiness;
   shutterStatus: OrderWindowReadiness;
   glassStatus: OrderGlassStatus;

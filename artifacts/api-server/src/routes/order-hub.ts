@@ -693,16 +693,14 @@ router.post(
           createdAt: now,
           updatedAt: now,
         };
-    const lots: OrderLotDocument[] =
-      clientType === "Project"
-        ? [{
-            _id: randomUUID(),
-            sequence: 1,
-            lotId: formatLotId(generatedOrderId, 1),
-            createdBy: actorId,
-            createdAt: now,
-          }]
-        : [];
+    const initialLotCount = clientType === "Project" ? parsed.data.initialLotCount ?? 1 : 0;
+    const lots: OrderLotDocument[] = Array.from({ length: initialLotCount }, (_, index) => ({
+      _id: randomUUID(),
+      sequence: index + 1,
+      lotId: formatLotId(generatedOrderId, index + 1),
+      createdBy: actorId,
+      createdAt: now,
+    }));
     const order: OrderDocument = {
       _id: randomUUID(),
       orderId: generatedOrderId,
@@ -724,7 +722,7 @@ router.post(
       quotationNo: quotation?.quoteNo ?? null,
       needsReview: false,
       lots,
-      nextLotSequence: clientType === "Project" ? 2 : 1,
+      nextLotSequence: initialLotCount + 1,
       status: "quotation_stage",
       isActive: true,
       dispatchStatus: "pending_dispatch",
@@ -1126,8 +1124,8 @@ router.post(
         res.status(404).json({ error: "Order not found." });
         return;
       }
-      if (order.needsReview || !order.clientType || !order.quotationId) {
-        res.status(409).json({ error: "Resolve this order's client type and quotation before adding lots." });
+      if (order.needsReview || order.clientType !== "Project") {
+        res.status(409).json({ error: "Resolve this order's type as Project before adding lots." });
         return;
       }
 
