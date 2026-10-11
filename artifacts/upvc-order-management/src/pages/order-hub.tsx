@@ -146,7 +146,7 @@ const orderSchema = z.object({
   siteLatitude: z.number().min(-90).max(90).nullable(),
   siteLongitude: z.number().min(-180).max(180).nullable(),
   notes: z.string().max(2000).optional(),
-  initialLotCount: z.coerce.number().int().min(1),
+  initialLots: z.array(z.object({ windowNosText: z.string().max(5000) })).min(1),
 }).superRefine((values, context) => {
   if (values.clientMode === 'existing' && !values.clientId) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'Select a client.', path: ['clientId'] });
@@ -192,7 +192,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
       siteLatitude: null,
       siteLongitude: null,
       notes: '',
-      initialLotCount: 1,
+      initialLots: [{ windowNosText: '' }],
     },
   });
   const clientMode = form.watch('clientMode');
@@ -236,7 +236,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
       siteLatitude: null,
       siteLongitude: null,
       notes: '',
-      initialLotCount: 1,
+      initialLots: [{ windowNosText: '' }],
     });
   }, [open, form]);
 
@@ -264,7 +264,11 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
       siteLatitude: values.siteLatitude,
       siteLongitude: values.siteLongitude,
       notes: values.notes?.trim() || null,
-      ...(selectedType === 'Project' ? { initialLotCount: values.initialLotCount } : {}),
+      ...(selectedType === 'Project' ? {
+        initialLots: values.initialLots.map((lot) => ({
+          windowNos: lot.windowNosText.split(/[,\n]/).map((windowNo) => windowNo.trim()).filter(Boolean),
+        })),
+      } : {}),
     };
     create.mutate(
       { data },
@@ -496,14 +500,25 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
               )}
             </div>
 
-            {clientType === 'Project' && <FormField control={form.control} name="initialLotCount" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Project lots at creation</FormLabel>
-                <FormControl><Input {...field} type="number" min={1} step={1} data-testid="input-initial-lot-count" /></FormControl>
-                <p className="text-[10px] text-muted-foreground">Lots belong to the order. You can add more later from its order page.</p>
-                <FormMessage />
-              </FormItem>
-            )} />}
+            {clientType === 'Project' && (() => {
+              const lots = form.watch('initialLots');
+              const addLot = () => form.setValue('initialLots', [...(form.getValues('initialLots') ?? []), { windowNosText: '' }], { shouldDirty: true });
+              return <section className="space-y-3 rounded-xl border border-border/80 p-3" data-testid="section-initial-project-lots">
+                <div className="flex items-center justify-between gap-3">
+                  <div><FormLabel>Project lots and windows</FormLabel><p className="mt-1 text-[10px] text-muted-foreground">Enter window numbers separated by commas or new lines. Dimensions can be added later.</p></div>
+                  <Button type="button" size="sm" variant="outline" onClick={addLot}><Plus size={13} /> Add lot</Button>
+                </div>
+                {lots.map((lot, index) => {
+                  const count = lot.windowNosText.split(/[,\n]/).map((value) => value.trim()).filter(Boolean).length;
+                  return <div key={index} className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                    <div className="mb-2 flex items-center justify-between"><span className="text-xs font-semibold">Lot {String(index + 1).padStart(2, '0')} · {count} {count === 1 ? 'window' : 'windows'}</span>
+                      {lots.length > 1 && <Button type="button" size="icon" variant="ghost" aria-label={`Remove lot ${index + 1}`} onClick={() => form.setValue('initialLots', lots.filter((_, lotIndex) => lotIndex !== index), { shouldDirty: true })}><X size={14} /></Button>}
+                    </div>
+                    <Textarea value={lot.windowNosText} onChange={(event) => form.setValue('initialLots', lots.map((item, lotIndex) => lotIndex === index ? { windowNosText: event.target.value } : item), { shouldDirty: true })} placeholder="e.g. W01, W02, W03" rows={2} aria-label={`Window numbers for lot ${index + 1}`} />
+                  </div>;
+                })}
+              </section>;
+            })()}
 
             <FormField control={form.control} name="locationName" render={({ field }) => (
               <FormItem>

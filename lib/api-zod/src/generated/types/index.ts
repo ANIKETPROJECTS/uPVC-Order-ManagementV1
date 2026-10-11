@@ -84,6 +84,7 @@ export * from './glassWorkbookPreview';
 export * from './glassWorkbookSection';
 export * from './glassWorkbookSectionList';
 export * from './healthStatus';
+export * from './initialOrderLotInput';
 export * from './installationAssignedMember';
 export * from './installationAssignmentUpdate';
 export * from './installationDrawing';

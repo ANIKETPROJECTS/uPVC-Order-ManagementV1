@@ -12,9 +12,12 @@ export interface OrderWindow {
   id: string;
   orderRecordId: string;
   windowNo: string;
-  widthMm: number;
-  heightMm: number;
-  windowType: string;
+  /** @nullable */
+  widthMm: number | null;
+  /** @nullable */
+  heightMm: number | null;
+  /** @nullable */
+  windowType: string | null;
   /** @nullable */
   lotId: string | null;
   frameStatus: OrderWindowReadiness;
@@ -22,7 +25,8 @@ export interface OrderWindow {
   glassStatus: OrderGlassStatus;
   /** @nullable */
   pendingReason: string | null;
-  sqFt: number;
+  /** @nullable */
+  sqFt: number | null;
   createdAt: Date;
   updatedAt: Date;
 }

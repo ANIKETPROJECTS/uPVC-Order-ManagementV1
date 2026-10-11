@@ -1,0 +1,66 @@
+# The Order ID screen: one full example
+
+Numbered callouts are explained below the screen. The reference HTML is older and has no mesh shutter changes.
+
+**SSW-2026-0001**
+**Rohan Deshmukh**
+CREATED: 2/12/2026
+*existing lifecycle bar, stages as already built*
+
+**① Lifecycle bar:** Measurement → Quotation → Confirmation / PO → **Production** → Dispatch → Installation
+
+**② Tabs:** Overview | Windows | Payments | Documents | Activity
+
+**③ Summary row 1**
+- LOCATION: Kothrud, Pune
+- PHONE: +91 93973 49536
+- Mesh Type: Fiber (Extracted from confirmation)
+- GLASS TYPE: Clear toughened 8mm
+
+**④ Summary row 2**
+- WINDOW QTY: 13
+- SQ FT: 182.4
+- GLASS STATUS: All received
+- PAYMENT STATUS: Due – ₹20,600
+
+**⑤ Window list**
+
+| WINDOW | TYPE | LOCATION | FRAME STATUS | ⑥ SHUTTER STATUS: GLASS SHUTTER | SHUTTER STATUS: MESH SHUTTER |
+|---|---|---|---|---|---|
+| W1 | 2+1 sliding | Living room | Ready | ⑦ 2/2 Ready | 1/1 Ready |
+| W2 | Sliding | Bedroom 1 | Ready | 0/2 Ready (2 assembly completed) | Not applicable |
+| W3 | Casement | Bedroom 2 | ⑧ Pending (Hardware pending) | Pending (Profile pending) | Not applicable |
+| W4 | Fixed | Kitchen | Ready | ⑨ Not applicable | Not applicable |
+| W5 | Sliding | Balcony | Ready | 2/2 Ready | Not applicable |
+| W6 | 2+1 sliding | Hall | Ready | 1/2 Ready (1 assembly completed) | 1/1 Ready |
+
+*Sample rows. Showing 6 of 13 windows. Window dimensions are not shown.*
+
+---
+
+**① Lifecycle bar** [CORRECTED]
+Just below the client's name. Keep the stages as already built.
+
+**② Tabs** [UNCHANGED]
+Overview, Windows, Payments, Documents, Activity. Only the Overview content changes.
+
+**③ Summary row 1** [UNCHANGED]
+Location, Phone, Created on, Glass type.
+
+**④ Summary row 2** [NEW]
+Window qty, Sq ft, Glass status, Payment status. All counted from the window table.
+
+**⑤ Window list** [CHANGED]
+Window, Type, Location, Frame status, then the two shutter columns. No dimensions. No Rate Approval card.
+
+**⑥ Shutter split** [NEW]
+Glass shutter and Mesh shutter side by side under one Shutter status heading.
+
+**⑦ Count display** [NEW]
+Windows with more than one shutter show x/y Ready in both shutter cells.
+
+**⑧ Pending reason** [CHANGED]
+A small tag under the badge, says why the pending state is recorded. It is not a column.
+
+**⑨ Not applicable** [UNCHANGED]
+Shown in grey when the window type has no such piece. Never left blank.

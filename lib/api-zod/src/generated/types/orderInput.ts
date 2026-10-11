@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ClientType } from './clientType';
+import type { InitialOrderLotInput } from './initialOrderLotInput';
 
 export interface OrderInput {
   /** @minLength 1 */
@@ -62,4 +63,6 @@ export interface OrderInput {
   notes?: string | null;
   /** @minimum 1 */
   initialLotCount?: number;
+  /** @minItems 1 */
+  initialLots?: InitialOrderLotInput[];
 }

@@ -3710,9 +3710,9 @@ components:
         lotId:
           type: [string, "null"]
         widthMm:
-          type: number
+          type: ["number", "null"]
         heightMm:
-          type: number
+          type: ["number", "null"]
         ready:
           type: boolean
       required: [id, windowNo, lotId, widthMm, heightMm, ready]
@@ -4220,7 +4220,22 @@ components:
         initialLotCount:
           type: integer
           minimum: 1
+        initialLots:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/InitialOrderLotInput"
       required: [locationName, siteAddress]
+    InitialOrderLotInput:
+      type: object
+      properties:
+        windowNos:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 20
+      required: [windowNos]
     OrderUpdate:
       type: object
       properties:
@@ -4296,11 +4311,11 @@ components:
         windowNo:
           type: string
         widthMm:
-          type: number
+          type: ["number", "null"]
         heightMm:
-          type: number
+          type: ["number", "null"]
         windowType:
-          type: string
+          type: ["string", "null"]
         lotId:
           type: ["string", "null"]
         frameStatus:
@@ -4312,7 +4327,7 @@ components:
         pendingReason:
           type: ["string", "null"]
         sqFt:
-          type: number
+          type: ["number", "null"]
         createdAt:
           type: string
           format: date-time

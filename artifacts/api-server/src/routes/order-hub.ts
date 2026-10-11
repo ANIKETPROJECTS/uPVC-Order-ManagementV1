@@ -44,6 +44,7 @@ import {
   getOrderLocations,
   getOrderMessageTemplates,
   getOrders,
+  getOrderWindows,
   getOrderActivity,
   getOrderPayments,
   getOrderPaymentFlags,
@@ -56,6 +57,7 @@ import {
   type ClientDocument,
   type OrderLotDocument,
   type OrderDocument,
+  type OrderWindowDocument,
   type OrderLocationDocument,
   type OrderMessageTemplateDocument,
   type OrderStatus,
@@ -630,6 +632,21 @@ router.post(
       res.status(409).json({ error: "The selected client already has a different client type." });
       return;
     }
+    const submittedLots = clientType === "Project" ? parsed.data.initialLots : undefined;
+    const normalizedLotWindows = (submittedLots ?? []).map((lot) => lot.windowNos.map((windowNo) => windowNo.trim()));
+    const submittedWindowNos = normalizedLotWindows.flat();
+    if (clientType === "Retail" && parsed.data.initialLots?.length) {
+      res.status(400).json({ error: "Retail orders cannot contain project lots." });
+      return;
+    }
+    if (submittedWindowNos.some((windowNo) => !windowNo || windowNo.length > 20)) {
+      res.status(400).json({ error: "Each planned window needs a number of 1–20 characters." });
+      return;
+    }
+    if (new Set(submittedWindowNos.map((windowNo) => windowNo.toLowerCase())).size !== submittedWindowNos.length) {
+      res.status(409).json({ error: "A window number can only be assigned to one lot in this order." });
+      return;
+    }
 
     let quotation = null;
     if (parsed.data.quotationId) {
@@ -693,7 +710,9 @@ router.post(
           createdAt: now,
           updatedAt: now,
         };
-    const initialLotCount = clientType === "Project" ? parsed.data.initialLotCount ?? 1 : 0;
+    const initialLotCount = clientType === "Project"
+      ? submittedLots?.length ?? parsed.data.initialLotCount ?? 1
+      : 0;
     const lots: OrderLotDocument[] = Array.from({ length: initialLotCount }, (_, index) => ({
       _id: randomUUID(),
       sequence: index + 1,
@@ -733,6 +752,26 @@ router.post(
       updatedBy: null,
       updatedAt: now,
     };
+    const plannedWindows: OrderWindowDocument[] = normalizedLotWindows.flatMap((windowNos, lotIndex) =>
+      windowNos.map((windowNo) => ({
+        _id: randomUUID(),
+        orderRecordId: order._id,
+        windowNo,
+        widthMm: null,
+        heightMm: null,
+        windowType: null,
+        lotId: lots[lotIndex].lotId,
+        frameStatus: "pending",
+        shutterStatus: "pending",
+        glassStatus: "pending",
+        pendingReason: null,
+        sqFt: null,
+        createdBy: actorId,
+        createdAt: now,
+        updatedBy: actorId,
+        updatedAt: now,
+      })),
+    );
     let insertedManualClient = false;
     try {
       if (!existingClient) {
@@ -745,7 +784,10 @@ router.post(
         );
       }
       await getOrders(db).insertOne(order);
+      if (plannedWindows.length > 0) await getOrderWindows(db).insertMany(plannedWindows);
     } catch (error) {
+      await getOrderWindows(db).deleteMany({ orderRecordId: order._id });
+      await getOrders(db).deleteOne({ _id: order._id });
       if (insertedManualClient) {
         await getClients(db).deleteOne({ _id: client._id });
       }
@@ -952,6 +994,14 @@ router.patch(
         ...lot,
         lotId: formatLotId(generatedOrderId, lot.sequence),
       }));
+      const lotIdMap = new Map((before.lots ?? []).map((lot) => [
+        lot.lotId,
+        formatLotId(generatedOrderId, lot.sequence),
+      ]));
+      updates.dispatches = (before.dispatches ?? []).map((dispatch) => ({
+        ...dispatch,
+        lotId: dispatch.lotId ? lotIdMap.get(dispatch.lotId) ?? dispatch.lotId : null,
+      }));
     }
     const result = await getOrders(db).updateOne(
       { _id: params.data.id },
@@ -968,7 +1018,14 @@ router.patch(
     }
     const orderIdChanged = before.orderId !== order.orderId;
     if (orderIdChanged) {
+      const lotWindowUpdates = (before.lots ?? []).flatMap((lot) => {
+        const newLotId = order.lots?.find((updatedLot) => updatedLot.sequence === lot.sequence)?.lotId;
+        return newLotId && newLotId !== lot.lotId
+          ? [{ updateMany: { filter: { orderRecordId: order._id, lotId: lot.lotId }, update: { $set: { lotId: newLotId } } } }]
+          : [];
+      });
       await Promise.all([
+        ...(lotWindowUpdates.length > 0 ? [getOrderWindows(db).bulkWrite(lotWindowUpdates)] : []),
         getOrderPaymentFlags(db).updateMany(
           { orderRecordId: order._id },
           { $set: { orderId: order.orderId, clientName: order.clientName, locationName: order.locationName } },

@@ -1377,6 +1377,9 @@ export const createOrderBodySiteLongitudeMax = 180;
 export const createOrderBodyNotesMax = 2000;
 
 
+export const createOrderBodyInitialLotsItemWindowNosItemMax = 20;
+
+
 
 
 export const CreateOrderBody = zod.object({
@@ -1392,7 +1395,10 @@ export const CreateOrderBody = zod.object({
   "siteLatitude": zod.number().min(createOrderBodySiteLatitudeMin).max(createOrderBodySiteLatitudeMax).nullish(),
   "siteLongitude": zod.number().min(createOrderBodySiteLongitudeMin).max(createOrderBodySiteLongitudeMax).nullish(),
   "notes": zod.string().max(createOrderBodyNotesMax).nullish(),
-  "initialLotCount": zod.number().int().min(1).optional()
+  "initialLotCount": zod.number().int().min(1).optional(),
+  "initialLots": zod.array(zod.object({
+  "windowNos": zod.array(zod.string().min(1).max(createOrderBodyInitialLotsItemWindowNosItemMax))
+})).min(1).optional()
 })
 
 
@@ -1727,8 +1733,8 @@ export const ListDispatchOrdersResponseItem = zod.object({
   "id": zod.string(),
   "windowNo": zod.string(),
   "lotId": zod.string().nullable(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
+  "widthMm": zod.number().nullable(),
+  "heightMm": zod.number().nullable(),
   "ready": zod.boolean()
 })),
   "dispatchPlanRevision": zod.number().int(),
@@ -1775,8 +1781,8 @@ export const UpdateDispatchOrderStatusResponse = zod.object({
   "id": zod.string(),
   "windowNo": zod.string(),
   "lotId": zod.string().nullable(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
+  "widthMm": zod.number().nullable(),
+  "heightMm": zod.number().nullable(),
   "ready": zod.boolean()
 })),
   "dispatchPlanRevision": zod.number().int(),
@@ -1832,8 +1838,8 @@ export const UpdateDispatchOrderPlanResponse = zod.object({
   "id": zod.string(),
   "windowNo": zod.string(),
   "lotId": zod.string().nullable(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
+  "widthMm": zod.number().nullable(),
+  "heightMm": zod.number().nullable(),
   "ready": zod.boolean()
 })),
   "dispatchPlanRevision": zod.number().int(),
@@ -4810,15 +4816,15 @@ export const ListOrderWindowsResponseItem = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
   "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
+  "widthMm": zod.number().nullable(),
+  "heightMm": zod.number().nullable(),
+  "windowType": zod.string().nullable(),
   "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
   "pendingReason": zod.string().nullable(),
-  "sqFt": zod.number(),
+  "sqFt": zod.number().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -4862,15 +4868,15 @@ export const CreateOrderWindowResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
   "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
+  "widthMm": zod.number().nullable(),
+  "heightMm": zod.number().nullable(),
+  "windowType": zod.string().nullable(),
   "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
   "pendingReason": zod.string().nullable(),
-  "sqFt": zod.number(),
+  "sqFt": zod.number().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -4914,15 +4920,15 @@ export const UpdateOrderWindowResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string(),
   "windowNo": zod.string(),
-  "widthMm": zod.number(),
-  "heightMm": zod.number(),
-  "windowType": zod.string(),
+  "widthMm": zod.number().nullable(),
+  "heightMm": zod.number().nullable(),
+  "windowType": zod.string().nullable(),
   "lotId": zod.string().nullable(),
   "frameStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "shutterStatus": zod.enum(['pending', 'in_progress', 'ready']),
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
   "pendingReason": zod.string().nullable(),
-  "sqFt": zod.number(),
+  "sqFt": zod.number().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })

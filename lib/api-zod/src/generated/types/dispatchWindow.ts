@@ -11,7 +11,9 @@ export interface DispatchWindow {
   windowNo: string;
   /** @nullable */
   lotId: string | null;
-  widthMm: number;
-  heightMm: number;
+  /** @nullable */
+  widthMm: number | null;
+  /** @nullable */
+  heightMm: number | null;
   ready: boolean;
 }

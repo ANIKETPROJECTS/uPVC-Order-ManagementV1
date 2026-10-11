@@ -737,7 +737,7 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
   const changedKeys = keys.filter(k => (old as any)[k] !== (b.data as any)[k]);
   if (changedKeys.length === 0) { res.json(UpdateOrderWindowResponse.parse(windowResponse(old))); return; }
   const changes = Object.fromEntries(changedKeys.map(k => [k, (b.data as any)[k]]));
-  const next = { ...old, ...changes }; const updates: any = { ...changes, sqFt: Math.round((next.widthMm * next.heightMm / 92903.04) * 1000) / 1000, updatedAt: new Date(), updatedBy: actor.id };
+  const next = { ...old, ...changes }; const sqFt = next.widthMm !== null && next.heightMm !== null ? Math.round((next.widthMm * next.heightMm / 92903.04) * 1000) / 1000 : null; const updates: any = { ...changes, sqFt, updatedAt: new Date(), updatedBy: actor.id };
   try { await getOrderWindows(db).updateOne({ _id: old._id }, { $set: updates }); } catch (e) { if ((e as any)?.code === 11000) { res.status(409).json({ error: "Window number already exists for this order." }); return; } throw e; }
   const updated = await getOrderWindows(db).findOne({ _id: old._id }); await event(p.data.id, actor, "window.updated", `Updated window ${old.windowNo}.`); res.json(UpdateOrderWindowResponse.parse(windowResponse(updated!)));
 });

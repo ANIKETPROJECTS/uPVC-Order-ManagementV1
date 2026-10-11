@@ -340,8 +340,10 @@ export interface DispatchWindow {
   windowNo: string;
   /** @nullable */
   lotId: string | null;
-  widthMm: number;
-  heightMm: number;
+  /** @nullable */
+  widthMm: number | null;
+  /** @nullable */
+  heightMm: number | null;
   ready: boolean;
 }
 
@@ -661,6 +663,14 @@ export interface Order {
   updatedAt: string;
 }
 
+export interface InitialOrderLotInput {
+  /**
+     * @items.minLength 1
+     * @items.maxLength 20
+     */
+  windowNos: string[];
+}
+
 export interface OrderInput {
   /** @minLength 1 */
   clientId?: string;
@@ -716,6 +726,8 @@ export interface OrderInput {
   notes?: string | null;
   /** @minimum 1 */
   initialLotCount?: number;
+  /** @minItems 1 */
+  initialLots?: InitialOrderLotInput[];
 }
 
 /**
@@ -822,9 +834,12 @@ export interface OrderWindow {
   id: string;
   orderRecordId: string;
   windowNo: string;
-  widthMm: number;
-  heightMm: number;
-  windowType: string;
+  /** @nullable */
+  widthMm: number | null;
+  /** @nullable */
+  heightMm: number | null;
+  /** @nullable */
+  windowType: string | null;
   /** @nullable */
   lotId: string | null;
   frameStatus: OrderWindowReadiness;
@@ -832,7 +847,8 @@ export interface OrderWindow {
   glassStatus: OrderGlassStatus;
   /** @nullable */
   pendingReason: string | null;
-  sqFt: number;
+  /** @nullable */
+  sqFt: number | null;
   createdAt: string;
   updatedAt: string;
 }
