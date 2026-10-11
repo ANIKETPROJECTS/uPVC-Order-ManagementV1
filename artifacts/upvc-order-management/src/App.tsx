@@ -16,7 +16,7 @@ import ChatGroupsPage from '@/pages/chat-groups';
 import CommunicationPage from '@/pages/communication';
 import QuotationRateRequestDetailPage from '@/pages/quotation-rate-request-detail';
 import OrderHubPage from '@/pages/order-hub';
-import OrderDetailPage from '@/pages/order-detail';
+import OrderDetailPage, { ProjectLotDetailPage } from '@/pages/order-detail';
 import OrderScannerPage from '@/pages/order-scanner';
 import DispatchPage from '@/pages/dispatch';
 import InstallationPage from '@/pages/installation';
@@ -43,6 +43,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/installation/teams" component={() => <InstallationTeamsPage user={user} />} />
     <Route path="/order-scanner" component={() => <OrderScannerPage user={user} />} />
     <Route path="/order-status/:id" component={() => <OrderStatusPage user={user} />} />
+    <Route path="/order-hub/:id/lots/:lotId" component={() => <ProjectLotDetailPage user={user} />} />
     <Route path="/order-hub/:id" component={() => <OrderDetailPage user={user} />} />
     <Route path="/order-hub" component={() => <OrderHubPage user={user} />} />
     <Route path="/admin/users" component={() => <UsersPage user={user} />} />

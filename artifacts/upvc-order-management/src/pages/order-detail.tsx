@@ -873,6 +873,211 @@ function ProjectOrderProgress({ orderRecordId, windows, user }: { orderRecordId:
   </section>;
 }
 
+function projectWindowReady(window: OrderWindow) {
+  return window.frameStatus === OrderWindowReadiness.ready
+    && window.shutterStatus === OrderWindowReadiness.ready
+    && window.glassStatus === OrderGlassStatus.received;
+}
+
+function ProjectLotWindowsTable({ windows }: { windows: OrderWindow[] }) {
+  const shutterValue = (ready: number | null, total: number | null, fallback: string) =>
+    total == null ? fallback : total === 0 ? 'Not applicable' : `${ready ?? 0}/${total} Ready`;
+  if (!windows.length) return <p className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">No windows have been assigned to this lot yet.</p>;
+  return <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <table className="w-full min-w-[760px] text-left text-xs">
+      <thead><tr className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+        <th className="px-3 py-3">Window</th><th className="px-3 py-3">Type</th><th className="px-3 py-3">Location</th>
+        <th className="px-3 py-3">Frame status</th><th className="px-3 py-3">Glass shutter</th><th className="px-3 py-3">Mesh shutter</th>
+      </tr></thead>
+      <tbody>{windows.map((window) => <tr key={window.id} data-testid={`lot-window-${window.id}`}>
+        <td className="px-3 py-3 font-bold">{window.windowNo}</td>
+        <td className="px-3 py-3">{window.windowType || 'Not recorded'}</td>
+        <td className="px-3 py-3">{window.location || 'Not recorded'}</td>
+        <td className="px-3 py-3"><ReadinessPill value={window.frameStatus} />{window.pendingReason && <p className="mt-1 text-[10px] text-amber-800">{window.pendingReason}</p>}</td>
+        <td className="px-3 py-3">{shutterValue(window.glassShutterReadyCount ?? null, window.glassShutterCount ?? null, window.glassStatus === 'received' ? 'Ready' : readable(window.glassStatus))}</td>
+        <td className="px-3 py-3">{shutterValue(window.meshShutterReadyCount ?? null, window.meshShutterCount ?? null, readable(window.shutterStatus))}</td>
+      </tr>)}</tbody>
+    </table>
+  </div>;
+}
+
+function ProjectLotCards({ order, windows, user }: { order: Order; windows: OrderWindow[]; user: User }) {
+  const canViewDispatch = hasPermission(user, 'dispatch', 'view');
+  const dispatchQuery = useListDispatchOrders({ query: { enabled: canViewDispatch, queryKey: getListDispatchOrdersQueryKey(), refetchInterval: 10_000 } });
+  const dispatchOrder = dispatchQuery.data?.find((item) => item.id === order.id);
+  const lots = [...(order.lots ?? [])].sort((a, b) => a.sequence - b.sequence);
+  if (!lots.length) return <p className="rounded-xl border border-dashed border-border bg-card p-5 text-center text-sm text-muted-foreground">No lots have been planned for this project yet.</p>;
+  return <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="list-project-lots">
+    {lots.map((lot) => {
+      const lotWindows = windows.filter((window) => window.lotId === lot.lotId);
+      const area = lotWindows.reduce((sum, window) => sum + (window.sqFt ?? 0), 0);
+      const ready = lotWindows.filter(projectWindowReady).length;
+      const batches = (dispatchOrder?.dispatches ?? []).filter((dispatch) => dispatch.lotId === lot.lotId).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+      const lastBatch = batches[batches.length - 1];
+      return <Link key={lot.id} href={`/order-hub/${order.id}/lots/${encodeURIComponent(lot.lotId)}`} className="group block rounded-xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/50 hover:shadow-md" data-testid={`link-project-lot-${lot.lotId}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="font-mono text-xs font-bold text-primary">{lot.lotId}</p><h3 className="mt-1 font-display text-sm font-bold">Lot {String(lot.sequence).padStart(2, '0')}</h3></div>
+          <span className="text-xs font-bold text-primary transition group-hover:translate-x-0.5">Open lot →</span>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">{lotWindows.length} {lotWindows.length === 1 ? 'window' : 'windows'} · {area ? `${area.toFixed(1)} sq ft` : 'Area not measured'}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{canViewDispatch ? `${ready} of ${lotWindows.length} fully ready · ${lastBatch ? `${lastBatch.code} ${readable(lastBatch.dispatchStatus)}` : 'No dispatch yet'}` : `${ready} of ${lotWindows.length} fully ready · Dispatch access restricted`}</p>
+        {lotWindows.length > 0 && <p className="mt-2 truncate text-[10px] text-muted-foreground">{lotWindows.map((window) => window.windowNo).join(' · ')}</p>}
+      </Link>;
+    })}
+  </div>;
+}
+
+function ProjectOrderDetailView({ order, windows, user, received, timeline }: { order: Order; windows: OrderWindow[]; user: User; received: number; timeline: { label: string; step: number; complete: boolean; current: boolean }[] }) {
+  const assigned = windows.filter((window) => Boolean(window.lotId && order.lots?.some((lot) => lot.lotId === window.lotId)));
+  const area = assigned.reduce((sum, window) => sum + (window.sqFt ?? 0), 0);
+  const total = windows.length;
+  const assignedPercent = total ? Math.round(assigned.length * 100 / total) : 0;
+  const canViewDispatch = hasPermission(user, 'dispatch', 'view');
+  const dispatchQuery = useListDispatchOrders({ query: { enabled: canViewDispatch, queryKey: getListDispatchOrdersQueryKey(), refetchInterval: 10_000 } });
+  const dispatchOrder = dispatchQuery.data?.find((item) => item.id === order.id);
+  const dispatchedIds = new Set((dispatchOrder?.dispatches ?? []).filter((dispatch) => dispatch.dispatchStatus !== 'pending_dispatch').flatMap((dispatch) => dispatch.windowIds));
+  const stageCounts = windows.reduce((counts, window) => {
+    if (dispatchedIds.has(window.id)) counts.dispatched += 1;
+    else if (projectWindowReady(window)) counts.produced += 1;
+    else if (window.frameStatus !== 'pending' || window.shutterStatus !== 'pending' || window.glassStatus !== 'pending') counts.production += 1;
+    else counts.notStarted += 1;
+    return counts;
+  }, { produced: 0, production: 0, dispatched: 0, notStarted: 0 });
+  const stageParts = [
+    { key: 'produced', label: 'Produced', color: 'bg-emerald-600', value: stageCounts.produced },
+    { key: 'production', label: 'In production', color: 'bg-amber-500', value: stageCounts.production },
+    { key: 'dispatched', label: 'Dispatched', color: 'bg-blue-600', value: stageCounts.dispatched },
+    { key: 'notStarted', label: 'Not started', color: 'bg-slate-300', value: stageCounts.notStarted },
+  ];
+  const glassType = [...new Set(windows.map((window) => window.glassType).filter((value): value is string => Boolean(value)))].join(', ') || 'Not recorded';
+  const meshType = [...new Set(windows.map((window) => window.meshType).filter((value): value is string => Boolean(value)))].join(', ') || 'Not recorded';
+  const paid = order.orderValue == null ? null : order.orderValue - received;
+  const requestedTab = new URLSearchParams(window.location.search).get('tab');
+  const defaultTab = ['overview', 'lots', 'windows', 'payments', 'documents', 'activity'].includes(requestedTab || '') ? requestedTab! : 'overview';
+
+  return <AppShell user={user} title={order.orderId} eyebrow="Project · parent order">
+    <div className="space-y-5" data-testid="page-project-order">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline"><ArrowLeft size={15} /> Back to orders</Link>
+        <span className="text-[10px] text-muted-foreground">Project summary · {windows.length} window records</span>
+      </div>
+      <section className="order-hub-accent order-detail-hero rounded-2xl p-5 text-white shadow-sm sm:p-7" data-testid="section-project-header">
+        <p className="font-mono text-xs font-bold tracking-wider text-sidebar-primary">{order.orderId} · Project</p>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <div><h2 className="font-display text-2xl font-bold sm:text-3xl" data-testid="text-project-client">{order.clientName}</h2><p className="mt-1 text-sm text-white/75">{order.locationName} · created {formatIstDate(order.createdAt)}</p></div>
+          <div className="text-sm text-white/85">Mesh type: {meshType}</div>
+        </div>
+      </section>
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5" aria-label="Project lifecycle" data-testid="section-project-lifecycle">
+        <div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Lifecycle trace</p><h2 className="mt-1 font-display text-sm font-bold">Project status</h2></div><span className="text-[10px] text-muted-foreground">SEQ {String(order.sequenceNo).padStart(3, '0')}</span></div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">{timeline.map((stage, index) => <div key={stage.step} className="relative flex flex-col items-center text-center" data-testid={`project-timeline-stage-${stage.step}`}>
+          {index < timeline.length - 1 && <div className="absolute left-1/2 right-[-50%] top-3.5 hidden h-px bg-border lg:block" />}
+          <span className={`relative z-10 grid size-7 place-items-center rounded-full border text-xs font-bold ${stage.complete ? 'border-emerald-600 bg-emerald-600 text-white' : stage.current ? 'border-primary bg-primary text-white' : 'border-border bg-card text-muted-foreground'}`}>{stage.complete ? '✓' : stage.step}</span>
+          <span className="mt-2 text-[10px] font-semibold">{stage.label}</span>
+        </div>)}</div>
+      </section>
+      <Tabs defaultValue={defaultTab} className="w-full" data-testid="tabs-project-detail">
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl bg-secondary/70 p-1 sm:grid-cols-6">
+          <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="lots">Lots</TabsTrigger><TabsTrigger value="windows">Windows</TabsTrigger><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="documents">Documents</TabsTrigger><TabsTrigger value="activity">Activity</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview" className="space-y-4 pt-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryStat label="Location" value={order.siteAddress || order.locationName} detail={order.locationName} testId="project-stat-location" />
+            <SummaryStat label="Phone" value={order.clientPhone || 'Not recorded'} detail="Client contact" testId="project-stat-phone" />
+            <SummaryStat label="Glass type" value={glassType} detail="From window records" testId="project-stat-glass" />
+            <SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : paid == null ? 'Not set' : paid > 0 ? `Due — ${plainInr(paid)}` : 'Paid'} detail="Payments stay on the project" testId="project-stat-payment" />
+          </div>
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5" data-testid="section-project-lot-progress">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <SummaryStat label="Planned window qty" value={String(total)} detail="Counted from project windows" testId="project-stat-planned-windows" />
+              <SummaryStat label="Planned sq ft" value="Not recorded" detail="No project area target is saved" testId="project-stat-planned-area" />
+              <SummaryStat label="Windows in lots" value={`${assigned.length} / ${total}`} detail={`${assignedPercent}% of project windows assigned`} testId="project-stat-windows-in-lots" />
+              <SummaryStat label="Sq ft in lots" value={area ? area.toFixed(1) : '—'} detail="Measured area for lot-assigned windows" testId="project-stat-area-in-lots" />
+            </div>
+            <div className="mt-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold"><span>Windows added to lots</span><span>{assigned.length} of {total} · {assignedPercent}%</span></div>
+              <div className="mt-2 h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${assignedPercent}%` }} /></div>
+              <p className="mt-2 text-[10px] italic text-muted-foreground">Progress fills as project windows are assigned to existing lots.</p>
+            </div>
+          </section>
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5" data-testid="section-project-production-breakdown">
+            <h2 className="font-display text-sm font-bold">Production status of windows in lots</h2>
+            <div className="mt-3 flex h-5 overflow-hidden rounded-sm bg-muted" role="img" aria-label={stageParts.map((part) => `${part.label}: ${part.value}`).join(', ')}>
+              {stageParts.map((part) => <div key={part.key} className={`${part.color} transition-[width]`} style={{ width: total ? `${part.value * 100 / total}%` : '0%' }} />)}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">{stageParts.map((part) => <span key={part.key} className="inline-flex items-center gap-2 text-xs"><span className={`size-3 ${part.color}`} />{part.label} <strong>{part.value}</strong></span>)}</div>
+          </section>
+          <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-display text-base font-bold">Lots</h2><span className="text-xs text-muted-foreground">{order.lots?.length ?? 0} total · each opens its own lot page</span></div><ProjectLotCards order={order} windows={windows} user={user} /></section>
+        </TabsContent>
+        <TabsContent value="lots" className="space-y-3 pt-4"><div><h2 className="font-display text-base font-bold">Project lots</h2><p className="text-xs text-muted-foreground">Each lot owns its windows and dispatch history.</p></div><ProjectLotCards order={order} windows={windows} user={user} /></TabsContent>
+        <TabsContent value="windows" className="pt-4"><WindowsPanel orderId={order.id} user={user} /></TabsContent>
+        <TabsContent value="payments" className="space-y-4 pt-4"><BillingPanel order={order} user={user} id={order.id} /><OrderPaymentFlagsPanel orderId={order.id} user={user} /><PaymentsPanel orderId={order.id} user={user} order={order} /></TabsContent>
+        <TabsContent value="documents" className="pt-4"><DocumentsPanel orderId={order.id} user={user} /></TabsContent>
+        <TabsContent value="activity" className="space-y-4 pt-4"><GrievancesPanel order={order} user={user} /><ActivityPanel orderId={order.id} /></TabsContent>
+      </Tabs>
+    </div>
+  </AppShell>;
+}
+
+export function ProjectLotDetailPage({ user }: { user: User }) {
+  const { id = '', lotId = '' } = useParams<{ id: string; lotId: string }>();
+  const orderQuery = useGetOrder(id, { query: { enabled: Boolean(id), queryKey: getGetOrderQueryKey(id), refetchInterval: 10_000 } });
+  const windowsQuery = useListOrderWindows(id, { query: { enabled: Boolean(id), queryKey: getListOrderWindowsQueryKey(id) } });
+  const activityQuery = useListOrderActivity(id, { query: { enabled: Boolean(id), queryKey: getListOrderActivityQueryKey(id) } });
+  const dispatchQuery = useListDispatchOrders({ query: { enabled: hasPermission(user, 'dispatch', 'view'), queryKey: getListDispatchOrdersQueryKey(), refetchInterval: 10_000 } });
+  const order = orderQuery.data;
+  const lot = order?.lots?.find((item) => item.lotId === lotId);
+  const windows = (windowsQuery.data ?? []).filter((window) => window.lotId === lotId);
+  const dispatchOrder = dispatchQuery.data?.find((item) => item.id === id);
+  const lotDispatches = (dispatchOrder?.dispatches ?? []).filter((dispatch) => dispatch.lotId === lotId).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+  if (orderQuery.isLoading) return <AppShell user={user} title="Lot detail" eyebrow="Project lot"><DetailLoading /></AppShell>;
+  if (orderQuery.isError || !order) return <AppShell user={user} title="Lot detail" eyebrow="Project lot"><DetailError onRetry={() => void orderQuery.refetch()} /></AppShell>;
+  if (!hasPermission(user, 'order-hub', 'view')) return <AppShell user={user} title="Lot detail" eyebrow="Project lot"><ZeroState icon={CircleAlert} title="Order access is restricted" description="You need order-hub view access to open this project lot." testId="state-project-lot-access-restricted" /></AppShell>;
+  if (windowsQuery.isLoading) return <AppShell user={user} title="Lot detail" eyebrow="Project lot"><DetailLoading /></AppShell>;
+  if (windowsQuery.isError) return <AppShell user={user} title="Lot detail" eyebrow="Project lot"><DetailError onRetry={() => void windowsQuery.refetch()} /></AppShell>;
+  if (order.clientType !== 'Project' || !lot) return <AppShell user={user} title="Lot unavailable" eyebrow="Project lot"><ZeroState icon={CircleAlert} title="Project lot unavailable" description="This lot does not exist on the selected Project order." testId="state-project-lot-not-found" /></AppShell>;
+  const readyCount = windows.filter(projectWindowReady).length;
+  const area = windows.reduce((sum, window) => sum + (window.sqFt ?? 0), 0);
+  const glassReceived = windows.filter((window) => window.glassStatus === OrderGlassStatus.received).length;
+  const latestDispatch = lotDispatches[lotDispatches.length - 1];
+  const lotDispatchLabel = latestDispatch ? `${latestDispatch.code} ${readable(latestDispatch.dispatchStatus)}` : 'No dispatch yet';
+  const projectPath = `/order-hub/${order.id}`;
+  const windowNos = windows.map((window) => window.windowNo);
+  const lotActivity = (activityQuery.data ?? []).filter((item) => windowNos.some((windowNo) => item.summary.includes(windowNo)) || item.summary.includes(lot.lotId));
+  return <AppShell user={user} title={`${lot.lotId} · ${order.orderId}`} eyebrow="Project · lot record">
+    <div className="space-y-5" data-testid="page-project-lot">
+      <div className="flex flex-wrap items-center justify-between gap-3"><Link href={projectPath} className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-project"><ArrowLeft size={14} /> {order.orderId} · {order.clientName}</Link><span className="text-[10px] text-muted-foreground">Lot details are inherited from the project and its windows.</span></div>
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7" data-testid="section-lot-header">
+        <p className="font-mono text-xs font-bold tracking-wider text-primary">{lot.lotId}</p><h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">{order.clientName}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{order.orderId} · Lot {String(lot.sequence).padStart(2, '0')}</p>
+      </section>
+      <Tabs defaultValue="overview" className="w-full" data-testid="tabs-project-lot">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 sm:grid-cols-4"><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="windows">Windows</TabsTrigger><TabsTrigger value="documents">Documents</TabsTrigger><TabsTrigger value="activity">Activity</TabsTrigger></TabsList>
+        <TabsContent value="overview" className="space-y-4 pt-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryStat label="Windows" value={String(windows.length)} detail={`${readyCount} fully ready`} testId="lot-stat-windows" />
+            <SummaryStat label="Sq ft" value={area ? area.toFixed(1) : '—'} detail="Summed from measured windows" testId="lot-stat-area" />
+            <SummaryStat label="Glass status" value={windows.length && glassReceived === windows.length ? 'All received' : `${glassReceived} of ${windows.length} received`} detail="Counted from this lot’s windows" testId="lot-stat-glass" />
+            <SummaryStat label="Dispatch" value={hasPermission(user, 'dispatch', 'view') ? lotDispatchLabel : 'Restricted'} detail="Dispatch batches stay attached to this lot" testId="lot-stat-dispatch" />
+          </div>
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5" data-testid="section-lot-inherited-details">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Location</p><p className="mt-1 text-sm font-semibold">{order.siteAddress || order.locationName}</p></div><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Phone</p><p className="mt-1 text-sm font-semibold">{order.clientPhone || 'Not recorded'}</p></div><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Glass type</p><p className="mt-1 text-sm font-semibold">{[...new Set(windows.map((window) => window.glassType).filter(Boolean))].join(', ') || 'Not recorded'}</p></div><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mesh type</p><p className="mt-1 text-sm font-semibold">{[...new Set(windows.map((window) => window.meshType).filter(Boolean))].join(', ') || 'Not recorded'}</p></div></div>
+            <p className="mt-3 text-[10px] italic text-muted-foreground">Read-only details inherited from the parent project.</p>
+          </section>
+          <section className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-display text-sm font-bold">Windows in {lot.lotId}</h2><p className="text-xs text-muted-foreground">Window readiness is read from the project’s canonical window records.</p></div><Button asChild size="sm" variant="outline"><Link href="/dispatch">Open dispatch desk</Link></Button></div><ProjectLotWindowsTable windows={windows} /></section>
+          <aside className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-foreground">Dispatches select this existing lot. The lot is never created from Dispatch.</aside>
+        </TabsContent>
+        <TabsContent value="windows" className="space-y-3 pt-4"><div><h2 className="font-display text-base font-bold">Windows</h2><p className="text-xs text-muted-foreground">Only windows assigned to {lot.lotId} are shown.</p></div><ProjectLotWindowsTable windows={windows} /></TabsContent>
+        <TabsContent value="documents" className="pt-4"><Card className="border-border/80"><CardHeader><CardTitle className="text-base">Lot documents</CardTitle><p className="text-xs text-muted-foreground">Documents are currently stored on the project order, not linked to individual lots.</p></CardHeader><CardContent><Link href={`${projectPath}?tab=documents`} className="text-sm font-semibold text-primary hover:underline">Open project documents →</Link></CardContent></Card></TabsContent>
+        <TabsContent value="activity" className="space-y-4 pt-4">
+          <Card className="border-border/80"><CardHeader><CardTitle className="text-base">Dispatch history</CardTitle><p className="text-xs text-muted-foreground">Each dispatch batch for this lot has its own status.</p></CardHeader><CardContent>{!hasPermission(user, 'dispatch', 'view') ? <p className="text-xs text-muted-foreground">Dispatch access is required to view history.</p> : lotDispatches.length ? <ol className="space-y-3">{lotDispatches.map((dispatch) => <li key={dispatch.id} className="rounded-lg border border-border bg-card p-3"><p className="text-sm font-semibold">{dispatch.code} · {readable(dispatch.dispatchStatus)}</p><p className="mt-1 text-xs text-muted-foreground">{dispatch.windowIds.length} windows · updated {dateLabel(dispatch.updatedAt)}</p></li>)}</ol> : <p className="text-xs text-muted-foreground">No dispatches have been recorded for this lot.</p>}</CardContent></Card>
+          <Card className="border-border/80"><CardHeader><CardTitle className="text-base">Window activity</CardTitle><p className="text-xs text-muted-foreground">Production updates for windows in this lot.</p></CardHeader><CardContent>{activityQuery.isLoading ? <div className="h-12 animate-pulse rounded-lg bg-muted/50" /> : activityQuery.isError ? <p className="text-xs text-destructive">Window activity could not be loaded.</p> : lotActivity.length ? <ol className="space-y-2">{lotActivity.map((item) => <li key={item.id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-border bg-card p-3 text-xs"><span>{item.summary}</span><span className="text-muted-foreground">{item.actorName} · {dateLabel(item.createdAt)}</span></li>)}</ol> : <p className="text-xs text-muted-foreground">No window activity is recorded for this lot yet.</p>}</CardContent></Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  </AppShell>;
+}
+
 const paymentSchema = z.object({ amount: z.coerce.number().positive('Enter an amount'), method: z.string(), reference: z.string().max(120).optional(), notes: z.string().max(500).optional(), paidAt: z.string().min(1, 'Select a payment date') });
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
@@ -1619,6 +1824,9 @@ export default function OrderDetailPage({ user }: { user: User }) {
      const current = step === currentLifecycleRank && record.status !== OrderStatus.installed;
      return { label, step, complete, current, active: complete || current };
    });
+   if (record.clientType === 'Project') {
+     return <ProjectOrderDetailView order={record} windows={windowRows} user={user} received={received} timeline={timeline} />;
+   }
   return <AppShell user={user} title={record.orderId} eyebrow="Module 2 · order record"><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-order-hub"><ArrowLeft size={15} /> Back to order hub</Link><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full bg-primary" /> <span>Last updated {dateLabel(record.updatedAt)}</span></div></div>
      <section className="order-hub-accent order-detail-hero relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header">
