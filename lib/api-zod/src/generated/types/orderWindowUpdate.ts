@@ -29,6 +29,41 @@ export interface OrderWindowUpdate {
      * @maxLength 100
      */
   windowType?: string;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  location?: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  glassType?: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  meshType?: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  glassShutterCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  glassShutterReadyCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  meshShutterCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  meshShutterReadyCount?: number | null;
   /** @nullable */
   lotId?: string | null;
   frameStatus?: OrderWindowReadiness;

@@ -19,6 +19,32 @@ export interface OrderWindow {
   /** @nullable */
   windowType: string | null;
   /** @nullable */
+  location: string | null;
+  /** @nullable */
+  glassType: string | null;
+  /** @nullable */
+  meshType: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  glassShutterCount: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  glassShutterReadyCount: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  meshShutterCount: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  meshShutterReadyCount: number | null;
+  /** @nullable */
   lotId: string | null;
   frameStatus: OrderWindowReadiness;
   shutterStatus: OrderWindowReadiness;

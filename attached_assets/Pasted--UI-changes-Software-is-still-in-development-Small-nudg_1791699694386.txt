@@ -1,0 +1,49 @@
+# UI changes
+
+Software is still in development. Small nudges for the design team.
+
+**Style reference: the Operations dashboard.** Its colours, header and cards are the look we want on every screen. Use only this palette and keep teal as the main action colour.
+
+**Palette**
+- Navy: #0B1C38
+- Deep teal: #0F766E
+- Accent teal: #0F9F8B
+- Blue: #2563EB
+- Purple: #7C3AED
+- Red: #EF4444
+- Page bg: #F3F6FC
+- Card: #FFFFFF
+
+---
+
+**1. Make the table the focus**
+The big banner and the stat cards use about 40% of the screen before the order list begins. Shrink the banner to a slim page title and keep the stat cards as one compact row. The list should start near the top.
+*(Now: large banner plus stat cards above the table. Next: slim title, compact stat row, table starts near the top.)*
+
+**2. Make the text bigger**
+Table text is very small, which is hard to read on a factory PC or phone. Use at least 13-14 px for body text. Drop lines that add nothing, such as the "admin" under every date and the "Sequence 00x" line.
+*(Small now → 13-14 px or more.)*
+
+**3. Use status colours that mean something**
+Give each stage one distinct colour and use it everywhere: table, lifecycle bar and QR scan results. For example grey for early stages, amber for in production, blue for dispatched, green for installed. Red is only for problems like an overdue payment or pending.
+*(Chips: Early stages = grey, In production = amber, Dispatched = blue, Installed = green, Problem = red. Same colour in table, lifecycle bar and QR results.)*
+
+**4. Improve contrast**
+Grey labels (column headers, helper text, search placeholders) are too light on the background. Darken the grey text and the table borders a little.
+*(Example: ORDER, CLIENT, STATUS headers — too light vs. darker grey.)*
+
+**5. Match the dashboard theme**
+Make every screen feel like the Operations dashboard: the same navy-to-teal header, white rounded cards with soft shadows, teal for main actions and the same colour set for chips, icons and charts. Sidebar icons should use this palette too, with no extra colours.
+*(Example: slim navy-to-teal header; ORDERS card showing 3 with a small chart.)*
+
+**6. Make row actions quieter**
+View is the main action (or the whole row is clickable). Edit and Delete move into a "..." menu. That prevents accidental deletions and cleans up the table.
+*(Example row: P1431, Installed chip, View →, "..." menu. Edit and Delete hidden behind the menu.)*
+
+**7. Simplify the filters**
+Keep search, status and date on the first row. Move the rest, including Include inactive, into a More filters control.
+*(Example: Search..., Status, 30 days, More. Search, status and date on one row. The rest sits under More filters.)*
+
+**8. Sidebar**
+Make the group labels (PRE-PRODUCTION, MATERIALS, FINANCE, FULFILLMENT) slightly larger and darker so the grouping is clear at a glance. Give the QR scanner a stronger look, such as a filled button, because it is used constantly.
+*(Example: FINANCE small, faint → FINANCE larger, darker. QR scanner as a filled teal button.)*

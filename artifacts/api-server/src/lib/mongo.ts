@@ -227,7 +227,10 @@ export type GlassStatus = "pending" | "partial" | "received";
 export interface OrderWindowDocument {
   _id: string; orderRecordId: string; windowNo: string; widthMm: number | null; heightMm: number | null;
   lotId?: string | null;
-  windowType: string | null; frameStatus: WindowReadiness; shutterStatus: WindowReadiness;
+  windowType: string | null; location?: string | null; glassType?: string | null; meshType?: string | null;
+  glassShutterCount?: number | null; glassShutterReadyCount?: number | null;
+  meshShutterCount?: number | null; meshShutterReadyCount?: number | null;
+  frameStatus: WindowReadiness; shutterStatus: WindowReadiness;
   glassStatus: GlassStatus; pendingReason: string | null; sqFt: number | null;
   createdBy: string; createdAt: Date; updatedBy: string; updatedAt: Date; archivedAt?: Date | null;
 }

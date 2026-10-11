@@ -27,3 +27,4 @@
 - [Order-only client edits and site addresses](order-site-addresses.md) — keep client-detail edits on the order snapshot; the shared profile and other orders stay unchanged.
 - [Map-provider cost constraint](map-provider-cost.md) — avoid billable map APIs; explain that third-party free-service availability cannot be guaranteed for life.
 - [Dispatch plan model](dispatch-plan-model.md) — keep lot-level dispatches embedded in the order and aggregate status for downstream delivery flows.
+- [Order detail window tracking](order-detail-window-tracking.md) — persist room, glass/mesh type, and separate shutter quantities per window; keep missing counts distinct from zero.
