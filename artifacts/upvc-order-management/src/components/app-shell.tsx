@@ -244,7 +244,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
             // Scroll position preservation is best-effort only.
           }
         }} className="sidebar-scrollbar flex-1 overflow-y-auto px-3 py-5">
-          <p className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40 ${collapsed ? 'text-center' : ''}`}>{collapsed ? '•••' : 'Workspace'}</p>
+          <p className={`mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/70 ${collapsed ? 'text-center' : ''}`}>{collapsed ? '•••' : 'Workspace'}</p>
           <nav className="space-y-1" aria-label="Main navigation">
             <Link href="/" onClick={preserveSidebarScroll} title={collapsed ? 'Overview' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location === '/' ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-dashboard">
               <SidebarSectionIcon name="overview" size={40} className="shrink-0" />
@@ -254,7 +254,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               <MessageSquareText size={24} className="mx-[2px] shrink-0" />
               {!collapsed && <span className="flex-1">Communication</span>}
             </Link>
-            {canOpenOrderScanner && <Link href="/order-scanner" onClick={preserveSidebarScroll} title={collapsed ? 'QR scanner' : undefined} aria-current={location.startsWith('/order-scanner') ? 'page' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/order-scanner') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-order-scanner">
+            {canOpenOrderScanner && <Link href="/order-scanner" onClick={preserveSidebarScroll} title={collapsed ? 'QR scanner' : undefined} aria-current={location.startsWith('/order-scanner') ? 'page' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors ${location.startsWith('/order-scanner') ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`} data-testid="link-nav-order-scanner">
               <ScanLine size={24} className="mx-[2px] shrink-0" />
               {!collapsed && <span className="flex-1">QR scanner</span>}
               {collapsed && <span className="sr-only">QR scanner</span>}
@@ -271,7 +271,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
 
               return (
                 <section key={group.id} className="pt-3" aria-label={group.label} data-testid={`nav-section-${group.id}`}>
-                  <p className={collapsed ? 'sr-only' : 'px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45'}>
+                  <p className={collapsed ? 'sr-only' : 'px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-sidebar-foreground/70'}>
                     {group.label}
                   </p>
                   <div className={`space-y-1 ${collapsed ? '' : 'pl-2'}`}>

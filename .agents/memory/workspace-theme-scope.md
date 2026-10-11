@@ -3,8 +3,8 @@ name: Scoped workspace themes
 description: Appearance behavior for the uPVC Order Management workspace.
 ---
 
-Light is the default appearance. The sidebar and navigation keep the earlier light palette on every route and theme; the top header and main workspace content follow the saved light/dark choice. The dashboard keeps its scoped surface.
+Use the Operations dashboard as the shared visual reference across the workspace: navy/teal actions, cool light page surfaces, white cards, stronger contrast, and semantic stage colors. Keep the sidebar's earlier light palette independent of content themes, with clearer group labels and a filled teal QR scanner action.
 
-**Why:** The user chose to restore the earlier light sidebar palette and asked that it not change with workspace appearance.
+**Why:** The user asked that all screens follow the Operations dashboard visual language while specifically preserving the earlier light sidebar palette.
 
-**How to apply:** Keep sidebar tokens independent of light/dark content tokens and never override them in `.dark`. Use theme-aware tokens for main surfaces and preserve dashboard-scoped styling.
+**How to apply:** Keep sidebar tokens independent of light/dark content tokens and never override them in `.dark`. Use teal for primary actions, gray for early stages, amber for production, blue for dispatched, green/teal for installed, and red only for problems or overdue states.

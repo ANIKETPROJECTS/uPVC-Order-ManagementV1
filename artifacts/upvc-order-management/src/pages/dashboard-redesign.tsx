@@ -75,7 +75,6 @@ const widgetGroupLabels: Record<DashboardWidgetDefinition['group'], string> = {
   dispatch: 'Dispatch and clients',
   'follow-ups': 'Additional follow-up',
 };
-const stagePalette = ['#0F766E', '#2563EB', '#7C3AED', '#16A34A', '#D97706', '#DB2777', '#475569', '#0891B2'];
 const normalizeWidgetPreferences = (value?: DashboardWidgetPreferences | null): DashboardWidgetPreferences => {
   const registered = new Set(DASHBOARD_WIDGETS.map((widget) => widget.id));
   const savedOrder = (value?.order ?? []).filter((id) => registered.has(id));
@@ -91,8 +90,13 @@ const normalizeWidgetPreferences = (value?: DashboardWidgetPreferences | null): 
 };
 const widgetById = (id: string) => DASHBOARD_WIDGETS.find((widget) => widget.id === id)!;
 const stageColor = (status: string, pipeline: OperationsDashboard['pipeline'] = []) => {
-  const index = pipeline.findIndex((stage) => stage.status === status);
-  return stagePalette[(index < 0 ? 0 : index) % stagePalette.length];
+  const stage = pipeline.find((item) => item.status === status);
+  const key = `${status} ${stage?.label || ''}`.toLowerCase().replaceAll('_', ' ');
+  if (/(reserved|overdue|problem|blocked|cancel|issue|delayed|on hold)/.test(key)) return '#EF4444';
+  if (/(installed|installation complete|completed installation)/.test(key)) return '#0F766E';
+  if (/(dispatch|dispatched|in transit|shipped)/.test(key)) return '#2563EB';
+  if (/(production|manufactur|fabricat|assembly|in progress)/.test(key)) return '#D97706';
+  return '#64748B';
 };
 const severityOrder: Record<string, number> = { critical: 0, warning: 1, info: 2, success: 3 };
 
@@ -459,8 +463,9 @@ function ExportMenu({ title, onCsv, onPng }: { title: string; onCsv: () => void;
   );
 }
 function StatusPill({ status, label, color }: { status: string; label?: string; color?: string }) {
-  return <span className="inline-flex w-max max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-secondary/80 px-2.5 py-1 text-[10px] font-semibold capitalize">
-    <i className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: color || stagePalette[0] }} />
+  const tone = color || stageColor(status);
+  return <span className="inline-flex w-max max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-semibold capitalize" style={{ color: tone, backgroundColor: `color-mix(in srgb, ${tone} 12%, transparent)` }}>
+    <i className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: tone }} />
     <span className="whitespace-nowrap">{label || status.replaceAll('_', ' ')}</span>
   </span>;
 }
@@ -750,7 +755,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
       <div className="dashboard-page -mx-5 -my-6 min-h-[calc(100dvh-76px)] px-5 py-6 md:-mx-8 md:-my-8 md:px-8 md:py-8">
         <div className="dashboard-layout mx-auto max-w-[1600px] pb-8">
           <DashboardWidgetBoundary name="Dashboard overview" onRetry={refresh}>
-            <header className="dashboard-hero relative z-20 col-span-12 rounded-[24px] px-5 py-4 shadow-lg md:px-7 md:py-5">
+            <header className="dashboard-hero relative z-20 col-span-12 rounded-[18px] px-4 py-3 shadow-md md:px-6">
               <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
                 <div className="absolute -right-12 -top-20 size-72 rounded-full border border-white/10" />
                 <div className="absolute right-16 top-10 size-28 rounded-full border border-white/10" />
@@ -826,13 +831,13 @@ export default function DashboardRedesign({ user }: { user: User }) {
           <DashboardWidgetBoundary name="Dashboard filters" onRetry={refresh}>
             <section className="dashboard-filterbar col-span-12 rounded-2xl border border-border/80 bg-card/95 p-3 shadow-sm sm:p-3.5" aria-label="Dashboard filters">
                   <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(280px,1.8fr)_160px_minmax(150px,1fr)_minmax(150px,1fr)_auto]">
-                <label className="relative block min-w-0">
+                <label className="relative order-1 block min-w-0">
                   <span className="sr-only">Search dashboard records</span>
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input ref={searchInputRef} aria-label="Search orders, clients, locations" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search orders, clients, locations" className="h-9 w-full rounded-xl border border-input bg-background pl-9 pr-14 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" data-testid="input-dashboard-search" />
                   <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">⌘K</kbd>
                 </label>
-                <label className="relative min-w-0">
+                <label className="relative order-3 min-w-0">
                   <span className="sr-only">Date range</span>
                   <CalendarDays size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <select value={rangePreset} onChange={(event) => chooseRange(event.target.value as RangePreset)} className="h-9 w-full appearance-none rounded-xl border border-input bg-background pl-9 pr-7 text-xs font-medium" data-testid="select-dashboard-date-range">
@@ -840,21 +845,14 @@ export default function DashboardRedesign({ user }: { user: User }) {
                   </select>
                   <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </label>
-                {permissions?.orders && <label className="relative min-w-0">
+                {permissions?.orders && <label className="relative order-2 min-w-0">
                   <span className="sr-only">Order stage</span>
                   <select value={filters.stage || ''} onChange={(event) => setFilter('stage', (event.target.value || undefined) as Filters['stage'])} className="h-9 w-full appearance-none rounded-xl border border-input bg-background px-3 pr-7 text-xs" data-testid="select-filter-stage">
                     <option value="">All stages</option>{data?.filterOptions.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
                   </select>
                   <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </label>}
-                {permissions?.orders && <label className="relative min-w-0">
-                  <span className="sr-only">Client</span>
-                  <select value={filters.clientId || ''} onChange={(event) => setFilter('clientId', event.target.value || undefined)} className="h-9 w-full appearance-none rounded-xl border border-input bg-background px-3 pr-7 text-xs" data-testid="select-filter-client">
-                    <option value="">All clients</option>{data?.filterOptions.clients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}
-                  </select>
-                  <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                </label>}
-                <div className="flex items-center gap-2">
+                <div className="order-5 flex items-center gap-2">
                   <button type="button" onClick={() => setMoreFiltersOpen((value) => !value)} aria-expanded={moreFiltersOpen} className={`inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${moreFiltersOpen || activeFilterCount ? 'border-primary/30 bg-primary/[.07] text-primary' : 'border-input bg-background text-muted-foreground hover:text-foreground'}`} data-testid="button-dashboard-more-filters"><Filter size={14} />More filters{activeFilterCount > 0 && <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px]">{activeFilterCount}</span>}<ChevronDown size={12} className={moreFiltersOpen ? 'rotate-180' : ''} /></button>
                   <button type="button" onClick={clearFilters} className="h-9 rounded-xl px-2.5 text-[11px] font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground" data-testid="button-clear-filters">Reset</button>
                 </div>
@@ -873,6 +871,10 @@ export default function DashboardRedesign({ user }: { user: User }) {
                 {permissions?.orders && <label className="relative min-w-0">
                   <span className="mb-1 block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Location</span>
                   <select value={filters.locationCode || ''} onChange={(event) => setFilter('locationCode', event.target.value || undefined)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-xs" data-testid="select-filter-location"><option value="">All locations</option>{data?.filterOptions.locations.map((location) => <option key={location.id} value={location.id}>{location.label}</option>)}</select>
+                </label>}
+                {permissions?.orders && <label className="relative min-w-0">
+                  <span className="mb-1 block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Client</span>
+                  <select value={filters.clientId || ''} onChange={(event) => setFilter('clientId', event.target.value || undefined)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-xs" data-testid="select-filter-client"><option value="">All clients</option>{data?.filterOptions.clients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select>
                 </label>}
                 {permissions?.installation && <label className="relative min-w-0">
                   <span className="mb-1 block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Installer</span>
@@ -922,11 +924,11 @@ export default function DashboardRedesign({ user }: { user: User }) {
           ) : <>
             {isWidgetVisible('kpis') && <DashboardWidgetBoundary name="Key performance indicators" onRetry={refresh}>
               {loading && !data ? <div className="dashboard-kpi-grid" aria-label="Loading key figures">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-[112px] animate-pulse rounded-[20px] border border-border bg-card/80" />)}</div> : permissions && <section className="dashboard-kpi-grid" aria-label="Key performance indicators" data-dashboard-widget="kpis">
-                {permissions.orders && <MetricCard label="Orders" value={data?.summary.activeOrders} format={formatNumber} note="Created in selected period" icon={Layers3} tint="#3B82F6" spark={orderSpark} comparison={formatCompare(data?.summary.activeOrders, previous?.activeOrders)} onClick={() => setFilter('stage', undefined)} />}
-                {permissions.finance && <MetricCard label="Order value" value={data?.summary.orderValue} format={compactCurrency} note="Recorded order value · not collected revenue" icon={CircleDollarSign} tint="#14B8A6" spark={valueSpark} comparison={formatCompare(data?.summary.orderValue, previous?.orderValue)} onClick={() => setLocation(makeDashboardHref('/payments', filters))} />}
-                {permissions.readiness && <MetricCard label="Windows ready" value={data?.summary.readyWindows} format={(value) => `${formatNumber(value)} / ${formatNumber(data?.summary.totalWindows)}`} note={data?.summary.readyWindowPercent == null ? 'No window totals in this range' : `${data.summary.readyWindowPercent}% of matching windows`} icon={Gauge} tint="#10B981" spark={readinessSpark} comparison={filters.compare ? `${formatNumber(previous?.readyWindows)} / ${formatNumber(previous?.totalWindows)} previously` : undefined} />}
+                {permissions.orders && <MetricCard label="Orders" value={data?.summary.activeOrders} format={formatNumber} note="Created in selected period" icon={Layers3} tint="#2563EB" spark={orderSpark} comparison={formatCompare(data?.summary.activeOrders, previous?.activeOrders)} onClick={() => setFilter('stage', undefined)} />}
+                {permissions.finance && <MetricCard label="Order value" value={data?.summary.orderValue} format={compactCurrency} note="Recorded order value · not collected revenue" icon={CircleDollarSign} tint="#0F9F8B" spark={valueSpark} comparison={formatCompare(data?.summary.orderValue, previous?.orderValue)} onClick={() => setLocation(makeDashboardHref('/payments', filters))} />}
+                {permissions.readiness && <MetricCard label="Windows ready" value={data?.summary.readyWindows} format={(value) => `${formatNumber(value)} / ${formatNumber(data?.summary.totalWindows)}`} note={data?.summary.readyWindowPercent == null ? 'No window totals in this range' : `${data.summary.readyWindowPercent}% of matching windows`} icon={Gauge} tint="#0F766E" spark={readinessSpark} comparison={filters.compare ? `${formatNumber(previous?.readyWindows)} / ${formatNumber(previous?.totalWindows)} previously` : undefined} />}
                 {permissions.finance && <MetricCard label="Outstanding balance" value={data?.summary.outstandingBalance} format={compactCurrency} note="Known balance · not an overdue total" icon={CircleDollarSign} tint="#EF4444" spark={balanceSpark} comparison={formatCompare(data?.summary.outstandingBalance, previous?.outstandingBalance)} onClick={() => setLocation('/balance-payment')} />}
-                {permissions.orders && permissions.installation && <MetricCard label="Installed orders" value={data?.summary.installedOrders} format={formatNumber} note="Installed in matching orders" icon={PackageCheck} tint="#8B5CF6" spark={installedSpark} comparison={formatCompare(data?.summary.installedOrders, previous?.installedOrders)} onClick={() => setLocation('/installation')} />}
+                {permissions.orders && permissions.installation && <MetricCard label="Installed orders" value={data?.summary.installedOrders} format={formatNumber} note="Installed in matching orders" icon={PackageCheck} tint="#7C3AED" spark={installedSpark} comparison={formatCompare(data?.summary.installedOrders, previous?.installedOrders)} onClick={() => setLocation('/installation')} />}
               </section>}
             </DashboardWidgetBoundary>}
 
@@ -956,14 +958,14 @@ export default function DashboardRedesign({ user }: { user: User }) {
                           {permissions?.orders && <YAxis yAxisId="orders" domain={[0, 'auto']} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} width={36} />}
                           {hasOrderValue && <YAxis yAxisId="value" orientation="right" domain={[0, 'auto']} tickFormatter={(value) => compactCurrency(Number(value))} tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={56} />}
                           <Tooltip cursor={{ fill: 'hsl(var(--primary) / .06)', stroke: 'none' }} contentStyle={{ borderRadius: 12, borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))', fontSize: 11 }} formatter={(value, name) => [name === 'Order value' ? compactCurrency(Number(value)) : formatNumber(Number(value)), name]} />
-                          {hasOrderValue && <Area yAxisId="value" type="monotone" dataKey="orderValue" name="Order value" stroke="#14B8A6" strokeWidth={2.5} fill="#14B8A6" fillOpacity={0.13} connectNulls isAnimationActive={false} />}
-                          {permissions?.orders && <Line yAxisId="orders" type="monotone" dataKey="orderCount" name="Orders" stroke="#3B82F6" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />}
+                          {hasOrderValue && <Area yAxisId="value" type="monotone" dataKey="orderValue" name="Order value" stroke="#0F9F8B" strokeWidth={2.5} fill="#0F9F8B" fillOpacity={0.13} connectNulls isAnimationActive={false} />}
+                          {permissions?.orders && <Line yAxisId="orders" type="monotone" dataKey="orderCount" name="Orders" stroke="#2563EB" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />}
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-4 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">
-                      {permissions?.orders && <span className="inline-flex items-center gap-2"><i className="h-0.5 w-4 rounded bg-[#3B82F6]" />Orders</span>}
-                      {hasOrderValue ? <span className="inline-flex items-center gap-2"><i className="h-0.5 w-4 rounded bg-[#14B8A6]" />Order value (INR)</span> : permissions?.finance && <span>Order value appears once rates are approved.</span>}
+                      {permissions?.orders && <span className="inline-flex items-center gap-2"><i className="h-0.5 w-4 rounded bg-[#2563EB]" />Orders</span>}
+                      {hasOrderValue ? <span className="inline-flex items-center gap-2"><i className="h-0.5 w-4 rounded bg-[#0F9F8B]" />Order value (INR)</span> : permissions?.finance && <span>Order value appears once rates are approved.</span>}
                       <span className="ml-auto">Clicking the range above also updates all dashboard sections.</span>
                     </div>
                   </> : <SectionState loading={false} error={null} empty retry={refresh} emptyTitle="No trend data for this range" />}
@@ -1071,10 +1073,10 @@ export default function DashboardRedesign({ user }: { user: User }) {
                         <div className="flex min-w-0 items-start gap-3">
                           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials(order.clientName)}</span>
                           <span className="min-w-0 flex-1">
-                            <span className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-[11px] font-bold text-primary">{order.orderId}</span><StatusPill status={order.status} label={statusLabel(order.status)} color={stageColor(order.status, data?.pipeline)} /></span>
-                            <span className="mt-1 block truncate text-xs font-semibold">{order.clientName}</span>
-                            <span className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-muted-foreground"><MapPin size={10} />{order.locationName}</span>
-                            <span className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                          <span className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-[13px] font-bold text-primary">{order.orderId}</span><StatusPill status={order.status} label={statusLabel(order.status)} color={stageColor(order.status, data?.pipeline)} /></span>
+                            <span className="mt-1 block truncate text-[13px] font-semibold">{order.clientName}</span>
+                          <span className="mt-0.5 flex items-center gap-1 truncate text-[13px] text-muted-foreground"><MapPin size={12} />{order.locationName}</span>
+                          <span className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted-foreground">
                               <span>Windows {formatNumber(order.readyWindows)}/{formatNumber(order.totalWindows)}</span>
                               {permissions.finance && <span className={`font-mono font-semibold ${order.orderValue == null ? 'text-muted-foreground' : 'text-foreground'}`}>{order.orderValue == null ? 'Rate pending' : compactCurrency(order.orderValue)}</span>}
                               <span>{dateLabel(order.createdAt)}</span>
@@ -1085,14 +1087,14 @@ export default function DashboardRedesign({ user }: { user: User }) {
                     </div>
                     <div className="hidden xl:block">
                       <table className="w-full table-fixed text-left">
-                        <thead><tr className="border-b border-border text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground"><th className="w-[34%] pb-2 pr-2">Order / client</th><th className="w-[22%] pb-2 pr-2">Stage</th><th className="w-[14%] pb-2 pr-2">Windows</th><th className="w-[18%] pb-2 pr-2">Fulfillment</th>{permissions.finance && <th className="w-[12%] pb-2 text-right">Value</th>}</tr></thead>
+                        <thead><tr className="border-b border-border text-[12px] font-bold uppercase tracking-[.08em] text-foreground/80"><th className="w-[34%] pb-2 pr-2">Order / client</th><th className="w-[22%] pb-2 pr-2">Stage</th><th className="w-[14%] pb-2 pr-2">Windows</th><th className="w-[18%] pb-2 pr-2">Fulfillment</th>{permissions.finance && <th className="w-[12%] pb-2 text-right">Value</th>}</tr></thead>
                         <tbody className="divide-y divide-border/60">
                           {recentOrders.slice(0, 8).map((order) => <tr key={order.id} tabIndex={0} onClick={() => setLocation(makeDashboardHref(`/order-hub/${encodeURIComponent(order.id)}`, filters))} onKeyDown={(event) => { if (event.key === 'Enter') setLocation(makeDashboardHref(`/order-hub/${encodeURIComponent(order.id)}`, filters)); }} className={`cursor-pointer transition hover:bg-primary/[.025] ${flashedRows.includes(order.id) ? 'dashboard-row-flash' : ''}`} data-testid={`row-dashboard-order-${order.id}`}>
-                            <td className="py-3 pr-2"><div className="flex min-w-0 items-center gap-2"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">{initials(order.clientName)}</span><span className="min-w-0"><span className="block truncate font-mono text-[10px] font-semibold text-primary">{order.orderId}</span><span className="mt-0.5 block truncate text-xs font-medium">{order.clientName}</span><span className="mt-0.5 block truncate text-[9px] text-muted-foreground">{order.locationName} · {dateLabel(order.createdAt)}</span></span></div></td>
+                            <td className="py-3 pr-2"><div className="flex min-w-0 items-center gap-2"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials(order.clientName)}</span><span className="min-w-0"><span className="block truncate font-mono text-[13px] font-semibold text-primary">{order.orderId}</span><span className="mt-0.5 block truncate text-[13px] font-medium">{order.clientName}</span><span className="mt-0.5 block truncate text-[13px] text-muted-foreground">{order.locationName} · {dateLabel(order.createdAt)}</span></span></div></td>
                             <td className="py-3 pr-2"><StatusPill status={order.status} label={statusLabel(order.status)} color={stageColor(order.status, data?.pipeline)} /></td>
-                            <td className="py-3 pr-2"><span className="font-mono text-[10px]">{formatNumber(order.readyWindows)}<span className="text-muted-foreground"> / {formatNumber(order.totalWindows)}</span></span><div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${order.totalWindows ? Math.min(100, (order.readyWindows / order.totalWindows) * 100) : 0}%` }} /></div></td>
-                            <td className="py-3 pr-2"><span className="block truncate text-[9px] capitalize text-muted-foreground">{order.dispatchStatus?.replaceAll('_', ' ') ?? 'Dispatch —'}</span><span className="mt-1 block truncate text-[9px] capitalize">{order.installationStatus ?? 'Installation —'}</span></td>
-                            {permissions.finance && <td className="py-3 text-right font-mono text-[10px]">{order.orderValue == null ? <span className="font-sans text-[9px] text-muted-foreground">Rate pending</span> : compactCurrency(order.orderValue)}</td>}
+                            <td className="py-3 pr-2"><span className="font-mono text-[13px]">{formatNumber(order.readyWindows)}<span className="text-muted-foreground"> / {formatNumber(order.totalWindows)}</span></span><div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${order.totalWindows ? Math.min(100, (order.readyWindows / order.totalWindows) * 100) : 0}%` }} /></div></td>
+                            <td className="py-3 pr-2"><span className="block truncate text-[13px] capitalize text-muted-foreground">{order.dispatchStatus?.replaceAll('_', ' ') ?? 'Dispatch —'}</span><span className="mt-1 block truncate text-[13px] capitalize">{order.installationStatus ?? 'Installation —'}</span></td>
+                            {permissions.finance && <td className="py-3 text-right font-mono text-[13px]">{order.orderValue == null ? <span className="font-sans text-[13px] text-muted-foreground">Rate pending</span> : compactCurrency(order.orderValue)}</td>}
                           </tr>)}
                         </tbody>
                       </table>

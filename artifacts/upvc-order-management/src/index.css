@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -6,25 +6,25 @@
 
 :root {
   color-scheme: light;
-  --background: 42 38% 95%;
-  --foreground: 197 36% 18%;
-  --card: 42 46% 99%;
-  --card-foreground: 197 36% 18%;
-  --border: 39 25% 84%;
-  --input: 39 25% 80%;
-  --ring: 168 58% 35%;
-  --primary: 168 58% 35%;
-  --primary-foreground: 42 46% 99%;
-  --secondary: 174 28% 88%;
-  --secondary-foreground: 185 38% 20%;
-  --muted: 40 27% 90%;
-  --muted-foreground: 198 15% 45%;
-  --accent: 31 84% 57%;
-  --accent-foreground: 25 43% 17%;
-  --destructive: 1 68% 48%;
-  --destructive-foreground: 42 46% 99%;
-  --popover: 42 46% 99%;
-  --popover-foreground: 197 36% 18%;
+  --background: 216 60% 97%;
+  --foreground: 216 68% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 216 68% 13%;
+  --border: 216 27% 84%;
+  --input: 216 25% 81%;
+  --ring: 174 77% 26%;
+  --primary: 174 77% 26%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 214 35% 92%;
+  --secondary-foreground: 216 52% 20%;
+  --muted: 214 34% 92%;
+  --muted-foreground: 216 20% 38%;
+  --accent: 217 83% 55%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 216 68% 13%;
   /* Navigation keeps the earlier light palette, independent of workspace appearance. */
   --sidebar-bg: hsl(42 33% 96%);
   --sidebar-bg-hover: hsl(188 32% 92%);
@@ -35,48 +35,48 @@
   --sidebar-border: hsl(39 23% 86%);
   --sidebar-flyout-bg: hsl(42 33% 96%);
   --sidebar-flyout-shadow: 0 24px 60px rgb(15 23 42 / 0.14);
-  --hero-foreground: 197 36% 18%;
-  --hero-muted-foreground: 198 15% 45%;
-  --hero-kicker: 168 58% 35%;
-  --hero-decoration: 168 58% 35%;
-  --hero-surface-start: #f8fcfa;
-  --hero-surface-middle: #e8f4f0;
-  --hero-surface-end: #d9ebe6;
+  --hero-foreground: 216 68% 13%;
+  --hero-muted-foreground: 216 20% 38%;
+  --hero-kicker: 174 77% 26%;
+  --hero-decoration: 174 77% 26%;
+  --hero-surface-start: #f7faff;
+  --hero-surface-middle: #eaf1fb;
+  --hero-surface-end: #dfeaf8;
   --radius: 0.75rem;
   --app-font-sans: 'DM Sans', sans-serif;
   --app-font-display: 'Space Grotesk', sans-serif;
-  --app-font-mono: 'DM Mono', ui-monospace, monospace;
+  --app-font-mono: 'DM Sans', ui-monospace, monospace;
 }
 
 .dark {
   color-scheme: dark;
   /* Workspace surfaces follow the theme; the sidebar tokens above remain fixed. */
-  --background: 198 30% 8%;
-  --foreground: 190 22% 93%;
-  --card: 196 29% 12%;
-  --card-foreground: 190 22% 93%;
-  --border: 193 20% 24%;
-  --input: 193 18% 27%;
-  --ring: 168 63% 48%;
-  --primary: 168 63% 45%;
-  --primary-foreground: 180 30% 98%;
-  --secondary: 194 22% 19%;
-  --secondary-foreground: 190 25% 90%;
-  --muted: 195 20% 16%;
-  --muted-foreground: 190 10% 67%;
-  --accent: 31 84% 57%;
-  --accent-foreground: 25 43% 17%;
-  --destructive: 1 68% 50%;
-  --destructive-foreground: 42 46% 99%;
-  --popover: 196 30% 13%;
-  --popover-foreground: 190 22% 93%;
-  --hero-foreground: 42 35% 93%;
-  --hero-muted-foreground: 42 35% 82%;
-  --hero-kicker: 169 64% 78%;
-  --hero-decoration: 169 64% 78%;
-  --hero-surface-start: #173b48;
-  --hero-surface-middle: #123241;
-  --hero-surface-end: #0d2938;
+  --background: 216 53% 8%;
+  --foreground: 216 25% 94%;
+  --card: 216 43% 12%;
+  --card-foreground: 216 25% 94%;
+  --border: 216 25% 25%;
+  --input: 216 24% 29%;
+  --ring: 174 77% 43%;
+  --primary: 174 77% 43%;
+  --primary-foreground: 216 53% 8%;
+  --secondary: 216 29% 19%;
+  --secondary-foreground: 216 25% 92%;
+  --muted: 216 29% 16%;
+  --muted-foreground: 216 15% 67%;
+  --accent: 217 83% 61%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 78% 59%;
+  --destructive-foreground: 0 0% 100%;
+  --popover: 216 43% 13%;
+  --popover-foreground: 216 25% 94%;
+  --hero-foreground: 216 25% 94%;
+  --hero-muted-foreground: 216 20% 80%;
+  --hero-kicker: 172 65% 75%;
+  --hero-decoration: 172 65% 75%;
+  --hero-surface-start: #162b4d;
+  --hero-surface-middle: #102746;
+  --hero-surface-end: #0c3d42;
 }
 
 /* The operations dashboard uses its own cool, high-contrast surface palette. */
@@ -87,20 +87,20 @@
   --card-foreground: 220 68% 14%;
   --border: 214 29% 88%;
   --input: 214 25% 83%;
-  --ring: 172 83% 34%;
-  --primary: 172 83% 34%;
+  --ring: 171 83% 34%;
+  --primary: 174 77% 26%;
   --primary-foreground: 0 0% 100%;
   --secondary: 213 35% 93%;
   --secondary-foreground: 220 53% 20%;
   --muted: 214 33% 93%;
-  --muted-foreground: 215 17% 45%;
-  --accent: 24 93% 53%;
+  --muted-foreground: 216 20% 38%;
+  --accent: 217 83% 55%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 79% 57%;
   --destructive-foreground: 0 0% 100%;
   --popover: 0 0% 100%;
   --popover-foreground: 220 68% 14%;
-  --dashboard-font: 'Inter', 'DM Sans', sans-serif;
+  --dashboard-font: 'DM Sans', sans-serif;
   --app-font-sans: var(--dashboard-font);
   --app-font-display: var(--dashboard-font);
   background-color: hsl(var(--background));
@@ -115,6 +115,17 @@
   gap: 1rem;
 }
 
+/* Keep the operations surface ordered for the daily scan: figures, then orders, then analysis. */
+.dashboard-layout > .dashboard-hero { order: 1; }
+.dashboard-layout > .dashboard-filterbar { order: 2; }
+.dashboard-layout > [data-dashboard-widget="kpis"] { order: 3; }
+.dashboard-layout > .dashboard-field-row { order: 4; }
+.dashboard-layout > .dashboard-chart-row { order: 5; }
+.dashboard-layout > [data-dashboard-widget="pipeline"] { order: 6; }
+.dashboard-layout > .dashboard-operations-row { order: 7; }
+.dashboard-layout > .dashboard-dispatch-row { order: 8; }
+.dashboard-layout > .dashboard-follow-up-row { order: 9; }
+
 .dashboard-layout > * {
   grid-column: 1 / -1;
   min-width: 0;
@@ -123,7 +134,7 @@
 .dashboard-kpi-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: .75rem;
+  gap: .65rem;
 }
 
 .dashboard-chart-row > [data-dashboard-widget],
@@ -142,6 +153,7 @@
 
 .dashboard-secondary-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  order: 9;
 }
 
 .dashboard-pipeline-grid {
@@ -152,7 +164,7 @@
 
 @media (min-width: 768px) {
   .dashboard-kpi-grid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
   }
 
   .dashboard-chart-row > [data-dashboard-widget],
@@ -220,7 +232,7 @@
 
 @media (max-width: 480px) {
   .dashboard-kpi-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -250,14 +262,33 @@
 .dashboard-page .dashboard-hero {
   background:
     radial-gradient(circle at 83% 8%, rgb(20 184 166 / .22), transparent 24%),
-    linear-gradient(115deg, #0b1b3a 0%, #0b2c47 58%, #0f766e 100%);
+    linear-gradient(115deg, #0B1C38 0%, #102B4A 58%, #0F766E 100%);
   color: #f8fafc;
 }
 
+.dashboard-page .dashboard-hero {
+  min-height: 0;
+  padding-block: 12px;
+  border-radius: 18px;
+  box-shadow: 0 12px 28px rgb(11 28 56 / .14);
+}
+.dashboard-page .dashboard-hero h2 { font-size: clamp(1.35rem, 2vw, 1.8rem); }
+.dashboard-page .dashboard-hero .relative.flex.flex-col { gap: .6rem; }
+.dashboard-page .dashboard-hero .w-full.min-w-0.rounded-xl { padding: .45rem .7rem; }
+.dashboard-page .dashboard-hero .font-mono.text-\[17px\] { font-size: 15px; }
+.dashboard-page .dashboard-card {
+  border-color: hsl(var(--border));
+  box-shadow: 0 2px 7px rgb(11 28 56 / .045);
+}
+.dashboard-page .dashboard-card th { color: hsl(var(--foreground) / .78); font-size: 12px; }
+.dashboard-page .dashboard-card td { font-size: 13px; }
+.dashboard-page .dashboard-card tbody tr { border-color: hsl(var(--border)); }
+.dashboard-page .dashboard-row-flash { animation-duration: .7s; }
+
 @media (min-width: 1280px) {
   .dashboard-page .dashboard-hero {
-    min-height: 140px;
-    padding-block: 20px;
+    min-height: 0;
+    padding-block: 12px;
   }
 }
 
