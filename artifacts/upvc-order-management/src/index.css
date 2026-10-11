@@ -432,6 +432,18 @@
   border-color: hsl(var(--hero-decoration) / 0.28);
 }
 
+.order-detail-hero {
+  background: #0F9F8B;
+  border: 1px solid rgba(6, 78, 59, 0.36);
+  box-shadow: 0 12px 28px rgba(15, 118, 110, 0.18);
+  color: #fff;
+}
+.order-detail-hero [class~='text-white'] { color: #fff; }
+.order-detail-hero [class~='text-white/70'] { color: rgba(255, 255, 255, 0.84); }
+.order-detail-hero [class~='text-white/65'] { color: rgba(255, 255, 255, 0.76); }
+.order-detail-hero [class~='text-white/40'] { color: rgba(255, 255, 255, 0.68); }
+.order-detail-hero [class~='text-sidebar-primary'] { color: #D1FAE5; }
+
 .quotation-hero-mark {
   position: absolute;
   right: 8%;

@@ -1621,7 +1621,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
    });
   return <AppShell user={user} title={record.orderId} eyebrow="Module 2 · order record"><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-order-hub"><ArrowLeft size={15} /> Back to order hub</Link><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full bg-primary" /> <span>Last updated {dateLabel(record.updatedAt)}</span></div></div>
-     <section className="order-hub-accent relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header">
+     <section className="order-hub-accent order-detail-hero relative overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:p-6 md:p-8" data-testid="section-order-header">
        <div className="pointer-events-none absolute right-10 top-8 h-28 w-28 rounded-full border border-sidebar-primary/20" />
        <div className="relative">
          <div className="flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-end">
@@ -1632,16 +1632,19 @@ export default function OrderDetailPage({ user }: { user: User }) {
            </div>
            <span className={`inline-flex w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusTone(record.status)}`} data-testid="status-order-detail">{statusLabel(record.status)}</span>
          </div>
-         <div className="relative mt-6 border-t border-white/20 pt-6" data-testid="section-order-lifecycle" aria-label="Order lifecycle">
-           <span className="absolute right-0 top-2 font-mono text-[10px] text-white/60">SEQ {String(record.sequenceNo).padStart(3, '0')}</span>
+         <div className="relative mt-6 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm sm:p-5" data-testid="section-order-lifecycle" aria-label="Order lifecycle">
+           <div className="mb-4 flex items-center justify-between gap-3">
+             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Order lifecycle</p>
+             <span className="font-mono text-[10px] text-muted-foreground">SEQ {String(record.sequenceNo).padStart(3, '0')}</span>
+           </div>
            <div className="mx-auto grid max-w-5xl grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">
              {timeline.map((item, index) => (
                <div key={item.step} className="relative flex min-w-0 flex-col items-center text-center" data-testid={`timeline-stage-${item.step}`} aria-current={item.current ? 'step' : undefined}>
-                 {index < timeline.length - 1 && <div aria-hidden="true" className="absolute left-1/2 right-[-50%] top-4 z-0 hidden h-px lg:block" style={{ backgroundColor: item.active ? 'rgba(134, 239, 172, 0.75)' : 'rgba(255, 255, 255, 0.35)' }} />}
-                 <span className={`relative z-10 grid size-8 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.complete ? 'border-emerald-300 bg-emerald-500 text-white' : item.current ? 'border-white bg-white/20 text-white ring-4 ring-white/15' : 'border-white/55 bg-transparent text-transparent'}`}>
+                 {index < timeline.length - 1 && <div aria-hidden="true" className="absolute left-1/2 right-[-50%] top-4 z-0 hidden h-px lg:block" style={{ backgroundColor: item.complete ? '#42A66C' : '#D1D5DB' }} />}
+                 <span className={`relative z-10 grid size-8 shrink-0 place-items-center rounded-full border text-[10px] font-bold ${item.complete ? 'border-emerald-600 bg-emerald-600 text-white' : item.current ? 'border-primary bg-primary text-primary-foreground ring-4 ring-primary/15' : 'border-border bg-card text-transparent'}`}>
                    {item.complete ? <Check size={13} /> : item.current ? <span className="size-2 rounded-full bg-white" /> : null}
                  </span>
-                 <p className={`mt-2 min-h-8 text-[10px] leading-4 ${item.current ? 'font-bold text-white' : item.complete ? 'font-semibold text-emerald-100' : 'text-white/65'}`}>{item.label}</p>
+                 <p className={`mt-2 min-h-8 text-[11px] leading-4 ${item.current ? 'font-bold text-foreground' : item.complete ? 'font-semibold text-emerald-700' : 'text-muted-foreground'}`}>{item.label}</p>
                </div>
              ))}
            </div>
