@@ -5463,6 +5463,10 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "orderValue": zod.number().nullable(),
   "orderUpdatedAt": zod.coerce.date(),
+  "clientConfirmationStatus": zod.union([zod.literal('approved_by_client'),zod.literal('rejected_by_client'),zod.literal('revision_requested_by_client'),zod.literal(null)]).nullable(),
+  "clientConfirmationNote": zod.string().nullable(),
+  "clientConfirmationUpdatedAt": zod.coerce.date().nullable(),
+  "clientConfirmationUpdatedBy": zod.string().nullable(),
   "quotationRequests": zod.array(zod.object({
   "id": zod.string(),
   "clientName": zod.string(),
@@ -5496,6 +5500,30 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
 }))
 })
 export const GetPurchaseOrderRegisterResponse = zod.array(GetPurchaseOrderRegisterResponseItem)
+
+
+/**
+ * @summary Record the client decision for an order confirmation
+ */
+export const UpdateClientConfirmationDecisionParams = zod.object({
+  "orderRecordId": zod.coerce.string()
+})
+
+export const updateClientConfirmationDecisionBodyNoteMax = 2000;
+
+
+
+export const UpdateClientConfirmationDecisionBody = zod.object({
+  "status": zod.enum(['approved_by_client', 'rejected_by_client', 'revision_requested_by_client']),
+  "note": zod.string().max(updateClientConfirmationDecisionBodyNoteMax).nullable()
+})
+
+export const UpdateClientConfirmationDecisionResponse = zod.object({
+  "status": zod.enum(['approved_by_client', 'rejected_by_client', 'revision_requested_by_client']),
+  "note": zod.string().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "updatedBy": zod.string()
+})
 
 
 /**

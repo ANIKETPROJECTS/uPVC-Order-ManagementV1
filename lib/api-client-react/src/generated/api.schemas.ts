@@ -1537,6 +1537,18 @@ export interface OrderDocument {
 
 export type OrderDocumentList = OrderDocument[];
 
+/**
+ * @nullable
+ */
+export type PurchaseOrderRegisterEntryClientConfirmationStatus = typeof PurchaseOrderRegisterEntryClientConfirmationStatus[keyof typeof PurchaseOrderRegisterEntryClientConfirmationStatus] | null;
+
+
+export const PurchaseOrderRegisterEntryClientConfirmationStatus = {
+  approved_by_client: 'approved_by_client',
+  rejected_by_client: 'rejected_by_client',
+  revision_requested_by_client: 'revision_requested_by_client',
+} as const;
+
 export type QuotationRateSubmissionStatus = typeof QuotationRateSubmissionStatus[keyof typeof QuotationRateSubmissionStatus];
 
 
@@ -1570,9 +1582,43 @@ export interface PurchaseOrderRegisterEntry {
   /** @nullable */
   orderValue: number | null;
   orderUpdatedAt: string;
+  /** @nullable */
+  clientConfirmationStatus: PurchaseOrderRegisterEntryClientConfirmationStatus;
+  /** @nullable */
+  clientConfirmationNote: string | null;
+  /** @nullable */
+  clientConfirmationUpdatedAt: string | null;
+  /** @nullable */
+  clientConfirmationUpdatedBy: string | null;
   quotationRequests: PurchaseOrderQuotationRequest[];
   purchaseOrderDocuments: OrderDocumentList;
   confirmationDocuments: OrderDocumentList;
+}
+
+export type ClientConfirmationStatus = typeof ClientConfirmationStatus[keyof typeof ClientConfirmationStatus];
+
+
+export const ClientConfirmationStatus = {
+  approved_by_client: 'approved_by_client',
+  rejected_by_client: 'rejected_by_client',
+  revision_requested_by_client: 'revision_requested_by_client',
+} as const;
+
+export interface ClientConfirmationDecisionInput {
+  status: ClientConfirmationStatus;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note: string | null;
+}
+
+export interface ClientConfirmationDecision {
+  status: ClientConfirmationStatus;
+  /** @nullable */
+  note: string | null;
+  updatedAt: string;
+  updatedBy: string;
 }
 
 export type PurchaseOrderRegisterList = PurchaseOrderRegisterEntry[];

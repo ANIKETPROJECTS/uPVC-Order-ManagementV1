@@ -214,6 +214,10 @@ export interface OrderDocument {
   nextLotSequence?: number;
   dispatches?: OrderDispatchDocument[];
   dispatchPlanRevision?: number;
+  clientConfirmationStatus?: "approved_by_client" | "rejected_by_client" | "revision_requested_by_client" | null;
+  clientConfirmationNote?: string | null;
+  clientConfirmationUpdatedAt?: Date | null;
+  clientConfirmationUpdatedBy?: string | null;
   status: OrderStatus;
   isActive?: boolean;
   dispatchStatus?: DispatchStatus;

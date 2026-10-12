@@ -8,6 +8,7 @@ import {
   CreateOrderDocumentCategoryBody, CreateOrderDocumentCategoryResponse,
   CreateOrderPaymentFlagBody, CreateOrderPaymentFlagParams, CreateOrderPaymentFlagResponse,
   CreateOrderWindowBody, CreateOrderWindowParams, CreateOrderWindowResponse, DownloadOrderDocumentParams,
+  UpdateClientConfirmationDecisionBody, UpdateClientConfirmationDecisionParams, UpdateClientConfirmationDecisionResponse,
   DeleteOrderDocumentCategoryParams,
   DeleteGlassTrackingParams,
   GetBalancePaymentRegisterResponse,
@@ -705,6 +706,10 @@ router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {
       orderStatus: order.status,
       orderValue: order.orderValue ?? null,
       orderUpdatedAt: order.updatedAt.toISOString(),
+      clientConfirmationStatus: order.clientConfirmationStatus ?? null,
+      clientConfirmationNote: order.clientConfirmationNote ?? null,
+      clientConfirmationUpdatedAt: order.clientConfirmationUpdatedAt?.toISOString() ?? null,
+      clientConfirmationUpdatedBy: order.clientConfirmationUpdatedBy ?? null,
       quotationRequests: (quotationRequestsByOrder.get(order._id) ?? []).map((request) => ({
         id: request._id,
         clientName: request.clientName,
@@ -720,6 +725,53 @@ router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {
   });
 
   res.json(GetPurchaseOrderRegisterResponse.parse(register));
+});
+
+router.patch("/confirmation/purchase-orders/:orderRecordId/client-decision", async (req, res): Promise<void> => {
+  const params = UpdateClientConfirmationDecisionParams.safeParse(req.params);
+  const body = UpdateClientConfirmationDecisionBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Invalid client decision." });
+    return;
+  }
+  const actor = await context(req, res, "confirmation", true);
+  if (!actor) return;
+
+  const status = body.data.status;
+  const note = body.data.note?.trim() ?? "";
+  if (status !== "approved_by_client" && !note) {
+    res.status(400).json({ error: "A reason is required when the client rejects or requests a revision." });
+    return;
+  }
+
+  const db = await getMongoDb();
+  const order = await getOrders(db).findOne({ _id: params.data.orderRecordId });
+  if (!order) {
+    res.status(404).json({ error: "Order not found." });
+    return;
+  }
+  const updatedAt = new Date();
+  const decisionNote = status === "approved_by_client" ? null : note;
+  await getOrders(db).updateOne({ _id: order._id }, {
+    $set: {
+      clientConfirmationStatus: status,
+      clientConfirmationNote: decisionNote,
+      clientConfirmationUpdatedAt: updatedAt,
+      clientConfirmationUpdatedBy: actor.name,
+      updatedAt,
+      updatedBy: actor.id,
+    },
+  });
+  const label = status === "approved_by_client" ? "Approved By Client"
+    : status === "rejected_by_client" ? "Rejected By Client"
+      : "Revision Requested By Client";
+  await event(order._id, actor, "client.confirmation.decision", `${label}${decisionNote ? `: ${decisionNote}` : ""}`);
+  res.json(UpdateClientConfirmationDecisionResponse.parse({
+    status,
+    note: decisionNote,
+    updatedAt: updatedAt.toISOString(),
+    updatedBy: actor.name,
+  }));
 });
 
 router.get("/orders/:id/windows", async (req, res): Promise<void> => {

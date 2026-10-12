@@ -33,6 +33,8 @@ import type {
   ChatMessageUpdate,
   ChatPerson,
   Client,
+  ClientConfirmationDecision,
+  ClientConfirmationDecisionInput,
   ClientInput,
   ClientList,
   ClientUpdate,
@@ -11610,6 +11612,95 @@ export function useGetPurchaseOrderRegister<TData = Awaited<ReturnType<typeof ge
 
 
 
+
+export const getUpdateClientConfirmationDecisionUrl = (orderRecordId: string,) => {
+
+
+
+
+  return `/api/confirmation/purchase-orders/${orderRecordId}/client-decision`
+}
+
+/**
+ * @summary Record the client decision for an order confirmation
+ */
+export const updateClientConfirmationDecision = async (orderRecordId: string,
+    clientConfirmationDecisionInput: ClientConfirmationDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<ClientConfirmationDecision> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ClientConfirmationDecision>(getUpdateClientConfirmationDecisionUrl(orderRecordId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(clientConfirmationDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateClientConfirmationDecisionMutationKey = () => ['updateClientConfirmationDecision'] as const;
+
+export const getUpdateClientConfirmationDecisionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClientConfirmationDecision>>, TError,UpdateClientConfirmationDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateClientConfirmationDecision>>, TError,UpdateClientConfirmationDecisionMutationVariables, TContext> => {
+
+const mutationKey = getUpdateClientConfirmationDecisionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateClientConfirmationDecision>>, UpdateClientConfirmationDecisionMutationVariables> = (props) => {
+          const {orderRecordId,data} = props ?? {};
+
+          return  updateClientConfirmationDecision(orderRecordId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateClientConfirmationDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof updateClientConfirmationDecision>>>
+    export type UpdateClientConfirmationDecisionMutationBody = BodyType<ClientConfirmationDecisionInput>
+    export type UpdateClientConfirmationDecisionMutationError = ErrorType<void>
+    export type UpdateClientConfirmationDecisionMutationVariables = {orderRecordId: string;data: BodyType<ClientConfirmationDecisionInput>}
+
+    /**
+ * @summary Record the client decision for an order confirmation
+ */
+export const useUpdateClientConfirmationDecision = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClientConfirmationDecision>>, TError,UpdateClientConfirmationDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateClientConfirmationDecision>>,
+        TError,
+        UpdateClientConfirmationDecisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateClientConfirmationDecisionMutationOptions(options));
+    }
 
 export const getListOrderDocumentsUrl = (id: string,) => {
 

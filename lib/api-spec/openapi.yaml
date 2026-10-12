@@ -3114,6 +3114,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PurchaseOrderRegisterList"
+  /confirmation/purchase-orders/{orderRecordId}/client-decision:
+    patch:
+      operationId: updateClientConfirmationDecision
+      tags: [orders]
+      summary: Record the client decision for an order confirmation
+      parameters:
+        - name: orderRecordId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientConfirmationDecisionInput"
+      responses:
+        "200":
+          description: Updated client decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientConfirmationDecision"
+        "400":
+          description: Invalid status or required reason missing
+        "404":
+          description: Order not found
   /orders/{id}/documents:
     get:
       operationId: listOrderDocuments
@@ -5274,6 +5302,16 @@ components:
         orderUpdatedAt:
           type: string
           format: date-time
+        clientConfirmationStatus:
+          type: ["string", "null"]
+          enum: [approved_by_client, rejected_by_client, revision_requested_by_client, null]
+        clientConfirmationNote:
+          type: ["string", "null"]
+        clientConfirmationUpdatedAt:
+          type: ["string", "null"]
+          format: date-time
+        clientConfirmationUpdatedBy:
+          type: ["string", "null"]
         quotationRequests:
           type: array
           items:
@@ -5282,7 +5320,32 @@ components:
           $ref: "#/components/schemas/OrderDocumentList"
         confirmationDocuments:
           $ref: "#/components/schemas/OrderDocumentList"
-      required: [orderRecordId, orderId, clientName, locationCode, locationName, orderStatus, orderValue, orderUpdatedAt, quotationRequests, purchaseOrderDocuments, confirmationDocuments]
+      required: [orderRecordId, orderId, clientName, locationCode, locationName, orderStatus, orderValue, orderUpdatedAt, clientConfirmationStatus, clientConfirmationNote, clientConfirmationUpdatedAt, clientConfirmationUpdatedBy, quotationRequests, purchaseOrderDocuments, confirmationDocuments]
+    ClientConfirmationStatus:
+      type: string
+      enum: [approved_by_client, rejected_by_client, revision_requested_by_client]
+    ClientConfirmationDecisionInput:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/ClientConfirmationStatus"
+        note:
+          type: ["string", "null"]
+          maxLength: 2000
+      required: [status, note]
+    ClientConfirmationDecision:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/ClientConfirmationStatus"
+        note:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+      required: [status, note, updatedAt, updatedBy]
     PurchaseOrderQuotationRequest:
       type: object
       properties:

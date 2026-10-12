@@ -35,6 +35,7 @@ import {
   useDownloadQuotationRateSubmissionPdf,
   useGetPurchaseOrderRegister,
   useReplaceOrderDocument,
+  useUpdateClientConfirmationDecision,
   useUploadQuotationConfirmationDocument,
 } from '@workspace/api-client-react';
 import type { OrderDocument, PurchaseOrderQuotationRequest, PurchaseOrderRegisterEntry, User } from '@workspace/api-client-react';
@@ -64,6 +65,11 @@ const quotationStatusNames: Record<string, string> = {
   approved: 'Approved',
   rejected: 'Rejected',
 };
+const clientDecisionLabels = {
+  approved_by_client: 'Approved By Client',
+  rejected_by_client: 'Rejected By Client',
+  revision_requested_by_client: 'Revision Requested By Client',
+} as const;
 const statusStyles: Record<string, string> = {
   quotation_stage: 'bg-slate-100 text-slate-700',
   confirmed: 'bg-cyan-100 text-cyan-800',
@@ -119,6 +125,65 @@ function DocumentChip({ document, orderRecordId, busy, onDownload }: {
     <ArrowDownToLine size={14} className="shrink-0 text-muted-foreground transition-colors group-hover/file:text-primary" />
     {busy && <span className="sr-only">Preparing download</span>}
   </button>;
+}
+
+function ClientDecisionControl({ entry, canEdit }: { entry: PurchaseOrderRegisterEntry; canEdit: boolean }) {
+  type Decision = keyof typeof clientDecisionLabels;
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const updateDecision = useUpdateClientConfirmationDecision();
+  const [status, setStatus] = useState<Decision | ''>(entry.clientConfirmationStatus ?? '');
+  const [note, setNote] = useState(entry.clientConfirmationNote ?? '');
+  const needsNote = status === 'rejected_by_client' || status === 'revision_requested_by_client';
+
+  useEffect(() => {
+    setStatus(entry.clientConfirmationStatus ?? '');
+    setNote(entry.clientConfirmationNote ?? '');
+  }, [entry.clientConfirmationNote, entry.clientConfirmationStatus]);
+
+  const save = () => {
+    if (!status || (needsNote && !note.trim())) return;
+    updateDecision.mutate({
+      orderRecordId: entry.orderRecordId,
+      data: { status, note: needsNote ? note.trim() : null },
+    }, {
+      onSuccess: () => {
+        toast({ title: 'Client decision saved', description: clientDecisionLabels[status] });
+        void queryClient.invalidateQueries({ queryKey: getGetPurchaseOrderRegisterQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(entry.orderRecordId) });
+      },
+      onError: () => toast({ title: 'Could not save client decision', variant: 'destructive' }),
+    });
+  };
+
+  return <div className="mt-3 grid gap-2 rounded-lg border border-border/70 bg-background/75 p-3 sm:grid-cols-[minmax(210px,.8fr)_minmax(240px,1.2fr)_auto] sm:items-end" data-testid={`panel-client-decision-${entry.orderRecordId}`}>
+    <label className="grid gap-1 text-[10px] font-semibold text-muted-foreground">
+      Client confirmation status
+      <select value={status} onChange={(event) => setStatus(event.target.value as Decision | '')}
+        disabled={!canEdit || updateDecision.isPending}
+        className="h-9 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:opacity-70"
+        data-testid={`select-client-decision-${entry.orderRecordId}`}>
+        <option value="">Select client decision</option>
+        {Object.entries(clientDecisionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
+    </label>
+    {needsNote ? <label className="grid gap-1 text-[10px] font-semibold text-muted-foreground">
+      Reason <span className="text-destructive">Required</span>
+      <textarea value={note} onChange={(event) => setNote(event.target.value)} disabled={!canEdit || updateDecision.isPending}
+        required maxLength={2000} rows={2} placeholder="Enter the client’s reason"
+        className="min-h-9 resize-y rounded-md border border-border bg-card px-2 py-1.5 text-xs font-normal text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:opacity-70"
+        data-testid={`textarea-client-decision-note-${entry.orderRecordId}`} />
+    </label> : <div className="text-[10px] text-muted-foreground">
+      {entry.clientConfirmationUpdatedAt
+        ? `Recorded ${formatDate(entry.clientConfirmationUpdatedAt)}${entry.clientConfirmationUpdatedBy ? ` by ${entry.clientConfirmationUpdatedBy}` : ''}`
+        : 'Record the client’s response to this confirmation.'}
+    </div>}
+    {canEdit && <Button type="button" size="sm" className="h-9 text-[10px]" disabled={!status || (needsNote && !note.trim()) || updateDecision.isPending}
+      onClick={save} data-testid={`button-save-client-decision-${entry.orderRecordId}`}>
+      {updateDecision.isPending ? <Loader2 size={13} className="animate-spin" /> : 'Save decision'}
+    </Button>}
+    {!canEdit && needsNote && entry.clientConfirmationNote && <p className="text-xs text-foreground sm:col-span-3">{entry.clientConfirmationNote}</p>}
+  </div>;
 }
 
 export default function ConfirmationPage({ user }: { user: User }) {
@@ -444,6 +509,7 @@ export default function ConfirmationPage({ user }: { user: User }) {
                     </div>
                   </div>
                 </div>
+                <ClientDecisionControl entry={entry} canEdit={canEditConfirmation} />
                 <div id={detailsId} className={`mt-4 border-t border-border/65 pt-4 ${expanded ? '' : 'hidden'}`} aria-hidden={!expanded}>
                   <DocumentColumn label="Purchase order" documents={entry.purchaseOrderDocuments} orderRecordId={entry.orderRecordId} onDownload={requestDownload} downloadingId={downloadTarget?.document.id} />
                   <QuotationRequestsPanel

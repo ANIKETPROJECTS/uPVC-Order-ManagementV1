@@ -8,6 +8,7 @@
 import type { OrderDocumentList } from './orderDocumentList';
 import type { OrderStatus } from './orderStatus';
 import type { PurchaseOrderQuotationRequest } from './purchaseOrderQuotationRequest';
+import type { PurchaseOrderRegisterEntryClientConfirmationStatus } from './purchaseOrderRegisterEntryClientConfirmationStatus';
 
 export interface PurchaseOrderRegisterEntry {
   orderRecordId: string;
@@ -19,6 +20,14 @@ export interface PurchaseOrderRegisterEntry {
   /** @nullable */
   orderValue: number | null;
   orderUpdatedAt: Date;
+  /** @nullable */
+  clientConfirmationStatus: PurchaseOrderRegisterEntryClientConfirmationStatus;
+  /** @nullable */
+  clientConfirmationNote: string | null;
+  /** @nullable */
+  clientConfirmationUpdatedAt: Date | null;
+  /** @nullable */
+  clientConfirmationUpdatedBy: string | null;
   quotationRequests: PurchaseOrderQuotationRequest[];
   purchaseOrderDocuments: OrderDocumentList;
   confirmationDocuments: OrderDocumentList;
