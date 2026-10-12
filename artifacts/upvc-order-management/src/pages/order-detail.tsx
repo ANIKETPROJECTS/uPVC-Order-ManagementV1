@@ -1067,11 +1067,11 @@ function ProjectLotWindowsTable({ windows }: { windows: OrderWindow[] }) {
   </div>;
 }
 
-function ProjectLotCards({ order, windows, user }: { order: Order; windows: OrderWindow[]; user: User }) {
+function ProjectLotCards({ order, windows, user, managementEnabled = false }: { order: Order; windows: OrderWindow[]; user: User; managementEnabled?: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const canViewDispatch = hasPermission(user, 'dispatch', 'view');
-  const canManage = hasPermission(user, 'order-hub', 'edit') && !order.needsReview;
+  const canManage = managementEnabled && hasPermission(user, 'order-hub', 'edit') && !order.needsReview;
   const canCreateWindow = hasPermission(user, 'measurements');
   const dispatchQuery = useListDispatchOrders({ query: { enabled: canViewDispatch, queryKey: getListDispatchOrdersQueryKey(), refetchInterval: 10_000 } });
   const dispatchOrder = dispatchQuery.data?.find((item) => item.id === order.id);
@@ -1229,7 +1229,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
           </section>
           <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-display text-base font-bold">Lots</h2><span className="text-xs text-muted-foreground">{order.lots?.length ?? 0} total · each opens its own lot page</span></div><ProjectLotCards order={order} windows={windows} user={user} /></section>
         </TabsContent>
-        <TabsContent value="lots" className="space-y-3 pt-4"><div><h2 className="font-display text-base font-bold">Project lots</h2><p className="text-xs text-muted-foreground">Each lot owns its windows and dispatch history.</p></div><ProjectLotCards order={order} windows={windows} user={user} /></TabsContent>
+         <TabsContent value="lots" className="space-y-3 pt-4"><div><h2 className="font-display text-base font-bold">Project lots</h2><p className="text-xs text-muted-foreground">Each lot owns its windows and dispatch history.</p></div><ProjectLotCards order={order} windows={windows} user={user} managementEnabled /></TabsContent>
         <TabsContent value="windows" className="pt-4"><WindowsPanel orderId={order.id} user={user} allowMultiple /></TabsContent>
         <TabsContent value="payments" className="space-y-4 pt-4"><BillingPanel order={order} user={user} id={order.id} /><OrderPaymentFlagsPanel orderId={order.id} user={user} /><PaymentsPanel orderId={order.id} user={user} order={order} /></TabsContent>
         <TabsContent value="documents" className="pt-4"><DocumentsPanel orderId={order.id} user={user} /></TabsContent>
