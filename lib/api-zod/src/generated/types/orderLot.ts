@@ -9,6 +9,8 @@
 export interface OrderLot {
   id: string;
   lotId: string;
+  /** @nullable */
+  name: string | null;
   /** @minimum 1 */
   sequence: number;
   createdAt: Date;

@@ -172,6 +172,7 @@ export interface OrderLotDocument {
   _id: string;
   sequence: number;
   lotId: string;
+  name?: string | null;
   createdBy: string;
   createdAt: Date;
 }

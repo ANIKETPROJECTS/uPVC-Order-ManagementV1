@@ -65,6 +65,9 @@ import {
   useCreateOrderDocumentCategory,
   useCreateOrderGrievance,
   useCreateOrderWindow,
+  useCreateProjectLot,
+  useUpdateProjectLot,
+  useDeleteProjectLot,
   useCreateOrderPaymentFlag,
   useDeleteOrderDocumentCategory,
   useDownloadOrderDocument,
@@ -765,7 +768,7 @@ const windowSchema = z.object({
 });
 type WindowFormValues = z.infer<typeof windowSchema>;
 
-function WindowDialog({ orderId, window, user, open, onOpenChange, onComplete }: { orderId: string; window: OrderWindow | null; user: User; open: boolean; onOpenChange: (open: boolean) => void; onComplete: () => void }) {
+function WindowDialog({ orderId, window, user, open, onOpenChange, onComplete, defaultLotId = null }: { orderId: string; window: OrderWindow | null; user: User; open: boolean; onOpenChange: (open: boolean) => void; onComplete: () => void; defaultLotId?: string | null }) {
   const { toast } = useToast();
   const canMeasure = hasPermission(user, 'measurements');
   const canReadiness = hasPermission(user, 'window-readiness');
@@ -775,8 +778,8 @@ function WindowDialog({ orderId, window, user, open, onOpenChange, onComplete }:
   const update = useUpdateOrderWindow();
   const form = useForm<WindowFormValues>({ resolver: zodResolver(windowSchema), defaultValues: { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', meshType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: null, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' } });
   useEffect(() => {
-    if (open) form.reset(window ? { windowNo: window.windowNo, widthMm: window.widthMm ?? 0, heightMm: window.heightMm ?? 0, windowType: window.windowType ?? '', location: window.location ?? '', glassType: window.glassType ?? '', meshType: window.meshType ?? '', glassShutterCount: window.glassShutterCount == null ? '' : String(window.glassShutterCount), glassShutterReadyCount: window.glassShutterReadyCount == null ? '' : String(window.glassShutterReadyCount), meshShutterCount: window.meshShutterCount == null ? '' : String(window.meshShutterCount), meshShutterReadyCount: window.meshShutterReadyCount == null ? '' : String(window.meshShutterReadyCount), lotId: window.lotId, frameStatus: window.frameStatus, shutterStatus: window.shutterStatus, glassStatus: window.glassStatus, pendingReason: window.pendingReason || '' } : { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', meshType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: null, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' });
-  }, [form, open, window]);
+    if (open) form.reset(window ? { windowNo: window.windowNo, widthMm: window.widthMm ?? 0, heightMm: window.heightMm ?? 0, windowType: window.windowType ?? '', location: window.location ?? '', glassType: window.glassType ?? '', meshType: window.meshType ?? '', glassShutterCount: window.glassShutterCount == null ? '' : String(window.glassShutterCount), glassShutterReadyCount: window.glassShutterReadyCount == null ? '' : String(window.glassShutterReadyCount), meshShutterCount: window.meshShutterCount == null ? '' : String(window.meshShutterCount), meshShutterReadyCount: window.meshShutterReadyCount == null ? '' : String(window.meshShutterReadyCount), lotId: window.lotId, frameStatus: window.frameStatus, shutterStatus: window.shutterStatus, glassStatus: window.glassStatus, pendingReason: window.pendingReason || '' } : { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', meshType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: defaultLotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' });
+  }, [form, open, window, defaultLotId]);
   const save = (values: WindowFormValues) => {
     const options = { onSuccess: () => { toast({ title: window ? 'Window updated' : 'Window added', description: 'The order window record is now current.' }); onOpenChange(false); onComplete(); }, onError: () => toast({ title: 'Window could not be saved', description: 'Check your permissions and the entered values.', variant: 'destructive' as const }) };
     if (window) {
@@ -902,28 +905,82 @@ function ProjectLotWindowsTable({ windows }: { windows: OrderWindow[] }) {
 }
 
 function ProjectLotCards({ order, windows, user }: { order: Order; windows: OrderWindow[]; user: User }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const canViewDispatch = hasPermission(user, 'dispatch', 'view');
+  const canManage = hasPermission(user, 'order-hub', 'edit') && !order.needsReview;
+  const canCreateWindow = hasPermission(user, 'measurements');
   const dispatchQuery = useListDispatchOrders({ query: { enabled: canViewDispatch, queryKey: getListDispatchOrdersQueryKey(), refetchInterval: 10_000 } });
   const dispatchOrder = dispatchQuery.data?.find((item) => item.id === order.id);
+  const createLot = useCreateProjectLot();
+  const updateLot = useUpdateProjectLot();
+  const deleteLot = useDeleteProjectLot();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Order['lots'][number] | null>(null);
+  const [name, setName] = useState('');
+  const [selectedWindowIds, setSelectedWindowIds] = useState<string[]>([]);
+  const [windowLotId, setWindowLotId] = useState<string | null>(null);
   const lots = [...(order.lots ?? [])].sort((a, b) => a.sequence - b.sequence);
-  if (!lots.length) return <p className="rounded-xl border border-dashed border-border bg-card p-5 text-center text-sm text-muted-foreground">No lots have been planned for this project yet.</p>;
-  return <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="list-project-lots">
+  const openCreate = () => { setEditing(null); setName(''); setSelectedWindowIds([]); setDialogOpen(true); };
+  const openEdit = (lot: Order['lots'][number]) => { setEditing(lot); setName(lot.name || ''); setSelectedWindowIds(windows.filter((window) => window.lotId === lot.lotId).map((window) => window.id)); setDialogOpen(true); };
+  const refresh = (updated: Order, title: string) => {
+    queryClient.setQueryData(getGetOrderQueryKey(order.id), updated);
+    void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(order.id) });
+    void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(order.id) });
+    void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+    toast({ title, description: updated.orderId });
+  };
+  const saveLot = (addWindowAfter = false) => {
+    const onSuccess = (updated: Order) => {
+      refresh(updated, editing ? 'Lot updated' : 'Lot created');
+      setDialogOpen(false);
+      if (addWindowAfter) {
+        const newLot = updated.lots.find((lot) => !order.lots?.some((old) => old.id === lot.id));
+        if (newLot) setWindowLotId(newLot.lotId);
+      }
+    };
+    if (editing) updateLot.mutate({ id: order.id, lotId: editing.lotId, data: { name: name.trim() || null, windowIds: selectedWindowIds } }, { onSuccess, onError: (error) => toast({ title: 'Lot could not be updated', description: error instanceof Error ? error.message : 'Refresh and try again.', variant: 'destructive' }) });
+    else createLot.mutate({ id: order.id, data: { name: name.trim() || null, windowIds: selectedWindowIds } }, { onSuccess, onError: (error) => toast({ title: 'Lot could not be created', description: error instanceof Error ? error.message : 'Refresh and try again.', variant: 'destructive' }) });
+  };
+  const removeLot = (lot: Order['lots'][number], hasHistory: boolean) => {
+    if (hasHistory) return;
+    if (!globalThis.confirm(`Delete ${lot.lotId}? Its windows will become unassigned.`)) return;
+    deleteLot.mutate({ id: order.id, lotId: lot.lotId }, { onSuccess: (updated) => refresh(updated, 'Lot deleted; its windows are now unassigned'), onError: (error) => toast({ title: 'Lot could not be deleted', description: error instanceof Error ? error.message : 'Refresh and try again.', variant: 'destructive' }) });
+  };
+  const saving = createLot.isPending || updateLot.isPending;
+  return <div className="space-y-3" data-testid="list-project-lots">
+    <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">Lots belong to this project. Assign existing windows or create one in a new lot.</p>{canManage && <Button size="sm" onClick={openCreate} data-testid="button-create-project-lot"><Plus size={14} /> Add lot</Button>}</div>
+    {!lots.length && <p className="rounded-xl border border-dashed border-border bg-card p-5 text-center text-sm text-muted-foreground">No lots have been planned for this project yet.</p>}
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
     {lots.map((lot) => {
       const lotWindows = windows.filter((window) => window.lotId === lot.lotId);
       const area = lotWindows.reduce((sum, window) => sum + (window.sqFt ?? 0), 0);
       const ready = lotWindows.filter(projectWindowReady).length;
       const batches = (dispatchOrder?.dispatches ?? []).filter((dispatch) => dispatch.lotId === lot.lotId).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
       const lastBatch = batches[batches.length - 1];
-      return <Link key={lot.id} href={`/order-hub/${order.id}/lots/${encodeURIComponent(lot.lotId)}`} className="group block rounded-xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/50 hover:shadow-md" data-testid={`link-project-lot-${lot.lotId}`}>
-        <div className="flex items-start justify-between gap-3">
-          <div><p className="font-mono text-xs font-bold text-primary">{lot.lotId}</p><h3 className="mt-1 font-display text-sm font-bold">Lot {String(lot.sequence).padStart(2, '0')}</h3></div>
-          <span className="text-xs font-bold text-primary transition group-hover:translate-x-0.5">Open lot →</span>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">{lotWindows.length} {lotWindows.length === 1 ? 'window' : 'windows'} · {area ? `${area.toFixed(1)} sq ft` : 'Area not measured'}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{canViewDispatch ? `${ready} of ${lotWindows.length} fully ready · ${lastBatch ? `${lastBatch.code} ${readable(lastBatch.dispatchStatus)}` : 'No dispatch yet'}` : `${ready} of ${lotWindows.length} fully ready · Dispatch access restricted`}</p>
-        {lotWindows.length > 0 && <p className="mt-2 truncate text-[10px] text-muted-foreground">{lotWindows.map((window) => window.windowNo).join(' · ')}</p>}
-      </Link>;
+      const hasHistory = batches.length > 0 || Boolean(dispatchOrder?.dispatchStatus && dispatchOrder.dispatchStatus !== 'pending_dispatch');
+      return <Card key={lot.id} className="border-border bg-card shadow-sm" data-testid={`card-project-lot-${lot.lotId}`}>
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-2"><div><p className="font-mono text-xs font-bold text-primary">{lot.lotId}</p><h3 className="mt-1 font-display text-sm font-bold">{lot.name || `Lot ${String(lot.sequence).padStart(2, '0')}`}</h3></div><Link href={`/order-hub/${order.id}/lots/${encodeURIComponent(lot.lotId)}`} className="text-xs font-bold text-primary hover:underline" data-testid={`link-project-lot-${lot.lotId}`}>Open lot →</Link></div>
+          <p className="mt-3 text-xs text-muted-foreground">{lotWindows.length} {lotWindows.length === 1 ? 'window' : 'windows'} · {area ? `${area.toFixed(1)} sq ft` : 'Area not measured'}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{canViewDispatch ? `${ready} of ${lotWindows.length} fully ready · ${lastBatch ? `${lastBatch.code} ${readable(lastBatch.dispatchStatus)}` : 'No dispatch yet'}` : `${ready} of ${lotWindows.length} fully ready · Dispatch access restricted`}</p>
+          {lotWindows.length > 0 && <p className="mt-2 truncate text-[10px] text-muted-foreground">{lotWindows.map((window) => window.windowNo).join(' · ')}</p>}
+          {canManage && <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={() => openEdit(lot)}><Pencil size={13} /> Edit</Button><Button size="sm" variant="outline" disabled={!canCreateWindow} onClick={() => setWindowLotId(lot.lotId)}><Plus size={13} /> Add window</Button><Button size="sm" variant="ghost" className="text-destructive" disabled={hasHistory || deleteLot.isPending} onClick={() => removeLot(lot, hasHistory)}><Trash2 size={13} /> Delete</Button>{hasHistory && <span className="self-center text-[10px] text-muted-foreground">Locked after dispatch</span>}</div>}
+        </CardContent>
+      </Card>;
     })}
+    </div>
+    {dialogOpen && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={editing ? 'Edit project lot' : 'Create project lot'}><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl">
+      <div className="flex items-start justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-primary">Project lot</p><h2 className="mt-1 font-display text-lg font-bold">{editing ? `Edit ${editing.lotId}` : 'Create lot'}</h2><p className="text-xs text-muted-foreground">Assign unassigned project windows here; each window remains a single canonical record.</p></div><Button size="sm" variant="ghost" onClick={() => setDialogOpen(false)}>Close</Button></div>
+      <label className="mt-4 block text-xs font-semibold">Lot name (optional)<Input className="mt-1" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Living room group" maxLength={100} /></label>
+      {editing && (dispatchOrder?.dispatches.some((dispatch) => dispatch.lotId === editing.lotId) || Boolean(dispatchOrder?.dispatchStatus && dispatchOrder.dispatchStatus !== 'pending_dispatch')) && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">This lot has dispatch history. You can rename it, but its window membership is locked.</p>}
+      <div className="mt-4 max-h-72 space-y-2 overflow-y-auto rounded-xl border border-border p-3">{windows.filter((window) => !window.lotId || window.lotId === editing?.lotId).length ? windows.filter((window) => !window.lotId || window.lotId === editing?.lotId).map((window) => {
+        const locked = Boolean(editing && (dispatchOrder?.dispatches.some((dispatch) => dispatch.lotId === editing.lotId) || (dispatchOrder?.dispatchStatus && dispatchOrder.dispatchStatus !== 'pending_dispatch')));
+        return <label key={window.id} className="flex items-center gap-3 rounded-lg border border-border/70 bg-card p-3 text-sm"><Checkbox checked={selectedWindowIds.includes(window.id)} disabled={locked} onCheckedChange={(checked) => setSelectedWindowIds((current) => checked ? [...new Set([...current, window.id])] : current.filter((id) => id !== window.id))} /><span className="font-semibold">{window.windowNo}</span><span className="text-xs text-muted-foreground">{window.windowType || 'Type pending'} · {window.location || 'Location not set'}</span></label>;
+      }) : <p className="p-4 text-center text-xs text-muted-foreground">No unassigned windows. You can create a window for this lot from its card.</p>}</div>
+      <div className="mt-4 flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button disabled={saving} onClick={() => saveLot(false)}>{editing ? 'Save lot' : 'Create lot'}</Button>{!editing && canCreateWindow && <Button disabled={saving} onClick={() => saveLot(true)}>Create lot + window</Button>}</div>
+    </div></div>}
+    <WindowDialog orderId={order.id} window={null} user={user} open={Boolean(windowLotId)} defaultLotId={windowLotId} onOpenChange={(open) => { if (!open) setWindowLotId(null); }} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(order.id) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(order.id) }); }} />
   </div>;
 }
 
@@ -1048,8 +1105,8 @@ export function ProjectLotDetailPage({ user }: { user: User }) {
     <div className="space-y-5" data-testid="page-project-lot">
       <div className="flex flex-wrap items-center justify-between gap-3"><Link href={projectPath} className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-project"><ArrowLeft size={14} /> {order.orderId} · {order.clientName}</Link><span className="text-[10px] text-muted-foreground">Lot details are inherited from the project and its windows.</span></div>
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7" data-testid="section-lot-header">
-        <p className="font-mono text-xs font-bold tracking-wider text-primary">{lot.lotId}</p><h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">{order.clientName}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{order.orderId} · Lot {String(lot.sequence).padStart(2, '0')}</p>
+        <p className="font-mono text-xs font-bold tracking-wider text-primary">{lot.lotId}</p><h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">{lot.name || `Lot ${String(lot.sequence).padStart(2, '0')}`}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{order.orderId} · {order.clientName}</p>
       </section>
       <Tabs defaultValue="overview" className="w-full" data-testid="tabs-project-lot">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 sm:grid-cols-4"><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="windows">Windows</TabsTrigger><TabsTrigger value="documents">Documents</TabsTrigger><TabsTrigger value="activity">Activity</TabsTrigger></TabsList>

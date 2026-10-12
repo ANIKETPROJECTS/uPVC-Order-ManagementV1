@@ -189,6 +189,8 @@ export * from './paymentReminderOrder';
 export * from './paymentReminderOrderList';
 export * from './permissionLevel';
 export * from './permissionMap';
+export * from './projectLotInput';
+export * from './projectLotUpdate';
 export * from './publicInstallationShare';
 export * from './purchaseOrderQuotationRequest';
 export * from './purchaseOrderRegisterEntry';

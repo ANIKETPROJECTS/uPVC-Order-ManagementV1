@@ -119,6 +119,8 @@ import type {
   PaymentFlagResolution,
   PaymentFlagUpdate,
   PaymentOverview,
+  ProjectLotInput,
+  ProjectLotUpdate,
   PublicInstallationShare,
   PurchaseOrderRegisterList,
   PushConfig,
@@ -3540,6 +3542,262 @@ export const useAddOrderLot = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getAddOrderLotMutationOptions(options));
+    }
+
+export const getCreateProjectLotUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/project-lots`
+}
+
+/**
+ * @summary Create a project lot and optionally assign unassigned windows
+ */
+export const createProjectLot = async (id: string,
+    projectLotInput: ProjectLotInput, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Order>(getCreateProjectLotUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(projectLotInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProjectLotMutationKey = () => ['createProjectLot'] as const;
+
+export const getCreateProjectLotMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectLot>>, TError,CreateProjectLotMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectLot>>, TError,CreateProjectLotMutationVariables, TContext> => {
+
+const mutationKey = getCreateProjectLotMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectLot>>, CreateProjectLotMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createProjectLot(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectLotMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectLot>>>
+    export type CreateProjectLotMutationBody = BodyType<ProjectLotInput>
+    export type CreateProjectLotMutationError = ErrorType<void>
+    export type CreateProjectLotMutationVariables = {id: string;data: BodyType<ProjectLotInput>}
+
+    /**
+ * @summary Create a project lot and optionally assign unassigned windows
+ */
+export const useCreateProjectLot = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectLot>>, TError,CreateProjectLotMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectLot>>,
+        TError,
+        CreateProjectLotMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateProjectLotMutationOptions(options));
+    }
+
+export const getUpdateProjectLotUrl = (id: string,
+    lotId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/project-lots/${lotId}`
+}
+
+/**
+ * @summary Rename a project lot and update its window membership
+ */
+export const updateProjectLot = async (id: string,
+    lotId: string,
+    projectLotUpdate: ProjectLotUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Order>(getUpdateProjectLotUrl(id,lotId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(projectLotUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateProjectLotMutationKey = () => ['updateProjectLot'] as const;
+
+export const getUpdateProjectLotMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectLot>>, TError,UpdateProjectLotMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProjectLot>>, TError,UpdateProjectLotMutationVariables, TContext> => {
+
+const mutationKey = getUpdateProjectLotMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectLot>>, UpdateProjectLotMutationVariables> = (props) => {
+          const {id,lotId,data} = props ?? {};
+
+          return  updateProjectLot(id,lotId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectLotMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectLot>>>
+    export type UpdateProjectLotMutationBody = BodyType<ProjectLotUpdate>
+    export type UpdateProjectLotMutationError = ErrorType<void>
+    export type UpdateProjectLotMutationVariables = {id: string;lotId: string;data: BodyType<ProjectLotUpdate>}
+
+    /**
+ * @summary Rename a project lot and update its window membership
+ */
+export const useUpdateProjectLot = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectLot>>, TError,UpdateProjectLotMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProjectLot>>,
+        TError,
+        UpdateProjectLotMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateProjectLotMutationOptions(options));
+    }
+
+export const getDeleteProjectLotUrl = (id: string,
+    lotId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/project-lots/${lotId}`
+}
+
+/**
+ * @summary Delete a project lot without dispatch history
+ */
+export const deleteProjectLot = async (id: string,
+    lotId: string, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+  return customFetch<Order>(getDeleteProjectLotUrl(id,lotId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteProjectLotMutationKey = () => ['deleteProjectLot'] as const;
+
+export const getDeleteProjectLotMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProjectLot>>, TError,DeleteProjectLotMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProjectLot>>, TError,DeleteProjectLotMutationVariables, TContext> => {
+
+const mutationKey = getDeleteProjectLotMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProjectLot>>, DeleteProjectLotMutationVariables> = (props) => {
+          const {id,lotId} = props ?? {};
+
+          return  deleteProjectLot(id,lotId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteProjectLotMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProjectLot>>>
+
+    export type DeleteProjectLotMutationError = ErrorType<void>
+    export type DeleteProjectLotMutationVariables = {id: string;lotId: string}
+
+    /**
+ * @summary Delete a project lot without dispatch history
+ */
+export const useDeleteProjectLot = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProjectLot>>, TError,DeleteProjectLotMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteProjectLot>>,
+        TError,
+        DeleteProjectLotMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteProjectLotMutationOptions(options));
     }
 
 export const getListDispatchOrdersUrl = () => {

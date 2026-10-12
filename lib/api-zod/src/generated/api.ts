@@ -1321,6 +1321,7 @@ export const ListOrdersResponseItem = zod.object({
   "lots": zod.array(zod.object({
   "id": zod.string(),
   "lotId": zod.string(),
+  "name": zod.string().nullable(),
   "sequence": zod.number().int().min(1),
   "createdAt": zod.coerce.date()
 })),
@@ -1421,6 +1422,7 @@ export const CreateOrderResponse = zod.object({
   "lots": zod.array(zod.object({
   "id": zod.string(),
   "lotId": zod.string(),
+  "name": zod.string().nullable(),
   "sequence": zod.number().int().min(1),
   "createdAt": zod.coerce.date()
 })),
@@ -1474,6 +1476,7 @@ export const GetOrderResponse = zod.object({
   "lots": zod.array(zod.object({
   "id": zod.string(),
   "lotId": zod.string(),
+  "name": zod.string().nullable(),
   "sequence": zod.number().int().min(1),
   "createdAt": zod.coerce.date()
 })),
@@ -1572,6 +1575,7 @@ export const UpdateOrderResponse = zod.object({
   "lots": zod.array(zod.object({
   "id": zod.string(),
   "lotId": zod.string(),
+  "name": zod.string().nullable(),
   "sequence": zod.number().int().min(1),
   "createdAt": zod.coerce.date()
 })),
@@ -1625,6 +1629,7 @@ export const DeleteOrderResponse = zod.object({
   "lots": zod.array(zod.object({
   "id": zod.string(),
   "lotId": zod.string(),
+  "name": zod.string().nullable(),
   "sequence": zod.number().int().min(1),
   "createdAt": zod.coerce.date()
 })),
@@ -1678,6 +1683,7 @@ export const AddOrderLotResponse = zod.object({
   "lots": zod.array(zod.object({
   "id": zod.string(),
   "lotId": zod.string(),
+  "name": zod.string().nullable(),
   "sequence": zod.number().int().min(1),
   "createdAt": zod.coerce.date()
 })),
@@ -1690,6 +1696,188 @@ export const AddOrderLotResponse = zod.object({
   "siteAddress": zod.string().nullable(),
   "siteLatitude": zod.number().min(addOrderLotResponseSiteLatitudeMin).max(addOrderLotResponseSiteLatitudeMax).nullable(),
   "siteLongitude": zod.number().min(addOrderLotResponseSiteLongitudeMin).max(addOrderLotResponseSiteLongitudeMax).nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
+  "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Create a project lot and optionally assign unassigned windows
+ */
+export const CreateProjectLotParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const createProjectLotBodyNameMax = 100;
+
+
+
+export const CreateProjectLotBody = zod.object({
+  "name": zod.string().max(createProjectLotBodyNameMax).nullish(),
+  "windowIds": zod.array(zod.string())
+})
+
+
+export const createProjectLotResponseSiteLatitudeMin = -90;
+export const createProjectLotResponseSiteLatitudeMax = 90;
+
+export const createProjectLotResponseSiteLongitudeMin = -180;
+export const createProjectLotResponseSiteLongitudeMax = 180;
+
+
+
+export const CreateProjectLotResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "name": zod.string().nullable(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(createProjectLotResponseSiteLatitudeMin).max(createProjectLotResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(createProjectLotResponseSiteLongitudeMin).max(createProjectLotResponseSiteLongitudeMax).nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
+  "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Rename a project lot and update its window membership
+ */
+export const UpdateProjectLotParams = zod.object({
+  "id": zod.coerce.string(),
+  "lotId": zod.coerce.string()
+})
+
+export const updateProjectLotBodyNameMax = 100;
+
+
+
+export const UpdateProjectLotBody = zod.object({
+  "name": zod.string().max(updateProjectLotBodyNameMax).nullable(),
+  "windowIds": zod.array(zod.string())
+})
+
+
+export const updateProjectLotResponseSiteLatitudeMin = -90;
+export const updateProjectLotResponseSiteLatitudeMax = 90;
+
+export const updateProjectLotResponseSiteLongitudeMin = -180;
+export const updateProjectLotResponseSiteLongitudeMax = 180;
+
+
+
+export const UpdateProjectLotResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "name": zod.string().nullable(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(updateProjectLotResponseSiteLatitudeMin).max(updateProjectLotResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(updateProjectLotResponseSiteLongitudeMin).max(updateProjectLotResponseSiteLongitudeMax).nullable(),
+  "clientGstin": zod.string().nullable(),
+  "locationCode": zod.string(),
+  "locationName": zod.string(),
+  "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "isActive": zod.boolean(),
+  "notes": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a project lot without dispatch history
+ */
+export const DeleteProjectLotParams = zod.object({
+  "id": zod.coerce.string(),
+  "lotId": zod.coerce.string()
+})
+
+
+export const deleteProjectLotResponseSiteLatitudeMin = -90;
+export const deleteProjectLotResponseSiteLatitudeMax = 90;
+
+export const deleteProjectLotResponseSiteLongitudeMin = -180;
+export const deleteProjectLotResponseSiteLongitudeMax = 180;
+
+
+
+export const DeleteProjectLotResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "legacyOrderId": zod.string().nullable(),
+  "clientType": zod.union([zod.enum(['Project', 'Retail']),zod.null()]),
+  "quotationId": zod.string().nullable(),
+  "quotationNo": zod.string().nullable(),
+  "needsReview": zod.boolean(),
+  "lots": zod.array(zod.object({
+  "id": zod.string(),
+  "lotId": zod.string(),
+  "name": zod.string().nullable(),
+  "sequence": zod.number().int().min(1),
+  "createdAt": zod.coerce.date()
+})),
+  "sequenceNo": zod.number().int(),
+  "clientId": zod.string(),
+  "clientName": zod.string(),
+  "clientPrefix": zod.string(),
+  "clientPhone": zod.string().nullable(),
+  "clientAddress": zod.string().nullable(),
+  "siteAddress": zod.string().nullable(),
+  "siteLatitude": zod.number().min(deleteProjectLotResponseSiteLatitudeMin).max(deleteProjectLotResponseSiteLatitudeMax).nullable(),
+  "siteLongitude": zod.number().min(deleteProjectLotResponseSiteLongitudeMin).max(deleteProjectLotResponseSiteLongitudeMax).nullable(),
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
@@ -5572,6 +5760,7 @@ export const UpdateOrderBillingResponse = zod.object({
   "lots": zod.array(zod.object({
   "id": zod.string(),
   "lotId": zod.string(),
+  "name": zod.string().nullable(),
   "sequence": zod.number().int().min(1),
   "createdAt": zod.coerce.date()
 })),

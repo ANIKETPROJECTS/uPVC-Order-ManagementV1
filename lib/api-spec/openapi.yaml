@@ -942,6 +942,103 @@ paths:
           description: Order not found
         "409":
           description: The order needs review or cannot accept another lot
+  /orders/{id}/project-lots:
+    post:
+      operationId: createProjectLot
+      tags: [order-hub]
+      summary: Create a project lot and optionally assign unassigned windows
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectLotInput"
+      responses:
+        "201":
+          description: Updated project order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Invalid lot details
+        "403":
+          description: Edit access required
+        "404":
+          description: Project order not found
+        "409":
+          description: Lot or window assignments conflict
+  /orders/{id}/project-lots/{lotId}:
+    patch:
+      operationId: updateProjectLot
+      tags: [order-hub]
+      summary: Rename a project lot and update its window membership
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lotId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectLotUpdate"
+      responses:
+        "200":
+          description: Updated project order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Invalid lot details
+        "403":
+          description: Edit access required
+        "404":
+          description: Project or lot not found
+        "409":
+          description: Window assignments conflict with dispatch history
+    delete:
+      operationId: deleteProjectLot
+      tags: [order-hub]
+      summary: Delete a project lot without dispatch history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lotId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated project order; former lot windows are unassigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "403":
+          description: Edit access required
+        "404":
+          description: Project or lot not found
+        "409":
+          description: Lot has dispatch history and cannot be deleted
   /dispatch/orders:
     get:
       operationId: listDispatchOrders
@@ -4167,13 +4264,39 @@ components:
           type: string
         lotId:
           type: string
+        name:
+          type: ["string", "null"]
         sequence:
           type: integer
           minimum: 1
         createdAt:
           type: string
           format: date-time
-      required: [id, lotId, sequence, createdAt]
+      required: [id, lotId, name, sequence, createdAt]
+    ProjectLotInput:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+          maxLength: 100
+        windowIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+      required: [windowIds]
+    ProjectLotUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+          maxLength: 100
+        windowIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+      required: [name, windowIds]
     OrderInput:
       type: object
       properties:

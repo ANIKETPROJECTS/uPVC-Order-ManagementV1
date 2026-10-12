@@ -607,6 +607,8 @@ export type OrderGrievanceList = OrderGrievance[];
 export interface OrderLot {
   id: string;
   lotId: string;
+  /** @nullable */
+  name: string | null;
   /** @minimum 1 */
   sequence: number;
   createdAt: string;
@@ -661,6 +663,24 @@ export interface Order {
   /** @nullable */
   updatedBy: string | null;
   updatedAt: string;
+}
+
+export interface ProjectLotInput {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  name?: string | null;
+  windowIds: string[];
+}
+
+export interface ProjectLotUpdate {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  name: string | null;
+  windowIds: string[];
 }
 
 export interface InitialOrderLotInput {

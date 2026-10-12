@@ -5,11 +5,15 @@ import {
   CreateClientBody,
   CreateClientResponse,
   CreateOrderBody,
+  CreateProjectLotBody,
+  CreateProjectLotResponse,
   CreateOrderLocationBody,
   CreateOrderLocationResponse,
   CreateOrderResponse,
   DeleteOrderParams,
   DeleteOrderResponse,
+  DeleteProjectLotParams,
+  DeleteProjectLotResponse,
   GetOrderParams,
   GetOrderResponse,
   ListClientsQueryParams,
@@ -34,6 +38,9 @@ import {
   UpdateOrderMessageTemplateResponse,
   UpdateOrderParams,
   UpdateOrderResponse,
+  UpdateProjectLotBody,
+  UpdateProjectLotParams,
+  UpdateProjectLotResponse,
 } from "@workspace/api-zod";
 import { Router, type IRouter, type Request, type RequestHandler } from "express";
 import type { Filter } from "mongodb";
@@ -197,6 +204,7 @@ function orderResponse(order: OrderDocument) {
       .map((lot) => ({
         id: lot._id,
         lotId: lot.lotId,
+        name: lot.name ?? null,
         sequence: lot.sequence,
         createdAt: lot.createdAt.toISOString(),
       })),
@@ -1224,6 +1232,86 @@ router.post(
     res.status(409).json({ error: "The next lot number could not be allocated. Try again." });
   },
 );
+
+router.post("/orders/:id/project-lots", requireOrderHubPermission("edit"), async (req, res): Promise<void> => {
+  const params = AddOrderLotParams.safeParse(req.params);
+  const parsed = CreateProjectLotBody.safeParse(req.body);
+  if (!params.success) { inputError(req, res, params.error); return; }
+  if (!parsed.success) { inputError(req, res, parsed.error); return; }
+  const db = await getMongoDb();
+  const actorId = req.session.userId;
+  const order = await getOrders(db).findOne({ _id: params.data.id });
+  if (!order) { res.status(404).json({ error: "Project order not found." }); return; }
+  if (order.clientType !== "Project" || order.needsReview) { res.status(409).json({ error: "Only a resolved Project order can manage lots." }); return; }
+  const windowIds = parsed.data.windowIds;
+  const windows = windowIds.length ? await getOrderWindows(db).find({ orderRecordId: order._id, _id: { $in: windowIds } }).toArray() : [];
+  if (windows.length !== windowIds.length) { res.status(400).json({ error: "Choose windows from this project order." }); return; }
+  if (windows.some((window) => window.lotId)) { res.status(409).json({ error: "A selected window already belongs to another lot." }); return; }
+  const sequence = Math.max(order.nextLotSequence ?? 1, ...(order.lots ?? []).map((lot) => lot.sequence + 1));
+  const now = new Date();
+  const lot: OrderLotDocument = { _id: randomUUID(), sequence, lotId: formatLotId(order.orderId, sequence), name: parsed.data.name?.trim() || null, createdBy: actorId!, createdAt: now };
+  const sequenceFilter = order.nextLotSequence === undefined ? { nextLotSequence: { $exists: false } } : { nextLotSequence: order.nextLotSequence };
+  const inserted = await getOrders(db).updateOne({ _id: order._id, ...sequenceFilter }, { $push: { lots: lot }, $set: { nextLotSequence: sequence + 1, updatedAt: now, updatedBy: actorId } });
+  if (!inserted.matchedCount) { res.status(409).json({ error: "The project changed while creating the lot. Refresh and try again." }); return; }
+  if (windowIds.length) {
+    const assigned = await getOrderWindows(db).updateMany({ orderRecordId: order._id, _id: { $in: windowIds }, $or: [{ lotId: null }, { lotId: { $exists: false } }] }, { $set: { lotId: lot.lotId, updatedAt: now, updatedBy: actorId! } });
+    if (assigned.modifiedCount !== windowIds.length) {
+      await getOrderWindows(db).updateMany({ orderRecordId: order._id, _id: { $in: windowIds }, lotId: lot.lotId }, { $set: { lotId: null, updatedAt: new Date() } });
+      await getOrders(db).updateOne({ _id: order._id }, { $pull: { lots: { _id: lot._id } } });
+      res.status(409).json({ error: "A selected window was assigned elsewhere. Refresh and try again." }); return;
+    }
+  }
+  const updated = await getOrders(db).findOne({ _id: order._id });
+  if (!updated) { res.status(404).json({ error: "Project order not found." }); return; }
+  res.status(201).json(CreateProjectLotResponse.parse(orderResponse(updated)));
+});
+
+router.patch("/orders/:id/project-lots/:lotId", requireOrderHubPermission("edit"), async (req, res): Promise<void> => {
+  const params = UpdateProjectLotParams.safeParse(req.params);
+  const parsed = UpdateProjectLotBody.safeParse(req.body);
+  if (!params.success) { inputError(req, res, params.error); return; }
+  if (!parsed.success) { inputError(req, res, parsed.error); return; }
+  const db = await getMongoDb();
+  const actorId = req.session.userId!;
+  const order = await getOrders(db).findOne({ _id: params.data.id });
+  if (!order) { res.status(404).json({ error: "Project order not found." }); return; }
+  const lot = order.lots?.find((item) => item.lotId === params.data.lotId);
+  if (order.clientType !== "Project" || !lot) { res.status(404).json({ error: "Project lot not found." }); return; }
+  const selectedIds = parsed.data.windowIds;
+  const selected = selectedIds.length ? await getOrderWindows(db).find({ orderRecordId: order._id, _id: { $in: selectedIds } }).toArray() : [];
+  if (selected.length !== selectedIds.length || selected.some((window) => window.lotId && window.lotId !== lot.lotId)) { res.status(409).json({ error: "Choose only unassigned windows or windows already in this lot." }); return; }
+  const currentIds = (await getOrderWindows(db).find({ orderRecordId: order._id, lotId: lot.lotId }, { projection: { _id: 1 } }).toArray()).map((window) => window._id);
+  const membershipChanged = currentIds.length !== selectedIds.length || currentIds.some((id) => !selectedIds.includes(id));
+  const hasLotHistory = Boolean(order.dispatches?.some((dispatch) => dispatch.lotId === lot.lotId));
+  const hasLegacyDispatchHistory = Boolean(order.dispatchStatus && order.dispatchStatus !== "pending_dispatch");
+  if (membershipChanged && (hasLotHistory || hasLegacyDispatchHistory)) { res.status(409).json({ error: "Window membership is locked after dispatch history exists. You can still rename the lot." }); return; }
+  const now = new Date();
+  const removedIds = currentIds.filter((id) => !selectedIds.includes(id));
+  if (removedIds.length) await getOrderWindows(db).updateMany({ orderRecordId: order._id, lotId: lot.lotId, _id: { $in: removedIds } }, { $set: { lotId: null, updatedAt: now, updatedBy: actorId } });
+  if (selectedIds.length) await getOrderWindows(db).updateMany({ orderRecordId: order._id, _id: { $in: selectedIds } }, { $set: { lotId: lot.lotId, updatedAt: now, updatedBy: actorId } });
+  await getOrders(db).updateOne({ _id: order._id, "lots.lotId": lot.lotId }, { $set: { "lots.$.name": parsed.data.name?.trim() || null, updatedAt: now, updatedBy: actorId } });
+  const updated = await getOrders(db).findOne({ _id: order._id });
+  if (!updated) { res.status(404).json({ error: "Project order not found." }); return; }
+  res.json(UpdateProjectLotResponse.parse(orderResponse(updated)));
+});
+
+router.delete("/orders/:id/project-lots/:lotId", requireOrderHubPermission("edit"), async (req, res): Promise<void> => {
+  const params = DeleteProjectLotParams.safeParse(req.params);
+  if (!params.success) { inputError(req, res, params.error); return; }
+  const db = await getMongoDb();
+  const actorId = req.session.userId!;
+  const order = await getOrders(db).findOne({ _id: params.data.id });
+  if (!order) { res.status(404).json({ error: "Project order not found." }); return; }
+  const lot = order.lots?.find((item) => item.lotId === params.data.lotId);
+  if (order.clientType !== "Project" || !lot) { res.status(404).json({ error: "Project lot not found." }); return; }
+  if (order.dispatches?.some((dispatch) => dispatch.lotId === lot.lotId) || (order.dispatchStatus && order.dispatchStatus !== "pending_dispatch")) { res.status(409).json({ error: "A lot with dispatch history cannot be deleted." }); return; }
+  const now = new Date();
+  await getOrderWindows(db).updateMany({ orderRecordId: order._id, lotId: lot.lotId }, { $set: { lotId: null, updatedAt: now, updatedBy: actorId } });
+  await getOrders(db).updateOne({ _id: order._id }, { $pull: { lots: { _id: lot._id } }, $set: { updatedAt: now, updatedBy: actorId } });
+  const updated = await getOrders(db).findOne({ _id: order._id });
+  if (!updated) { res.status(404).json({ error: "Project order not found." }); return; }
+  res.json(DeleteProjectLotResponse.parse(orderResponse(updated)));
+});
 
 router.patch("/orders/:id/billing", requireOrderHubPermission("view"), async (req, res): Promise<void> => {
   const params = UpdateOrderBillingParams.safeParse(req.params);
