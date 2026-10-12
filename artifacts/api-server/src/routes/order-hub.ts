@@ -70,6 +70,7 @@ import {
   type OrderStatus,
 } from "../lib/mongo";
 import {
+  formatProjectOrderId,
   formatLotId,
   formatQuotationOrderId,
   normalizeLocationCode,
@@ -680,9 +681,11 @@ router.post(
     }
     const sequenceNo = counter.value;
 
-    const generatedOrderId = quotation
-      ? formatQuotationOrderId(clientType, quotation.quoteNo)
-      : `TMP-${String(sequenceNo).padStart(6, "0")}`;
+    const generatedOrderId = clientType === "Project"
+      ? formatProjectOrderId(now, sequenceNo)
+      : quotation
+        ? formatQuotationOrderId(clientType, quotation.quoteNo)
+        : `TMP-${String(sequenceNo).padStart(6, "0")}`;
     if (!generatedOrderId) {
       res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
       return;
@@ -983,9 +986,11 @@ router.patch(
         res.status(409).json({ error: "Set this order's client type to Project or Retail before linking a quotation." });
         return;
       }
-      const generatedOrderId = linkedQuotation
-        ? formatQuotationOrderId(clientType as ClientType, linkedQuotation.quoteNo)
-        : `TMP-${String(before.sequenceNo).padStart(6, "0")}`;
+      const generatedOrderId = clientType === "Project"
+        ? formatProjectOrderId(before.createdAt, before.sequenceNo)
+        : linkedQuotation
+          ? formatQuotationOrderId(clientType as ClientType, linkedQuotation.quoteNo)
+          : `TMP-${String(before.sequenceNo).padStart(6, "0")}`;
       if (!generatedOrderId) {
         res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
         return;

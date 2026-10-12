@@ -51,6 +51,7 @@ import {
   storeProjectUpload,
 } from "../lib/project-upload-storage";
 import { parseGlassOrderWorkbook, type ParsedGlassWorkbookSection } from "../lib/glass-order-workbook";
+import { formatProjectPieceId } from "../lib/order-identifiers";
 
 const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
@@ -85,21 +86,25 @@ async function event(orderRecordId: string, actor: UserContext, action: string, 
   await getOrderActivity(await getMongoDb()).insertOne({ _id: randomUUID(), orderRecordId, actorId: actor.id, actorName: actor.name, action, summary, createdAt: new Date() });
 }
 function windowPieces(w: OrderWindowDocument): OrderWindowPieceDocument[] {
-  if (w.pieces) return w.pieces;
-  const pieces: OrderWindowPieceDocument[] = [];
-  for (const [kind, count, readyCount, ready] of [
-    ["frame", w.frameCount ?? 1, 0, w.frameStatus === "ready"],
-    ["glass_shutter", w.glassShutterCount ?? 0, w.glassShutterReadyCount ?? (w.glassStatus === "received" ? w.glassShutterCount ?? 0 : 0), false],
-    ["mesh_shutter", w.meshShutterCount ?? 0, w.meshShutterReadyCount ?? 0, false],
-  ] as const) {
-    for (let pieceNo = 1; pieceNo <= count; pieceNo++) pieces.push({
-      id: `${w._id}_${kind}_${pieceNo}`,
-      kind,
-      pieceNo,
-      status: kind === "glass_shutter" ? (pieceNo <= readyCount ? "ready" : "pending") : kind === "mesh_shutter" ? (pieceNo <= readyCount ? "ready" : "pending") : ready ? "ready" : "pending",
-    });
+  const pieces = w.pieces ? [...w.pieces] : [];
+  if (!w.pieces) {
+    for (const [kind, count, readyCount, ready] of [
+      ["frame", w.frameCount ?? 1, 0, w.frameStatus === "ready"],
+      ["glass_shutter", w.glassShutterCount ?? 0, w.glassShutterReadyCount ?? (w.glassStatus === "received" ? w.glassShutterCount ?? 0 : 0), false],
+      ["mesh_shutter", w.meshShutterCount ?? 0, w.meshShutterReadyCount ?? 0, false],
+    ] as const) {
+      for (let pieceNo = 1; pieceNo <= count; pieceNo++) pieces.push({
+        id: `${w._id}_${kind}_${pieceNo}`,
+        kind,
+        pieceNo,
+        status: kind === "glass_shutter" ? (pieceNo <= readyCount ? "ready" : "pending") : kind === "mesh_shutter" ? (pieceNo <= readyCount ? "ready" : "pending") : ready ? "ready" : "pending",
+      });
+    }
   }
-  return pieces;
+  return w.lotId ? pieces.map((piece) => ({
+    ...piece,
+    id: formatProjectPieceId(w.lotId!, w.windowNo, piece.kind, piece.pieceNo),
+  })) : pieces;
 }
 const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, location: w.location ?? null, glassType: w.glassType ?? null, meshType: w.meshType ?? null, frameCount: w.frameCount ?? 1, glassShutterCount: w.glassShutterCount ?? null, glassShutterReadyCount: w.glassShutterReadyCount ?? null, meshShutterCount: w.meshShutterCount ?? null, meshShutterReadyCount: w.meshShutterReadyCount ?? null, pieces: windowPieces(w), lotId: w.lotId ?? null, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
 const paymentResponse = (p: any) => ({

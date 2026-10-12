@@ -45,9 +45,33 @@ export function formatQuotationOrderId(
   return `${clientType === "Project" ? "P" : "R"}${number}`;
 }
 
+export function formatProjectOrderId(createdAt: Date, sequenceNo: number): string {
+  if (!Number.isInteger(sequenceNo) || sequenceNo < 1) {
+    throw new Error("Project sequence must be a positive integer.");
+  }
+  const year = orderDateKey(createdAt).slice(-2);
+  return `P-${year}-${String(sequenceNo).padStart(4, "0")}`;
+}
+
 export function formatLotId(orderId: string, sequence: number): string {
   if (!Number.isInteger(sequence) || sequence < 1) {
     throw new Error("Lot sequence must be a positive integer.");
   }
-  return `${orderId}-L${String(sequence).padStart(2, "0")}`;
+  return `${orderId}-L${sequence}`;
+}
+
+export function formatProjectPieceId(
+  lotId: string,
+  windowNo: string,
+  kind: "frame" | "glass_shutter" | "mesh_shutter",
+  pieceNo: number,
+): string {
+  const normalizedWindow = windowNo.trim().match(/^W?0*(\d+)$/i);
+  const windowSuffix = normalizedWindow
+    ? `W${Number(normalizedWindow[1])}`
+    : `W${windowNo.trim().replace(/^W/i, "").replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const pieceSuffix =
+    kind === "frame" ? (pieceNo === 1 ? "F" : `F${pieceNo}`) :
+    kind === "glass_shutter" ? `G${pieceNo}` : `M${pieceNo}`;
+  return `${lotId}-${windowSuffix}-${pieceSuffix}`;
 }

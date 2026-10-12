@@ -62,7 +62,8 @@ export function PieceQrLabelSheet({ order, windows }: { order: Order; windows: O
     return () => window.clearTimeout(timer);
   }, [printing]);
 
-  const labels = windows.flatMap((row) => row.pieces.map((piece) => ({
+  const printableWindows = order.clientType === 'Project' ? windows.filter((row) => row.lotId) : windows;
+  const labels = printableWindows.flatMap((row) => row.pieces.map((piece) => ({
     row,
     piece,
     name: piece.kind === 'frame' ? 'Frame' : piece.kind === 'glass_shutter' ? 'Glass shutter' : 'Mesh shutter',
@@ -73,7 +74,7 @@ export function PieceQrLabelSheet({ order, windows }: { order: Order; windows: O
       <CardHeader className="flex-row items-center justify-between gap-3">
         <div>
           <CardTitle className="text-base">Factory QR labels</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">Print software-generated labels for the order’s window components.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Print software-generated labels for the order’s window components.{order.clientType === 'Project' ? ' Assign project windows to a lot before printing their formatted IDs.' : ''}</p>
         </div>
         <Button type="button" variant="outline" onClick={() => setPrinting(true)} disabled={!labels.length}>Print label sheet</Button>
       </CardHeader>
@@ -82,7 +83,7 @@ export function PieceQrLabelSheet({ order, windows }: { order: Order; windows: O
           {labels.map(({ row, name, piece }) => (
             <div key={piece.id} className="piece-qr-label flex flex-col items-center gap-1 border border-border p-2 text-center">
               <QRCodeCanvas value={`FRAMEWISE_PIECE:${order.id}:${row.id}:${piece.id}`} size={96} includeMargin />
-              <strong className="text-xs">{order.orderId} · {row.windowNo}</strong>
+              <strong className="text-xs">{order.clientType === 'Project' ? piece.id : `${order.orderId} · ${row.windowNo}`}</strong>
               <span className="text-[10px]">{name} {piece.pieceNo} · {piece.status === 'ready' ? 'Ready' : 'Pending'}</span>
             </div>
           ))}

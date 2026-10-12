@@ -4,6 +4,7 @@ import { logger } from "./logger";
 import {
   formatLotId,
   formatOrderId,
+  formatProjectOrderId,
   formatQuotationOrderId,
   normalizeLocationCode,
   orderDailyCounterId,
@@ -1303,6 +1304,103 @@ export async function getPublicUser(
   };
 }
 
+async function migrateProjectIdentifiers(db: Db, now: Date): Promise<void> {
+  const counters = getCounters(db);
+  const migrationId = "projectIdentifierFormatV1";
+  if ((await counters.findOne({ _id: migrationId }))?.value === 1) return;
+
+  const projects = await getOrders(db)
+    .find({ clientType: "Project" })
+    .sort({ createdAt: 1, sequenceNo: 1, _id: 1 })
+    .toArray();
+  if (projects.length === 0) {
+    await counters.updateOne({ _id: migrationId }, { $set: { value: 1, updatedAt: now } }, { upsert: true });
+    return;
+  }
+
+  const projectIds = new Set(projects.map((order) => order._id));
+  const plans = projects.map((order) => {
+    const orderId = formatProjectOrderId(order.createdAt, order.sequenceNo);
+    const legacyOrderId = order.orderId === orderId || order.orderId.startsWith("__project_id_migration_")
+      ? order.legacyOrderId ?? null
+      : order.legacyOrderId ?? order.orderId;
+    const lots = (order.lots ?? []).map((lot) => ({ ...lot, lotId: formatLotId(orderId, lot.sequence) }));
+    const lotIdMap = new Map<string, string>();
+    (order.lots ?? []).forEach((lot, index) => {
+      lotIdMap.set(lot.lotId, lots[index].lotId);
+      lotIdMap.set(formatLotId(legacyOrderId ?? order.orderId, lot.sequence), lots[index].lotId);
+    });
+    return {
+      order,
+      orderId,
+      legacyOrderId,
+      lots,
+      lotIdMap,
+      dispatches: (order.dispatches ?? []).map((dispatch) => ({
+        ...dispatch,
+        lotId: dispatch.lotId ? lotIdMap.get(dispatch.lotId) ?? dispatch.lotId : null,
+      })),
+    };
+  });
+  const targetIds = plans.map((plan) => plan.orderId);
+  if (new Set(targetIds).size !== targetIds.length) {
+    throw new Error("Project IDs cannot be migrated because the year/sequence format produces duplicates.");
+  }
+  const occupiedTargets = await getOrders(db)
+    .find({ orderId: { $in: targetIds } }, { projection: { _id: 1, orderId: 1 } })
+    .toArray();
+  if (occupiedTargets.some((order) => !projectIds.has(order._id))) {
+    throw new Error("Project IDs cannot be migrated because a target ID is already used by a non-project order.");
+  }
+
+  const migrationToken = randomUUID();
+  await getOrders(db).bulkWrite(plans.map((plan, index) => ({
+    updateOne: {
+      filter: { _id: plan.order._id },
+      update: {
+        $set: {
+          orderId: `__project_id_migration_${migrationToken}_${index}`,
+          legacyOrderId: plan.legacyOrderId,
+        },
+      },
+    },
+  })));
+
+  for (const plan of plans) {
+    const lotUpdates = [...plan.lotIdMap].filter(([oldLotId, newLotId]) => oldLotId !== newLotId);
+    await Promise.all([
+      ...lotUpdates.map(([oldLotId, newLotId]) =>
+        getOrderWindows(db).updateMany(
+          { orderRecordId: plan.order._id, lotId: oldLotId },
+          { $set: { lotId: newLotId } },
+        ),
+      ),
+      getOrderPaymentFlags(db).updateMany(
+        { orderRecordId: plan.order._id },
+        { $set: { orderId: plan.orderId } },
+      ),
+      getOrderGrievances(db).updateMany(
+        { orderRecordId: plan.order._id },
+        { $set: { orderId: plan.orderId } },
+      ),
+      getQuotationRateSubmissions(db).updateMany(
+        { orderRecordId: plan.order._id },
+        { $set: { orderId: plan.orderId } },
+      ),
+    ]);
+  }
+
+  await getOrders(db).bulkWrite(plans.map((plan) => ({
+    updateOne: {
+      filter: { _id: plan.order._id },
+      update: { $set: { orderId: plan.orderId, lots: plan.lots, dispatches: plan.dispatches } },
+    },
+  })));
+
+  await counters.updateOne({ _id: migrationId }, { $set: { value: 1, updatedAt: now } }, { upsert: true });
+  logger.info({ migratedProjectOrders: plans.length }, "Migrated project, lot, and related IDs to the year/sequence format");
+}
+
 export async function initializeMongo(): Promise<void> {
   const db = await getMongoDb();
   const users = getUsers(db);
@@ -1500,6 +1598,7 @@ export async function initializeMongo(): Promise<void> {
 
   await migrateQuotationOrderIds(db, now);
   await migrateOrderIds(db, now);
+  await migrateProjectIdentifiers(db, now);
   await migrateMeasurementSheetIds(db, now);
   await migrateMeasurementSheetIdsToFullYear(db, now);
 
