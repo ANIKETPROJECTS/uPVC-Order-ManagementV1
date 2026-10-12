@@ -6,6 +6,7 @@ import {
   formatOrderId,
   formatProjectOrderId,
   formatQuotationOrderId,
+  formatRetailOrderId,
   normalizeLocationCode,
   orderDailyCounterId,
   orderDateKey,
@@ -1401,6 +1402,69 @@ async function migrateProjectIdentifiers(db: Db, now: Date): Promise<void> {
   logger.info({ migratedProjectOrders: plans.length }, "Migrated project, lot, and related IDs to the year/sequence format");
 }
 
+async function migrateRetailIdentifiers(db: Db, now: Date): Promise<void> {
+  const counters = getCounters(db);
+  const migrationId = "retailIdentifierFormatV1";
+  if ((await counters.findOne({ _id: migrationId }))?.value === 1) return;
+
+  const retailOrders = await getOrders(db)
+    .find({ clientType: "Retail" })
+    .sort({ createdAt: 1, sequenceNo: 1, _id: 1 })
+    .toArray();
+  if (retailOrders.length === 0) {
+    await counters.updateOne({ _id: migrationId }, { $set: { value: 1, updatedAt: now } }, { upsert: true });
+    return;
+  }
+
+  const retailIds = new Set(retailOrders.map((order) => order._id));
+  const plans = retailOrders.map((order) => {
+    const orderId = formatRetailOrderId(order.createdAt, order.sequenceNo);
+    const legacyOrderId = order.orderId === orderId || order.orderId.startsWith("__retail_id_migration_")
+      ? order.legacyOrderId ?? null
+      : order.orderId;
+    return { order, orderId, legacyOrderId };
+  });
+  const targetIds = plans.map((plan) => plan.orderId);
+  if (new Set(targetIds).size !== targetIds.length) {
+    throw new Error("Retail IDs cannot be migrated because the year/sequence format produces duplicates.");
+  }
+  const occupiedTargets = await getOrders(db)
+    .find({ orderId: { $in: targetIds } }, { projection: { _id: 1 } })
+    .toArray();
+  if (occupiedTargets.some((order) => !retailIds.has(order._id))) {
+    throw new Error("Retail IDs cannot be migrated because a target ID is already used by another order.");
+  }
+
+  const migrationToken = randomUUID();
+  await getOrders(db).bulkWrite(plans.map((plan, index) => ({
+    updateOne: {
+      filter: { _id: plan.order._id },
+      update: {
+        $set: {
+          orderId: `__retail_id_migration_${migrationToken}_${index}`,
+          legacyOrderId: plan.legacyOrderId,
+        },
+      },
+    },
+  })));
+  for (const plan of plans) {
+    await Promise.all([
+      getOrderPaymentFlags(db).updateMany({ orderRecordId: plan.order._id }, { $set: { orderId: plan.orderId } }),
+      getOrderGrievances(db).updateMany({ orderRecordId: plan.order._id }, { $set: { orderId: plan.orderId } }),
+      getQuotationRateSubmissions(db).updateMany({ orderRecordId: plan.order._id }, { $set: { orderId: plan.orderId } }),
+    ]);
+  }
+  await getOrders(db).bulkWrite(plans.map((plan) => ({
+    updateOne: {
+      filter: { _id: plan.order._id },
+      update: { $set: { orderId: plan.orderId } },
+    },
+  })));
+
+  await counters.updateOne({ _id: migrationId }, { $set: { value: 1, updatedAt: now } }, { upsert: true });
+  logger.info({ migratedRetailOrders: plans.length }, "Migrated retail IDs to the year/sequence format");
+}
+
 export async function initializeMongo(): Promise<void> {
   const db = await getMongoDb();
   const users = getUsers(db);
@@ -1599,6 +1663,7 @@ export async function initializeMongo(): Promise<void> {
   await migrateQuotationOrderIds(db, now);
   await migrateOrderIds(db, now);
   await migrateProjectIdentifiers(db, now);
+  await migrateRetailIdentifiers(db, now);
   await migrateMeasurementSheetIds(db, now);
   await migrateMeasurementSheetIdsToFullYear(db, now);
 

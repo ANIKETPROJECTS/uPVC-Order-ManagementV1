@@ -73,6 +73,7 @@ import {
   formatProjectOrderId,
   formatLotId,
   formatQuotationOrderId,
+  formatRetailOrderId,
   normalizeLocationCode,
 } from "../lib/order-identifiers";
 
@@ -683,9 +684,11 @@ router.post(
 
     const generatedOrderId = clientType === "Project"
       ? formatProjectOrderId(now, sequenceNo)
-      : quotation
-        ? formatQuotationOrderId(clientType, quotation.quoteNo)
-        : `TMP-${String(sequenceNo).padStart(6, "0")}`;
+      : clientType === "Retail"
+        ? formatRetailOrderId(now, sequenceNo)
+        : quotation
+          ? formatQuotationOrderId(clientType, quotation.quoteNo)
+          : `TMP-${String(sequenceNo).padStart(6, "0")}`;
     if (!generatedOrderId) {
       res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
       return;
@@ -988,9 +991,11 @@ router.patch(
       }
       const generatedOrderId = clientType === "Project"
         ? formatProjectOrderId(before.createdAt, before.sequenceNo)
-        : linkedQuotation
-          ? formatQuotationOrderId(clientType as ClientType, linkedQuotation.quoteNo)
-          : `TMP-${String(before.sequenceNo).padStart(6, "0")}`;
+        : clientType === "Retail"
+          ? formatRetailOrderId(before.createdAt, before.sequenceNo)
+          : linkedQuotation
+            ? formatQuotationOrderId(clientType!, linkedQuotation.quoteNo)
+            : `TMP-${String(before.sequenceNo).padStart(6, "0")}`;
       if (!generatedOrderId) {
         res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
         return;

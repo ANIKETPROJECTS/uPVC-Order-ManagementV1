@@ -53,6 +53,14 @@ export function formatProjectOrderId(createdAt: Date, sequenceNo: number): strin
   return `P-${year}-${String(sequenceNo).padStart(4, "0")}`;
 }
 
+export function formatRetailOrderId(createdAt: Date, sequenceNo: number): string {
+  if (!Number.isInteger(sequenceNo) || sequenceNo < 1) {
+    throw new Error("Retail sequence must be a positive integer.");
+  }
+  const year = orderDateKey(createdAt).slice(-2);
+  return `R-${year}-${String(sequenceNo).padStart(4, "0")}`;
+}
+
 export function formatLotId(orderId: string, sequence: number): string {
   if (!Number.isInteger(sequence) || sequence < 1) {
     throw new Error("Lot sequence must be a positive integer.");
