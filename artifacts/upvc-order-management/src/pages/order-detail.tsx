@@ -768,7 +768,170 @@ const windowSchema = z.object({
 });
 type WindowFormValues = z.infer<typeof windowSchema>;
 
-function WindowDialog({ orderId, window, user, open, onOpenChange, onComplete, defaultLotId = null }: { orderId: string; window: OrderWindow | null; user: User; open: boolean; onOpenChange: (open: boolean) => void; onComplete: () => void; defaultLotId?: string | null }) {
+type WindowDialogProps = { orderId: string; window: OrderWindow | null; user: User; open: boolean; onOpenChange: (open: boolean) => void; onComplete: () => void; defaultLotId?: string | null; allowMultiple?: boolean };
+
+function emptyWindowValues(lotId: string | null): WindowFormValues {
+  return { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', meshType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' };
+}
+
+function WindowDialog(props: WindowDialogProps) {
+  return props.window || !props.allowMultiple ? <SingleWindowDialog {...props} /> : <BulkWindowDialog {...props} />;
+}
+
+function BulkWindowDialog({ orderId, user, open, onOpenChange, onComplete, defaultLotId = null }: WindowDialogProps) {
+  const { toast } = useToast();
+  const create = useCreateOrderWindow();
+  const canMeasure = hasPermission(user, 'measurements');
+  const canReadiness = hasPermission(user, 'window-readiness');
+  const canGlass = hasPermission(user, 'glass-procurement');
+  const [rows, setRows] = useState<{ key: number; values: WindowFormValues }[]>([{ key: 1, values: emptyWindowValues(defaultLotId) }]);
+  const [errors, setErrors] = useState<Record<number, Record<string, string>>>({});
+  const [saving, setSaving] = useState(false);
+  const nextKey = useRef(2);
+
+  useEffect(() => {
+    if (open) {
+      setRows([{ key: 1, values: emptyWindowValues(defaultLotId) }]);
+      setErrors({});
+      nextKey.current = 2;
+    }
+  }, [open, defaultLotId]);
+
+  const change = (key: number, field: keyof WindowFormValues, value: string | number) => {
+    setRows((current) => current.map((row) => row.key === key ? { ...row, values: { ...row.values, [field]: value } } : row));
+    setErrors((current) => ({ ...current, [key]: { ...current[key], [field]: '' } }));
+  };
+  const addRow = () => {
+    setRows((current) => [...current, { key: nextKey.current++, values: emptyWindowValues(defaultLotId) }]);
+  };
+  const removeRow = (key: number) => {
+    if (rows.length < 2) return;
+    setRows((current) => current.filter((row) => row.key !== key));
+    setErrors((current) => { const next = { ...current }; delete next[key]; return next; });
+  };
+  const payloadFor = (values: WindowFormValues) => ({
+    windowNo: values.windowNo.trim(),
+    widthMm: values.widthMm,
+    heightMm: values.heightMm,
+    windowType: values.windowType.trim(),
+    location: values.location || null,
+    glassType: values.glassType || null,
+    meshType: values.meshType || null,
+    glassShutterCount: values.glassShutterCount === '' ? null : Number(values.glassShutterCount),
+    glassShutterReadyCount: values.glassShutterReadyCount === '' ? null : Number(values.glassShutterReadyCount),
+    meshShutterCount: values.meshShutterCount === '' ? null : Number(values.meshShutterCount),
+    meshShutterReadyCount: values.meshShutterReadyCount === '' ? null : Number(values.meshShutterReadyCount),
+    lotId: values.lotId,
+    frameStatus: (canReadiness ? values.frameStatus : OrderWindowReadiness.pending) as Readiness,
+    shutterStatus: (canReadiness ? values.shutterStatus : OrderWindowReadiness.pending) as Readiness,
+    glassStatus: (canGlass ? values.glassStatus : OrderGlassStatus.pending) as GlassStatus,
+    pendingReason: canReadiness ? values.pendingReason || null : null,
+  });
+  const saveAll = async () => {
+    if (!canMeasure || saving) return;
+    const nextErrors: Record<number, Record<string, string>> = {};
+    rows.forEach((row) => {
+      const result = windowSchema.safeParse(row.values);
+      if (!result.success) {
+        nextErrors[row.key] = Object.fromEntries(result.error.issues.map((issue) => [String(issue.path[0]), issue.message]));
+      }
+      for (const [readyField, totalField, label] of [
+        ['glassShutterReadyCount', 'glassShutterCount', 'Glass'],
+        ['meshShutterReadyCount', 'meshShutterCount', 'Mesh'],
+      ] as const) {
+        const ready = row.values[readyField];
+        const total = row.values[totalField];
+        if (ready !== '' && total !== '' && Number(ready) > Number(total)) {
+          nextErrors[row.key] = { ...nextErrors[row.key], [readyField]: `${label} ready count cannot exceed its total.` };
+        }
+      }
+    });
+    const firstRowForNumber = new Map<string, number>();
+    rows.forEach((row) => {
+      const normalizedNo = row.values.windowNo.trim().toLocaleLowerCase();
+      if (!normalizedNo) return;
+      const previousKey = firstRowForNumber.get(normalizedNo);
+      if (previousKey !== undefined) {
+        nextErrors[row.key] = { ...nextErrors[row.key], windowNo: 'Window numbers must be unique within this batch.' };
+        nextErrors[previousKey] = { ...nextErrors[previousKey], windowNo: 'Window numbers must be unique within this batch.' };
+      } else firstRowForNumber.set(normalizedNo, row.key);
+    });
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      toast({ title: 'Check the highlighted window fields', description: 'Every entry needs a unique window number, type, and valid dimensions.', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    let saved = 0;
+    try {
+      for (const row of rows) {
+        await create.mutateAsync({ id: orderId, data: payloadFor(row.values) });
+        saved += 1;
+      }
+      toast({ title: `${saved} ${saved === 1 ? 'window' : 'windows'} added`, description: 'All entries are now in the order register.' });
+      onOpenChange(false);
+      onComplete();
+    } catch (error) {
+      const remaining = rows.slice(saved);
+      setRows(remaining.length ? remaining : [{ key: nextKey.current++, values: emptyWindowValues(defaultLotId) }]);
+      if (saved) onComplete();
+      toast({
+        title: saved ? `${saved} saved; remaining entries were not added` : 'Windows could not be saved',
+        description: error instanceof Error ? error.message : 'Check the window numbers and your permissions, then retry the remaining entries.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  const textField = (row: { key: number; values: WindowFormValues }, field: keyof WindowFormValues, label: string, type: 'text' | 'number' = 'text', required = false) => (
+    <label className="block space-y-1 text-xs font-medium">
+      <span>{label}{required && <span className="text-destructive"> *</span>}</span>
+      <Input value={String(row.values[field] ?? '')} type={type} min={type === 'number' ? 0 : undefined} disabled={saving || !canMeasure}
+        onChange={(event) => change(row.key, field, type === 'number' && (field === 'widthMm' || field === 'heightMm') ? Number(event.target.value) : event.target.value)}
+        aria-label={`${label} for ${row.values.windowNo || `entry ${row.key}`}`} />
+      {errors[row.key]?.[field] && <span className="text-[11px] text-destructive">{errors[row.key][field]}</span>}
+    </label>
+  );
+
+  return <div className={open ? 'fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-2 sm:items-center sm:p-4' : 'hidden'} role="dialog" aria-modal="true" aria-labelledby="window-dialog-title" data-testid="dialog-window">
+    <div className="max-h-[calc(100dvh-1rem)] w-full max-w-6xl overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-xl sm:max-h-[calc(100dvh-2rem)] sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Window register</p><h2 id="window-dialog-title" className="mt-1 font-display text-xl font-bold">Add windows</h2><p className="mt-1 text-xs text-muted-foreground">Add several separate window records together. Dimensions are in millimetres.{defaultLotId ? ` New windows will be assigned to ${defaultLotId}.` : ''}</p></div>
+        <Button variant="ghost" size="sm" disabled={saving} onClick={() => onOpenChange(false)} data-testid="button-close-window-dialog">Close</Button>
+      </div>
+      <div className="mt-5 space-y-4">
+        {rows.map((row, index) => <section key={row.key} className="rounded-xl border border-border bg-card p-4 shadow-sm" aria-label={`Window entry ${index + 1}`}>
+          <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">Window {index + 1}</h3>{rows.length > 1 && <Button type="button" size="sm" variant="ghost" className="text-destructive" disabled={saving} onClick={() => removeRow(row.key)}><Trash2 size={14} /> Remove</Button>}</div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {textField(row, 'windowNo', 'Window no.', 'text', true)}
+            {textField(row, 'windowType', 'Window type', 'text', true)}
+            {textField(row, 'widthMm', 'Width (mm)', 'number', true)}
+            {textField(row, 'heightMm', 'Height (mm)', 'number', true)}
+            {textField(row, 'location', 'Room / location')}
+            {textField(row, 'glassType', 'Glass type')}
+            {textField(row, 'meshType', 'Mesh type')}
+            {textField(row, 'glassShutterCount', 'Glass shutters total', 'number')}
+            {textField(row, 'glassShutterReadyCount', 'Glass shutters ready', 'number')}
+            {textField(row, 'meshShutterCount', 'Mesh shutters total', 'number')}
+            {textField(row, 'meshShutterReadyCount', 'Mesh shutters ready', 'number')}
+          </div>
+          {(canReadiness || canGlass) && <div className="mt-4 grid gap-3 rounded-lg border border-border/70 bg-muted/20 p-3 sm:grid-cols-3">
+            {canReadiness && <>{(['frameStatus', 'shutterStatus'] as const).map((field) => <label key={field} className="space-y-1 text-xs font-medium"><span>{field === 'frameStatus' ? 'Frame status' : 'Shutter status'}</span><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={String(row.values[field])} disabled={saving} onChange={(event) => change(row.key, field, event.target.value)}>{READINESS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>)}</>}
+            {canGlass && <label className="space-y-1 text-xs font-medium"><span>Glass status</span><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={String(row.values.glassStatus)} disabled={saving} onChange={(event) => change(row.key, 'glassStatus', event.target.value)}>{GLASS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
+            {canReadiness && <label className="space-y-1 text-xs font-medium sm:col-span-3"><span>Pending reason (optional)</span><textarea className="min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" maxLength={500} value={row.values.pendingReason || ''} disabled={saving} onChange={(event) => change(row.key, 'pendingReason', event.target.value)} /></label>}
+          </div>}
+        </section>)}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4">
+        <Button type="button" variant="outline" disabled={saving} onClick={addRow}><Plus size={14} /> Add another window</Button>
+        <div className="flex gap-2"><Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>Cancel</Button><Button type="button" disabled={saving || !canMeasure} onClick={() => void saveAll()} data-testid="button-save-windows">{saving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} {saving ? 'Saving…' : `Add ${rows.length} ${rows.length === 1 ? 'window' : 'windows'}`}</Button></div>
+      </div>
+    </div>
+  </div>;
+}
+
+function SingleWindowDialog({ orderId, window, user, open, onOpenChange, onComplete, defaultLotId = null }: WindowDialogProps) {
   const { toast } = useToast();
   const canMeasure = hasPermission(user, 'measurements');
   const canReadiness = hasPermission(user, 'window-readiness');
@@ -806,7 +969,7 @@ function WindowSelectField({ control, name, label, options, disabled, testId }: 
   </div>}</div>;
 }
 
-function WindowsPanel({ orderId, user }: { orderId: string; user: User }) {
+function WindowsPanel({ orderId, user, allowMultiple = false }: { orderId: string; user: User; allowMultiple?: boolean }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const query = useListOrderWindows(orderId, { query: { queryKey: getListOrderWindowsQueryKey(orderId) } });
@@ -821,7 +984,7 @@ function WindowsPanel({ orderId, user }: { orderId: string; user: User }) {
     if (!globalThis.confirm(`Archive window ${window.windowNo}?`)) return;
     archive.mutate({ id: orderId, windowId: window.id }, { onSuccess: () => { toast({ title: 'Window archived' }); void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Window could not be archived', variant: 'destructive' as const }) });
   };
-  return <Card className="border-border/80" data-testid="card-order-windows"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Manufacturing register</p><CardTitle className="mt-1 text-base">Windows <span className="font-mono text-xs font-normal text-muted-foreground">{windows.length} · {readyCount} fully ready</span></CardTitle><p className="mt-1 text-xs text-muted-foreground">Measurements, frame, shutter, and glass state per opening.</p></div>{canMeasure && <Button size="sm" onClick={openAdd} data-testid="button-add-window"><Plus size={14} /> Add window</Button>}</CardHeader><CardContent>{query.isLoading ? <div className="space-y-3" data-testid="state-windows-loading">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Windows could not be loaded." testId="state-windows-error" /> : windows.length === 0 ? <ZeroState icon={Wrench} title="No window records yet" description={canMeasure ? 'Add the first opening to begin the manufacturing register.' : 'No window records have been persisted for this order.'} testId="state-windows-empty" /> : <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Window</th><th className="px-3 py-3">Dimensions</th><th className="px-3 py-3">Area</th><th className="px-3 py-3">Frame</th><th className="px-3 py-3">Shutter</th><th className="px-3 py-3">Glass</th><th className="px-3 py-3 text-right">Actions</th></tr></thead><tbody>{windows.map((item) => <tr key={item.id} className="group border-b border-border/50 last:border-0" data-testid={`row-window-${item.id}`}><td className="px-3 py-3"><p className="font-semibold" data-testid={`text-window-no-${item.id}`}>{item.windowNo}</p><p className="mt-1 text-[11px] text-muted-foreground">{item.windowType || 'Type pending'}</p>{item.pendingReason && <p className="mt-1 max-w-[180px] truncate text-[10px] text-amber-700" title={item.pendingReason}>{item.pendingReason}</p>}</td><td className="px-3 py-3 font-mono text-[11px]">{item.widthMm === null || item.heightMm === null ? 'Measurements pending' : `${item.widthMm} × ${item.heightMm} mm`}</td><td className="px-3 py-3 font-mono">{item.sqFt === null ? '—' : `${item.sqFt.toFixed(2)} sq ft`}</td><td className="px-3 py-3"><ReadinessPill value={item.frameStatus} /><PieceStatusList pieces={item.pieces.filter((piece) => piece.kind === 'frame')} /></td><td className="px-3 py-3"><ReadinessPill value={item.shutterStatus} /><PieceStatusList pieces={item.pieces.filter((piece) => piece.kind !== 'frame')} /></td><td className="px-3 py-3"><GlassPill value={item.glassStatus} /></td><td className="px-3 py-3"><div className="flex justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"><Button variant="ghost" size="icon" disabled={!canMeasure && !hasPermission(user, 'window-readiness') && !hasPermission(user, 'glass-procurement')} onClick={() => { setEditingWindow(item); setDialogOpen(true); }} data-testid={`button-edit-window-${item.id}`}><Pencil size={14} /></Button>{canMeasure && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => archiveWindow(item)} data-testid={`button-archive-window-${item.id}`}><Archive size={14} /></Button>}</div></td></tr>)}</tbody></table></div>}</CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>;
+  return <Card className="border-border/80" data-testid="card-order-windows"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Manufacturing register</p><CardTitle className="mt-1 text-base">Windows <span className="font-mono text-xs font-normal text-muted-foreground">{windows.length} · {readyCount} fully ready</span></CardTitle><p className="mt-1 text-xs text-muted-foreground">Measurements, frame, shutter, and glass state per opening.</p></div>{canMeasure && <Button size="sm" onClick={openAdd} data-testid="button-add-window"><Plus size={14} /> Add window</Button>}</CardHeader><CardContent>{query.isLoading ? <div className="space-y-3" data-testid="state-windows-loading">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Windows could not be loaded." testId="state-windows-error" /> : windows.length === 0 ? <ZeroState icon={Wrench} title="No window records yet" description={canMeasure ? 'Add the first opening to begin the manufacturing register.' : 'No window records have been persisted for this order.'} testId="state-windows-empty" /> : <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Window</th><th className="px-3 py-3">Dimensions</th><th className="px-3 py-3">Area</th><th className="px-3 py-3">Frame</th><th className="px-3 py-3">Shutter</th><th className="px-3 py-3">Glass</th><th className="px-3 py-3 text-right">Actions</th></tr></thead><tbody>{windows.map((item) => <tr key={item.id} className="group border-b border-border/50 last:border-0" data-testid={`row-window-${item.id}`}><td className="px-3 py-3"><p className="font-semibold" data-testid={`text-window-no-${item.id}`}>{item.windowNo}</p><p className="mt-1 text-[11px] text-muted-foreground">{item.windowType || 'Type pending'}</p>{item.pendingReason && <p className="mt-1 max-w-[180px] truncate text-[10px] text-amber-700" title={item.pendingReason}>{item.pendingReason}</p>}</td><td className="px-3 py-3 font-mono text-[11px]">{item.widthMm === null || item.heightMm === null ? 'Measurements pending' : `${item.widthMm} × ${item.heightMm} mm`}</td><td className="px-3 py-3 font-mono">{item.sqFt === null ? '—' : `${item.sqFt.toFixed(2)} sq ft`}</td><td className="px-3 py-3"><ReadinessPill value={item.frameStatus} /><PieceStatusList pieces={item.pieces.filter((piece) => piece.kind === 'frame')} /></td><td className="px-3 py-3"><ReadinessPill value={item.shutterStatus} /><PieceStatusList pieces={item.pieces.filter((piece) => piece.kind !== 'frame')} /></td><td className="px-3 py-3"><GlassPill value={item.glassStatus} /></td><td className="px-3 py-3"><div className="flex justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"><Button variant="ghost" size="icon" disabled={!canMeasure && !hasPermission(user, 'window-readiness') && !hasPermission(user, 'glass-procurement')} onClick={() => { setEditingWindow(item); setDialogOpen(true); }} data-testid={`button-edit-window-${item.id}`}><Pencil size={14} /></Button>{canMeasure && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => archiveWindow(item)} data-testid={`button-archive-window-${item.id}`}><Archive size={14} /></Button>}</div></td></tr>)}</tbody></table></div>}</CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} allowMultiple={allowMultiple} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>;
 }
 
 function PieceStatusList({ pieces }: { pieces: OrderWindow['pieces'] }) {
@@ -980,7 +1143,7 @@ function ProjectLotCards({ order, windows, user }: { order: Order; windows: Orde
       }) : <p className="p-4 text-center text-xs text-muted-foreground">No unassigned windows. You can create a window for this lot from its card.</p>}</div>
       <div className="mt-4 flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button disabled={saving} onClick={() => saveLot(false)}>{editing ? 'Save lot' : 'Create lot'}</Button>{!editing && canCreateWindow && <Button disabled={saving} onClick={() => saveLot(true)}>Create lot + window</Button>}</div>
     </div></div>}
-    <WindowDialog orderId={order.id} window={null} user={user} open={Boolean(windowLotId)} defaultLotId={windowLotId} onOpenChange={(open) => { if (!open) setWindowLotId(null); }} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(order.id) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(order.id) }); }} />
+    <WindowDialog orderId={order.id} window={null} user={user} allowMultiple open={Boolean(windowLotId)} defaultLotId={windowLotId} onOpenChange={(open) => { if (!open) setWindowLotId(null); }} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(order.id) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(order.id) }); }} />
   </div>;
 }
 
@@ -1067,7 +1230,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
           <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-display text-base font-bold">Lots</h2><span className="text-xs text-muted-foreground">{order.lots?.length ?? 0} total · each opens its own lot page</span></div><ProjectLotCards order={order} windows={windows} user={user} /></section>
         </TabsContent>
         <TabsContent value="lots" className="space-y-3 pt-4"><div><h2 className="font-display text-base font-bold">Project lots</h2><p className="text-xs text-muted-foreground">Each lot owns its windows and dispatch history.</p></div><ProjectLotCards order={order} windows={windows} user={user} /></TabsContent>
-        <TabsContent value="windows" className="pt-4"><WindowsPanel orderId={order.id} user={user} /></TabsContent>
+        <TabsContent value="windows" className="pt-4"><WindowsPanel orderId={order.id} user={user} allowMultiple /></TabsContent>
         <TabsContent value="payments" className="space-y-4 pt-4"><BillingPanel order={order} user={user} id={order.id} /><OrderPaymentFlagsPanel orderId={order.id} user={user} /><PaymentsPanel orderId={order.id} user={user} order={order} /></TabsContent>
         <TabsContent value="documents" className="pt-4"><DocumentsPanel orderId={order.id} user={user} /></TabsContent>
         <TabsContent value="activity" className="space-y-4 pt-4"><GrievancesPanel order={order} user={user} /><ActivityPanel orderId={order.id} /></TabsContent>
