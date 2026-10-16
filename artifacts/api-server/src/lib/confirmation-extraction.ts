@@ -31,7 +31,7 @@ const fieldGroups: Array<{ title: string; fields: Array<[string, RegExp]> }> = [
     ["Contact details", /^\s*CONTACT\s+DETAILS\s*:?\s*(.*?)\s*$/im],
     ["Address", /^\s*ADDRESS\s*:?\s*(.*?)\s*$/im],
     ["GSTIN", /^\s*GSTIN\s*:?\s*(.*?)\s*$/im],
-    ["Final measurement taken / checked by", /^\s*FINAL\s+MEASUR[EA]MENT\s+TAKEN\s+BY\s*\/?\s*CHECK\s+BY\s*:?\s*(.*?)\s*$/im],
+    ["Final measurement taken / checked by", /^\s*FINAL\s+MEASUR(?:E)?MENT\s+TAKEN\s+BY\s*\/?\s*CHECK\s+BY\s*:?\s*(.*?)\s*$/im],
     ["Confirmation made by", /^\s*CONFIRMATION\s+MADE\s+BY\s*:?\s*(.*?)\s*$/im],
     ["Decision given by", /^\s*DECISION\s+GIVEN\s+BY\s*:?\s*(.*?)\s*$/im],
     ["Checked by", /^\s*CHECKED\s+BY\s*:?\s*(.*?)\s*$/im],
@@ -44,6 +44,7 @@ const fieldGroups: Array<{ title: string; fields: Array<[string, RegExp]> }> = [
     ["CGST", /^\s*CGST\s*(?:\d+(?:\.\d+)?%\s*)?:?\s*₹?\s*([\d,.]+)\s*$/im],
     ["SGST", /^\s*SGST\s*(?:\d+(?:\.\d+)?%\s*)?:?\s*₹?\s*([\d,.]+)\s*$/im],
     ["Final billing amount", /^\s*FINAL\s+BILLING\s+AMT\.?\s*:?\s*₹?\s*([\d,.]+)\s*$/im],
+    ["Advance payment terms", /^\s*(\d{1,3}%\s+ADVANCE\s+PAYMENT)\b/im],
   ] },
   { title: "Contacts and banking", fields: [
     ["Accounts contact", /^\s*ACCOUNTS\s+CONTACT\s+NO\s*:?\s*(.*?)\s*$/im],
@@ -70,9 +71,13 @@ function extractWindows(text: string) {
     const endMarker = lines.findIndex((line, lineIndex) => lineIndex > start && lineIndex < nextRow && /^\s*(?:TOTAL\b|ACCOUNTS\s+CONTACT|PRODUCTION\s+CONTACT|NOTE\s+\d|PAYMENT\s+DETAILS)/i.test(line));
     const stop = endMarker >= 0 ? endMarker : nextRow;
     const segment = lines.slice(start, stop).join(" ").replace(/\s+/g, " ").trim();
+    const previousLine = [...lines.slice(0, start)].reverse().find((line) => line.trim()) ?? "";
+    const nearby = lines.slice(Math.max(0, start - 3), stop).join(" ").replace(/\s+/g, " ").trim();
     const primaryLine = lines[start].replace(/\s+/g, " ").trim();
     const match = primaryLine.match(/^\s*(W\d{1,4})\s+([A-Z0-9 /-]+?)\s+(\d{2,5})\s+(\d{2,5})\s+([\d,.]+)\s+(\d+)\s+(.+?)\s*$/i);
-    const upper = segment.toUpperCase();
+    const upper = nearby.toUpperCase();
+    const trackType = previousLine.match(/\b\d+\s*TRACK\b.*$/i)?.[0]?.replace(/\s+(?:TOUCH|UPVC)\b.*$/i, "").trim();
+    const louversType = match?.[7]?.replace(/\s+NA$/i, "").replace(/\s+(?:4|5|6)\s*MM\b.*$/i, "").trim();
     return {
       windowNo: match?.[1] ?? "",
       location: match?.[2]?.trim() ?? "",
@@ -80,11 +85,11 @@ function extractWindows(text: string) {
       height: match?.[4] ?? "",
       area: match?.[5] ?? "",
       quantity: match?.[6] ?? "",
-      windowType: segment.match(/(?:\d+\s*TRACK[^]*?|LOUVERS[^]*?|SLIDING|CASEMENT|FIXED|OPENABLE)(?=\s+(?:\d+\s*MM|TOUCH\s+UPVC|TOTAL|ACCOUNTS\s+CONTACT)|$)/i)?.[0]?.trim() || match?.[7]?.replace(/\s+NA$/i, "").replace(/\s+(?:4|5|6)\s*MM\b.*$/i, "").trim() || "",
-      glass: upper.match(/\b\d+\s*MM\s+[A-Z ]*?GLASS\b/)?.[0] ?? "",
-      lockType: upper.includes("TOUCH") && upper.includes("LOCK") ? "Touch lock" : upper.includes("LOCK") ? "Lock" : "",
+      windowType: trackType ? `${trackType}${/\bMESH\b/i.test(nearby) ? " MESH" : ""}` : louversType || "",
+      glass: /\b4\s*MM\s+FROSTED\b/.test(upper) ? "4 MM Frosted glass" : upper.match(/\b\d+\s*MM\s+(?:FROSTED|CLEAR|TOUGHENED)?\s*GLASS\b/)?.[0] ?? "",
+      lockType: upper.includes("TOUCH") && upper.includes("LOCK") ? "Touch lock" : upper.includes("LOCK") ? "Lock" : /\bNA\b/.test(upper) ? "N/A" : "",
       profile: upper.includes("UPVC") ? "UPVC" : "",
-      mesh: upper.includes("FIBER") ? "Fiber" : upper.includes("ALUMIN") ? "Aluminium" : "",
+      mesh: upper.includes("FIBER") ? "Fiber" : /AL+UMIN/.test(upper) ? "Aluminium" : "",
     };
   }).filter((row) => row.windowNo);
 }
