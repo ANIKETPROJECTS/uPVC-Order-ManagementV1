@@ -380,6 +380,7 @@ export default function ConfirmationPage({ user }: { user: User }) {
     sizeBytes: previewTarget.request.pdfSizeBytes || 0,
     uploadedBy: 'Quotation request',
     uploadedAt: previewTarget.request.updatedAt,
+    confirmationInfo: null,
   } satisfies OrderDocument : null;
   const previewFile = previewTarget?.kind === 'order-document' ? orderPreviewQuery.data : quotationPreviewQuery.data;
   const previewLoading = previewTarget?.kind === 'order-document' ? orderPreviewQuery.isLoading : quotationPreviewQuery.isLoading;

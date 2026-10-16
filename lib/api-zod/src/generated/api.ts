@@ -1308,6 +1308,8 @@ export const listOrdersResponseSiteLatitudeMax = 90;
 export const listOrdersResponseSiteLongitudeMin = -180;
 export const listOrdersResponseSiteLongitudeMax = 180;
 
+export const listOrdersResponseMeshTypeMax = 100;
+
 
 
 export const ListOrdersResponseItem = zod.object({
@@ -1337,6 +1339,7 @@ export const ListOrdersResponseItem = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(listOrdersResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -1409,6 +1412,8 @@ export const createOrderResponseSiteLatitudeMax = 90;
 export const createOrderResponseSiteLongitudeMin = -180;
 export const createOrderResponseSiteLongitudeMax = 180;
 
+export const createOrderResponseMeshTypeMax = 100;
+
 
 
 export const CreateOrderResponse = zod.object({
@@ -1438,6 +1443,7 @@ export const CreateOrderResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(createOrderResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -1462,6 +1468,8 @@ export const getOrderResponseSiteLatitudeMax = 90;
 
 export const getOrderResponseSiteLongitudeMin = -180;
 export const getOrderResponseSiteLongitudeMax = 180;
+
+export const getOrderResponseMeshTypeMax = 100;
 
 
 
@@ -1492,6 +1500,7 @@ export const GetOrderResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(getOrderResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -1522,6 +1531,8 @@ export const updateOrderBodyClientGstinMax = 15;
 export const updateOrderBodyLocationNameMin = 2;
 export const updateOrderBodyLocationNameMax = 120;
 
+export const updateOrderBodyMeshTypeMax = 100;
+
 export const updateOrderBodyLocationCodeMin = 2;
 export const updateOrderBodyLocationCodeMax = 5;
 
@@ -1547,6 +1558,7 @@ export const UpdateOrderBody = zod.object({
   "clientGstin": zod.string().max(updateOrderBodyClientGstinMax).nullish(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']).optional(),
   "locationName": zod.string().min(updateOrderBodyLocationNameMin).max(updateOrderBodyLocationNameMax).optional(),
+  "meshType": zod.string().max(updateOrderBodyMeshTypeMax).nullish(),
   "locationCode": zod.string().min(updateOrderBodyLocationCodeMin).max(updateOrderBodyLocationCodeMax).optional(),
   "siteAddress": zod.string().min(updateOrderBodySiteAddressMin).max(updateOrderBodySiteAddressMax).optional(),
   "siteLatitude": zod.number().min(updateOrderBodySiteLatitudeMin).max(updateOrderBodySiteLatitudeMax).nullish(),
@@ -1561,6 +1573,8 @@ export const updateOrderResponseSiteLatitudeMax = 90;
 
 export const updateOrderResponseSiteLongitudeMin = -180;
 export const updateOrderResponseSiteLongitudeMax = 180;
+
+export const updateOrderResponseMeshTypeMax = 100;
 
 
 
@@ -1591,6 +1605,7 @@ export const UpdateOrderResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(updateOrderResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -1615,6 +1630,8 @@ export const deleteOrderResponseSiteLatitudeMax = 90;
 
 export const deleteOrderResponseSiteLongitudeMin = -180;
 export const deleteOrderResponseSiteLongitudeMax = 180;
+
+export const deleteOrderResponseMeshTypeMax = 100;
 
 
 
@@ -1645,6 +1662,7 @@ export const DeleteOrderResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(deleteOrderResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -1669,6 +1687,8 @@ export const addOrderLotResponseSiteLatitudeMax = 90;
 
 export const addOrderLotResponseSiteLongitudeMin = -180;
 export const addOrderLotResponseSiteLongitudeMax = 180;
+
+export const addOrderLotResponseMeshTypeMax = 100;
 
 
 
@@ -1699,6 +1719,7 @@ export const AddOrderLotResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(addOrderLotResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -1733,6 +1754,8 @@ export const createProjectLotResponseSiteLatitudeMax = 90;
 export const createProjectLotResponseSiteLongitudeMin = -180;
 export const createProjectLotResponseSiteLongitudeMax = 180;
 
+export const createProjectLotResponseMeshTypeMax = 100;
+
 
 
 export const CreateProjectLotResponse = zod.object({
@@ -1762,6 +1785,7 @@ export const CreateProjectLotResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(createProjectLotResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -1797,6 +1821,8 @@ export const updateProjectLotResponseSiteLatitudeMax = 90;
 export const updateProjectLotResponseSiteLongitudeMin = -180;
 export const updateProjectLotResponseSiteLongitudeMax = 180;
 
+export const updateProjectLotResponseMeshTypeMax = 100;
+
 
 
 export const UpdateProjectLotResponse = zod.object({
@@ -1826,6 +1852,7 @@ export const UpdateProjectLotResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(updateProjectLotResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -1851,6 +1878,8 @@ export const deleteProjectLotResponseSiteLatitudeMax = 90;
 
 export const deleteProjectLotResponseSiteLongitudeMin = -180;
 export const deleteProjectLotResponseSiteLongitudeMax = 180;
+
+export const deleteProjectLotResponseMeshTypeMax = 100;
 
 
 
@@ -1881,6 +1910,7 @@ export const DeleteProjectLotResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(deleteProjectLotResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),
@@ -5485,7 +5515,35 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
-  "uploadedAt": zod.coerce.date()
+  "uploadedAt": zod.coerce.date(),
+  "confirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+})),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()])
 })),
   "confirmationDocuments": zod.array(zod.object({
   "id": zod.string(),
@@ -5496,7 +5554,35 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
-  "uploadedAt": zod.coerce.date()
+  "uploadedAt": zod.coerce.date(),
+  "confirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+})),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()])
 }))
 })
 export const GetPurchaseOrderRegisterResponse = zod.array(GetPurchaseOrderRegisterResponseItem)
@@ -5546,7 +5632,35 @@ export const ListOrderDocumentsResponseItem = zod.object({
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
-  "uploadedAt": zod.coerce.date()
+  "uploadedAt": zod.coerce.date(),
+  "confirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+})),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()])
 })
 export const ListOrderDocumentsResponse = zod.array(ListOrderDocumentsResponseItem)
 
@@ -5657,7 +5771,35 @@ export const UploadOrderDocumentResponse = zod.object({
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
-  "uploadedAt": zod.coerce.date()
+  "uploadedAt": zod.coerce.date(),
+  "confirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+})),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()])
 })
 
 
@@ -5689,7 +5831,35 @@ export const UploadQuotationConfirmationDocumentResponse = zod.object({
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
-  "uploadedAt": zod.coerce.date()
+  "uploadedAt": zod.coerce.date(),
+  "confirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+})),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()])
 })
 
 
@@ -5730,7 +5900,35 @@ export const ReplaceOrderDocumentResponse = zod.object({
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
   "uploadedBy": zod.string(),
-  "uploadedAt": zod.coerce.date()
+  "uploadedAt": zod.coerce.date(),
+  "confirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+})),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()])
 })
 
 
@@ -5775,6 +5973,8 @@ export const updateOrderBillingResponseSiteLatitudeMax = 90;
 export const updateOrderBillingResponseSiteLongitudeMin = -180;
 export const updateOrderBillingResponseSiteLongitudeMax = 180;
 
+export const updateOrderBillingResponseMeshTypeMax = 100;
+
 
 
 export const UpdateOrderBillingResponse = zod.object({
@@ -5804,6 +6004,7 @@ export const UpdateOrderBillingResponse = zod.object({
   "clientGstin": zod.string().nullable(),
   "locationCode": zod.string(),
   "locationName": zod.string(),
+  "meshType": zod.string().max(updateOrderBillingResponseMeshTypeMax).nullable(),
   "status": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
   "isActive": zod.boolean(),
   "notes": zod.string().nullable(),

@@ -652,6 +652,11 @@ export interface Order {
   clientGstin: string | null;
   locationCode: string;
   locationName: string;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  meshType: string | null;
   status: OrderStatus;
   isActive: boolean;
   /** @nullable */
@@ -792,6 +797,11 @@ export interface OrderUpdate {
      * @maxLength 120
      */
   locationName?: string;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  meshType?: string | null;
   /**
      * @minLength 2
      * @maxLength 5
@@ -1522,6 +1532,61 @@ export interface OrderDocumentCategoryInput {
   name: string;
 }
 
+export interface ConfirmationInfoField {
+  label: string;
+  value: string;
+}
+
+export interface ConfirmationInfoSection {
+  title: string;
+  fields: ConfirmationInfoField[];
+}
+
+export interface ConfirmationWindowRow {
+  windowNo: string;
+  location: string;
+  width: string;
+  height: string;
+  area: string;
+  quantity: string;
+  windowType: string;
+  glass: string;
+  lockType: string;
+  profile: string;
+  mesh: string;
+}
+
+export type ConfirmationInfoStatus = typeof ConfirmationInfoStatus[keyof typeof ConfirmationInfoStatus];
+
+
+export const ConfirmationInfoStatus = {
+  extracted: 'extracted',
+  no_text: 'no_text',
+  unsupported: 'unsupported',
+  failed: 'failed',
+} as const;
+
+export type ConfirmationInfoMethod = typeof ConfirmationInfoMethod[keyof typeof ConfirmationInfoMethod];
+
+
+export const ConfirmationInfoMethod = {
+  pdf_text: 'pdf_text',
+  ocr: 'ocr',
+  none: 'none',
+} as const;
+
+export interface ConfirmationInfo {
+  status: ConfirmationInfoStatus;
+  method: ConfirmationInfoMethod;
+  extractedAt: string;
+  sections: ConfirmationInfoSection[];
+  windows: ConfirmationWindowRow[];
+  terms: string[];
+  rawText: string;
+  /** @nullable */
+  error: string | null;
+}
+
 export interface OrderDocument {
   id: string;
   orderRecordId: string;
@@ -1533,6 +1598,7 @@ export interface OrderDocument {
   sizeBytes: number;
   uploadedBy: string;
   uploadedAt: string;
+  confirmationInfo: ConfirmationInfo | null;
 }
 
 export type OrderDocumentList = OrderDocument[];

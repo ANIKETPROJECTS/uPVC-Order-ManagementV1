@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ConfirmationInfo } from './confirmationInfo';
 import type { OrderDocumentCategory } from './orderDocumentCategory';
 
 export interface OrderDocument {
@@ -18,4 +19,5 @@ export interface OrderDocument {
   sizeBytes: number;
   uploadedBy: string;
   uploadedAt: Date;
+  confirmationInfo: ConfirmationInfo | null;
 }

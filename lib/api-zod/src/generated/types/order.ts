@@ -47,6 +47,11 @@ export interface Order {
   clientGstin: string | null;
   locationCode: string;
   locationName: string;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  meshType: string | null;
   status: OrderStatus;
   isActive: boolean;
   /** @nullable */

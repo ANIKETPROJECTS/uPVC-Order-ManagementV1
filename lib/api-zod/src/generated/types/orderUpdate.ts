@@ -40,6 +40,11 @@ export interface OrderUpdate {
      */
   locationName?: string;
   /**
+     * @maxLength 100
+     * @nullable
+     */
+  meshType?: string | null;
+  /**
      * @minLength 2
      * @maxLength 5
      */

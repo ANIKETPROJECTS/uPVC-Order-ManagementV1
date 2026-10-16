@@ -53,6 +53,7 @@ import {
 } from "../lib/project-upload-storage";
 import { parseGlassOrderWorkbook, type ParsedGlassWorkbookSection } from "../lib/glass-order-workbook";
 import { formatProjectPieceId } from "../lib/order-identifiers";
+import { extractConfirmationInfo } from "../lib/confirmation-extraction";
 
 const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
@@ -228,7 +229,7 @@ const withIstCalendarDate = (value: string | Date, time: Date): Date | null => {
   ) - (5 * 60 + 30) * 60_000;
   return new Date(timestamp);
 };
-const docResponse = (d: any) => ({ id: d._id, orderRecordId: d.orderRecordId, quotationRequestId: d.quotationRequestId ?? null, filename: d.filename, category: d.category, contentType: d.contentType, sizeBytes: d.sizeBytes, uploadedBy: d.uploadedBy, uploadedAt: d.uploadedAt.toISOString() });
+const docResponse = (d: any) => ({ id: d._id, orderRecordId: d.orderRecordId, quotationRequestId: d.quotationRequestId ?? null, filename: d.filename, category: d.category, contentType: d.contentType, sizeBytes: d.sizeBytes, uploadedBy: d.uploadedBy, uploadedAt: d.uploadedAt.toISOString(), confirmationInfo: d.confirmationInfo ?? null });
 const activityResponse = (a: any) => ({ ...a, id: a._id, createdAt: a.createdAt.toISOString() });
 const gridFsOptions = (contentType: string, orderRecordId: string, category: string) => ({ contentType, metadata: { orderRecordId, category } });
 const toWhatsAppNumber = (value: string | null | undefined) => {
@@ -793,7 +794,7 @@ router.post("/orders/:id/windows", async (req, res): Promise<void> => {
       ...Array.from({ length: frameCount }, (_, i) => ({ id: randomUUID(), kind: "frame" as const, pieceNo: i + 1, status: "pending" as const })),
       ...Array.from({ length: b.data.glassShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "glass_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
       ...Array.from({ length: b.data.meshShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "mesh_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
-    ], location: b.data.location ?? null, glassType: b.data.glassType ?? null, meshType: b.data.meshType ?? null, glassShutterCount: b.data.glassShutterCount ?? null, glassShutterReadyCount: b.data.glassShutterReadyCount ?? 0, meshShutterCount: b.data.meshShutterCount ?? null, meshShutterReadyCount: b.data.meshShutterReadyCount ?? 0, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
+    ], location: b.data.location ?? null, glassType: b.data.glassType ?? null, meshType: order.meshType ?? null, glassShutterCount: b.data.glassShutterCount ?? null, glassShutterReadyCount: b.data.glassShutterReadyCount ?? 0, meshShutterCount: b.data.meshShutterCount ?? null, meshShutterReadyCount: b.data.meshShutterReadyCount ?? 0, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
   try { await getOrderWindows(await getMongoDb()).insertOne(w); } catch (e) { if ((e as any)?.code === 11000) { res.status(409).json({ error: "Window number already exists for this order." }); return; } throw e; }
   await event(p.data.id, actor, "window.created", `Added window ${w.windowNo}.`); res.status(201).json(CreateOrderWindowResponse.parse(windowResponse(w)));
 });
@@ -1557,7 +1558,8 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
       return;
     }
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
-    const meta = { _id: randomUUID(), orderRecordId: p.data.id, quotationRequestId: null, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: null, storagePath, uploadedBy: actor.id, uploadedAt: new Date() };
+    const confirmationInfo = p.data.category === "confirmation" ? await extractConfirmationInfo(body, p.data.filename) : null;
+    const meta = { _id: randomUUID(), orderRecordId: p.data.id, quotationRequestId: null, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: null, storagePath, uploadedBy: actor.id, uploadedAt: new Date(), confirmationInfo };
     try {
       await getOrderDocumentMetadata(db).insertOne(meta);
     } catch (error) {
@@ -1597,6 +1599,7 @@ router.post("/orders/:id/quotation-requests/:quotationRequestId/confirmation-doc
       return;
     }
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
+    const confirmationInfo = await extractConfirmationInfo(body, p.data.filename);
     const meta = {
       _id: randomUUID(),
       orderRecordId: p.data.id,
@@ -1609,6 +1612,7 @@ router.post("/orders/:id/quotation-requests/:quotationRequestId/confirmation-doc
       storagePath,
       uploadedBy: actor.id,
       uploadedAt: new Date(),
+      confirmationInfo,
     };
     try {
       await getOrderDocumentMetadata(db).insertOne(meta);
@@ -1699,6 +1703,7 @@ router.put("/orders/:id/documents/:documentId/content/:filename", async (req, re
 
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
     const uploadedAt = new Date();
+    const confirmationInfo = meta.category === "confirmation" ? await extractConfirmationInfo(body, p.data.filename) : null;
     let replaced;
     try {
       replaced = await documents.updateOne(
@@ -1720,6 +1725,7 @@ router.put("/orders/:id/documents/:documentId/content/:filename", async (req, re
             gridFsId: null,
             uploadedBy: actor.id,
             uploadedAt,
+            ...(meta.category === "confirmation" ? { confirmationInfo } : {}),
           },
         },
       );

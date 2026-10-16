@@ -222,6 +222,7 @@ function orderResponse(order: OrderDocument) {
     clientGstin: order.clientGstin,
     locationCode: order.locationCode,
     locationName: order.locationName,
+    meshType: order.meshType ?? null,
     status: order.status,
     isActive: order.isActive !== false,
     notes: order.notes,
@@ -867,6 +868,7 @@ router.patch(
       parsed.data.siteLatitude === undefined &&
       parsed.data.siteLongitude === undefined &&
       parsed.data.locationName === undefined &&
+      parsed.data.meshType === undefined &&
       parsed.data.quotationId === undefined &&
       parsed.data.isActive === undefined
     ) {
@@ -885,6 +887,9 @@ router.patch(
     };
     if (parsed.data.status !== undefined) {
       updates.status = parsed.data.status as OrderStatus;
+    }
+    if (parsed.data.meshType !== undefined) {
+      updates.meshType = parsed.data.meshType?.trim() || null;
     }
     if (parsed.data.isActive !== undefined) {
       updates.isActive = parsed.data.isActive;
@@ -1029,6 +1034,12 @@ router.patch(
       res.status(404).json({ error: "Order not found." });
       return;
     }
+    if (parsed.data.meshType !== undefined) {
+      await getOrderWindows(db).updateMany(
+        { orderRecordId: params.data.id, archivedAt: null },
+        { $set: { meshType: updates.meshType ?? null, updatedAt: updates.updatedAt, updatedBy: actorId } },
+      );
+    }
     const order = await getOrders(db).findOne({ _id: params.data.id });
     if (!order) {
       res.status(404).json({ error: "Order not found." });
@@ -1084,6 +1095,7 @@ router.patch(
         before.siteLatitude !== order.siteLatitude ||
         before.siteLongitude !== order.siteLongitude ||
         before.status !== order.status ||
+        before.meshType !== order.meshType ||
         before.notes !== order.notes ||
         activeStateChanged)
     ) {
@@ -1101,6 +1113,7 @@ router.patch(
         before.siteAddress !== order.siteAddress ? "site address" : "",
         before.siteLatitude !== order.siteLatitude || before.siteLongitude !== order.siteLongitude ? "map pin" : "",
         before.status !== order.status ? `status to ${order.status}` : "",
+        before.meshType !== order.meshType ? `mesh type to ${order.meshType ?? "not set"} for all windows` : "",
         before.notes !== order.notes ? "internal notes" : "",
         quotationChanged
           ? order.quotationNo

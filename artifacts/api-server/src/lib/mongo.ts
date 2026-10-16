@@ -207,6 +207,7 @@ export interface OrderDocument {
   clientGstin: string | null;
   locationCode: string;
   locationName: string;
+  meshType?: string | null;
   quotationId?: string | null;
   quotationNo?: string | null;
   needsReview?: boolean;
@@ -357,6 +358,7 @@ export interface OrderDocumentCategoryDocument {
 export interface OrderDocumentMetadataDocument {
   _id: string; orderRecordId: string; quotationRequestId?: string | null; filename: string; category: DocumentCategory;
   contentType: string; sizeBytes: number; gridFsId: string | null; storagePath?: string | null; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
+  confirmationInfo?: import("./confirmation-extraction").ConfirmationInfo | null;
 }
 export interface OrderActivityDocument {
   _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;

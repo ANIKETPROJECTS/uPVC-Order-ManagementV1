@@ -4238,6 +4238,9 @@ components:
           type: string
         locationName:
           type: string
+        meshType:
+          type: ["string", "null"]
+          maxLength: 100
         status:
           $ref: "#/components/schemas/OrderStatus"
         isActive:
@@ -4277,6 +4280,7 @@ components:
         - clientGstin
         - locationCode
         - locationName
+        - meshType
         - status
         - isActive
         - notes
@@ -4414,6 +4418,9 @@ components:
           type: string
           minLength: 2
           maxLength: 120
+        meshType:
+          type: ["string", "null"]
+          maxLength: 100
         locationCode:
           type: string
           minLength: 2
@@ -5246,6 +5253,67 @@ components:
           minLength: 1
           maxLength: 64
       required: [name]
+    ConfirmationInfoField:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+      required: [label, value]
+    ConfirmationInfoSection:
+      type: object
+      properties:
+        title:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfirmationInfoField"
+      required: [title, fields]
+    ConfirmationWindowRow:
+      type: object
+      properties:
+        windowNo: { type: string }
+        location: { type: string }
+        width: { type: string }
+        height: { type: string }
+        area: { type: string }
+        quantity: { type: string }
+        windowType: { type: string }
+        glass: { type: string }
+        lockType: { type: string }
+        profile: { type: string }
+        mesh: { type: string }
+      required: [windowNo, location, width, height, area, quantity, windowType, glass, lockType, profile, mesh]
+    ConfirmationInfo:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [extracted, no_text, unsupported, failed]
+        method:
+          type: string
+          enum: [pdf_text, ocr, none]
+        extractedAt:
+          type: string
+          format: date-time
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfirmationInfoSection"
+        windows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfirmationWindowRow"
+        terms:
+          type: array
+          items: { type: string }
+        rawText:
+          type: string
+        error:
+          type: ["string", "null"]
+      required: [status, method, extractedAt, sections, windows, terms, rawText, error]
     OrderDocument:
       type: object
       properties:
@@ -5268,6 +5336,10 @@ components:
         uploadedAt:
           type: string
           format: date-time
+        confirmationInfo:
+          anyOf:
+            - $ref: "#/components/schemas/ConfirmationInfo"
+            - type: "null"
       required:
         - id
         - orderRecordId
@@ -5278,6 +5350,7 @@ components:
         - sizeBytes
         - uploadedBy
         - uploadedAt
+        - confirmationInfo
     OrderDocumentList:
       type: array
       items:
