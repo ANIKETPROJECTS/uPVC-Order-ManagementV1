@@ -6,7 +6,7 @@ import { Link } from 'wouter';
 import { z } from 'zod';
 import { QRCodeCanvas } from 'qrcode.react';
 import {
-  ArrowRight, ArrowUpDown, CalendarDays, Check, CircleAlert, ClipboardCheck,
+  ArrowRight, ArrowUpDown, CalendarDays, Camera, Check, CircleAlert, ClipboardCheck,
   Copy, Download, FileText, LayoutGrid, List, MapPin, MessageSquareText, QrCode,
   RefreshCw, Search, ShieldCheck, Upload, Wrench,
 } from 'lucide-react';
@@ -407,7 +407,7 @@ export default function InstallationPage({ user }: { user: User }) {
           <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.18em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> Fulfillment · service completion</p>
           <h1 className="mt-2 font-display text-3xl font-bold tracking-[-.05em] md:text-[2.65rem]">Plan the visit. Close the order.</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Coordinate field teams for delivered orders, keep the schedule current, and record completion or follow-up issues.</p>
-        </div><Link href="/dispatch" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background/80 px-4 text-xs font-bold transition hover:border-primary/35 hover:text-primary" data-testid="link-back-to-dispatch">Dispatch register <ArrowRight size={14} /></Link></div>
+        </div><div className="flex flex-wrap gap-2"><Link href="/order-scanner" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:bg-primary/90" data-testid="link-scan-installation-qr"><Camera size={14} /> Scan QR</Link><Link href="/dispatch" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background/80 px-4 text-xs font-bold transition hover:border-primary/35 hover:text-primary" data-testid="link-back-to-dispatch">Dispatch register <ArrowRight size={14} /></Link></div></div>
       </section>
 
       {canView && requestedOrderId && <section className="overflow-hidden rounded-xl border border-primary/25 bg-card shadow-sm" aria-label="Focused installation assignment" data-testid="panel-focused-installation-assignment">

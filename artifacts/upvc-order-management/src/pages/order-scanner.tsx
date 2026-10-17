@@ -8,7 +8,7 @@ import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getDispatchRecordIdFromQr, getOrderRecordIdFromQr } from '@/lib/order-qr';
+import { getDispatchRecordIdFromQr, getInstallationRecordIdFromQr, getOrderRecordIdFromQr } from '@/lib/order-qr';
 import { useUpdateOrderWindow } from '@workspace/api-client-react';
 
 type ScannerError = {
@@ -24,10 +24,13 @@ export default function OrderScannerPage({ user }: { user: User }) {
   const lastInvalidQrRef = useRef('');
   const orderPermission = user.permissions?.['order-hub'];
   const dispatchPermission = user.permissions?.dispatch;
+  const installationPermission = user.permissions?.installation;
   const updateWindow = useUpdateOrderWindow();
   const canViewOrders = user.roleId === 'master-admin' || orderPermission === 'view' || orderPermission === 'edit';
   const canViewDispatch = user.roleId === 'master-admin' || dispatchPermission === 'view' || dispatchPermission === 'edit';
-  const canView = canViewOrders || canViewDispatch;
+  const canViewInstallation = user.roleId === 'master-admin' || installationPermission === 'view' || installationPermission === 'edit';
+  const canEditInstallation = user.roleId === 'master-admin' || installationPermission === 'edit';
+  const canView = canViewOrders || canViewDispatch || canViewInstallation;
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<ScannerError | null>(null);
   const needsHttps =
@@ -119,6 +122,24 @@ export default function OrderScannerPage({ user }: { user: User }) {
           return;
         }
 
+        const installationRecordId = getInstallationRecordIdFromQr(result.getText());
+        if (installationRecordId) {
+          if (!canEditInstallation) {
+            setError({
+              kind: 'qr',
+              message: 'Installation edit access is required to update installation status.',
+            });
+            return;
+          }
+          handledResultRef.current = true;
+          activeControls.stop();
+          controlsRef.current = null;
+          setScanning(false);
+          setError(null);
+          setLocation(`/installation?order=${encodeURIComponent(installationRecordId)}&updateStatus=1`);
+          return;
+        }
+
         const recordId = getOrderRecordIdFromQr(result.getText());
         if (!recordId) {
           if (lastInvalidQrRef.current !== result.getText()) {
@@ -126,7 +147,7 @@ export default function OrderScannerPage({ user }: { user: User }) {
             setError({
               kind: 'qr',
               message:
-                'This code is not an order or dispatch QR. The camera is still on; scan a supported code to continue.',
+                'This is not a supported order, factory piece, dispatch, or installation status QR. The camera is still on; scan a supported code to continue.',
             });
           }
           return;
@@ -163,24 +184,24 @@ export default function OrderScannerPage({ user }: { user: User }) {
       <AppShell user={user} title="QR scanner" eyebrow="Order access">
         <Alert variant="destructive" className="mx-auto mt-12 max-w-lg">
           <CircleAlert size={18} />
-          <AlertTitle>Order or dispatch access required</AlertTitle>
-          <AlertDescription>Your role does not have permission to scan order or dispatch codes.</AlertDescription>
+          <AlertTitle>Order, dispatch, or installation access required</AlertTitle>
+          <AlertDescription>Your role does not have permission to scan these codes.</AlertDescription>
         </Alert>
       </AppShell>
     );
   }
 
   return (
-    <AppShell user={user} title="QR scanner" eyebrow="Sales & orders">
+      <AppShell user={user} title="QR scanner" eyebrow="Order and field operations">
       <div className="mx-auto w-full max-w-2xl space-y-5">
         <Card className="border-border/80">
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Order lookup</p>
-              <CardTitle className="mt-1">Scan an order or dispatch QR</CardTitle>
+              <CardTitle className="mt-1">Scan an order, factory piece, dispatch, or installation QR</CardTitle>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Point your camera at an order QR to open its status page, or a dispatch QR to open the dispatch status action. Your role permissions control which records you can update.
+                  Scan an order QR to open its status page, a factory piece QR to update a component, a dispatch QR to open dispatch, or an Installation status QR to open the installation update form. Your role permissions control available actions.
                 </p>
               </div>
               <ScanLine size={22} className="shrink-0 text-primary" aria-hidden="true" />

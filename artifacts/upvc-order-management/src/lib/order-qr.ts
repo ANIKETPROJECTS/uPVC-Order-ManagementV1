@@ -32,6 +32,23 @@ export function getDispatchRecordIdFromQr(value: string): string | null {
   }
 }
 
+export function getInstallationRecordIdFromQr(value: string): string | null {
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+
+    const segments = url.pathname.split('/').filter(Boolean);
+    const installationIndex = segments.lastIndexOf('installation');
+    if (installationIndex < 0 || installationIndex !== segments.length - 1) return null;
+    if (url.searchParams.get('updateStatus') !== '1') return null;
+
+    const recordId = url.searchParams.get('order');
+    return recordId && !recordId.includes('/') ? recordId : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getOrderRecordIdFromQr(value: string): string | null {
   try {
     const url = new URL(value, window.location.origin);

@@ -165,7 +165,13 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
       .filter((module): module is (typeof MODULES)[number] => Boolean(module && isModuleVisible(module)));
 
   const orderHubModule = MODULES.find((module) => module.key === 'order-hub');
-  const canOpenOrderScanner = Boolean(orderHubModule && isModuleVisible(orderHubModule));
+  const dispatchModule = MODULES.find((module) => module.key === 'dispatch');
+  const installationModule = MODULES.find((module) => module.key === 'installation');
+  const canOpenOrderScanner = Boolean(
+    (orderHubModule && isModuleVisible(orderHubModule)) ||
+    (dispatchModule && isModuleVisible(dispatchModule)) ||
+    (installationModule && isModuleVisible(installationModule)),
+  );
 
   const renderModuleLink = (module: (typeof MODULES)[number]) => {
     const iconName = iconMap[module.key] || 'overview';
