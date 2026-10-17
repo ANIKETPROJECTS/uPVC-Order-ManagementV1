@@ -755,7 +755,6 @@ const windowSchema = z.object({
   windowType: z.string().min(1, 'Window type is required').max(100),
   location: z.string().max(120),
   glassType: z.string().max(100),
-  meshType: z.string().max(100),
   glassShutterCount: z.string(),
   glassShutterReadyCount: z.string(),
   meshShutterCount: z.string(),
@@ -770,8 +769,8 @@ type WindowFormValues = z.infer<typeof windowSchema>;
 
 type WindowDialogProps = { orderId: string; window: OrderWindow | null; user: User; open: boolean; onOpenChange: (open: boolean) => void; onComplete: () => void; defaultLotId?: string | null; allowMultiple?: boolean; universalMeshType: string };
 
-function emptyWindowValues(lotId: string | null, meshType = ''): WindowFormValues {
-  return { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', meshType, glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' };
+function emptyWindowValues(lotId: string | null): WindowFormValues {
+  return { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' };
 }
 
 function WindowDialog(props: WindowDialogProps) {
@@ -784,25 +783,25 @@ function BulkWindowDialog({ orderId, user, open, onOpenChange, onComplete, defau
   const canMeasure = hasPermission(user, 'measurements');
   const canReadiness = hasPermission(user, 'window-readiness');
   const canGlass = hasPermission(user, 'glass-procurement');
-  const [rows, setRows] = useState<{ key: number; values: WindowFormValues }[]>([{ key: 1, values: emptyWindowValues(defaultLotId, universalMeshType) }]);
+  const [rows, setRows] = useState<{ key: number; values: WindowFormValues }[]>([{ key: 1, values: emptyWindowValues(defaultLotId) }]);
   const [errors, setErrors] = useState<Record<number, Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
   const nextKey = useRef(2);
 
   useEffect(() => {
     if (open) {
-      setRows([{ key: 1, values: emptyWindowValues(defaultLotId, universalMeshType) }]);
+      setRows([{ key: 1, values: emptyWindowValues(defaultLotId) }]);
       setErrors({});
       nextKey.current = 2;
     }
-  }, [open, defaultLotId, universalMeshType]);
+  }, [open, defaultLotId]);
 
   const change = (key: number, field: keyof WindowFormValues, value: string | number) => {
     setRows((current) => current.map((row) => row.key === key ? { ...row, values: { ...row.values, [field]: value } } : row));
     setErrors((current) => ({ ...current, [key]: { ...current[key], [field]: '' } }));
   };
   const addRow = () => {
-    setRows((current) => [...current, { key: nextKey.current++, values: emptyWindowValues(defaultLotId, universalMeshType) }]);
+    setRows((current) => [...current, { key: nextKey.current++, values: emptyWindowValues(defaultLotId) }]);
   };
   const removeRow = (key: number) => {
     if (rows.length < 2) return;
@@ -816,7 +815,7 @@ function BulkWindowDialog({ orderId, user, open, onOpenChange, onComplete, defau
     windowType: values.windowType.trim(),
     location: values.location || null,
     glassType: values.glassType || null,
-    meshType: values.meshType || null,
+    meshType: universalMeshType.trim() || null,
     glassShutterCount: values.glassShutterCount === '' ? null : Number(values.glassShutterCount),
     glassShutterReadyCount: values.glassShutterReadyCount === '' ? null : Number(values.glassShutterReadyCount),
     meshShutterCount: values.meshShutterCount === '' ? null : Number(values.meshShutterCount),
@@ -873,7 +872,7 @@ function BulkWindowDialog({ orderId, user, open, onOpenChange, onComplete, defau
       onComplete();
     } catch (error) {
       const remaining = rows.slice(saved);
-      setRows(remaining.length ? remaining : [{ key: nextKey.current++, values: emptyWindowValues(defaultLotId, universalMeshType) }]);
+      setRows(remaining.length ? remaining : [{ key: nextKey.current++, values: emptyWindowValues(defaultLotId) }]);
       if (saved) onComplete();
       toast({
         title: saved ? `${saved} saved; remaining entries were not added` : 'Windows could not be saved',
@@ -938,9 +937,9 @@ function SingleWindowDialog({ orderId, window, user, open, onOpenChange, onCompl
   const canAssignLot = hasPermission(user, 'order-hub');
   const create = useCreateOrderWindow();
   const update = useUpdateOrderWindow();
-  const form = useForm<WindowFormValues>({ resolver: zodResolver(windowSchema), defaultValues: { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', meshType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: null, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' } });
+  const form = useForm<WindowFormValues>({ resolver: zodResolver(windowSchema), defaultValues: { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: null, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' } });
   useEffect(() => {
-    if (open) form.reset(window ? { windowNo: window.windowNo, widthMm: window.widthMm ?? 0, heightMm: window.heightMm ?? 0, windowType: window.windowType ?? '', location: window.location ?? '', glassType: window.glassType ?? '', meshType: window.meshType ?? '', glassShutterCount: window.glassShutterCount == null ? '' : String(window.glassShutterCount), glassShutterReadyCount: window.glassShutterReadyCount == null ? '' : String(window.glassShutterReadyCount), meshShutterCount: window.meshShutterCount == null ? '' : String(window.meshShutterCount), meshShutterReadyCount: window.meshShutterReadyCount == null ? '' : String(window.meshShutterReadyCount), lotId: window.lotId, frameStatus: window.frameStatus, shutterStatus: window.shutterStatus, glassStatus: window.glassStatus, pendingReason: window.pendingReason || '' } : { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', meshType: universalMeshType, glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: defaultLotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' });
+    if (open) form.reset(window ? { windowNo: window.windowNo, widthMm: window.widthMm ?? 0, heightMm: window.heightMm ?? 0, windowType: window.windowType ?? '', location: window.location ?? '', glassType: window.glassType ?? '', glassShutterCount: window.glassShutterCount == null ? '' : String(window.glassShutterCount), glassShutterReadyCount: window.glassShutterReadyCount == null ? '' : String(window.glassShutterReadyCount), meshShutterCount: window.meshShutterCount == null ? '' : String(window.meshShutterCount), meshShutterReadyCount: window.meshShutterReadyCount == null ? '' : String(window.meshShutterReadyCount), lotId: window.lotId, frameStatus: window.frameStatus, shutterStatus: window.shutterStatus, glassStatus: window.glassStatus, pendingReason: window.pendingReason || '' } : { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: defaultLotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' });
   }, [form, open, window, defaultLotId]);
   const save = (values: WindowFormValues) => {
     const options = { onSuccess: () => { toast({ title: window ? 'Window updated' : 'Window added', description: 'The order window record is now current.' }); onOpenChange(false); onComplete(); }, onError: () => toast({ title: 'Window could not be saved', description: 'Check your permissions and the entered values.', variant: 'destructive' as const }) };
@@ -968,27 +967,24 @@ function WindowSelectField({ control, name, label, options, disabled, testId }: 
   </div>}</div>;
 }
 
-function WindowsPanel({ orderId, user, allowMultiple = false }: { orderId: string; user: User; allowMultiple?: boolean }) {
-  const { toast } = useToast();
+function UniversalMeshTypePanel({ orderId, orderMeshType, windows, user }: { orderId: string; orderMeshType: string | null; windows: OrderWindow[]; user: User }) {
   const queryClient = useQueryClient();
-  const query = useListOrderWindows(orderId, { query: { queryKey: getListOrderWindowsQueryKey(orderId) } });
-  const orderQuery = useGetOrder(orderId, { query: { queryKey: getGetOrderQueryKey(orderId) } });
-  const updateOrder = useUpdateOrder();
-  const archive = useArchiveOrderWindow();
-  const canMeasure = hasPermission(user, 'measurements');
+  const { toast } = useToast();
   const canEditOrder = hasPermission(user, 'order-hub');
-  const [meshTypeDraft, setMeshTypeDraft] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingWindow, setEditingWindow] = useState<OrderWindow | null>(null);
-  const windows = query.data || [];
+  const updateOrder = useUpdateOrder();
   const distinctMeshTypes = [...new Set(windows.map((item) => item.meshType).filter((value): value is string => Boolean(value)))];
-  const appliedMeshType = orderQuery.data?.meshType ?? (distinctMeshTypes.length === 1 ? distinctMeshTypes[0] : '');
-  useEffect(() => { if (orderQuery.data) setMeshTypeDraft(orderQuery.data.meshType ?? (distinctMeshTypes.length === 1 ? distinctMeshTypes[0] : '')); }, [orderQuery.data?.meshType, query.data]);
-  const readyCount = windows.filter((item) => item.frameStatus === OrderWindowReadiness.ready && item.shutterStatus === OrderWindowReadiness.ready && item.glassStatus === OrderGlassStatus.received).length;
-  const openAdd = () => { setEditingWindow(null); setDialogOpen(true); };
+  const fallbackMeshType = distinctMeshTypes.length === 1 ? distinctMeshTypes[0] : '';
+  const appliedMeshType = orderMeshType ?? fallbackMeshType;
+  const [meshTypeDraft, setMeshTypeDraft] = useState(appliedMeshType);
+
+  useEffect(() => {
+    setMeshTypeDraft(orderMeshType ?? fallbackMeshType);
+  }, [orderMeshType, fallbackMeshType]);
+
   const applyMeshType = () => updateOrder.mutate(
     { id: orderId, data: { meshType: meshTypeDraft.trim() || null } },
-    { onSuccess: async () => {
+    { onSuccess: async (updated) => {
+      setMeshTypeDraft(updated.meshType || '');
       toast({ title: 'Mesh type applied', description: 'The order and all its windows now use this mesh type.' });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) }),
@@ -997,18 +993,39 @@ function WindowsPanel({ orderId, user, allowMultiple = false }: { orderId: strin
       ]);
     }, onError: () => toast({ title: 'Mesh type could not be saved', variant: 'destructive' as const }) },
   );
+
+  return <section className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm" data-testid="universal-mesh-type">
+    <div className="min-w-[220px] flex-1 space-y-1 text-xs font-medium">
+      <label htmlFor={`mesh-type-input-${orderId}`} className="block">Mesh type for all windows</label>
+      <Input id={`mesh-type-input-${orderId}`} list={`mesh-type-options-${orderId}`} value={meshTypeDraft} disabled={!canEditOrder || updateOrder.isPending} placeholder="e.g. Insect mesh, None" onChange={(event) => setMeshTypeDraft(event.target.value)} data-testid="input-universal-mesh-type" />
+      <datalist id={`mesh-type-options-${orderId}`}>{distinctMeshTypes.map((value) => <option value={value} key={value} />)}</datalist>
+    </div>
+    {canEditOrder && <Button type="button" size="sm" variant="outline" disabled={updateOrder.isPending || meshTypeDraft.trim() === (appliedMeshType || '')} onClick={applyMeshType} data-testid="button-apply-universal-mesh">{updateOrder.isPending ? 'Saving…' : 'Apply to all windows'}</Button>}
+    <p className="w-full text-[11px] text-muted-foreground">Choose it once here. The selected mesh type applies to existing windows and new windows added to this order.</p>
+  </section>;
+}
+
+function WindowsPanel({ orderId, user, allowMultiple = false }: { orderId: string; user: User; allowMultiple?: boolean }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const query = useListOrderWindows(orderId, { query: { queryKey: getListOrderWindowsQueryKey(orderId) } });
+  const orderQuery = useGetOrder(orderId, { query: { queryKey: getGetOrderQueryKey(orderId) } });
+  const archive = useArchiveOrderWindow();
+  const canMeasure = hasPermission(user, 'measurements');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingWindow, setEditingWindow] = useState<OrderWindow | null>(null);
+  const windows = query.data || [];
+  const distinctMeshTypes = [...new Set(windows.map((item) => item.meshType).filter((value): value is string => Boolean(value)))];
+  const universalMeshType = orderQuery.data?.meshType ?? (distinctMeshTypes.length === 1 ? distinctMeshTypes[0] : '');
+  const readyCount = windows.filter((item) => item.frameStatus === OrderWindowReadiness.ready && item.shutterStatus === OrderWindowReadiness.ready && item.glassStatus === OrderGlassStatus.received).length;
+  const openAdd = () => { setEditingWindow(null); setDialogOpen(true); };
   const archiveWindow = (window: OrderWindow) => {
     if (!globalThis.confirm(`Archive window ${window.windowNo}?`)) return;
     archive.mutate({ id: orderId, windowId: window.id }, { onSuccess: () => { toast({ title: 'Window archived' }); void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Window could not be archived', variant: 'destructive' as const }) });
   };
   return <Card className="border-border/80" data-testid="card-order-windows"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Manufacturing register</p><CardTitle className="mt-1 text-base">Windows <span className="font-mono text-xs font-normal text-muted-foreground">{windows.length} · {readyCount} fully ready</span></CardTitle><p className="mt-1 text-xs text-muted-foreground">Measurements, frame, shutter, and glass state per opening.</p></div>{canMeasure && <Button size="sm" onClick={openAdd} data-testid="button-add-window"><Plus size={14} /> Add window</Button>}</CardHeader><CardContent>
-    <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-muted/25 p-3" data-testid="universal-mesh-type">
-      <label className="min-w-[220px] flex-1 space-y-1 text-xs font-medium"><span>Mesh type for all windows</span><Input list={`mesh-type-options-${orderId}`} value={meshTypeDraft} disabled={!canEditOrder || updateOrder.isPending} placeholder="e.g. Insect mesh, None" onChange={(event) => setMeshTypeDraft(event.target.value)} data-testid="input-universal-mesh-type" /><datalist id={`mesh-type-options-${orderId}`}>{distinctMeshTypes.map((value) => <option value={value} key={value} />)}</datalist></label>
-      {canEditOrder && <Button type="button" size="sm" variant="outline" disabled={updateOrder.isPending || meshTypeDraft.trim() === (appliedMeshType || '')} onClick={applyMeshType} data-testid="button-apply-universal-mesh">{updateOrder.isPending ? 'Saving…' : 'Apply to all windows'}</Button>}
-      <p className="w-full text-[11px] text-muted-foreground">The selected mesh type is shared by existing windows and automatically used for new windows.</p>
-    </div>
     {query.isLoading ? <div className="space-y-3" data-testid="state-windows-loading">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Windows could not be loaded." testId="state-windows-error" /> : windows.length === 0 ? <ZeroState icon={Wrench} title="No window records yet" description={canMeasure ? 'Add the first opening to begin the manufacturing register.' : 'No window records have been persisted for this order.'} testId="state-windows-empty" /> : <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Window</th><th className="px-3 py-3">Dimensions</th><th className="px-3 py-3">Area</th><th className="px-3 py-3">Frame</th><th className="px-3 py-3">Shutter</th><th className="px-3 py-3">Glass</th><th className="px-3 py-3 text-right">Actions</th></tr></thead><tbody>{windows.map((item) => <tr key={item.id} className="group border-b border-border/50 last:border-0" data-testid={`row-window-${item.id}`}><td className="px-3 py-3"><p className="font-semibold" data-testid={`text-window-no-${item.id}`}>{item.windowNo}</p><p className="mt-1 text-[11px] text-muted-foreground">{item.windowType || 'Type pending'}</p>{item.pendingReason && <p className="mt-1 max-w-[180px] truncate text-[10px] text-amber-700" title={item.pendingReason}>{item.pendingReason}</p>}</td><td className="px-3 py-3 font-mono text-[11px]">{item.widthMm === null || item.heightMm === null ? 'Measurements pending' : `${item.widthMm} × ${item.heightMm} mm`}</td><td className="px-3 py-3 font-mono">{item.sqFt === null ? '—' : `${item.sqFt.toFixed(2)} sq ft`}</td><td className="px-3 py-3"><ReadinessPill value={item.frameStatus} /><PieceStatusList pieces={item.pieces.filter((piece) => piece.kind === 'frame')} /></td><td className="px-3 py-3"><ReadinessPill value={item.shutterStatus} /><PieceStatusList pieces={item.pieces.filter((piece) => piece.kind !== 'frame')} /></td><td className="px-3 py-3"><GlassPill value={item.glassStatus} /></td><td className="px-3 py-3"><div className="flex justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"><Button variant="ghost" size="icon" disabled={!canMeasure && !hasPermission(user, 'window-readiness') && !hasPermission(user, 'glass-procurement')} onClick={() => { setEditingWindow(item); setDialogOpen(true); }} data-testid={`button-edit-window-${item.id}`}><Pencil size={14} /></Button>{canMeasure && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => archiveWindow(item)} data-testid={`button-archive-window-${item.id}`}><Archive size={14} /></Button>}</div></td></tr>)}</tbody></table></div>}
-  </CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} allowMultiple={allowMultiple} universalMeshType={appliedMeshType} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>;
+   </CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} allowMultiple={allowMultiple} universalMeshType={universalMeshType} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>;
 }
 
 function PieceStatusList({ pieces }: { pieces: OrderWindow['pieces'] }) {
@@ -1231,6 +1248,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
             <SummaryStat label="Glass type" value={glassType} detail="From window records" testId="project-stat-glass" />
             <SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : paid == null ? 'Not set' : paid > 0 ? `Due — ${plainInr(paid)}` : 'Paid'} detail="Payments stay on the project" testId="project-stat-payment" />
           </div>
+          <UniversalMeshTypePanel orderId={order.id} orderMeshType={order.meshType} windows={windows} user={user} />
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5" data-testid="section-project-lot-progress">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryStat label="Planned window qty" value={String(total)} detail="Counted from project windows" testId="project-stat-planned-windows" />
@@ -2125,6 +2143,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
       <Tabs key={id} defaultValue={['overview', 'windows', 'payments', 'confirmation-info', 'documents', 'activity'].includes(new URLSearchParams(window.location.search).get('tab') || '') ? new URLSearchParams(window.location.search).get('tab')! : 'overview'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-6"><TabsTrigger value="overview" className="py-2.5 text-xs sm:text-sm">Overview</TabsTrigger><TabsTrigger value="windows" className="py-2.5 text-xs sm:text-sm">Windows</TabsTrigger><TabsTrigger value="payments" className="py-2.5 text-xs sm:text-sm">Payments</TabsTrigger><TabsTrigger value="confirmation-info" className="py-2.5 text-xs sm:text-sm">Confirmation info</TabsTrigger><TabsTrigger value="documents" className="py-2.5 text-xs sm:text-sm">Documents</TabsTrigger><TabsTrigger value="activity" className="py-2.5 text-xs sm:text-sm">Activity</TabsTrigger></TabsList>
       <TabsContent value="overview" className="space-y-5">
          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Location" value={record.siteAddress || record.locationName || 'Not recorded'} detail={record.locationName || 'Site'} testId="text-summary-location" /><SummaryStat label="Phone" value={record.clientPhone || 'Not recorded'} detail="Client contact" testId="text-summary-phone" /><SummaryStat label="Mesh Type" value={record.meshType || [...new Set(windowRows.map((w) => w.meshType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="Shared across all order windows" testId="text-summary-mesh-type" /><SummaryStat label="Glass Type" value={[...new Set(windowRows.map((w) => w.glassType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="From window records" testId="text-summary-glass-type" /></div>
+         <UniversalMeshTypePanel orderId={record.id} orderMeshType={record.meshType} windows={windowRows} user={user} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Window qty" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Sq ft" value={summary.measured === 0 && summary.count > 0 ? '—' : summary.sqFt.toFixed(1)} detail={`${summary.measured} of ${summary.count} windows measured`} testId="text-summary-area" /><SummaryStat label="Glass status" value={summary.glass} detail="Counted from window rows" testId="text-summary-glass" /><SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : record.orderValue == null ? 'Not set' : record.orderValue - received > 0 ? `Due — ${plainInr(record.orderValue - received)}` : 'Paid'} detail="Order value less received payments" testId="text-summary-payment-status" /></div>
         {record.clientType === 'Retail' ? <OverviewWindowList windows={windowRows} /> : <ProjectOrderProgress orderRecordId={record.id} windows={windowRows} user={user} />}
         <OrderDeliveryPanels orderRecordId={record.id} createdAt={record.createdAt} user={user} />
