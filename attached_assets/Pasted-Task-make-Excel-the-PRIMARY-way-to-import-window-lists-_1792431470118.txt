@@ -1,0 +1,50 @@
+Task: make Excel the PRIMARY way to import window lists / order confirmations, keep PDF as a secondary option, and fix data extraction wherever the app imports Excel or PDF.
+
+Client requirement: "Right now, when we upload a confirmation PDF, the software often gets it wrong. It skips some window rows completely. It also sometimes joins two columns into one, which leaves other columns empty. Build a way to read the window list from an Excel file instead. Excel is much more reliable than PDF for this. Keep the PDF option in the software too, in case we ever need it, just make Excel the main way from now on."
+
+STEP 0: AUDIT FIRST (do not change code yet)
+I do not know which modules do imports. Search the whole codebase (frontend and backend) for every file upload / import / parse path: PDF parsing, Excel/CSV parsing (xlsx, exceljs, sheetjs, pdf-parse, pdfjs, tabula, OCR, multer, file input, dropzone, "upload", "import", "parse", "extract"). Cover at least: Order confirmation / Create order, Windows (manufacturing register), Measurement sheets (retained register), Quotations / Quotation approvals / Rate approval requests, Glass tracking (invoices/shipments), Payments (receipts), Dispatch, Installation, Order Documents, Client import.
+Give me a table: Module | Screen | File types accepted | Parser file/function | What it extracts | Is it PDF, Excel or both | Known weaknesses. Then proceed to build.
+
+STEP 1: SHARED IMPORT ENGINE
+Create ONE shared import service (backend) that all modules use, instead of per-module parsers:
+- Excel reader (.xlsx, .xlsm, .xls, .csv) and PDF reader behind a common interface, returning the same normalized structure: { header: {...}, rows: [...], totals: {...}, warnings: [...], source: "excel"|"pdf", confidence }.
+- Reuse libraries already in the project. Add one only if unavoidable.
+
+STEP 2: EXCEL PARSER (primary) for the confirmation / window list
+Sample file format (Confirmation_sample_excel.xlsx):
+- Sheet name = client name. Handle multiple sheets (let the user pick or import each).
+- Header block (label in column A or D, value to the right, values often in merged cells such as E10:K10, so read the top-left cell of the merge): ORDER NO, DATE, Client Name, Contact Details, Address, GSTIN, Final Measurement Taken by / Check by, Reference, CONFIRMATION MADE BY, DECISION GIVEN BY, CHECKED BY, FINAL MEASUREMENT DATE, INSTALLATION DATE.
+- Window table: find the header row by SEARCHING for the labels, do not hardcode row 19. Expected columns: SR NO, Location, Width, Height, Total Sq Feet, Qty, Window Type, Glass, Lock Type, Profile, Mesh, then an optional separate block FINAL MEASUREMENT and its Total Sq Feet (columns M/N, with an empty spacer column L between them). Map columns by header text (case-insensitive, trim, ignore extra spaces/trailing spaces, tolerate small spelling variants like "Measurment"), never by position.
+- Data rows start under the header and end at the row whose label is TOTAL (or the first fully empty run). Import EVERY row between them including rows with a blank SR NO or merged cells. Never skip a row silently; if a row is skipped or incomplete, add it to warnings with the row number.
+- Values: Width and Height are in millimetres. Total Sq Feet is a formula (Width x Height / 92903). Read cached values, and if the cache is empty recompute it from width, height and qty. Compare the computed value with the sheet value and warn on mismatch above 0.5 percent. Qty defaults to 1 if blank. Convert numbers stored as text ("2608 ", "2,608") to numbers. Keep text columns exactly as written (trim whitespace only).
+- Ignore the used range reported by the file (the sheet claims A1:XFD81), scan only the real populated cells.
+- Payment block (optional import): total sq ft, Rate, Increase Rate, 4 Track Charges, Transport, CGST 9 percent, SGST 9 percent, Final Billing Amount. Cross-check the total with the window rows and warn on mismatch.
+- Support Devanagari / Marathi text (UTF-8) in remarks and terms without corruption. Ignore the terms and conditions, signature and notes rows.
+- Validate: duplicate SR NO / location, missing width/height, zero or negative values, unrealistic sizes (under 300 mm or over 6000 mm), missing window type.
+- Also provide a downloadable blank Excel TEMPLATE (same layout as the sample) from the import screen, plus a short instruction note.
+
+STEP 3: PDF PARSER (secondary, fix the known bugs)
+Keep PDF upload but make it clearly secondary ("Excel recommended, more reliable").
+- Fix skipped rows and merged columns. Prefer table extraction that uses text coordinates (x positions of words / column boundaries from the header row) over plain text splitting by whitespace. Detect column boundaries from the header labels, assign each word to a column by x-position, and handle multi-line cells (a row whose Window Type or Glass text wraps to a second line must stay ONE row).
+- Rows are kept even if some columns are empty. Never merge two adjacent columns because of a missing separator.
+- For scanned PDFs without a text layer, show a clear message instead of guessing (use OCR only if already available).
+- After parsing, compare the number of rows found with the sheet's TOTAL qty / count when present and show a warning if they differ.
+- Every PDF import shows the result in the review screen below, flagged "PDF import, please verify".
+
+STEP 4: REVIEW SCREEN BEFORE SAVING (all imports)
+Nothing is written to the database straight away. Show a preview table (editable cells), row count, total area, total qty, warnings highlighted per row/cell, and the source (Excel or PDF) with the original file name. The user can fix cells, delete or add a row, then Confirm. Skipped or invalid rows are listed, never silently dropped. Store the original uploaded file against the order (Order Documents) and log the import in User log with who/when/how many rows.
+
+STEP 5: UI CHANGES
+- In every import dialog make "Upload Excel" the main (primary) button and "Upload PDF" a secondary option with a small hint. Accept .xlsx, .xls, .csv, .pdf. Max size message.
+- Show clear error messages (unsupported file, header row not found: list the labels that were expected, empty sheet, password-protected file).
+
+STEP 6: TESTS
+Add automated tests with the attached sample file and a few variants: extra rows (10+ windows), blank SR NO, merged header cells, column order changed, extra spaces in headers, formulas without cached values, text numbers, a second sheet, a PDF export of the same sheet. The row count and every cell must match exactly.
+
+DELIVERABLES (in your final reply):
+1. The audit table from Step 0.
+2. A list of the sections/screens where the import ACTUALLY works now (Excel and/or PDF), with the exact menu path to reach each one (for example "Sidebar > Client & Orders > Create order > Import window list") so I can test them one by one.
+3. A list of sections that have upload but were NOT changed, and why.
+4. Files changed and any new dependencies.
+5. A manual test checklist per section: upload the sample Excel, the row count must equal the sheet, total sq ft must match, a bad file shows a clear message, PDF import shows the verify flag.
