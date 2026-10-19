@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import readXlsxFile from "read-excel-file/node";
+import { readImportWorkbook } from "./window-list-import";
 
 export interface ParsedGlassWorkbookItem {
   id: string;
@@ -80,11 +80,7 @@ function itemId(
 export async function parseGlassOrderWorkbook(
   bytes: Buffer,
 ): Promise<ParsedGlassWorkbookSection[]> {
-  const readAllSheets = readXlsxFile as unknown as (
-    workbook: Buffer,
-    options: { getSheets: true },
-  ) => Promise<Array<{ sheet: string; data: unknown[][] }>>;
-  const sheets = await readAllSheets(bytes, { getSheets: true });
+  const sheets = readImportWorkbook(bytes);
   const sections = new Map<string, ParsedGlassWorkbookSection>();
   const itemIndexes = new Map<string, Map<string, ParsedGlassWorkbookItem>>();
   let currentClientLabel = "";
@@ -92,7 +88,7 @@ export async function parseGlassOrderWorkbook(
   let parsedItemCount = 0;
 
   for (const sheet of sheets) {
-    for (const row of sheet.data as unknown[][]) {
+    for (const row of sheet.rows) {
       const heading = isClientHeading(row);
       if (heading) {
         currentClientLabel = heading;

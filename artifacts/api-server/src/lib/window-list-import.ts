@@ -78,6 +78,16 @@ function realRows(sheet: XLSX.WorkSheet): unknown[][] {
   return rows;
 }
 
+export function readImportWorkbook(bytes: Buffer): Array<{ sheetName: string; rows: unknown[][] }> {
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = XLSX.read(bytes, { type: "buffer", raw: true, cellDates: false });
+  } catch {
+    throw new Error("The workbook could not be opened. Check that it is not password-protected or damaged.");
+  }
+  return workbook.SheetNames.map((sheetName) => ({ sheetName, rows: realRows(workbook.Sheets[sheetName]) }));
+}
+
 function findHeader(rows: unknown[][]): { rowIndex: number; columns: Map<string, number> } | null {
   for (let rowIndex = 0; rowIndex < Math.min(rows.length, 500); rowIndex += 1) {
     const columns = new Map<string, number>();
@@ -103,15 +113,20 @@ function headerValue(rows: unknown[][], labelPattern: RegExp): string {
       for (let valueIndex = index + 1; valueIndex < row.length; valueIndex += 1) {
         const value = text(row[valueIndex]);
         if (knownLabel.test(normalized(value))) break;
-        if (value) return value;
+        if (value) {
+          const serial = numeric(value);
+          if (/date/i.test(labelPattern.source) && serial != null && serial > 20000 && serial < 100000) {
+            return new Date(Date.UTC(1899, 11, 30) + Math.round(serial) * 86_400_000).toISOString().slice(0, 10);
+          }
+          return value;
+        }
       }
     }
   }
   return "";
 }
 
-function parseSheet(sheet: XLSX.WorkSheet, sheetName: string): NormalizedWindowImport | null {
-  const rows = realRows(sheet);
+function parseSheet(rows: unknown[][], sheetName: string): NormalizedWindowImport | null {
   const found = findHeader(rows);
   if (!found) return null;
   const { rowIndex, columns } = found;
@@ -205,15 +220,10 @@ function headerName(rows: unknown[][]): string {
 }
 
 export function parseWindowListWorkbook(bytes: Buffer, selectedSheet?: string): NormalizedWindowImport[] {
-  let workbook: XLSX.WorkBook;
-  try {
-    workbook = XLSX.read(bytes, { type: "buffer", raw: true, cellDates: false });
-  } catch {
-    throw new Error("The workbook could not be opened. Check that it is not password-protected or damaged.");
-  }
-  const names = selectedSheet ? [selectedSheet] : workbook.SheetNames;
-  if (selectedSheet && !workbook.Sheets[selectedSheet]) throw new Error("The selected worksheet no longer exists. Choose a sheet and preview again.");
-  const parsed = names.map((name) => parseSheet(workbook.Sheets[name], name)).filter((item): item is NormalizedWindowImport => item !== null);
+  const sheets = readImportWorkbook(bytes);
+  const names = selectedSheet ? sheets.filter((sheet) => sheet.sheetName === selectedSheet) : sheets;
+  if (selectedSheet && !names.length) throw new Error("The selected worksheet no longer exists. Choose a sheet and preview again.");
+  const parsed = names.map((sheet) => parseSheet(sheet.rows, sheet.sheetName)).filter((item): item is NormalizedWindowImport => item !== null);
   if (!parsed.length) throw new Error("Window table header not found. Expected SR NO, Width, Height, and Window Type.");
   return parsed;
 }

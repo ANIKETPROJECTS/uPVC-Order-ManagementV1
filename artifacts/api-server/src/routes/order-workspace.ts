@@ -793,7 +793,7 @@ router.get("/orders/:id/windows/import-template", async (req, res): Promise<void
 router.post("/orders/:id/windows/import-preview/:filename", async (req, res, next): Promise<void> => {
   const actor = await context(req, res, "measurements");
   if (!actor || !(await orderExists(String(req.params.id), res))) return;
-  const filename = decodeURIComponent(String(req.params.filename || ""));
+  const filename = String(req.params.filename || "");
   if (!/\.(xlsx|xlsm|xls|csv)$/i.test(filename)) {
     res.status(400).json({ error: "Unsupported file. Choose an .xlsx, .xlsm, .xls, or .csv file." });
     return;
