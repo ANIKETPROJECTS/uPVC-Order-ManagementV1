@@ -1,0 +1,60 @@
+Fix: "Import glass Excel" mixes up clients. Change ONLY the glass workbook import (its parser, its preview/review screen, and the save step). Do NOT change any other module, screen, API, style or data. If the shared workbook reader or review-table component is used by other imports (window list import, Glass tracking elsewhere), do not alter their behaviour; add new code beside it or extend it without changing existing results.
+
+CLIENT REQUIREMENT (confirmed)
+The glass Excel tool does not keep each client's glass list separate. Each client's list starts with the client name, then the word "Glass", then the measurements, then a blank row before the next client starts. The software ignores this pattern, mixes glass from different clients into one group, and once even treated a date as a client name.
+Suggested fix from the client: first cut the Excel file into blocks using the blank rows as dividers (each blank row means "a new client starts next"). Inside each block, look for the client's name (words, not a number or a date), the word "Glass" and the measurement rows. Also check: does this look like a real name, not a date? After splitting, show the list of clients found before saving, and let someone check it is correct. Same check-before-saving step we already use for window lists.
+
+STEP 0: AUDIT FIRST
+Find the glass import end to end: the "Import glass Excel" button/screen, the frontend preview component, the API route(s), glass-order-workbook.ts (and the shared workbook reader), and how rows are grouped and saved into Glass tracking. Tell me in your reply: the file names, how grouping works today, and exactly why clients get mixed (and why a date became a name). Then build the fix.
+
+STEP 1: BLOCK SPLITTING (new logic)
+- Read every sheet. For each sheet, scan the real populated cells only (ignore the used range the file claims; merged cells: read the top-left cell).
+- Split into blocks using blank rows as dividers. A block = consecutive non-empty rows. Rows that are only whitespace count as blank.
+- Do not rely only on blank rows. Also start a NEW block whenever a new title area appears (a text-only row followed by a "sr no" / "w" / "h" header) even if the blank row is missing, and never let a blank row inside a data table silently end it: if numeric data rows continue after a single blank row with no new title/header, keep them in the same block and add a warning.
+- Handle the fact that the same client name can appear in several blocks (different glass type, lot or wing). Keep them as separate groups, but under the SAME client entry (match names case-insensitively after trimming and collapsing spaces). Never create duplicate clients, never merge different glass types or lots into one list.
+
+STEP 2: READ EACH BLOCK (flexible, not fixed cells)
+Different files place things in different columns, so detect by content, never by fixed cell addresses:
+- Header row: the row that contains "w" and "h" (also accept width/height, W/H, case-insensitive, trimmed). The row with "sr no" (also "sr.no", "s.no", "sr. no", "serial") sits on the same row or one row above. Merged header cells are normal.
+- Column map from the header: sr no, optional "Flat No" / "Flat" / "Unit" / "Room" column (may be missing or empty), width, height, quantity (the unlabeled column right of height holding values like "2nos", "1nos", "2 pcs", "2"). Columns can shift between blocks and between files; map per block.
+- GLASS TYPE: the text in the header area that is not one of the labels (examples: "5mm Clear Glass", "5mm Toughened Glass", "5mm Frosted Toughened", "5mm Light Gold Toughened", "5 mm glass"). Usually in a merged cell above/next to w/h. Keep it exactly as written, trimmed. If a block has none, flag it.
+- CLIENT NAME: the text lines ABOVE the header, inside the same block. Take the first line that is a real name and is NOT any of: a date, a number, the word "Glass" (any case), a header label (sr no, w, h, flat no), a glass type pattern (starts with a thickness like "5mm"), or a supplier/vendor line (for example "Saint Gobain Glass", i.e. a line that ends with "Glass" but has other words before it and comes right after the name line). Everything else in the title area becomes extra info, not the client:
+  - date (text like 03-07-2025, 12/19/2025, or a real date cell, any format incl. Excel date serials) -> order/glass date of this block
+  - lot text like "2nd Lot", "3rd Lot" -> lot
+  - wing/tower/building text like "E-Wing", "D-Wing" -> wing
+  - vendor line (like "Saint Gobain Glass") -> supplier
+  - any other leftover text -> note
+- If no client name is found in the block, use the previous block's client ONLY if nothing else is possible, and mark it "Client name missing, please set".
+- A date must NEVER be accepted as a client name. Also reject names that are purely numeric, too short (1 char), or equal to "glass".
+- Data rows: from the row after the header until the block ends. Parse: width and height as numbers (decimals like 458.5 allowed, numbers stored as text allowed, "1,376.5" allowed), quantity from text like "2nos", "1nos", "2 nos", "2pcs" (digits only; default 1 if blank), sr no (keep as written), flat no (numbers like 104 and texts like F-304 both allowed, keep as text). Never skip a row silently; unparsable rows go to warnings with the Excel row number.
+- Validate and warn: missing width/height, zero or negative, sizes under 100 mm or over 4000 mm, duplicate (flat no + sr no) inside a block, qty zero.
+
+STEP 3: REVIEW SCREEN BEFORE SAVING (reuse the existing review pattern used for window-list import)
+Nothing is saved yet. Show:
+- A summary: "N clients, M glass groups, R rows, total pieces, total area".
+- A list of CLIENT CARDS, one per block/group, each showing: client name (editable), glass type (editable), lot/wing/date/supplier if found, row count, qty total, area total, source sheet name and Excel row range (for example "Sheet1, rows 54 to 85"), and its glass rows in an editable table (add row, delete row, edit all fields, live area calculation width x height x qty / 92903 in sq ft).
+- A clear warning badge on any card whose name looks suspicious: looks like a date, looks like a glass type or vendor, is missing, is very short, or was inferred from another block. The user must fix or confirm those before Confirm is enabled.
+- Controls per card: rename client, change glass type, delete the whole group, move/merge it into another client, and a client dropdown that lists existing clients from the software so the user can match "Mr Prashant B3" to an existing client. Do not auto-create clients without the user confirming.
+- Show skipped/invalid rows and warnings per card. A "Confirm import" button at the bottom, disabled while any blocking warning is unresolved.
+- Save everything only after Confirm. Keep each client's glass list separate in storage, with its glass type, lot, wing, date and supplier. Keep the original Excel file attached for traceability and add a User log entry (who, when, clients, rows). If a save step fails, do not leave half-saved data: remove what was inserted in this import (MongoDB here has no multi-document transactions, so use compensating cleanup, validate the batch first, and tell me about any limitation).
+- Do not change how the existing Glass tracking pages display already-saved data except to show the correct separate groups per client.
+
+STEP 4: OTHER EXCEL LAYOUTS
+The client says other glass Excel layouts may exist besides these. So the parser must not depend on exact layout. Accept variations such as: client name merged across columns or sitting in any column; "Glass" line missing; date missing or before/after the name; glass type in different cells; extra columns (flat no, wing, remarks); header labels in different case or with extra spaces/dots; several sheets; values stored as text; hidden empty rows. When the structure cannot be understood for a block, do NOT guess: show that block as "Needs attention" with the raw rows so the user can fix client/type/columns manually in the review screen.
+Also keep supporting the existing glass workbook format that already imports today (do not break it); run it through the new logic as well and make sure its results stay the same or better.
+
+STEP 5: TESTS (use the 4 attached sample files; add them under a test fixtures folder, use the existing test setup)
+Expected results:
+1. Glass_Order_19-12-2025.xlsx: 1 block. Client "Mr. Deepak Pawar", date 19-12-2025 (NOT a client), glass type "5mm Clear Glass", 3 rows: 370x453, 458.5x680, 387.5x1373, each qty 2.
+2. 5mm_Clear_Glass_.xlsx: 3 blocks. "Mr Prashant B3" 3 rows (5mm Clear Glass); "Mr Prashant B2" 2 rows; "Crown" 1 row with flat no F303, 782x2211, qty 1. Total 6 rows.
+3. 5mm_Clear_Glass.xlsx: 2 blocks under client "CELESTIA": lot "2nd Lot", wing "E-Wing", 31 rows; lot "3rd Lot", wing "D-Wing", 16 rows. Total 47 rows. Qty "2nos" -> 2, "1nos" -> 1.
+4. Glass_Order_24-9-2026.xlsx: 4 blocks. "Mumbai D4" glass type "5mm Frosted Glass" 47 rows and "Mumbai D4" glass type "5mm Clear Glass" 28 rows (ONE client, two glass groups; "Saint Gobain Glass" is the supplier, not the client or a second client); "Aakar Solitaire" 4 rows (flat no 104, sr no 1 to 4); "Avdhoot" 1 row (no flat no). Total 80 rows.
+Also test synthetic variants: a date as the first line, blank row missing between clients, a block with no client name, values stored as text, two sheets, client name in a different column, Marathi/Hindi names, lowercase "glass", a vendor line, an unknown extra column. The date must never appear as a client in any test.
+
+DELIVERABLES in your final reply:
+1. Root cause of the mixing (from the audit).
+2. Files changed (only glass-import related) and confirmation that no other module was touched.
+3. The exact menu path to reach "Import glass Excel" for testing.
+4. A table of the 4 sample files: expected vs actual clients, groups, row counts.
+5. A manual checklist: upload each sample file; the review screen lists the right clients and counts; suspicious name badges show; rename and merge work; Confirm is blocked until fixed; after saving, each client's glass is separate in Glass tracking; a failed save leaves nothing behind.
+6. Anything you could not verify (for example signed-in screens).

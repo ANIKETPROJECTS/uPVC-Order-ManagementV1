@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readImportWorkbook } from "./window-list-import";
+import * as XLSX from "xlsx";
 
 export interface ParsedGlassWorkbookItem {
   id: string;
@@ -18,158 +18,198 @@ export interface ParsedGlassWorkbookSection {
 
 const MAX_SECTIONS = 100;
 const MAX_ITEMS = 5000;
+type Row = { excelRow: number; cells: unknown[] };
+type Columns = { sr: number; flat: number; width: number; height: number; qty: number; glass: number; headerRow: number };
 
-function cellText(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  return String(value).trim();
+function text(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value == null ? "" : String(value).trim().replace(/\s+/g, " ");
 }
-
-function normalized(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+function key(value: unknown): string { return text(value).toLocaleLowerCase().replace(/[.\s_-]+/g, " ").trim(); }
+function number(value: unknown): number | null {
+  const parsed = Number(text(value).replace(/,/g, "").replace(/[^\d.+-]/g, ""));
+  return text(value) && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
-
-function parsePositiveNumber(value: unknown): number | null {
-  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : null;
-  const text = cellText(value).replace(/,/g, "");
-  if (!text) return null;
-  const parsed = Number(text);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+function quantity(value: unknown): number | null {
+  if (value == null || text(value) === "") return 1;
+  const match = /^\s*(\d+)\s*(?:nos?|pcs?|pieces?)?\s*$/i.exec(text(value));
+  const parsed = match ? Number(match[1]) : NaN;
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
+function isDate(value: unknown): boolean {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return true;
+  const valueText = text(value);
+  return /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(valueText)
+    || /^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}$/.test(valueText)
+    || /^\d{4}-\d{2}-\d{2}T/.test(valueText);
+}
+function populated(value: unknown): boolean { return text(value) !== ""; }
 
-function parseQuantity(value: unknown): number | null {
-  if (typeof value === "number") {
-    return Number.isSafeInteger(value) && value > 0 ? value : null;
+function actualRows(sheet: XLSX.WorkSheet): Row[] {
+  const cells = new Map<number, Map<number, unknown>>();
+  for (const address of Object.keys(sheet)) {
+    if (address.startsWith("!")) continue;
+    let point: XLSX.CellAddress;
+    try { point = XLSX.utils.decode_cell(address); } catch { continue; }
+    const value = (sheet[address] as XLSX.CellObject | undefined)?.v;
+    if (!populated(value)) continue;
+    const row = cells.get(point.r) ?? new Map<number, unknown>();
+    row.set(point.c, value);
+    cells.set(point.r, row);
   }
-  const match = /^\s*(\d+)\s*(?:nos?|pcs?|pieces?)?\s*$/i.exec(cellText(value));
-  if (!match) return null;
-  const quantity = Number(match[1]);
-  return Number.isSafeInteger(quantity) && quantity > 0 ? quantity : null;
+  const maxRow = Math.max(-1, ...cells.keys());
+  const maxColumn = Math.max(-1, ...[...cells.values()].flatMap((row) => [...row.keys()]));
+  return Array.from({ length: maxRow + 1 }, (_, index) => ({
+    excelRow: index + 1,
+    cells: Array.from({ length: maxColumn + 1 }, (_, column) => cells.get(index)?.get(column) ?? null),
+  }));
 }
 
-function isClientHeading(row: unknown[]): string | null {
-  const populated = row
-    .map((value, index) => ({ value: cellText(value), index }))
-    .filter((cell) => cell.value);
-  if (populated.length !== 1) return null;
-
-  const label = populated[0].value;
-  const key = normalized(label);
-  if (["w", "h", "sr no", "sr. no", "villa no."].includes(key)) return null;
-  return label;
+function findColumns(rows: Row[], start = 0): Columns | null {
+  for (let rowIndex = start; rowIndex < rows.length; rowIndex += 1) {
+    const labels = rows[rowIndex].cells.map(key);
+    const width = labels.findIndex((label) => ["w", "width", "width mm", "width mm"].includes(label));
+    const height = labels.findIndex((label) => ["h", "height", "height mm"].includes(label));
+    if (width < 0 || height < 0) continue;
+    const find = (names: string[]) => labels.findIndex((label) => names.includes(label));
+    let sr = find(["sr no", "s no", "serial", "serial number"]);
+    if (sr < 0 && rowIndex > 0) sr = rows[rowIndex - 1].cells.map(key).findIndex((label) => ["sr no", "s no", "serial", "serial number"].includes(label));
+    let flat = find(["flat", "flat no", "unit", "room", "villa", "villa no"]);
+    if (flat < 0 && rowIndex > 0) flat = rows[rowIndex - 1].cells.map(key).findIndex((label) => ["flat", "flat no", "unit", "room", "villa", "villa no"].includes(label));
+    let qty = find(["qty", "quantity", "nos", "pieces"]);
+    if (qty < 0) {
+      const candidate = Math.max(width, height) + 1;
+      if (rows.slice(rowIndex + 1, rowIndex + 6).some((row) => quantity(row.cells[candidate]) !== null && populated(row.cells[candidate]))) qty = candidate;
+    }
+    const glass = labels.findIndex((label) => label.includes("glass") && !["glass", "glass type"].includes(label));
+    return { sr, flat, width, height, qty, glass, headerRow: rowIndex };
+  }
+  return null;
 }
 
-function itemId(
-  clientLabel: string,
-  glassType: string,
-  villaNo: string | null,
-  windowNo: string,
-  widthMm: number,
-  heightMm: number,
+function looksLikeNewBlock(rows: Row[], index: number): boolean {
+  const row = rows[index];
+  if (!row?.cells.some(populated) || row.cells.some((value) => number(value) != null)) return false;
+  const hasValidTitle = row.cells.some((value) => {
+    const candidate = text(value);
+    const normalized = key(candidate);
+    return candidate.length > 1 && !isDate(value) && !/^\d+$/.test(candidate)
+      && !["glass", "villa no", "flat no", "sr no", "s no", "serial", "w", "h", "width", "height"].includes(normalized)
+      && !/^\d+(?:\.\d+)?\s*mm\b/i.test(candidate)
+      && !/glass$/i.test(candidate);
+  });
+  if (!hasValidTitle) return false;
+  for (let next = index + 1; next < Math.min(rows.length, index + 5); next += 1) {
+    if (findColumns(rows, next)) return true;
+    if (rows[next].cells.some((value) => number(value) != null)) return false;
+  }
+  return false;
+}
+
+function splitBlocks(rows: Row[]): Row[][] {
+  const blocks: Row[][] = [];
+  let current: Row[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (!row.cells.some(populated)) {
+      if (!current.length) continue;
+      let next = index + 1;
+      while (next < rows.length && !rows[next].cells.some(populated)) next += 1;
+      const columns = findColumns(current);
+      const previousData = columns && number(current.at(-1)?.cells[columns.width]) != null && number(current.at(-1)?.cells[columns.height]) != null;
+      const nextData = columns && number(rows[next]?.cells[columns.width]) != null && number(rows[next]?.cells[columns.height]) != null;
+      if (previousData && nextData) { current.push(row); continue; }
+      blocks.push(current);
+      current = [];
+      continue;
+    }
+    if (current.length && looksLikeNewBlock(rows, index) && current.some((candidate) => {
+      const columns = findColumns(current);
+      return columns && number(candidate.cells[columns.width]) != null && number(candidate.cells[columns.height]) != null;
+    })) {
+      blocks.push(current);
+      current = [];
+    }
+    current.push(row);
+  }
+  if (current.length) blocks.push(current);
+  return blocks;
+}
+
+function stableId(
+  sheet: string, row: number, client: string, glass: string,
+  flat: string | null, serial: string, width: number, height: number,
 ): string {
-  const stableKey = [
-    normalized(clientLabel),
-    normalized(glassType),
-    normalized(villaNo ?? ""),
-    normalized(windowNo),
-    widthMm,
-    heightMm,
-  ].join("|");
-  return createHash("sha256").update(stableKey).digest("hex").slice(0, 32);
+  return createHash("sha256").update([sheet, row, key(client), key(glass), key(flat ?? ""), key(serial), width, height].join("|")).digest("hex").slice(0, 32);
 }
 
-export async function parseGlassOrderWorkbook(
-  bytes: Buffer,
-): Promise<ParsedGlassWorkbookSection[]> {
-  const sheets = readImportWorkbook(bytes);
-  const sections = new Map<string, ParsedGlassWorkbookSection>();
-  const itemIndexes = new Map<string, Map<string, ParsedGlassWorkbookItem>>();
-  let currentClientLabel = "";
-  let currentGlassType = "";
-  let parsedItemCount = 0;
-
-  for (const sheet of sheets) {
-    for (const row of sheet.rows) {
-      const heading = isClientHeading(row);
-      if (heading) {
-        currentClientLabel = heading;
-        currentGlassType = "";
-        const clientKey = normalized(heading);
-        if (!sections.has(clientKey)) {
-          if (sections.size >= MAX_SECTIONS) {
-            throw new Error(`This workbook contains more than ${MAX_SECTIONS} client sections.`);
+export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlassWorkbookSection[]> {
+  const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true, raw: true });
+  const sections: ParsedGlassWorkbookSection[] = [];
+  let itemCount = 0;
+  let previousClient = "";
+  for (const sheetName of workbook.SheetNames) {
+    const rows = actualRows(workbook.Sheets[sheetName]);
+    for (const block of splitBlocks(rows)) {
+      const columns = findColumns(block);
+      if (!columns) continue;
+      const titleRows = block.slice(0, columns.headerRow);
+      const titleValues = titleRows.flatMap((row) => row.cells.filter(populated));
+      let clientLabel = titleValues.map(text).find((value, index) => {
+        const keyValue = key(value);
+        const previousLine = text(titleValues[index - 1]);
+        return value.length > 1 && !isDate(value) && !/^\d+$/.test(value)
+        && !["glass", "w", "h", "sr no", "s no", "serial", "flat no", "villa no", "unit", "room"].includes(keyValue)
+          && !/^\d+(?:\.\d+)?\s*mm\b/i.test(value)
+          && !(previousLine && /glass$/i.test(value) && !/^glass$/i.test(value));
+      }) ?? "";
+      if (!clientLabel) clientLabel = previousClient;
+      if (!clientLabel) {
+        const start = block[0]?.excelRow ?? 1;
+        throw new Error(`${sheetName}, row ${start}: client name could not be identified. Add a client heading before the glass table.`);
+      }
+      previousClient = clientLabel;
+      const glassType = (columns.glass >= 0 ? text(block[columns.headerRow].cells[columns.glass]) : "")
+        || titleValues.map(text).find((value) => /(?:\d+(?:\.\d+)?\s*mm\b.*(?:glass|toughened|frosted|clear)|\bglass\b)/i.test(value) && !/^glass$/i.test(value) && !/saint\s+gobain/i.test(value))
+        || "Glass type not identified";
+      const groupKey = `${sheetName}:${block[0]?.excelRow ?? 1}:${sections.length}`;
+      const items: ParsedGlassWorkbookItem[] = [];
+      for (const row of block.slice(columns.headerRow + 1)) {
+        const widthMm = number(row.cells[columns.width]);
+        const heightMm = number(row.cells[columns.height]);
+        const anyCells = row.cells.some(populated);
+        if (!anyCells) continue;
+        if (widthMm == null && heightMm == null) {
+          if ([columns.sr, columns.flat, columns.qty].some((column) => column >= 0 && populated(row.cells[column]))) {
+            throw new Error(`${sheetName}, row ${row.excelRow}: this measurement row has no valid width or height.`);
           }
-          sections.set(clientKey, { clientLabel: heading, items: [] });
-          itemIndexes.set(clientKey, new Map());
+          continue;
         }
-        continue;
-      }
-
-      const serialHeader = normalized(cellText(row[1]));
-      const possibleGlassType = cellText(row[2]);
-      if (/^(?:sr\.?\s*no\.?|serial\s*(?:number|no\.?)?)$/i.test(serialHeader) && possibleGlassType) {
-        currentGlassType = possibleGlassType;
-        continue;
-      }
-
-      const widthMm = parsePositiveNumber(row[2]);
-      const heightMm = parsePositiveNumber(row[3]);
-      if (widthMm === null || heightMm === null || !currentGlassType) continue;
-
-      if (!currentClientLabel) {
-        throw new Error("Add a client or project heading above each glass section before importing.");
-      }
-
-      const ordered = parseQuantity(row[4]);
-      if (ordered === null) {
-        throw new Error(
-          `A glass row for “${currentClientLabel}” has no valid piece quantity. Use whole quantities such as “2nos”.`,
-        );
-      }
-
-      parsedItemCount += 1;
-      if (parsedItemCount > MAX_ITEMS) {
-        throw new Error(`This workbook contains more than ${MAX_ITEMS} glass rows.`);
-      }
-
-      const villaText = cellText(row[0]);
-      const villaNo = villaText || null;
-      const windowNo = cellText(row[1]) || (villaNo ? "Unnumbered" : "Unspecified");
-      const id = itemId(
-        currentClientLabel,
-        currentGlassType,
-        villaNo,
-        windowNo,
-        widthMm,
-        heightMm,
-      );
-      const clientKey = normalized(currentClientLabel);
-      const section = sections.get(clientKey)!;
-      const items = itemIndexes.get(clientKey)!;
-      const existing = items.get(id);
-
-      if (existing) {
-        existing.ordered += ordered;
-      } else {
-        const item: ParsedGlassWorkbookItem = {
-          id,
-          villaNo,
+        if (widthMm == null || heightMm == null) {
+          throw new Error(`${sheetName}, row ${row.excelRow}: width or height is missing or invalid.`);
+        }
+        const ordered = columns.qty >= 0 ? quantity(row.cells[columns.qty]) : 1;
+        if (ordered == null) throw new Error(`${sheetName}, row ${row.excelRow}: invalid quantity.`);
+        const serial = columns.sr >= 0 ? text(row.cells[columns.sr]) : "";
+        const flat = columns.flat >= 0 ? text(row.cells[columns.flat]) || null : null;
+        const windowNo = serial || `Row ${row.excelRow}`;
+        items.push({
+          id: stableId(groupKey, row.excelRow, clientLabel, glassType, flat, windowNo, widthMm, heightMm),
+          villaNo: flat,
           windowNo,
-          glassType: currentGlassType,
+          glassType,
           widthMm,
           heightMm,
           ordered,
-        };
-        items.set(id, item);
-        section.items.push(item);
+        });
+      }
+      if (items.length) {
+        sections.push({ clientLabel, items });
+        itemCount += items.length;
+        if (sections.length > MAX_SECTIONS || itemCount > MAX_ITEMS) throw new Error("This workbook exceeds the supported number of glass groups or rows.");
       }
     }
   }
-
-  const parsedSections = [...sections.values()].filter((section) => section.items.length > 0);
-  if (!parsedSections.length) {
-    throw new Error(
-      "No glass rows were found. Use client headings, glass-type headers, width/height columns, and quantities such as “2nos”.",
-    );
-  }
-  return parsedSections;
+  if (!sections.length) throw new Error("No glass rows were found. Include client headings, glass types, W/H headers, and measurement rows.");
+  return sections;
 }
