@@ -1,0 +1,30 @@
+Part 2 of the Excel/PDF window-list import work. Part 1 (Excel importer, template, shared workbook reader) is done. Read the current importer service, the Import window list dialog, order-workspace routes and the confirmation extraction code first. Reuse the existing code.
+
+1. PDF PARSER (main remaining bug)
+Client complaint: PDF import skips some window rows completely and sometimes joins two columns into one, leaving other columns empty. Keep PDF as a secondary option, but fix it:
+- Use word coordinates (x positions) with the existing PDF library. Detect column boundaries from the header labels (SR NO, Location, Width, Height, Total Sq Feet, Qty, Window Type, Glass, Lock Type, Profile, Mesh), assign each word to a column by x position, never split by whitespace alone.
+- A row whose text wraps onto a second line (Window Type, Glass) stays ONE row. A row with empty cells stays a row and is never merged with a neighbour column.
+- Rows end at the TOTAL row. Compare the parsed row count and qty with the TOTAL qty in the PDF and show a warning if they differ.
+- Scanned PDFs without a text layer: show a clear message, do not guess.
+- Mark every PDF result "PDF import, please verify" in the review screen. Use the same normalized output structure as the Excel parser.
+
+2. REVIEW SCREEN
+- Add "Add row" and "Delete row" controls and make every window field editable (SR NO, Location, Width, Height, Qty, Window Type, Glass, Lock Type, Profile, Mesh).
+- Recalculate Sq Ft live (Width x Height / 92903 x Qty) and show total rows, total qty, total area.
+- Highlight warnings per row/cell. List skipped rows with their row number; never drop a row silently.
+- Show the source (Excel or PDF) and file name.
+
+3. ATOMIC SAVE
+- Save all windows in ONE database transaction (all or nothing). If anything fails, nothing is saved and the user sees a clear error.
+- Store the original file under Order Documents and add an entry in the User log (who, when, row count, source).
+
+4. PAYMENT BLOCK (optional import)
+Read from the Excel: total sq ft, Rate, Increase Rate, 4 Track Charges, Transport, CGST 9%, SGST 9%, Final Billing Amount. Recompute from the window rows and warn if the sheet total differs. Show it in the review screen as a separate read-only summary.
+
+5. AUTOMATED TESTS
+Using the attached sample file and variants: 10+ windows, blank SR NO, merged header cells, changed column order, extra spaces in headers, formulas without cached values, numbers stored as text, second sheet, Marathi text, and a PDF export of the same sheet. Row count and every cell must match exactly. Use the existing test setup, or add a minimal one.
+
+6. UPLOAD CONSISTENCY
+Order Documents currently rejects .xls and .csv in the UI while the backend accepts them. Make them consistent. In every import dialog show "Upload Excel" as the main button and "Upload PDF" as secondary.
+
+DELIVERABLES: files changed, test results, and a manual checklist with exact menu paths for: Excel import, PDF import, review screen add/delete row, failed-save rollback, order confirmation upload.
