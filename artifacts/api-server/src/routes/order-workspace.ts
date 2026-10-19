@@ -52,13 +52,14 @@ import {
   storeProjectUpload,
 } from "../lib/project-upload-storage";
 import { parseGlassOrderWorkbook, type ParsedGlassWorkbookSection } from "../lib/glass-order-workbook";
+import { createWindowListTemplate, parseWindowListWorkbook } from "../lib/window-list-import";
 import { formatProjectPieceId } from "../lib/order-identifiers";
 import { extractConfirmationInfo } from "../lib/confirmation-extraction";
 
 const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
 const MAX_FILE_MESSAGE = "Document must be 10 MiB or smaller.";
-const mimeByExt: Record<string, string[]> = { pdf: ["application/pdf"], png: ["image/png"], jpg: ["image/jpeg"], jpeg: ["image/jpeg"], webp: ["image/webp"], docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"], xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] };
+const mimeByExt: Record<string, string[]> = { pdf: ["application/pdf"], png: ["image/png"], jpg: ["image/jpeg"], jpeg: ["image/jpeg"], webp: ["image/webp"], docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"], xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"], xlsm: ["application/vnd.ms-excel.sheet.macroEnabled.12"], xls: ["application/vnd.ms-excel"], csv: ["text/csv"] };
 type UserContext = { id: string; name: string; permissions: Record<string, string>; masterAdmin: boolean };
 
 async function context(req: Parameters<RequestHandler>[0], res: Parameters<RequestHandler>[1], module?: string, edit = false): Promise<UserContext | null> {
@@ -780,6 +781,34 @@ router.get("/orders/:id/windows", async (req, res): Promise<void> => {
   if (!(await context(req, res)) || !(await orderExists(p.data.id, res))) return;
   const rows = await getOrderWindows(await getMongoDb()).find({ orderRecordId: p.data.id, archivedAt: null }).sort({ windowNo: 1 }).toArray();
   res.json(ListOrderWindowsResponse.parse(rows.map(windowResponse)));
+});
+router.get("/orders/:id/windows/import-template", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "measurements");
+  if (!actor || !(await orderExists(String(req.params.id), res))) return;
+  const bytes = createWindowListTemplate();
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", 'attachment; filename="window-list-template.xlsx"');
+  res.send(bytes);
+});
+router.post("/orders/:id/windows/import-preview/:filename", async (req, res, next): Promise<void> => {
+  const actor = await context(req, res, "measurements");
+  if (!actor || !(await orderExists(String(req.params.id), res))) return;
+  const filename = decodeURIComponent(String(req.params.filename || ""));
+  if (!/\.(xlsx|xlsm|xls|csv)$/i.test(filename)) {
+    res.status(400).json({ error: "Unsupported file. Choose an .xlsx, .xlsm, .xls, or .csv file." });
+    return;
+  }
+  expressRaw(req, res, next, async () => {
+    const body = req.body as Buffer;
+    if (!body?.length) { res.status(400).json({ error: "The selected file is empty." }); return; }
+    if (body.length > 10 * 1024 * 1024) { res.status(413).json({ error: "Choose a file no larger than 10 MiB." }); return; }
+    try {
+      const sheet = typeof req.query.sheet === "string" ? req.query.sheet : undefined;
+      res.json({ filename, sheets: parseWindowListWorkbook(body, sheet) });
+    } catch (error) {
+      res.status(422).json({ error: error instanceof Error ? error.message : "The workbook could not be parsed." });
+    }
+  });
 });
 router.post("/orders/:id/windows", async (req, res): Promise<void> => {
   const p = CreateOrderWindowParams.safeParse(req.params), b = CreateOrderWindowBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; }

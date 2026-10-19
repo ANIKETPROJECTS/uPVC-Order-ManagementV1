@@ -3,6 +3,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { parseWindowListWorkbook } from "./window-list-import";
 
 const execFile = promisify(execFileCallback);
 
@@ -120,6 +121,31 @@ export async function extractConfirmationInfo(bytes: Buffer, filename: string): 
   const isPdf = ext === ".pdf";
   const isImage = [".png", ".jpg", ".jpeg", ".webp"].includes(ext);
   const now = new Date().toISOString();
+  if ([".xlsx", ".xlsm", ".xls", ".csv"].includes(ext)) {
+    try {
+      const sheets = parseWindowListWorkbook(bytes);
+      const selected = sheets[0];
+      const fields = Object.entries(selected.header)
+        .filter(([, value]) => Boolean(value))
+        .map(([label, value]) => ({ label: label.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()), value }));
+      fields.push({ label: "Worksheet", value: selected.sheetName });
+      fields.push({ label: "Window quantity", value: String(selected.totals.quantity) });
+      fields.push({ label: "Total area (sq ft)", value: selected.totals.areaSqFt.toFixed(2) });
+      return {
+        status: "extracted", method: "none", extractedAt: now,
+        sections: [{ title: "Workbook confirmation details", fields }],
+        windows: selected.rows.map((row) => ({
+          windowNo: row.windowNo, location: row.location, width: row.widthMm == null ? "" : String(row.widthMm),
+          height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : String(row.areaSqFt),
+          quantity: String(row.quantity), windowType: row.windowType, glass: row.glass, lockType: row.lockType,
+          profile: row.profile, mesh: row.mesh,
+        })),
+        terms: [], rawText: "", error: null,
+      };
+    } catch (error) {
+      return { status: "failed", method: "none", extractedAt: now, sections: [], windows: [], terms: [], rawText: "", error: error instanceof Error ? error.message.slice(0, 500) : "Workbook extraction failed." };
+    }
+  }
   if (!isPdf && !isImage) return { status: "unsupported", method: "none", extractedAt: now, sections: [], windows: [], terms: [], rawText: "", error: "Automatic extraction currently supports PDF and image confirmation files." };
   const tempDir = await mkdtemp(path.join(tmpdir(), "confirmation-ocr-"));
   try {
