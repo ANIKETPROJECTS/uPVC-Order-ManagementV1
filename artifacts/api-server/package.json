@@ -8,7 +8,8 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:window-list": "esbuild src/lib/window-list-import.test.ts --bundle --platform=node --format=cjs --outfile=.window-list-import-test.cjs && node .window-list-import-test.cjs; status=$?; rm -f .window-list-import-test.cjs; exit $status"
+    "test:window-list": "esbuild src/lib/window-list-import.test.ts --bundle --platform=node --format=cjs --outfile=.window-list-import-test.cjs && node .window-list-import-test.cjs; status=$?; rm -f .window-list-import-test.cjs; exit $status",
+    "test:glass-import": "esbuild src/lib/glass-order-workbook.test.ts --bundle --platform=node --format=cjs --outfile=.glass-order-workbook-test.cjs && node .glass-order-workbook-test.cjs; status=$?; rm -f .glass-order-workbook-test.cjs; exit $status"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
