@@ -1602,7 +1602,7 @@ function ConfirmationInfoPanel({ orderId }: { orderId: string }) {
   return <div className="space-y-4" data-testid="panel-confirmation-info">
     <Card className="border-border/80"><CardHeader><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Confirmation document extraction</p><CardTitle className="text-base">Confirmation info</CardTitle><p className="text-xs text-muted-foreground">Extracted from the latest document in the Order confirmation category. Review the original PDF for any uncertain OCR values.</p></CardHeader>
       <CardContent>{query.isLoading ? <p className="text-sm text-muted-foreground">Loading confirmation documents…</p> : query.isError ? <p className="text-sm text-destructive">Confirmation details could not be loaded.</p> : !documentRecord ? <p className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">No order confirmation document is uploaded yet. Upload one in the Documents tab to extract its details.</p> : !info ? <p className="text-sm text-muted-foreground">This older confirmation file has no extraction yet. Replace it with the PDF or image to extract its details.</p> : <>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs"><span className="font-semibold">{documentRecord.filename}</span><span>{info.status === 'extracted' ? /\.(xlsx|xlsm|xls|csv)$/i.test(documentRecord.filename) ? 'Extracted from workbook' : `Extracted with ${info.method === 'ocr' ? 'OCR' : 'PDF text recognition'}` : info.status === 'unsupported' ? 'File type not supported for extraction' : info.status === 'failed' ? 'Extraction failed' : 'No readable text found'}</span></div>
+     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs"><span className="font-semibold">{documentRecord.filename}</span><span>{info.status === 'extracted' ? /\.(xlsx|xlsm|xls|csv)$/i.test(documentRecord.filename) ? 'Extracted from workbook' : `Extracted with ${info.method === 'ocr' ? 'OCR' : 'PDF text recognition'}` : info.status === 'unsupported' ? 'File type not supported for extraction' : info.status === 'failed' ? 'Extraction failed' : 'No readable text found'}</span></div>
         {info.error && <p className="mb-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{info.error}</p>}
         <div className="grid gap-3 md:grid-cols-2">{info.sections.map((section) => <section key={section.title} className="overflow-hidden rounded-xl border border-border bg-card"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">{section.title}</h3><table className="w-full text-left text-xs"><tbody>{section.fields.map((field) => <tr key={field.label} className="border-b border-border/60 last:border-0"><th className="w-2/5 px-3 py-2 font-medium text-muted-foreground">{field.label}</th><td className="px-3 py-2 font-semibold">{field.value}</td></tr>)}</tbody></table></section>)}</div>
         {info.windows.length > 0 && <section className="overflow-hidden rounded-xl border border-border bg-card"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">Window schedule ({info.windows.length})</h3><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead><tr className="bg-muted/20 text-[10px] uppercase text-muted-foreground">{['Window','Location','Width','Height','Sq ft','Qty','Type','Glass','Lock','Profile','Mesh'].map((name) => <th key={name} className="border-b border-border px-3 py-2">{name}</th>)}</tr></thead><tbody>{info.windows.map((row) => <tr key={row.windowNo} className="border-b border-border/60 last:border-0">{[row.windowNo,row.location,row.width,row.height,row.area,row.quantity,row.windowType,row.glass,row.lockType,row.profile,row.mesh].map((value, index) => <td key={`${row.windowNo}-${index}`} className="px-3 py-2">{value || '—'}</td>)}</tr>)}</tbody></table></div></section>}
@@ -1701,8 +1701,8 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
       toast({ title: 'Document is too large', description: 'Choose a file that is 10 MiB or smaller.', variant: 'destructive' });
       return;
     }
-    if (!/\.(pdf|png|jpe?g|webp|docx|xlsx)$/i.test(file.name)) {
-      toast({ title: 'Unsupported document type', description: 'Choose a PDF, PNG, JPEG, WebP, DOCX, or XLSX file.', variant: 'destructive' });
+    if (!/\.(pdf|png|jpe?g|webp|docx|xlsx|xlsm|xls|csv)$/i.test(file.name)) {
+      toast({ title: 'Unsupported document type', description: 'Choose a PDF, PNG, JPEG, WebP, DOCX, XLSX, XLSM, XLS, or CSV file.', variant: 'destructive' });
       return;
     }
     upload.mutate({ id: orderId, category, filename: encodeURIComponent(file.name), data: file }, { onSuccess: () => { toast({ title: 'Document uploaded' }); setFileKey((value) => value + 1); void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Document could not be uploaded', variant: 'destructive' as const }) });
@@ -1716,8 +1716,8 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
       toast({ title: 'Document is too large', description: 'Choose a file that is 10 MiB or smaller.', variant: 'destructive' });
       return;
     }
-    if (!/\.(pdf|png|jpe?g|webp|docx|xlsx)$/i.test(file.name)) {
-      toast({ title: 'Unsupported document type', description: 'Choose a PDF, PNG, JPEG, WebP, DOCX, or XLSX file.', variant: 'destructive' });
+    if (!/\.(pdf|png|jpe?g|webp|docx|xlsx|xlsm|xls|csv)$/i.test(file.name)) {
+      toast({ title: 'Unsupported document type', description: 'Choose a PDF, PNG, JPEG, WebP, DOCX, XLSX, XLSM, XLS, or CSV file.', variant: 'destructive' });
       return;
     }
     setReplacingDocumentId(documentRecord.id);
@@ -1794,7 +1794,7 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
       <input
         ref={(node) => { replaceInputs.current[item.id] = node; }}
         type="file"
-        accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx"
+        accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.xlsm,.xls,.csv"
         className="sr-only"
         aria-label={`Choose a replacement for ${item.filename}`}
         disabled={replace.isPending}
@@ -1827,7 +1827,7 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
           <div className="flex flex-wrap items-center gap-2">
             <label className={`inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 ${!hasPermission(user, selectedModule) || upload.isPending || categories.length === 0 ? 'pointer-events-none opacity-50' : ''}`} data-testid="button-upload-document">
               <Upload size={14} /> {upload.isPending ? 'Uploading…' : 'Choose file'}
-              <input key={fileKey} type="file" className="sr-only" disabled={!hasPermission(user, selectedModule) || upload.isPending || categories.length === 0} onChange={uploadFile} data-testid="input-upload-document" />
+              <input key={fileKey} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.xlsm,.xls,.csv" className="sr-only" disabled={!hasPermission(user, selectedModule) || upload.isPending || categories.length === 0} onChange={uploadFile} data-testid="input-upload-document" />
             </label>
             {canConfigureCategories && <Button type="button" variant="outline" className="h-10" onClick={() => { setCategoryDialogOpen(true); setCategoryError(null); }} data-testid="button-document-category-config"><Settings2 size={14} /> Category configuration</Button>}
           </div>

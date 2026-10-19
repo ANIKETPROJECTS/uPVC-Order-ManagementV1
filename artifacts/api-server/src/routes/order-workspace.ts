@@ -817,10 +817,10 @@ router.post("/orders/:id/windows/import", async (req, res): Promise<void> => {
   if (!actor) return;
   const order = await getOrders(await getMongoDb()).findOne({ _id: id });
   if (!order) { res.status(404).json({ error: "Order not found." }); return; }
-  if (!Array.isArray(req.body?.rows) || req.body.rows.length < 1 || req.body.rows.length > 500) {
-    res.status(400).json({ error: "Import between 1 and 500 window rows at a time." }); return;
+  if (!Array.isArray(req.body?.rows) || req.body.rows.length < 1 || req.body.rows.length > 200) {
+    res.status(400).json({ error: "Import between 1 and 200 window rows at a time." }); return;
   }
-  const parsed = req.body.rows.map((row: unknown) => CreateOrderWindowBody.safeParse(row));
+      const parsed = req.body.rows.map((row: unknown) => CreateOrderWindowBody.safeParse(row));
   const invalid = parsed.find((result: any) => !result.success);
   if (invalid) { res.status(400).json({ error: invalid.error.message }); return; }
   const inputs = parsed.map((result: any) => result.data);
@@ -842,8 +842,9 @@ router.post("/orders/:id/windows/import", async (req, res): Promise<void> => {
     res.status(409).json({ error: "Window numbers must be unique in this order." }); return;
   }
   const now = new Date();
-  const windows: OrderWindowDocument[] = inputs.map((input: any) => {
+  const windows: OrderWindowDocument[] = inputs.map((input: any, index: number) => {
     const frameCount = input.frameCount ?? 1;
+    const sourceRow = req.body.rows[index] as Record<string, unknown>;
     return {
       _id: randomUUID(), orderRecordId: id, ...input, frameCount,
       pieces: [
@@ -859,6 +860,11 @@ router.post("/orders/:id/windows/import", async (req, res): Promise<void> => {
       glassStatus: hasModuleEdit(actor, "glass-procurement") ? input.glassStatus : "pending",
       pendingReason: hasModuleEdit(actor, "window-readiness") ? input.pendingReason ?? null : null,
       sqFt: Math.round((input.widthMm * input.heightMm / 92903.04) * 1000) / 1000,
+      importedDetails: {
+        lockType: typeof sourceRow.lockType === "string" ? sourceRow.lockType : "",
+        profile: typeof sourceRow.profile === "string" ? sourceRow.profile : "",
+        mesh: typeof sourceRow.mesh === "string" ? sourceRow.mesh : "",
+      },
       createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now,
     } as OrderWindowDocument;
   });

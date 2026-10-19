@@ -28,6 +28,7 @@ export type NormalizedWindowImport = {
   header: Record<string, string>;
   rows: WindowImportRow[];
   totals: { areaSqFt: number; quantity: number; sourceAreaSqFt: number | null; sourceQuantity: number | null };
+  paymentSummary: Record<string, string>;
   warnings: string[];
   source: "excel" | "pdf";
   confidence: number;
@@ -187,6 +188,7 @@ function parseSheet(rows: unknown[][], sheetName: string): NormalizedWindowImpor
     if (heightMm != null && (heightMm < 300 || heightMm > 6000)) rowWarnings.push("Height is outside the expected 300–6000 mm range.");
     if (quantity <= 0) rowWarnings.push("Quantity must be greater than zero.");
     if (!text(get("windowType"))) rowWarnings.push("Window type is missing.");
+    if (!text(get("windowNo"))) rowWarnings.push("SR NO is blank; verify this row before importing.");
     if (sourceArea != null && computedArea != null && computedArea > 0 && Math.abs(sourceArea - computedArea) / computedArea > 0.005) rowWarnings.push("Sheet area differs from the recomputed area by more than 0.5%.");
     const windowNo = text(get("windowNo"));
     const location = text(get("location"));
@@ -219,7 +221,26 @@ function parseSheet(rows: unknown[][], sheetName: string): NormalizedWindowImpor
   if (sourceQuantity != null && sourceQuantity !== importRows.reduce((sum, row) => sum + row.quantity, 0)) warnings.push("The row quantities do not match the TOTAL row quantity.");
   const areaSqFt = importRows.reduce((sum, row) => sum + (row.areaSqFt ?? 0), 0);
   if (sourceAreaSqFt != null && areaSqFt > 0 && Math.abs(sourceAreaSqFt - areaSqFt) / areaSqFt > 0.005) warnings.push("The window area does not match the TOTAL row area.");
-  return { header, rows: importRows, totals: { areaSqFt, quantity: importRows.reduce((sum, row) => sum + row.quantity, 0), sourceAreaSqFt, sourceQuantity }, warnings, source: "excel", confidence: importRows.length ? 0.95 : 0.2, sheetName };
+  const paymentSummary: Record<string, string> = {};
+  const paymentLabels: Array<[string, RegExp]> = [
+    ["Total sq ft", /^total\s*(?:sq\.?\s*(?:ft|feet)|square\s*feet)$/i],
+    ["Rate", /^rate$/i], ["Increase Rate", /^increase\s*rate$/i], ["4 Track Charges", /^4\s*track\s*charges?$/i],
+    ["Transport", /^transport$/i], ["CGST 9%", /^cgst\s*9\s*%?$/i], ["SGST 9%", /^sgst\s*9\s*%?$/i],
+    ["Final Billing Amount", /^final\s*billing\s*(?:amount|amt\.?)$/i],
+  ];
+  for (const [label, matcher] of paymentLabels) {
+    for (const row of rows) {
+      const index = row.findIndex((cell) => matcher.test(normalized(cell)));
+      if (index < 0) continue;
+      if (label === "Total sq ft" && sourceAreaSqFt != null) paymentSummary[label] = String(sourceAreaSqFt);
+      else {
+        const value = row.slice(index + 1).find((cell) => text(cell) && !paymentLabels.some(([, other]) => other.test(normalized(cell))));
+        if (value != null) paymentSummary[label] = text(value);
+      }
+      break;
+    }
+  }
+  return { header, rows: importRows, totals: { areaSqFt, quantity: importRows.reduce((sum, row) => sum + row.quantity, 0), sourceAreaSqFt, sourceQuantity }, paymentSummary, warnings, source: "excel", confidence: importRows.length ? 0.95 : 0.2, sheetName };
 }
 
 function headerName(rows: unknown[][]): string {
@@ -235,7 +256,7 @@ export function parseWindowListWorkbook(bytes: Buffer, selectedSheet?: string): 
   return parsed;
 }
 
-type PdfWord = { x: number; y: number; text: string };
+type PdfWord = { x: number; y: number; text: string; page: number };
 function decodeXml(value: string): string {
   return value.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
 }
@@ -247,48 +268,55 @@ export async function parseWindowListPdf(bytes: Buffer, filename: string): Promi
     await writeFile(input, bytes);
     const { stdout } = await execFile("pdftotext", ["-bbox-layout", input, "-"], { timeout: 30_000, maxBuffer: 12 * 1024 * 1024 });
     const words: PdfWord[] = [];
+    const pages = [...stdout.matchAll(/<page\b[^>]*>([\s\S]*?)<\/page>/gi)];
+    const pageContent = pages.length ? pages.map((match) => match[1]) : [stdout];
     const pattern = /<word\b([^>]*)>([\s\S]*?)<\/word>/gi;
-    for (const match of stdout.matchAll(pattern)) {
-      const attrs = match[1];
-      const x = Number(attrs.match(/\bxMin="([\d.]+)"/)?.[1]);
-      const y = Number(attrs.match(/\byMin="([\d.]+)"/)?.[1]);
-      const value = decodeXml(match[2].replace(/<[^>]+>/g, "").trim());
-      if (Number.isFinite(x) && Number.isFinite(y) && value) words.push({ x, y, text: value });
-    }
+    pageContent.forEach((content, page) => {
+      for (const match of content.matchAll(pattern)) {
+        const attrs = match[1];
+        const x = Number(attrs.match(/\bxMin="([\d.]+)"/)?.[1]);
+        const y = Number(attrs.match(/\byMin="([\d.]+)"/)?.[1]);
+        const value = decodeXml(match[2].replace(/<[^>]+>/g, "").trim());
+        if (Number.isFinite(x) && Number.isFinite(y) && value) words.push({ x, y, text: value, page });
+      }
+    });
     if (words.length < 8) throw new Error("This PDF has no readable text layer. It may be scanned; no rows were guessed.");
 
-    const lines: Array<{ y: number; words: PdfWord[] }> = [];
+    const lines: Array<{ y: number; page: number; words: PdfWord[] }> = [];
     for (const word of [...words].sort((a, b) => a.y - b.y || a.x - b.x)) {
-      let line = lines.find((item) => Math.abs(item.y - word.y) <= 3.5);
-      if (!line) { line = { y: word.y, words: [] }; lines.push(line); }
+      let line = lines.find((item) => item.page === word.page && Math.abs(item.y - word.y) <= 3.5);
+      if (!line) { line = { y: word.y, page: word.page, words: [] }; lines.push(line); }
       line.words.push(word);
     }
+    lines.sort((a, b) => a.page - b.page || a.y - b.y);
     lines.forEach((line) => line.words.sort((a, b) => a.x - b.x));
     const headerLine = lines.find((line) => {
       const joined = line.words.map((word) => normalized(word.text)).join(" ");
       return /\bsr\b/.test(joined) && /\blocation\b/.test(joined) && /\bwidth\b/.test(joined) && /\bheight\b/.test(joined);
     });
     if (!headerLine) throw new Error("The PDF window-table header could not be identified. Use Excel or check the PDF layout.");
-    const joined = headerLine.words.map((word) => normalized(word.text));
+    const headerWords = words.filter((word) => word.page === headerLine.page && Math.abs(word.y - headerLine.y) <= 5.5).sort((a, b) => a.x - b.x || a.y - b.y);
+    const joined = headerWords.map((word) => normalized(word.text));
     const firstX = (tokens: string[]) => {
       for (let i = 0; i <= joined.length - tokens.length; i += 1) {
-        if (tokens.every((token, offset) => joined[i + offset] === token)) return headerLine.words[i].x;
+        if (tokens.every((token, offset) => joined[i + offset] === token)) return headerWords[i].x;
       }
       return null;
     };
-    const headerColumns: Array<{ key: keyof WindowImportRow | "areaSqFt"; x: number }> = [
+    const candidates: Array<{ key: keyof WindowImportRow | "areaSqFt"; x: number }> = [
       { key: "windowNo", x: firstX(["sr"]) ?? firstX(["sr", "no"]) ?? -1 },
       { key: "location", x: firstX(["location"]) ?? -1 },
       { key: "widthMm", x: firstX(["width"]) ?? -1 },
       { key: "heightMm", x: firstX(["height"]) ?? -1 },
-      { key: "areaSqFt", x: firstX(["total", "sq", "feet"]) ?? firstX(["sq", "feet"]) ?? -1 },
+      { key: "areaSqFt", x: firstX(["total"]) ?? firstX(["sq", "feet"]) ?? -1 },
       { key: "quantity", x: firstX(["qty"]) ?? firstX(["quantity"]) ?? -1 },
       { key: "windowType", x: firstX(["window", "type"]) ?? firstX(["type"]) ?? -1 },
       { key: "glass", x: firstX(["glass"]) ?? -1 },
       { key: "lockType", x: firstX(["lock", "type"]) ?? firstX(["lock"]) ?? -1 },
       { key: "profile", x: firstX(["profile"]) ?? -1 },
       { key: "mesh", x: firstX(["mesh"]) ?? -1 },
-    ].filter((column) => column.x >= 0).sort((a, b) => a.x - b.x);
+    ];
+    const headerColumns = candidates.filter((column) => column.x >= 0).sort((a, b) => a.x - b.x);
     if (headerColumns.length < 7) throw new Error("The PDF table is missing several expected column headings.");
     const boundaries = headerColumns.map((column, index) => index === 0 ? -Infinity : (headerColumns[index - 1].x + column.x) / 2);
     const bucket = (word: PdfWord) => {
@@ -297,33 +325,43 @@ export async function parseWindowListPdf(bytes: Buffer, filename: string): Promi
       return headerColumns[index].key;
     };
     const startY = headerLine.y + 4;
-    const tableLines = lines.filter((line) => line.y > startY);
-    const records: Array<{ y: number; cells: Map<string, string[]> }> = [];
-    let current: { y: number; cells: Map<string, string[]> } | null = null;
-    let previousY = startY;
+    const tableLines = lines.filter((line) => line.page > headerLine.page || (line.page === headerLine.page && line.y > startY));
+    const mappedLines: Array<{ y: number; page: number; cells: Map<string, string[]>; wordCount: number }> = [];
     let sourceAreaSqFt: number | null = null;
     let sourceQuantity: number | null = null;
     for (const line of tableLines) {
       const cells = new Map<string, string[]>();
       for (const word of line.words) {
+        if (/^₹$/.test(word.text) || /^\d{1,3}(?:,\d{3})+(?:\.\d{2})?$/.test(word.text)) continue;
         const key = String(bucket(word));
         cells.set(key, [...(cells.get(key) ?? []), word.text]);
       }
-      const firstCell = (cells.get("windowNo") ?? []).join(" ").trim();
-      if (/^total\b/i.test(firstCell)) {
-        sourceAreaSqFt = Number((cells.get("areaSqFt") ?? []).join("").replace(/,/g, "")) || null;
-        sourceQuantity = Number((cells.get("quantity") ?? []).join("").replace(/,/g, "")) || null;
+      const lineArea = numeric((cells.get("areaSqFt") ?? []).join(""));
+      const lineQuantity = numeric((cells.get("quantity") ?? []).join(""));
+      if ([...cells.values()].flat().some((cell) => /^total$/i.test(cell.trim())) && lineArea != null && lineQuantity != null) {
+        sourceAreaSqFt = lineArea;
+        sourceQuantity = lineQuantity;
         break;
       }
-      if (!current && ![...cells.values()].some((items) => items.length)) continue;
-      const gap = line.y - previousY;
-      const startsWindow = /^(?:w\d{1,4}|\d{1,4})$/i.test(firstCell) || Boolean(current && gap > 17);
-      if (startsWindow) {
-        current = { y: line.y, cells: new Map() };
-        records.push(current);
+      for (const [key, values] of cells) cells.set(key, values.filter((value) => !/^total$/i.test(value)));
+      if ([...cells.values()].some((items) => items.length)) mappedLines.push({ y: line.y, page: line.page, cells, wordCount: line.words.length });
+    }
+    const records: Array<{ y: number; page: number; cells: Map<string, string[]> }> = [];
+    for (const line of mappedLines) {
+      const firstCell = (line.cells.get("windowNo") ?? []).join(" ").trim();
+      const widthValue = numeric((line.cells.get("widthMm") ?? []).join(""));
+      const heightValue = numeric((line.cells.get("heightMm") ?? []).join(""));
+      const hasDimensions = widthValue != null && heightValue != null && widthValue > 0 && heightValue > 0;
+      if (hasDimensions && (/^w\d{1,4}$/i.test(firstCell) || !firstCell || /^\d{1,4}$/.test(firstCell))) {
+        records.push({ y: line.y, page: line.page, cells: new Map() });
       }
-      if (current) for (const [key, values] of cells) current.cells.set(key, [...(current.cells.get(key) ?? []), ...values]);
-      previousY = line.y;
+    }
+    for (const line of mappedLines) {
+      if (line.wordCount > 14) continue;
+      const nearest = records
+        .filter((record) => record.page === line.page && Math.abs(record.y - line.y) <= 18)
+        .sort((a, b) => Math.abs(a.y - line.y) - Math.abs(b.y - line.y))[0];
+      if (nearest) for (const [key, values] of line.cells) nearest.cells.set(key, [...(nearest.cells.get(key) ?? []), ...values]);
     }
     const rows: WindowImportRow[] = records.map((record, index) => {
       const read = (key: string) => (record.cells.get(key) ?? []).join(" ").trim();
@@ -341,7 +379,7 @@ export async function parseWindowListPdf(bytes: Buffer, filename: string): Promi
     if (sourceQuantity != null && sourceQuantity !== quantity) warnings.push(`Parsed quantity ${quantity} does not match PDF TOTAL quantity ${sourceQuantity}.`);
     if (sourceAreaSqFt != null && areaSqFt > 0 && Math.abs(sourceAreaSqFt - areaSqFt) / areaSqFt > 0.005) warnings.push(`Recomputed area ${areaSqFt.toFixed(2)} sq ft does not match PDF TOTAL ${sourceAreaSqFt.toFixed(2)} sq ft.`);
     if (!rows.length) warnings.push("No rows were found between the table header and TOTAL row.");
-    return { header: {}, rows, totals: { areaSqFt, quantity, sourceAreaSqFt, sourceQuantity }, warnings, source: "pdf", confidence: 0.55, sheetName: path.basename(filename) };
+    return { header: {}, rows, totals: { areaSqFt, quantity, sourceAreaSqFt, sourceQuantity }, paymentSummary: {}, warnings, source: "pdf", confidence: 0.55, sheetName: path.basename(filename) };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
