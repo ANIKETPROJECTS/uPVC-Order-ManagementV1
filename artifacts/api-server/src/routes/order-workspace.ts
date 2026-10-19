@@ -52,7 +52,7 @@ import {
   storeProjectUpload,
 } from "../lib/project-upload-storage";
 import { parseGlassOrderWorkbook, type ParsedGlassWorkbookSection } from "../lib/glass-order-workbook";
-import { createWindowListTemplate, parseWindowListWorkbook } from "../lib/window-list-import";
+import { createWindowListTemplate, parseWindowListPdf, parseWindowListWorkbook } from "../lib/window-list-import";
 import { formatProjectPieceId } from "../lib/order-identifiers";
 import { extractConfirmationInfo } from "../lib/confirmation-extraction";
 
@@ -794,8 +794,8 @@ router.post("/orders/:id/windows/import-preview/:filename", async (req, res, nex
   const actor = await context(req, res, "measurements");
   if (!actor || !(await orderExists(String(req.params.id), res))) return;
   const filename = String(req.params.filename || "");
-  if (!/\.(xlsx|xlsm|xls|csv)$/i.test(filename)) {
-    res.status(400).json({ error: "Unsupported file. Choose an .xlsx, .xlsm, .xls, or .csv file." });
+  if (!/\.(xlsx|xlsm|xls|csv|pdf)$/i.test(filename)) {
+    res.status(400).json({ error: "Choose an Excel workbook or PDF." });
     return;
   }
   expressRaw(req, res, next, async () => {
@@ -804,11 +804,72 @@ router.post("/orders/:id/windows/import-preview/:filename", async (req, res, nex
     if (body.length > 10 * 1024 * 1024) { res.status(413).json({ error: "Choose a file no larger than 10 MiB." }); return; }
     try {
       const sheet = typeof req.query.sheet === "string" ? req.query.sheet : undefined;
-      res.json({ filename, sheets: parseWindowListWorkbook(body, sheet) });
+      const sheets = /\.pdf$/i.test(filename) ? [await parseWindowListPdf(body, filename)] : parseWindowListWorkbook(body, sheet);
+      res.json({ filename, sheets });
     } catch (error) {
       res.status(422).json({ error: error instanceof Error ? error.message : "The workbook could not be parsed." });
     }
   });
+});
+router.post("/orders/:id/windows/import", async (req, res): Promise<void> => {
+  const id = String(req.params.id);
+  const actor = await context(req, res, "measurements", true);
+  if (!actor) return;
+  const order = await getOrders(await getMongoDb()).findOne({ _id: id });
+  if (!order) { res.status(404).json({ error: "Order not found." }); return; }
+  if (!Array.isArray(req.body?.rows) || req.body.rows.length < 1 || req.body.rows.length > 500) {
+    res.status(400).json({ error: "Import between 1 and 500 window rows at a time." }); return;
+  }
+  const parsed = req.body.rows.map((row: unknown) => CreateOrderWindowBody.safeParse(row));
+  const invalid = parsed.find((result: any) => !result.success);
+  if (invalid) { res.status(400).json({ error: invalid.error.message }); return; }
+  const inputs = parsed.map((result: any) => result.data);
+  if (inputs.some((row: any) => row.lotId && !(order.lots ?? []).some((lot: any) => lot.lotId === row.lotId))) {
+    res.status(400).json({ error: "A selected lot does not belong to this order." }); return;
+  }
+  if (order.clientType !== "Project" && inputs.some((row: any) => row.lotId)) {
+    res.status(400).json({ error: "Retail order windows cannot be assigned to project lots." }); return;
+  }
+  if (!hasModuleEdit(actor, "window-readiness") && inputs.some((row: any) => row.frameStatus !== "pending" || row.shutterStatus !== "pending" || row.pendingReason)) {
+    res.status(403).json({ error: "window-readiness editing access is required to set readiness fields." }); return;
+  }
+  if (!hasModuleEdit(actor, "glass-procurement") && inputs.some((row: any) => row.glassStatus !== "pending")) {
+    res.status(403).json({ error: "glass-procurement editing access is required to set glass status." }); return;
+  }
+  const db = await getMongoDb();
+  const numbers = inputs.map((row: any) => String(row.windowNo).trim().toLocaleLowerCase());
+  if (new Set(numbers).size !== numbers.length || await getOrderWindows(db).countDocuments({ orderRecordId: id, archivedAt: null, windowNo: { $in: inputs.map((row: any) => row.windowNo) } })) {
+    res.status(409).json({ error: "Window numbers must be unique in this order." }); return;
+  }
+  const now = new Date();
+  const windows: OrderWindowDocument[] = inputs.map((input: any) => {
+    const frameCount = input.frameCount ?? 1;
+    return {
+      _id: randomUUID(), orderRecordId: id, ...input, frameCount,
+      pieces: [
+        ...Array.from({ length: frameCount }, (_, i) => ({ id: randomUUID(), kind: "frame" as const, pieceNo: i + 1, status: "pending" as const })),
+        ...Array.from({ length: input.glassShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "glass_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
+        ...Array.from({ length: input.meshShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "mesh_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
+      ],
+      location: input.location ?? null, glassType: input.glassType ?? null, meshType: order.meshType ?? null,
+      glassShutterCount: input.glassShutterCount ?? null, glassShutterReadyCount: input.glassShutterReadyCount ?? 0,
+      meshShutterCount: input.meshShutterCount ?? null, meshShutterReadyCount: input.meshShutterReadyCount ?? 0,
+      frameStatus: hasModuleEdit(actor, "window-readiness") ? input.frameStatus : "pending",
+      shutterStatus: hasModuleEdit(actor, "window-readiness") ? input.shutterStatus : "pending",
+      glassStatus: hasModuleEdit(actor, "glass-procurement") ? input.glassStatus : "pending",
+      pendingReason: hasModuleEdit(actor, "window-readiness") ? input.pendingReason ?? null : null,
+      sqFt: Math.round((input.widthMm * input.heightMm / 92903.04) * 1000) / 1000,
+      createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now,
+    } as OrderWindowDocument;
+  });
+  try {
+    await getOrderWindows(db).insertMany(windows, { ordered: true });
+    await event(id, actor, "window.list.imported", `Imported ${windows.length} window rows from ${String(req.body.filename || "file")} (${String(req.body.source || "Excel")}).`);
+  } catch (error) {
+    await getOrderWindows(db).deleteMany({ orderRecordId: id, _id: { $in: windows.map((window) => window._id) } }).catch((rollbackError: unknown) => req.log.error({ err: rollbackError, orderId: id }, "Window import rollback failed"));
+    throw error;
+  }
+  res.status(201).json({ created: windows.length, windows: windows.map(windowResponse) });
 });
 router.post("/orders/:id/windows", async (req, res): Promise<void> => {
   const p = CreateOrderWindowParams.safeParse(req.params), b = CreateOrderWindowBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
