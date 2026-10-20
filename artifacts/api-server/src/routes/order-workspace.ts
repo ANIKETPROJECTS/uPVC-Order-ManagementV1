@@ -53,7 +53,7 @@ import {
 } from "../lib/project-upload-storage";
 import { parseGlassOrderWorkbook, type GlassWorkbookColumnMapping, type ParsedGlassWorkbookSection } from "../lib/glass-order-workbook";
 import { createWindowListTemplate, parseWindowListPdf, parseWindowListWorkbook } from "../lib/window-list-import";
-import { formatProjectPieceId } from "../lib/order-identifiers";
+import { formatProjectPieceId, matchesProjectPieceId } from "../lib/order-identifiers";
 import { extractConfirmationInfo } from "../lib/confirmation-extraction";
 
 const router = ExpressRouter();
@@ -913,7 +913,14 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
   const db = await getMongoDb(); const old = await getOrderWindows(db).findOne({ _id: p.data.windowId, orderRecordId: p.data.id, archivedAt: null }); if (!old) { res.status(404).json({ error: "Window not found." }); return; }
   if (b.data.pieceId && b.data.pieceStatus) {
     const pieces = windowPieces(old);
-    const piece = pieces.find((item) => item.id === b.data.pieceId);
+    const piece = pieces.find((item) => item.id === b.data.pieceId
+      || Boolean(old.lotId && matchesProjectPieceId(
+        b.data.pieceId!,
+        old.lotId,
+        old.windowNo,
+        item.kind,
+        item.pieceNo,
+      )));
     if (!piece) { res.status(404).json({ error: "Piece QR does not belong to this window." }); return; }
     if (!(piece.kind === "glass_shutter" ? requireModuleEdit(actor, res, "glass-procurement") : requireModuleEdit(actor, res, "window-readiness"))) return;
     piece.status = b.data.pieceStatus;

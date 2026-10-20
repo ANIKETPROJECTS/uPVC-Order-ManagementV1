@@ -1,0 +1,35 @@
+Implement the shutter code change now, using your audit. Change ONLY what is needed. Do not touch anything else (no redesign, no other modules, no unrelated refactors, no data migration).
+
+CLIENT REQUIREMENT (confirmed)
+Use GS1, GS2, GS3 and so on for glass shutters. Use MS1, MS2, MS3 and so on for mesh shutters. These codes are easier to read and cause fewer mix-ups than what we use now.
+
+DECISIONS (from your audit questions)
+1. Scope: project windows that are assigned to a lot (the ones that already get formatted IDs). Retail windows keep their stored UUID piece IDs and their current labels. Do not touch them.
+2. Format: keep the fully qualified ID and change only the shutter suffix:
+   <lotId>-W<window>-GS<n> for glass shutters, <lotId>-W<window>-MS<n> for mesh shutters (no leading zeros). Frames stay F, F2, etc.
+3. Numbering: keep the current scope exactly (per window, per kind: each window's glass shutters count 1, 2, 3 and its mesh shutters count 1, 2, 3 separately). Do not add a global or per-order counter and do not add any new allocation or history logic in this task.
+4. Old codes: do NOT rename stored data and do not run any migration. Keep the old suffixes G<n> / M<n> as LEGACY ALIASES: when a scanned piece ID arrives, resolve it if it equals the current new ID OR the old-format ID of the same lot, window, kind and number. Old printed QR labels (FRAMEWISE_PIECE:<orderId>:<windowId>:<oldPieceId>) must keep working. The API returns the NEW ID for newly printed labels.
+5. Put the format and the legacy alias logic in ONE place (order-identifiers.ts, the existing formatter) and reuse it where windowPieces() and the piece-status lookup need it.
+6. Do not change quantities, statuses, stage logic, glass state, QR token/URL structure, dispatch logic, dashboard queries, permissions, imports, retail IDs, activity event text, stored UUIDs, or any saved data.
+7. Keep the API backward compatible: no removed or renamed fields. Only the generated ID string for project pieces changes, and old IDs are still accepted on lookup.
+
+FILES (expected, from your audit)
+Change: artifacts/api-server/src/lib/order-identifiers.ts, artifacts/api-server/src/routes/order-workspace.ts (piece lookup alias only), and a focused test file.
+Do NOT change: order-scanner.tsx, order-window-operations.tsx, order-detail.tsx, dispatch files, Operations Dashboard, order search, Glass Tracking, quotations, imports, communication, notifications, OpenAPI contracts, database indexes, order-status and installation QR files. If you find that one of these must change, stop and tell me why before changing it.
+
+TESTS
+- Glass shutter 1, 2, 3 of window W3 in a lot give <lot>-W3-GS1, GS2, GS3; mesh give MS1, MS2, MS3; counters are separate.
+- W03 still normalizes to W3.
+- Frames still give F, F2.
+- A scan using the OLD id (<lot>-W3-G1 and <lot>-W3-M1) updates the same piece as the new id.
+- A scan using the new id works.
+- An old id for a different window, lot or kind does NOT match (no false matches, for example G1 of W3 must not match GS1 of W4, and G1 must not match an MS piece).
+- Retail windows (UUID piece IDs) behave exactly as before.
+- Existing tests still pass.
+
+DELIVERABLES
+1. Files changed and a clear statement that nothing else was touched.
+2. Before/after table: place | old code | new code (label sheet, QR payload, API piece id, scanner lookup).
+3. How old printed QR labels behave now.
+4. A manual test checklist with exact menu paths: print the factory QR label sheet for a project order (new codes shown), scan a NEW label, scan an OLD label (use a QR saved before the change), mark a glass and a mesh shutter ready, check Windows table status, Dashboard window readiness, Dispatch readiness and activity feed are unchanged. Include a retail order check (labels unchanged).
+5. Anything you could not verify (for example signed-in screens).

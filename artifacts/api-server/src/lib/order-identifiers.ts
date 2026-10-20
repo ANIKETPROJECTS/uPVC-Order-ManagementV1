@@ -80,6 +80,24 @@ export function formatProjectPieceId(
     : `W${windowNo.trim().replace(/^W/i, "").replace(/[^a-zA-Z0-9-]/g, "")}`;
   const pieceSuffix =
     kind === "frame" ? (pieceNo === 1 ? "F" : `F${pieceNo}`) :
-    kind === "glass_shutter" ? `G${pieceNo}` : `M${pieceNo}`;
+    kind === "glass_shutter" ? `GS${pieceNo}` : `MS${pieceNo}`;
   return `${lotId}-${windowSuffix}-${pieceSuffix}`;
+}
+
+export function matchesProjectPieceId(
+  candidate: string,
+  lotId: string,
+  windowNo: string,
+  kind: "frame" | "glass_shutter" | "mesh_shutter",
+  pieceNo: number,
+): boolean {
+  if (candidate === formatProjectPieceId(lotId, windowNo, kind, pieceNo)) return true;
+  const normalizedWindow = windowNo.trim().match(/^W?0*(\d+)$/i);
+  const windowSuffix = normalizedWindow
+    ? `W${Number(normalizedWindow[1])}`
+    : `W${windowNo.trim().replace(/^W/i, "").replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const legacyPieceSuffix =
+    kind === "frame" ? (pieceNo === 1 ? "F" : `F${pieceNo}`) :
+    kind === "glass_shutter" ? `G${pieceNo}` : `M${pieceNo}`;
+  return candidate === `${lotId}-${windowSuffix}-${legacyPieceSuffix}`;
 }
