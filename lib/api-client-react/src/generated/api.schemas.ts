@@ -877,12 +877,184 @@ export const OrderWindowPieceStatus = {
   ready: 'ready',
 } as const;
 
+export type QrPrintStateStatus = typeof QrPrintStateStatus[keyof typeof QrPrintStateStatus];
+
+
+export const QrPrintStateStatus = {
+  pending: 'pending',
+  printed: 'printed',
+} as const;
+
+export interface QrPrintState {
+  status: QrPrintStateStatus;
+  /** @minimum 0 */
+  printCount: number;
+  /** @nullable */
+  firstPrintedAt: string | null;
+  /** @nullable */
+  lastPrintedAt: string | null;
+  /** @nullable */
+  lastPrintedBy: string | null;
+}
+
 export interface OrderWindowPiece {
   id: string;
+  displayId: string;
   kind: OrderWindowPieceKind;
   /** @minimum 1 */
   pieceNo: number;
   status: OrderWindowPieceStatus;
+  qrPrint: QrPrintState;
+}
+
+export type QrPrintSummaryInProgressPiecesItem = {
+  pieceId: string;
+  displayId: string;
+  createdByName: string;
+};
+
+export interface QrPrintSummary {
+  /** @minimum 0 */
+  totalPieces: number;
+  /** @minimum 0 */
+  pendingPieces: number;
+  /** @minimum 0 */
+  printedPieces: number;
+  inProgressPieces: QrPrintSummaryInProgressPiecesItem[];
+}
+
+export type QrPrintJobInputMode = typeof QrPrintJobInputMode[keyof typeof QrPrintJobInputMode];
+
+
+export const QrPrintJobInputMode = {
+  all: 'all',
+  selected: 'selected',
+  pending: 'pending',
+} as const;
+
+export interface QrPrintJobInput {
+  mode: QrPrintJobInputMode;
+  pieceIds?: string[];
+}
+
+export interface ConfirmQrPrintJobInput {
+  printedPieceIds?: string[];
+}
+
+export interface MarkOrderQrPiecesPendingInput {
+  /** @minItems 1 */
+  pieceIds: string[];
+}
+
+export interface QrPrintJobPiece {
+  windowId: string;
+  pieceId: string;
+  displayId: string;
+  payload: string;
+  clientName: string;
+}
+
+export type QrPrintJobMode = typeof QrPrintJobMode[keyof typeof QrPrintJobMode];
+
+
+export const QrPrintJobMode = {
+  all: 'all',
+  selected: 'selected',
+  pending: 'pending',
+  reprint: 'reprint',
+} as const;
+
+export type QrPrintJobState = typeof QrPrintJobState[keyof typeof QrPrintJobState];
+
+
+export const QrPrintJobState = {
+  requested: 'requested',
+  confirmed: 'confirmed',
+  cancelled: 'cancelled',
+  expired: 'expired',
+} as const;
+
+export interface QrPrintJob {
+  id: string;
+  orderId: string;
+  mode: QrPrintJobMode;
+  pieceIds: string[];
+  pieces: QrPrintJobPiece[];
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  state: QrPrintJobState;
+  /** @nullable */
+  confirmedAt: string | null;
+  confirmedPieceIds: string[];
+  /** @nullable */
+  note: string | null;
+}
+
+export type QrPrintJobResponseInProgressPiecesItem = {
+  pieceId: string;
+  displayId: string;
+  createdByName: string;
+};
+
+export type QrStickerSettingsInputOrientation = typeof QrStickerSettingsInputOrientation[keyof typeof QrStickerSettingsInputOrientation];
+
+
+export const QrStickerSettingsInputOrientation = {
+  portrait: 'portrait',
+  landscape: 'landscape',
+} as const;
+
+export interface QrStickerSettingsInput {
+  /**
+     * @minimum 20
+     * @maximum 150
+     */
+  widthMm: number;
+  /**
+     * @minimum 15
+     * @maximum 150
+     */
+  heightMm: number;
+  orientation: QrStickerSettingsInputOrientation;
+  /**
+     * @minimum 0
+     * @maximum 20
+     */
+  marginMm: number;
+  /**
+     * @minimum 10
+     * @maximum 100
+     */
+  qrSizeMm: number;
+  /**
+     * @minimum 4
+     * @maximum 24
+     */
+  fontSizeLine1Pt: number;
+  /**
+     * @minimum 4
+     * @maximum 24
+     */
+  fontSizeLine2Pt: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  nameMaxLines: number;
+}
+
+export type QrStickerSettingsResponse = QrStickerSettingsInput & {
+  defaultsUnconfirmed: boolean;
+  updatedBy?: string;
+  updatedAt?: string;
+};
+
+export interface QrPrintJobResponse {
+  job: QrPrintJob | null;
+  pieces: QrPrintJobPiece[];
+  stickerSettings?: QrStickerSettingsResponse;
+  inProgressPieces: QrPrintJobResponseInProgressPiecesItem[];
 }
 
 export interface OrderWindow {
@@ -933,6 +1105,8 @@ export interface OrderWindow {
   pendingReason: string | null;
   /** @nullable */
   sqFt: number | null;
+  /** @nullable */
+  pieceCountWarning: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3013,5 +3187,17 @@ export type SearchMeasurementRecordsParams = {
  * @maxLength 160
  */
 query: string;
+};
+
+export type CancelQrPrintJob200State = typeof CancelQrPrintJob200State[keyof typeof CancelQrPrintJob200State];
+
+
+export const CancelQrPrintJob200State = {
+  cancelled: 'cancelled',
+} as const;
+
+export type CancelQrPrintJob200 = {
+  id: string;
+  state: CancelQrPrintJob200State;
 };
 

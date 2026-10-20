@@ -7,11 +7,14 @@
  */
 import type { OrderWindowPieceKind } from './orderWindowPieceKind';
 import type { OrderWindowPieceStatus } from './orderWindowPieceStatus';
+import type { QrPrintState } from './qrPrintState';
 
 export interface OrderWindowPiece {
   id: string;
+  displayId: string;
   kind: OrderWindowPieceKind;
   /** @minimum 1 */
   pieceNo: number;
   status: OrderWindowPieceStatus;
+  qrPrint: QrPrintState;
 }

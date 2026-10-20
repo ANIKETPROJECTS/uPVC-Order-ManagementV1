@@ -24,6 +24,7 @@ import type {
   AuthSession,
   BalancePaymentRegisterList,
   BalancePaymentTransactions,
+  CancelQrPrintJob200,
   ChatConversation,
   ChatGroup,
   ChatGroupInput,
@@ -38,6 +39,7 @@ import type {
   ClientInput,
   ClientList,
   ClientUpdate,
+  ConfirmQrPrintJobInput,
   CreateOrderGrievance,
   Dashboard,
   DashboardPreferences,
@@ -67,6 +69,7 @@ import type {
   ListOrdersParams,
   ListUsersParams,
   LoginInput,
+  MarkOrderQrPiecesPendingInput,
   MeasurementRecord,
   MeasurementRecordInput,
   MeasurementRecordList,
@@ -128,6 +131,12 @@ import type {
   PushConfig,
   PushSubscriptionDeleteInput,
   PushSubscriptionInput,
+  QrPrintJob,
+  QrPrintJobInput,
+  QrPrintJobResponse,
+  QrPrintSummary,
+  QrStickerSettingsInput,
+  QrStickerSettingsResponse,
   Quotation,
   QuotationApprovalDecisionInput,
   QuotationApprovalQueue,
@@ -10853,6 +10862,589 @@ export const useCreateOrderWindow = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateOrderWindowMutationOptions(options));
+    }
+
+export const getGetOrderQrPrintSummaryUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/qr-print-summary`
+}
+
+/**
+ * @summary Get QR sticker print counts for an order
+ */
+export const getOrderQrPrintSummary = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<QrPrintSummary> => {
+
+  return customFetch<QrPrintSummary>(getGetOrderQrPrintSummaryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrderQrPrintSummaryQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/qr-print-summary`
+    ] as const;
+    }
+
+
+export const getGetOrderQrPrintSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getOrderQrPrintSummary>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderQrPrintSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrderQrPrintSummaryQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderQrPrintSummary>>> = ({ signal }) => getOrderQrPrintSummary(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderQrPrintSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOrderQrPrintSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderQrPrintSummary>>>
+export type GetOrderQrPrintSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get QR sticker print counts for an order
+ */
+
+export function useGetOrderQrPrintSummary<TData = Awaited<ReturnType<typeof getOrderQrPrintSummary>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderQrPrintSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOrderQrPrintSummaryQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateOrderQrPrintJobUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/qr-print-jobs`
+}
+
+/**
+ * @summary Create an order QR sticker print job
+ */
+export const createOrderQrPrintJob = async (id: string,
+    qrPrintJobInput: QrPrintJobInput, options?: Parameters<typeof customFetch>[1]): Promise<QrPrintJobResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QrPrintJobResponse>(getCreateOrderQrPrintJobUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(qrPrintJobInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOrderQrPrintJobMutationKey = () => ['createOrderQrPrintJob'] as const;
+
+export const getCreateOrderQrPrintJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderQrPrintJob>>, TError,CreateOrderQrPrintJobMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOrderQrPrintJob>>, TError,CreateOrderQrPrintJobMutationVariables, TContext> => {
+
+const mutationKey = getCreateOrderQrPrintJobMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOrderQrPrintJob>>, CreateOrderQrPrintJobMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createOrderQrPrintJob(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOrderQrPrintJobMutationResult = NonNullable<Awaited<ReturnType<typeof createOrderQrPrintJob>>>
+    export type CreateOrderQrPrintJobMutationBody = BodyType<QrPrintJobInput>
+    export type CreateOrderQrPrintJobMutationError = ErrorType<void>
+    export type CreateOrderQrPrintJobMutationVariables = {id: string;data: BodyType<QrPrintJobInput>}
+
+    /**
+ * @summary Create an order QR sticker print job
+ */
+export const useCreateOrderQrPrintJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderQrPrintJob>>, TError,CreateOrderQrPrintJobMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOrderQrPrintJob>>,
+        TError,
+        CreateOrderQrPrintJobMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOrderQrPrintJobMutationOptions(options));
+    }
+
+export const getConfirmQrPrintJobUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/qr-print-jobs/${jobId}/confirm`
+}
+
+/**
+ * @summary Confirm which labels were printed
+ */
+export const confirmQrPrintJob = async (jobId: string,
+    confirmQrPrintJobInput?: ConfirmQrPrintJobInput, options?: Parameters<typeof customFetch>[1]): Promise<QrPrintJob> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QrPrintJob>(getConfirmQrPrintJobUrl(jobId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(confirmQrPrintJobInput)
+  }
+);}
+
+
+
+
+
+export const getConfirmQrPrintJobMutationKey = () => ['confirmQrPrintJob'] as const;
+
+export const getConfirmQrPrintJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmQrPrintJob>>, TError,ConfirmQrPrintJobMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmQrPrintJob>>, TError,ConfirmQrPrintJobMutationVariables, TContext> => {
+
+const mutationKey = getConfirmQrPrintJobMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmQrPrintJob>>, ConfirmQrPrintJobMutationVariables> = (props) => {
+          const {jobId,data} = props ?? {};
+
+          return  confirmQrPrintJob(jobId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmQrPrintJobMutationResult = NonNullable<Awaited<ReturnType<typeof confirmQrPrintJob>>>
+    export type ConfirmQrPrintJobMutationBody = BodyType<ConfirmQrPrintJobInput> | undefined
+    export type ConfirmQrPrintJobMutationError = ErrorType<void>
+    export type ConfirmQrPrintJobMutationVariables = {jobId: string;data?: BodyType<ConfirmQrPrintJobInput>}
+
+    /**
+ * @summary Confirm which labels were printed
+ */
+export const useConfirmQrPrintJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmQrPrintJob>>, TError,ConfirmQrPrintJobMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmQrPrintJob>>,
+        TError,
+        ConfirmQrPrintJobMutationVariables,
+        TContext
+      > => {
+      return useMutation(getConfirmQrPrintJobMutationOptions(options));
+    }
+
+export const getCancelQrPrintJobUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/qr-print-jobs/${jobId}/cancel`
+}
+
+/**
+ * @summary Cancel a pending QR sticker print job
+ */
+export const cancelQrPrintJob = async (jobId: string, options?: Parameters<typeof customFetch>[1]): Promise<CancelQrPrintJob200> => {
+
+  return customFetch<CancelQrPrintJob200>(getCancelQrPrintJobUrl(jobId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelQrPrintJobMutationKey = () => ['cancelQrPrintJob'] as const;
+
+export const getCancelQrPrintJobMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelQrPrintJob>>, TError,CancelQrPrintJobMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelQrPrintJob>>, TError,CancelQrPrintJobMutationVariables, TContext> => {
+
+const mutationKey = getCancelQrPrintJobMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelQrPrintJob>>, CancelQrPrintJobMutationVariables> = (props) => {
+          const {jobId} = props ?? {};
+
+          return  cancelQrPrintJob(jobId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelQrPrintJobMutationResult = NonNullable<Awaited<ReturnType<typeof cancelQrPrintJob>>>
+
+    export type CancelQrPrintJobMutationError = ErrorType<unknown>
+    export type CancelQrPrintJobMutationVariables = {jobId: string}
+
+    /**
+ * @summary Cancel a pending QR sticker print job
+ */
+export const useCancelQrPrintJob = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelQrPrintJob>>, TError,CancelQrPrintJobMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelQrPrintJob>>,
+        TError,
+        CancelQrPrintJobMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelQrPrintJobMutationOptions(options));
+    }
+
+export const getMarkOrderQrPiecesPendingUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/qr-pieces/mark-pending`
+}
+
+/**
+ * @summary Mark selected QR pieces pending
+ */
+export const markOrderQrPiecesPending = async (id: string,
+    markOrderQrPiecesPendingInput: MarkOrderQrPiecesPendingInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getMarkOrderQrPiecesPendingUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(markOrderQrPiecesPendingInput)
+  }
+);}
+
+
+
+
+
+export const getMarkOrderQrPiecesPendingMutationKey = () => ['markOrderQrPiecesPending'] as const;
+
+export const getMarkOrderQrPiecesPendingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markOrderQrPiecesPending>>, TError,MarkOrderQrPiecesPendingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markOrderQrPiecesPending>>, TError,MarkOrderQrPiecesPendingMutationVariables, TContext> => {
+
+const mutationKey = getMarkOrderQrPiecesPendingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markOrderQrPiecesPending>>, MarkOrderQrPiecesPendingMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  markOrderQrPiecesPending(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkOrderQrPiecesPendingMutationResult = NonNullable<Awaited<ReturnType<typeof markOrderQrPiecesPending>>>
+    export type MarkOrderQrPiecesPendingMutationBody = BodyType<MarkOrderQrPiecesPendingInput>
+    export type MarkOrderQrPiecesPendingMutationError = ErrorType<unknown>
+    export type MarkOrderQrPiecesPendingMutationVariables = {id: string;data: BodyType<MarkOrderQrPiecesPendingInput>}
+
+    /**
+ * @summary Mark selected QR pieces pending
+ */
+export const useMarkOrderQrPiecesPending = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markOrderQrPiecesPending>>, TError,MarkOrderQrPiecesPendingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markOrderQrPiecesPending>>,
+        TError,
+        MarkOrderQrPiecesPendingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkOrderQrPiecesPendingMutationOptions(options));
+    }
+
+export const getGetQrStickerSettingsUrl = () => {
+
+
+
+
+  return `/api/settings/qr-stickers`
+}
+
+/**
+ * @summary Get QR sticker settings
+ */
+export const getQrStickerSettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<QrStickerSettingsResponse> => {
+
+  return customFetch<QrStickerSettingsResponse>(getGetQrStickerSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetQrStickerSettingsQueryKey = () => {
+    return [
+    `/api/settings/qr-stickers`
+    ] as const;
+    }
+
+
+export const getGetQrStickerSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getQrStickerSettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQrStickerSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetQrStickerSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQrStickerSettings>>> = ({ signal }) => getQrStickerSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQrStickerSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetQrStickerSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getQrStickerSettings>>>
+export type GetQrStickerSettingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get QR sticker settings
+ */
+
+export function useGetQrStickerSettings<TData = Awaited<ReturnType<typeof getQrStickerSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQrStickerSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetQrStickerSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateQrStickerSettingsUrl = () => {
+
+
+
+
+  return `/api/settings/qr-stickers`
+}
+
+/**
+ * @summary Update QR sticker settings
+ */
+export const updateQrStickerSettings = async (qrStickerSettingsInput: QrStickerSettingsInput, options?: Parameters<typeof customFetch>[1]): Promise<QrStickerSettingsResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QrStickerSettingsResponse>(getUpdateQrStickerSettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(qrStickerSettingsInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateQrStickerSettingsMutationKey = () => ['updateQrStickerSettings'] as const;
+
+export const getUpdateQrStickerSettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQrStickerSettings>>, TError,UpdateQrStickerSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateQrStickerSettings>>, TError,UpdateQrStickerSettingsMutationVariables, TContext> => {
+
+const mutationKey = getUpdateQrStickerSettingsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateQrStickerSettings>>, UpdateQrStickerSettingsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateQrStickerSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateQrStickerSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateQrStickerSettings>>>
+    export type UpdateQrStickerSettingsMutationBody = BodyType<QrStickerSettingsInput>
+    export type UpdateQrStickerSettingsMutationError = ErrorType<void>
+    export type UpdateQrStickerSettingsMutationVariables = {data: BodyType<QrStickerSettingsInput>}
+
+    /**
+ * @summary Update QR sticker settings
+ */
+export const useUpdateQrStickerSettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQrStickerSettings>>, TError,UpdateQrStickerSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateQrStickerSettings>>,
+        TError,
+        UpdateQrStickerSettingsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateQrStickerSettingsMutationOptions(options));
     }
 
 export const getUpdateOrderWindowUrl = (id: string,

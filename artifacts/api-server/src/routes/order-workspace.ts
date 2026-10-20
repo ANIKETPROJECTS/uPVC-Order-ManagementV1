@@ -39,6 +39,7 @@ import {
 import {
   getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPaymentFlags, getOrderPayments,
   getOrderRefunds, getOrders, getOrderWindows, getGlassTrackingOrders, getGlassTrackingWorkbookImports, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderDocument, type OrderWindowDocument, type OrderWindowPieceDocument,
+  getQrPrintJobs, getQrStickerSettings, getQrStickerSettingsAudit, type QrPrintJobDocument, type QrPrintJobPieceDocument,
   type GlassTrackingItemDocument, type GlassTrackingOrderDocument,
   type OrderPaymentFlagDocument, type PaymentFlagActionDocument, type OrderRefundDocument,
 } from "../lib/mongo";
@@ -55,6 +56,16 @@ import { parseGlassOrderWorkbook, type GlassWorkbookColumnMapping, type ParsedGl
 import { createWindowListTemplate, parseWindowListPdf, parseWindowListWorkbook } from "../lib/window-list-import";
 import { formatProjectPieceId, matchesProjectPieceId } from "../lib/order-identifiers";
 import { extractConfirmationInfo } from "../lib/confirmation-extraction";
+import {
+  createWindowPieces,
+  DEFAULT_QR_STICKER_SETTINGS,
+  isPiecePrinted,
+  pieceDisplayId,
+  pieceQrPayload,
+  QR_STICKER_SETTINGS_ID,
+  reconcileWindowPieceCounts,
+  validateQrStickerSettings,
+} from "../lib/order-qr-printing";
 
 const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
@@ -89,27 +100,33 @@ async function event(orderRecordId: string, actor: UserContext, action: string, 
   await getOrderActivity(await getMongoDb()).insertOne({ _id: randomUUID(), orderRecordId, actorId: actor.id, actorName: actor.name, action, summary, createdAt: new Date() });
 }
 function windowPieces(w: OrderWindowDocument): OrderWindowPieceDocument[] {
-  const pieces = w.pieces ? [...w.pieces] : [];
-  if (!w.pieces) {
-    for (const [kind, count, readyCount, ready] of [
-      ["frame", w.frameCount ?? 1, 0, w.frameStatus === "ready"],
-      ["glass_shutter", w.glassShutterCount ?? 0, w.glassShutterReadyCount ?? (w.glassStatus === "received" ? w.glassShutterCount ?? 0 : 0), false],
-      ["mesh_shutter", w.meshShutterCount ?? 0, w.meshShutterReadyCount ?? 0, false],
-    ] as const) {
-      for (let pieceNo = 1; pieceNo <= count; pieceNo++) pieces.push({
-        id: `${w._id}_${kind}_${pieceNo}`,
-        kind,
-        pieceNo,
-        status: kind === "glass_shutter" ? (pieceNo <= readyCount ? "ready" : "pending") : kind === "mesh_shutter" ? (pieceNo <= readyCount ? "ready" : "pending") : ready ? "ready" : "pending",
-      });
-    }
-  }
+  const pieces = w.pieces ? [...w.pieces] : createWindowPieces(w, true);
   return w.lotId ? pieces.map((piece) => ({
     ...piece,
     id: formatProjectPieceId(w.lotId!, w.windowNo, piece.kind, piece.pieceNo),
   })) : pieces;
 }
-const windowResponse = (w: OrderWindowDocument) => ({ id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm, windowType: w.windowType, location: w.location ?? null, glassType: w.glassType ?? null, meshType: w.meshType ?? null, frameCount: w.frameCount ?? 1, glassShutterCount: w.glassShutterCount ?? null, glassShutterReadyCount: w.glassShutterReadyCount ?? null, meshShutterCount: w.meshShutterCount ?? null, meshShutterReadyCount: w.meshShutterReadyCount ?? null, pieces: windowPieces(w), lotId: w.lotId ?? null, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus, glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt, createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
+const windowResponse = (w: OrderWindowDocument, order?: OrderDocument, pieceCountWarning: string | null = null) => ({
+  id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm,
+  windowType: w.windowType, location: w.location ?? null, glassType: w.glassType ?? null, meshType: w.meshType ?? null,
+  frameCount: w.frameCount ?? 1, glassShutterCount: w.glassShutterCount ?? null,
+  glassShutterReadyCount: w.glassShutterReadyCount ?? null, meshShutterCount: w.meshShutterCount ?? null,
+  meshShutterReadyCount: w.meshShutterReadyCount ?? null,
+  pieces: windowPieces(w).map((piece) => ({
+    ...piece,
+    displayId: order ? pieceDisplayId(order, w, piece) : piece.id,
+    qrPrint: (() => {
+      const { lastPrintJobId: _lastPrintJobId, ...state } = piece.qrPrint ?? {
+        status: "printed" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null,
+      };
+      return state;
+    })(),
+  })),
+  lotId: w.lotId ?? null, frameStatus: w.frameStatus, shutterStatus: w.shutterStatus,
+  glassStatus: w.glassStatus, pendingReason: w.pendingReason, sqFt: w.sqFt,
+  pieceCountWarning,
+  createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString(),
+});
 const paymentResponse = (p: any) => ({
   ...p,
   id: p._id,
@@ -791,9 +808,269 @@ router.patch("/confirmation/purchase-orders/:orderRecordId/client-decision", asy
 
 router.get("/orders/:id/windows", async (req, res): Promise<void> => {
   const p = ListOrderWindowsParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
-  if (!(await context(req, res)) || !(await orderExists(p.data.id, res))) return;
+  const actor = await context(req, res);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
   const rows = await getOrderWindows(await getMongoDb()).find({ orderRecordId: p.data.id, archivedAt: null }).sort({ windowNo: 1 }).toArray();
-  res.json(ListOrderWindowsResponse.parse(rows.map(windowResponse)));
+  res.json(ListOrderWindowsResponse.parse(rows.map((row) => windowResponse(row, order))));
+});
+
+router.get("/orders/:id/qr-print-summary", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  const order = actor ? await orderExists(String(req.params.id), res) : null;
+  if (!actor || !order) return;
+  const db = await getMongoDb();
+  await expireQrPrintJobs(order._id);
+  const windows = await getOrderWindows(db).find({ orderRecordId: order._id, archivedAt: null }).toArray();
+  const pieces = windows.flatMap(windowPieces);
+  const printedPieces = pieces.filter(isPiecePrinted).length;
+  const visiblePieceIds = new Set(pieces.map((piece) => piece.id));
+  const activeJobs = await getQrPrintJobs(db).find({ orderRecordId: order._id, state: "requested" }).toArray();
+  const inProgressPieces = activeJobs.flatMap((job) => job.pieces
+    .filter((piece) => visiblePieceIds.has(piece.pieceId))
+    .map(({ pieceId, displayId }) => ({ pieceId, displayId, createdByName: job.createdByName })));
+  const inProgressIds = new Set(inProgressPieces.map((piece) => piece.pieceId));
+  const pendingPieces = pieces.filter((piece) => !isPiecePrinted(piece) && !inProgressIds.has(piece.id)).length;
+  res.json({ totalPieces: pieces.length, printedPieces, pendingPieces, inProgressPieces });
+});
+
+const qrPrintSettingsResponse = (settings: Awaited<ReturnType<ReturnType<typeof getQrStickerSettings>["findOne"]>>) => ({
+  ...(settings ?? DEFAULT_QR_STICKER_SETTINGS),
+  defaultsUnconfirmed: !settings,
+});
+const printJobResponse = (job: QrPrintJobDocument) => ({
+  id: job._id, orderId: job.orderId, mode: job.mode, pieceIds: job.pieceIds,
+  pieces: job.pieces.map(({ windowId, pieceId, displayId, payload, clientName }) => ({ windowId, pieceId, displayId, payload, clientName })),
+  createdBy: job.createdBy, createdByName: job.createdByName, createdAt: job.createdAt.toISOString(),
+  state: job.state, confirmedAt: job.confirmedAt?.toISOString() ?? null,
+  confirmedPieceIds: job.confirmedPieceIds, note: job.note,
+});
+const expireQrPrintJobs = async (orderRecordId: string, now = new Date()) =>
+  getQrPrintJobs(await getMongoDb()).updateMany(
+    { orderRecordId, state: "requested", createdAt: { $lte: new Date(now.getTime() - 15 * 60_000) } },
+    { $set: { state: "expired" } },
+  );
+
+router.post("/orders/:id/qr-print-jobs", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  const order = actor ? await orderExists(String(req.params.id), res) : null;
+  if (!actor || !order) return;
+  const body = req.body as { mode?: unknown; pieceIds?: unknown };
+  if (!["all", "selected", "pending"].includes(String(body?.mode))) {
+    res.status(400).json({ error: "Choose all, selected, or pending mode." }); return;
+  }
+  if (body.mode === "selected" && (!Array.isArray(body.pieceIds) || body.pieceIds.length === 0 ||
+    body.pieceIds.some((id) => typeof id !== "string" || id.length > 200))) {
+    res.status(400).json({ error: "Select at least one valid piece." }); return;
+  }
+  const db = await getMongoDb();
+  const now = new Date();
+  await expireQrPrintJobs(order._id, now);
+  const allWindows = body.mode === "selected"
+    ? await getOrderWindows(db).find({ orderRecordId: order._id }).toArray()
+    : await getOrderWindows(db).find({ orderRecordId: order._id, archivedAt: null }).toArray();
+
+  // Keep legacy materialization in memory until authorization and selection are validated.
+  for (const window of allWindows) if (!window.pieces) window.pieces = createWindowPieces(window, true);
+  const activeJobs = await getQrPrintJobs(db).find({ orderRecordId: order._id, state: "requested" }).toArray();
+  const heldByPiece = new Map(activeJobs.flatMap((job) => job.pieces.map((piece) => [
+    piece.pieceId,
+    { name: job.createdByName, jobId: job._id },
+  ] as const)));
+  const candidates = allWindows.flatMap((window) => windowPieces(window).map((piece) => ({
+    window,
+    piece,
+    storedPieceId: (window.pieces ?? []).find((item) => item.kind === piece.kind && item.pieceNo === piece.pieceNo)!.id,
+  })));
+  let selected = body.mode === "selected"
+    ? candidates.filter(({ piece }) => (body.pieceIds as string[]).includes(piece.id))
+    : candidates;
+  if (body.mode === "selected" && selected.length !== new Set(body.pieceIds as string[]).size) {
+    res.status(400).json({ error: "One or more selected pieces do not belong to this order." }); return;
+  }
+  const archivedSelected = body.mode === "selected" && selected.some(({ window }) => Boolean(window.archivedAt));
+  if (archivedSelected && !hasModuleEdit(actor, "order.qr.reprint")) {
+    res.status(403).json({ error: "Reprint access is required for archived windows." }); return;
+  }
+  if (body.mode === "pending") selected = selected.filter(({ piece }) => !isPiecePrinted(piece) && !heldByPiece.has(piece.id));
+  const hasPrinted = selected.some(({ piece }) => isPiecePrinted(piece));
+  const requiresReprint = archivedSelected || hasPrinted;
+  if (requiresReprint && !hasModuleEdit(actor, "order.qr.reprint")) {
+    res.status(403).json({ error: "QR sticker reprint access is required for already printed pieces." }); return;
+  }
+  if (!requiresReprint && !hasModuleEdit(actor, "order.qr.print")) {
+    res.status(403).json({ error: "QR sticker printing access is required." }); return;
+  }
+  const touchedWindowIds = new Set(body.mode === "selected"
+    ? selected.map(({ window }) => window._id)
+    : allWindows.map((window) => window._id));
+  for (const window of allWindows) {
+    if (!touchedWindowIds.has(window._id) || await getOrderWindows(db).findOne({ _id: window._id, pieces: { $exists: true } })) continue;
+    await getOrderWindows(db).updateOne({ _id: window._id, pieces: { $exists: false } }, { $set: { pieces: window.pieces } });
+  }
+  if (!selected.length) {
+    const currentSettings = await getQrStickerSettings(db).findOne({ _id: QR_STICKER_SETTINGS_ID });
+    res.json({
+      job: null,
+      pieces: [],
+      stickerSettings: qrPrintSettingsResponse(currentSettings),
+      inProgressPieces: [...heldByPiece.entries()].map(([pieceId, info]) => ({
+        pieceId,
+        displayId: candidates.find(({ piece }) => piece.id === pieceId)?.piece.id ?? pieceId,
+        createdByName: info.name,
+      })),
+    });
+    return;
+  }
+  const settings = await getQrStickerSettings(db).findOne({ _id: QR_STICKER_SETTINGS_ID });
+  const pieces: QrPrintJobPieceDocument[] = selected.map(({ window, piece, storedPieceId }) => ({
+    windowId: window._id,
+    pieceId: piece.id,
+    storedPieceId,
+    displayId: pieceDisplayId(order, window, piece),
+    payload: pieceQrPayload(order.orderId, window._id, piece.id),
+    clientName: order.clientName,
+  }));
+  const job: QrPrintJobDocument = {
+    _id: randomUUID(), orderRecordId: order._id, orderId: order.orderId,
+    mode: requiresReprint ? "reprint" : body.mode as QrPrintJobDocument["mode"],
+    pieceIds: pieces.map((piece) => piece.pieceId), pieces, createdBy: actor.id,
+    createdByName: actor.name, createdAt: now, state: "requested", confirmedAt: null,
+    confirmedPieceIds: [], note: null,
+  };
+  try {
+    await getQrPrintJobs(db).insertOne(job);
+  } catch (error) {
+    if ((error as any)?.code === 11000) {
+      res.status(409).json({ error: "One or more pieces are already in an open print job. Refresh the pending list and try again." }); return;
+    }
+    throw error;
+  }
+  res.status(201).json({
+    job: printJobResponse(job),
+    pieces,
+    stickerSettings: qrPrintSettingsResponse(settings),
+    inProgressPieces: [...heldByPiece.entries()].map(([pieceId, info]) => ({ pieceId, displayId: candidates.find(({ piece }) => piece.id === pieceId)?.piece.id ?? pieceId, createdByName: info.name })),
+  });
+});
+
+router.post("/qr-print-jobs/:jobId/confirm", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  if (!actor) return;
+  const job = await getQrPrintJobs(await getMongoDb()).findOne({ _id: String(req.params.jobId) });
+  if (!job) { res.status(404).json({ error: "QR print job not found." }); return; }
+  if (job.createdBy !== actor.id && !actor.masterAdmin && !hasModuleEdit(actor, "order.qr.reprint")) {
+    res.status(403).json({ error: "Only the job creator or an administrator can confirm this print job." }); return;
+  }
+  const db = await getMongoDb();
+  if (job.state === "confirmed") { res.json(printJobResponse(job)); return; }
+  if (job.state !== "requested" || Date.now() - job.createdAt.getTime() >= 15 * 60_000) {
+    await getQrPrintJobs(db).updateOne({ _id: job._id, state: "requested" }, { $set: { state: "expired" } });
+    res.status(409).json({ error: "This print job has expired or is no longer open." }); return;
+  }
+  const requestedIds = (req.body as { printedPieceIds?: unknown })?.printedPieceIds;
+  const printedIds = requestedIds === undefined ? job.pieceIds : Array.isArray(requestedIds) ? requestedIds : null;
+  if (!printedIds || printedIds.some((id) => typeof id !== "string" || !job.pieceIds.includes(id))) {
+    res.status(400).json({ error: "Printed piece IDs must belong to this print job." }); return;
+  }
+  const windows = await getOrderWindows(db).find({ _id: { $in: job.pieces.map((piece) => piece.windowId) }, orderRecordId: job.orderRecordId }).toArray();
+  const windowById = new Map(windows.map((window) => [window._id, window]));
+  const confirmedAt = new Date();
+  for (const item of job.pieces.filter((piece) => printedIds.includes(piece.pieceId))) {
+    const window = windowById.get(item.windowId);
+    if (!window) continue;
+    const pieces = window.pieces ?? createWindowPieces(window, true);
+    const stored = pieces.find((piece) => piece.id === item.storedPieceId);
+    if (!stored) continue;
+    if (stored.qrPrint?.lastPrintJobId !== job._id) {
+      const qrPrint = stored.qrPrint ?? { status: "printed" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null };
+      stored.qrPrint = {
+        status: "printed",
+        printCount: qrPrint.printCount + 1,
+        firstPrintedAt: qrPrint.firstPrintedAt ?? confirmedAt,
+        lastPrintedAt: confirmedAt,
+        lastPrintedBy: actor.id,
+        lastPrintJobId: job._id,
+      } as OrderWindowPieceDocument["qrPrint"];
+    }
+    await getOrderWindows(db).updateOne({ _id: window._id }, { $set: { pieces } });
+  }
+  await getQrPrintJobs(db).updateOne({ _id: job._id, state: "requested" }, { $set: { state: "confirmed", confirmedAt, confirmedPieceIds: printedIds } });
+  const updated = await getQrPrintJobs(db).findOne({ _id: job._id });
+  await event(job.orderRecordId, actor, "qr.stickers.confirmed", `Confirmed ${printedIds.length} QR sticker(s) from ${job.mode} job.`);
+  res.json(printJobResponse(updated!));
+});
+
+router.post("/qr-print-jobs/:jobId/cancel", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const job = await getQrPrintJobs(db).findOne({ _id: String(req.params.jobId), state: "requested" });
+  if (!job) { res.status(404).json({ error: "Open QR print job not found." }); return; }
+  if (job.createdBy !== actor.id && !actor.masterAdmin) {
+    res.status(403).json({ error: "Only the job creator or a Master Admin can cancel this print job." }); return;
+  }
+  await getQrPrintJobs(db).updateOne({ _id: job._id, state: "requested" }, { $set: { state: "cancelled" } });
+  await event(job.orderRecordId, actor, "qr.stickers.cancelled", `Cancelled QR sticker job with ${job.pieceIds.length} piece(s).`);
+  res.json({ id: job._id, state: "cancelled" });
+});
+
+router.post("/orders/:id/qr-pieces/mark-pending", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  const order = actor ? await orderExists(String(req.params.id), res) : null;
+  if (!actor || !order) return;
+  if (!actor.masterAdmin) { res.status(403).json({ error: "Master Admin access is required." }); return; }
+  const ids = (req.body as { pieceIds?: unknown })?.pieceIds;
+  if (!Array.isArray(ids) || !ids.length || ids.some((id) => typeof id !== "string")) {
+    res.status(400).json({ error: "Select one or more pieces." }); return;
+  }
+  const db = await getMongoDb();
+  const windows = await getOrderWindows(db).find({ orderRecordId: order._id, archivedAt: null }).toArray();
+  const selectableIds = new Set(windows.flatMap((window) => windowPieces(window).map((piece) => piece.id)));
+  if ((ids as string[]).some((id) => !selectableIds.has(id))) {
+    res.status(400).json({ error: "One or more selected pieces do not belong to an active window in this order." }); return;
+  }
+  let updatedCount = 0;
+  for (const window of windows) {
+    const pieces = window.pieces ?? createWindowPieces(window, true);
+    let windowChanged = false;
+    for (const piece of windowPieces({ ...window, pieces })) {
+      if ((ids as string[]).includes(piece.id)) {
+        const stored = pieces.find((candidate) => candidate.kind === piece.kind && candidate.pieceNo === piece.pieceNo)!;
+        stored.qrPrint = { status: "pending", printCount: stored.qrPrint?.printCount ?? 0, firstPrintedAt: stored.qrPrint?.firstPrintedAt ?? null, lastPrintedAt: stored.qrPrint?.lastPrintedAt ?? null, lastPrintedBy: stored.qrPrint?.lastPrintedBy ?? null };
+        updatedCount++;
+        windowChanged = true;
+      }
+    }
+    if (windowChanged) await getOrderWindows(db).updateOne({ _id: window._id }, { $set: { pieces } });
+  }
+  await event(order._id, actor, "qr.stickers.mark_pending", `Marked ${updatedCount} piece(s) pending for QR sticker printing.`);
+  res.json({ updatedCount });
+});
+
+router.get("/settings/qr-stickers", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  if (!actor) return;
+  const settings = await getQrStickerSettings(await getMongoDb()).findOne({ _id: QR_STICKER_SETTINGS_ID });
+  res.json(qrPrintSettingsResponse(settings));
+});
+router.put("/settings/qr-stickers", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  if (!actor) return;
+  if (!actor.masterAdmin) { res.status(403).json({ error: "Master Admin access is required." }); return; }
+  const settings = validateQrStickerSettings(req.body);
+  if (!settings) { res.status(400).json({ error: "Sticker settings are invalid or outside the supported ranges." }); return; }
+  const now = new Date();
+  const db = await getMongoDb();
+  await getQrStickerSettings(db).updateOne(
+    { _id: QR_STICKER_SETTINGS_ID },
+    { $set: { ...settings, updatedBy: actor.id, updatedAt: now } },
+    { upsert: true },
+  );
+  await getQrStickerSettingsAudit(db).insertOne({
+    _id: randomUUID(), actorId: actor.id, actorName: actor.name, createdAt: now, settings,
+  });
+  res.json({ ...settings, defaultsUnconfirmed: false, updatedBy: actor.id, updatedAt: now.toISOString() });
 });
 router.get("/orders/:id/windows/import-template", async (req, res): Promise<void> => {
   const actor = await context(req, res, "measurements");
@@ -861,9 +1138,9 @@ router.post("/orders/:id/windows/import", async (req, res): Promise<void> => {
     return {
       _id: randomUUID(), orderRecordId: id, ...input, frameCount,
       pieces: [
-        ...Array.from({ length: frameCount }, (_, i) => ({ id: randomUUID(), kind: "frame" as const, pieceNo: i + 1, status: "pending" as const })),
-        ...Array.from({ length: input.glassShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "glass_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
-        ...Array.from({ length: input.meshShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "mesh_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
+        ...Array.from({ length: frameCount }, (_, i) => ({ id: randomUUID(), kind: "frame" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
+        ...Array.from({ length: input.glassShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "glass_shutter" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
+        ...Array.from({ length: input.meshShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "mesh_shutter" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
       ],
       location: input.location ?? null, glassType: input.glassType ?? null, meshType: order.meshType ?? null,
       glassShutterCount: input.glassShutterCount ?? null, glassShutterReadyCount: input.glassShutterReadyCount ?? 0,
@@ -888,7 +1165,7 @@ router.post("/orders/:id/windows/import", async (req, res): Promise<void> => {
     await getOrderWindows(db).deleteMany({ orderRecordId: id, _id: { $in: windows.map((window) => window._id) } }).catch((rollbackError: unknown) => req.log.error({ err: rollbackError, orderId: id }, "Window import rollback failed"));
     throw error;
   }
-  res.status(201).json({ created: windows.length, windows: windows.map(windowResponse) });
+  res.status(201).json({ created: windows.length, windows: windows.map((window) => windowResponse(window, order)) });
 });
 router.post("/orders/:id/windows", async (req, res): Promise<void> => {
   const p = CreateOrderWindowParams.safeParse(req.params), b = CreateOrderWindowBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
@@ -899,13 +1176,13 @@ router.post("/orders/:id/windows", async (req, res): Promise<void> => {
   if (order.clientType !== "Project" && b.data.lotId) { res.status(400).json({ error: "Retail order windows cannot be assigned to project lots." }); return; }
   if (!hasModuleEdit(actor, "window-readiness") && (b.data.frameStatus !== "pending" || b.data.shutterStatus !== "pending" || b.data.pendingReason)) { res.status(403).json({ error: "window-readiness editing access is required to set readiness fields." }); return; }
   if (!hasModuleEdit(actor, "glass-procurement") && b.data.glassStatus !== "pending") { res.status(403).json({ error: "glass-procurement editing access is required to set glass status." }); return; }
-    const now = new Date(); const frameCount = b.data.frameCount ?? 1; const w: OrderWindowDocument = { _id: randomUUID(), orderRecordId: p.data.id, ...b.data, frameCount, pieces: [
-      ...Array.from({ length: frameCount }, (_, i) => ({ id: randomUUID(), kind: "frame" as const, pieceNo: i + 1, status: "pending" as const })),
-      ...Array.from({ length: b.data.glassShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "glass_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
-      ...Array.from({ length: b.data.meshShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "mesh_shutter" as const, pieceNo: i + 1, status: "pending" as const })),
+     const now = new Date(); const frameCount = b.data.frameCount ?? 1; const w: OrderWindowDocument = { _id: randomUUID(), orderRecordId: p.data.id, ...b.data, frameCount, pieces: [
+       ...Array.from({ length: frameCount }, (_, i) => ({ id: randomUUID(), kind: "frame" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
+       ...Array.from({ length: b.data.glassShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "glass_shutter" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
+       ...Array.from({ length: b.data.meshShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "mesh_shutter" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
     ], location: b.data.location ?? null, glassType: b.data.glassType ?? null, meshType: order.meshType ?? null, glassShutterCount: b.data.glassShutterCount ?? null, glassShutterReadyCount: b.data.glassShutterReadyCount ?? 0, meshShutterCount: b.data.meshShutterCount ?? null, meshShutterReadyCount: b.data.meshShutterReadyCount ?? 0, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
   try { await getOrderWindows(await getMongoDb()).insertOne(w); } catch (e) { if ((e as any)?.code === 11000) { res.status(409).json({ error: "Window number already exists for this order." }); return; } throw e; }
-  await event(p.data.id, actor, "window.created", `Added window ${w.windowNo}.`); res.status(201).json(CreateOrderWindowResponse.parse(windowResponse(w)));
+   await event(p.data.id, actor, "window.created", `Added window ${w.windowNo}.`); res.status(201).json(CreateOrderWindowResponse.parse(windowResponse(w, order)));
 });
 router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> => {
   const p = UpdateOrderWindowParams.safeParse(req.params), b = UpdateOrderWindowBody.safeParse(req.body); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } if (!b.success) { res.status(400).json({ error: b.error.message }); return; }
@@ -935,12 +1212,13 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
     await getOrderWindows(db).updateOne({ _id: old._id }, { $set: updates });
     const updated = await getOrderWindows(db).findOne({ _id: old._id });
     await event(p.data.id, actor, "window.piece.ready", `Marked ${piece.kind.replaceAll("_", " ")} ${piece.pieceNo} ready for ${old.windowNo}.`);
-    res.json(UpdateOrderWindowResponse.parse(windowResponse(updated!)));
+    const order = await getOrders(db).findOne({ _id: p.data.id });
+    res.json(UpdateOrderWindowResponse.parse(windowResponse(updated!, order ?? undefined)));
     return;
   }
   const proposedWindow = { ...old, ...b.data };
   if ((proposedWindow.glassShutterCount != null && proposedWindow.glassShutterReadyCount != null && proposedWindow.glassShutterReadyCount > proposedWindow.glassShutterCount) || (proposedWindow.meshShutterCount != null && proposedWindow.meshShutterReadyCount != null && proposedWindow.meshShutterReadyCount > proposedWindow.meshShutterCount)) { res.status(400).json({ error: "Ready shutter counts cannot exceed total shutter counts." }); return; }
-  const keys = Object.keys(b.data); const measurement = keys.some(k => ["windowNo", "widthMm", "heightMm", "windowType", "location", "glassType", "meshType"].includes(k)); const readiness = keys.some(k => ["frameStatus", "shutterStatus", "pendingReason", "glassShutterCount", "glassShutterReadyCount", "meshShutterCount", "meshShutterReadyCount"].includes(k)); const glass = keys.includes("glassStatus");
+  const keys = Object.keys(b.data); const measurement = keys.some(k => ["windowNo", "widthMm", "heightMm", "windowType", "location", "glassType", "meshType"].includes(k)); const readiness = keys.some(k => ["frameCount", "frameStatus", "shutterStatus", "pendingReason", "glassShutterCount", "glassShutterReadyCount", "meshShutterCount", "meshShutterReadyCount"].includes(k)); const glass = keys.includes("glassStatus");
   const order = await getOrders(db).findOne({ _id: p.data.id });
   if (keys.includes("lotId")) {
     if (!order || (b.data.lotId && !(order.lots ?? []).some((lot) => lot.lotId === b.data.lotId))) { res.status(400).json({ error: "Choose a lot that belongs to this order." }); return; }
@@ -953,11 +1231,26 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
   if (readiness && !requireModuleEdit(actor, res, "window-readiness")) return;
   if (glass && !requireModuleEdit(actor, res, "glass-procurement")) return;
   const changedKeys = keys.filter(k => (old as any)[k] !== (b.data as any)[k]);
-  if (changedKeys.length === 0) { res.json(UpdateOrderWindowResponse.parse(windowResponse(old))); return; }
+  if (changedKeys.length === 0) { res.json(UpdateOrderWindowResponse.parse(windowResponse(old, order ?? undefined))); return; }
   const changes = Object.fromEntries(changedKeys.map(k => [k, (b.data as any)[k]]));
-  const next = { ...old, ...changes }; const sqFt = next.widthMm !== null && next.heightMm !== null ? Math.round((next.widthMm * next.heightMm / 92903.04) * 1000) / 1000 : null; const updates: any = { ...changes, sqFt, updatedAt: new Date(), updatedBy: actor.id };
+  const next = { ...old, ...changes };
+  const sqFt = next.widthMm !== null && next.heightMm !== null ? Math.round((next.widthMm * next.heightMm / 92903.04) * 1000) / 1000 : null;
+  const updates: any = { ...changes, sqFt, updatedAt: new Date(), updatedBy: actor.id };
+  let pieceCountWarning: string | null = null;
+  if (["frameCount", "glassShutterCount", "meshShutterCount"].some((key) => keys.includes(key))) {
+    const reconciled = reconcileWindowPieceCounts(old, {
+      frameCount: keys.includes("frameCount") ? next.frameCount : undefined,
+      glassShutterCount: keys.includes("glassShutterCount") ? next.glassShutterCount : undefined,
+      meshShutterCount: keys.includes("meshShutterCount") ? next.meshShutterCount : undefined,
+    });
+    if (reconciled.error) { res.status(409).json({ error: reconciled.error }); return; }
+    updates.pieces = reconciled.pieces;
+    if (reconciled.printedRemoved) pieceCountWarning = `${reconciled.printedRemoved} removed piece(s) already had QR stickers; the physical labels still exist.`;
+  }
   try { await getOrderWindows(db).updateOne({ _id: old._id }, { $set: updates }); } catch (e) { if ((e as any)?.code === 11000) { res.status(409).json({ error: "Window number already exists for this order." }); return; } throw e; }
-  const updated = await getOrderWindows(db).findOne({ _id: old._id }); await event(p.data.id, actor, "window.updated", `Updated window ${old.windowNo}.`); res.json(UpdateOrderWindowResponse.parse(windowResponse(updated!)));
+   const updated = await getOrderWindows(db).findOne({ _id: old._id });
+   await event(p.data.id, actor, "window.updated", `Updated window ${old.windowNo}.${pieceCountWarning ? ` ${pieceCountWarning}` : ""}`);
+   res.json(UpdateOrderWindowResponse.parse(windowResponse(updated!, order ?? undefined, pieceCountWarning)));
 });
 router.delete("/orders/:id/windows/:windowId", async (req, res): Promise<void> => {
   const p = ArchiveOrderWindowParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } const actor = await context(req, res, "measurements", true); if (!actor || !(await orderExists(p.data.id, res))) return;

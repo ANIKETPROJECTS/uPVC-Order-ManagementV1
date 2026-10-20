@@ -5060,6 +5060,8 @@ export const listOrderWindowsResponseMeshShutterCountMin = 0;
 
 
 
+export const listOrderWindowsResponsePiecesItemQrPrintPrintCountMin = 0;
+
 export const listOrderWindowsResponseMeshShutterReadyCountMin = 0;
 
 
@@ -5080,9 +5082,17 @@ export const ListOrderWindowsResponseItem = zod.object({
   "frameCount": zod.number().int().min(1),
   "pieces": zod.array(zod.object({
   "id": zod.string(),
+  "displayId": zod.string(),
   "kind": zod.enum(['frame', 'glass_shutter', 'mesh_shutter']),
   "pieceNo": zod.number().int().min(1),
-  "status": zod.enum(['pending', 'ready'])
+  "status": zod.enum(['pending', 'ready']),
+  "qrPrint": zod.object({
+  "status": zod.enum(['pending', 'printed']),
+  "printCount": zod.number().int().min(listOrderWindowsResponsePiecesItemQrPrintPrintCountMin),
+  "firstPrintedAt": zod.coerce.date().nullable(),
+  "lastPrintedAt": zod.coerce.date().nullable(),
+  "lastPrintedBy": zod.string().nullable()
+})
 })),
   "meshShutterReadyCount": zod.number().int().min(listOrderWindowsResponseMeshShutterReadyCountMin).nullable(),
   "lotId": zod.string().nullable(),
@@ -5091,6 +5101,7 @@ export const ListOrderWindowsResponseItem = zod.object({
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
   "pendingReason": zod.string().nullable(),
   "sqFt": zod.number().nullable(),
+  "pieceCountWarning": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -5162,6 +5173,8 @@ export const createOrderWindowResponseMeshShutterCountMin = 0;
 
 
 
+export const createOrderWindowResponsePiecesItemQrPrintPrintCountMin = 0;
+
 export const createOrderWindowResponseMeshShutterReadyCountMin = 0;
 
 
@@ -5182,9 +5195,17 @@ export const CreateOrderWindowResponse = zod.object({
   "frameCount": zod.number().int().min(1),
   "pieces": zod.array(zod.object({
   "id": zod.string(),
+  "displayId": zod.string(),
   "kind": zod.enum(['frame', 'glass_shutter', 'mesh_shutter']),
   "pieceNo": zod.number().int().min(1),
-  "status": zod.enum(['pending', 'ready'])
+  "status": zod.enum(['pending', 'ready']),
+  "qrPrint": zod.object({
+  "status": zod.enum(['pending', 'printed']),
+  "printCount": zod.number().int().min(createOrderWindowResponsePiecesItemQrPrintPrintCountMin),
+  "firstPrintedAt": zod.coerce.date().nullable(),
+  "lastPrintedAt": zod.coerce.date().nullable(),
+  "lastPrintedBy": zod.string().nullable()
+})
 })),
   "meshShutterReadyCount": zod.number().int().min(createOrderWindowResponseMeshShutterReadyCountMin).nullable(),
   "lotId": zod.string().nullable(),
@@ -5193,9 +5214,299 @@ export const CreateOrderWindowResponse = zod.object({
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
   "pendingReason": zod.string().nullable(),
   "sqFt": zod.number().nullable(),
+  "pieceCountWarning": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Get QR sticker print counts for an order
+ */
+export const GetOrderQrPrintSummaryParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const getOrderQrPrintSummaryResponseTotalPiecesMin = 0;
+
+export const getOrderQrPrintSummaryResponsePendingPiecesMin = 0;
+
+export const getOrderQrPrintSummaryResponsePrintedPiecesMin = 0;
+
+
+
+export const GetOrderQrPrintSummaryResponse = zod.object({
+  "totalPieces": zod.number().int().min(getOrderQrPrintSummaryResponseTotalPiecesMin),
+  "pendingPieces": zod.number().int().min(getOrderQrPrintSummaryResponsePendingPiecesMin),
+  "printedPieces": zod.number().int().min(getOrderQrPrintSummaryResponsePrintedPiecesMin),
+  "inProgressPieces": zod.array(zod.object({
+  "pieceId": zod.string(),
+  "displayId": zod.string(),
+  "createdByName": zod.string()
+}))
+})
+
+
+/**
+ * @summary Create an order QR sticker print job
+ */
+export const CreateOrderQrPrintJobParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const CreateOrderQrPrintJobBody = zod.object({
+  "mode": zod.enum(['all', 'selected', 'pending']),
+  "pieceIds": zod.array(zod.string()).optional()
+})
+
+export const createOrderQrPrintJobResponseStickerSettingsOneWidthMmMin = 20;
+export const createOrderQrPrintJobResponseStickerSettingsOneWidthMmMax = 150;
+
+export const createOrderQrPrintJobResponseStickerSettingsOneHeightMmMin = 15;
+export const createOrderQrPrintJobResponseStickerSettingsOneHeightMmMax = 150;
+
+export const createOrderQrPrintJobResponseStickerSettingsOneMarginMmMin = 0;
+export const createOrderQrPrintJobResponseStickerSettingsOneMarginMmMax = 20;
+
+export const createOrderQrPrintJobResponseStickerSettingsOneQrSizeMmMin = 10;
+export const createOrderQrPrintJobResponseStickerSettingsOneQrSizeMmMax = 100;
+
+export const createOrderQrPrintJobResponseStickerSettingsOneFontSizeLine1PtMin = 4;
+export const createOrderQrPrintJobResponseStickerSettingsOneFontSizeLine1PtMax = 24;
+
+export const createOrderQrPrintJobResponseStickerSettingsOneFontSizeLine2PtMin = 4;
+export const createOrderQrPrintJobResponseStickerSettingsOneFontSizeLine2PtMax = 24;
+
+export const createOrderQrPrintJobResponseStickerSettingsOneNameMaxLinesMax = 5;
+
+
+
+export const CreateOrderQrPrintJobResponse = zod.object({
+  "job": zod.union([zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "mode": zod.enum(['all', 'selected', 'pending', 'reprint']),
+  "pieceIds": zod.array(zod.string()),
+  "pieces": zod.array(zod.object({
+  "windowId": zod.string(),
+  "pieceId": zod.string(),
+  "displayId": zod.string(),
+  "payload": zod.string(),
+  "clientName": zod.string()
+})),
+  "createdBy": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "state": zod.enum(['requested', 'confirmed', 'cancelled', 'expired']),
+  "confirmedAt": zod.coerce.date().nullable(),
+  "confirmedPieceIds": zod.array(zod.string()),
+  "note": zod.string().nullable()
+}),zod.null()]),
+  "pieces": zod.array(zod.object({
+  "windowId": zod.string(),
+  "pieceId": zod.string(),
+  "displayId": zod.string(),
+  "payload": zod.string(),
+  "clientName": zod.string()
+})),
+  "stickerSettings": zod.object({
+  "widthMm": zod.number().min(createOrderQrPrintJobResponseStickerSettingsOneWidthMmMin).max(createOrderQrPrintJobResponseStickerSettingsOneWidthMmMax),
+  "heightMm": zod.number().min(createOrderQrPrintJobResponseStickerSettingsOneHeightMmMin).max(createOrderQrPrintJobResponseStickerSettingsOneHeightMmMax),
+  "orientation": zod.enum(['portrait', 'landscape']),
+  "marginMm": zod.number().min(createOrderQrPrintJobResponseStickerSettingsOneMarginMmMin).max(createOrderQrPrintJobResponseStickerSettingsOneMarginMmMax),
+  "qrSizeMm": zod.number().min(createOrderQrPrintJobResponseStickerSettingsOneQrSizeMmMin).max(createOrderQrPrintJobResponseStickerSettingsOneQrSizeMmMax),
+  "fontSizeLine1Pt": zod.number().min(createOrderQrPrintJobResponseStickerSettingsOneFontSizeLine1PtMin).max(createOrderQrPrintJobResponseStickerSettingsOneFontSizeLine1PtMax),
+  "fontSizeLine2Pt": zod.number().min(createOrderQrPrintJobResponseStickerSettingsOneFontSizeLine2PtMin).max(createOrderQrPrintJobResponseStickerSettingsOneFontSizeLine2PtMax),
+  "nameMaxLines": zod.number().int().min(1).max(createOrderQrPrintJobResponseStickerSettingsOneNameMaxLinesMax)
+}).and(zod.object({
+  "defaultsUnconfirmed": zod.boolean(),
+  "updatedBy": zod.string().optional(),
+  "updatedAt": zod.coerce.date().optional()
+})).optional(),
+  "inProgressPieces": zod.array(zod.object({
+  "pieceId": zod.string(),
+  "displayId": zod.string(),
+  "createdByName": zod.string()
+}))
+})
+
+
+/**
+ * @summary Confirm which labels were printed
+ */
+export const ConfirmQrPrintJobParams = zod.object({
+  "jobId": zod.coerce.string()
+})
+
+export const ConfirmQrPrintJobBody = zod.object({
+  "printedPieceIds": zod.array(zod.string()).optional()
+})
+
+export const ConfirmQrPrintJobResponse = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "mode": zod.enum(['all', 'selected', 'pending', 'reprint']),
+  "pieceIds": zod.array(zod.string()),
+  "pieces": zod.array(zod.object({
+  "windowId": zod.string(),
+  "pieceId": zod.string(),
+  "displayId": zod.string(),
+  "payload": zod.string(),
+  "clientName": zod.string()
+})),
+  "createdBy": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "state": zod.enum(['requested', 'confirmed', 'cancelled', 'expired']),
+  "confirmedAt": zod.coerce.date().nullable(),
+  "confirmedPieceIds": zod.array(zod.string()),
+  "note": zod.string().nullable()
+})
+
+
+/**
+ * @summary Cancel a pending QR sticker print job
+ */
+export const CancelQrPrintJobParams = zod.object({
+  "jobId": zod.coerce.string()
+})
+
+export const CancelQrPrintJobResponse = zod.object({
+  "id": zod.string(),
+  "state": zod.enum(['cancelled'])
+})
+
+
+/**
+ * @summary Mark selected QR pieces pending
+ */
+export const MarkOrderQrPiecesPendingParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+
+
+export const MarkOrderQrPiecesPendingBody = zod.object({
+  "pieceIds": zod.array(zod.string()).min(1)
+})
+
+export const MarkOrderQrPiecesPendingResponse = zod.unknown()
+
+
+/**
+ * @summary Get QR sticker settings
+ */
+export const getQrStickerSettingsResponseOneWidthMmMin = 20;
+export const getQrStickerSettingsResponseOneWidthMmMax = 150;
+
+export const getQrStickerSettingsResponseOneHeightMmMin = 15;
+export const getQrStickerSettingsResponseOneHeightMmMax = 150;
+
+export const getQrStickerSettingsResponseOneMarginMmMin = 0;
+export const getQrStickerSettingsResponseOneMarginMmMax = 20;
+
+export const getQrStickerSettingsResponseOneQrSizeMmMin = 10;
+export const getQrStickerSettingsResponseOneQrSizeMmMax = 100;
+
+export const getQrStickerSettingsResponseOneFontSizeLine1PtMin = 4;
+export const getQrStickerSettingsResponseOneFontSizeLine1PtMax = 24;
+
+export const getQrStickerSettingsResponseOneFontSizeLine2PtMin = 4;
+export const getQrStickerSettingsResponseOneFontSizeLine2PtMax = 24;
+
+export const getQrStickerSettingsResponseOneNameMaxLinesMax = 5;
+
+
+
+export const GetQrStickerSettingsResponse = zod.object({
+  "widthMm": zod.number().min(getQrStickerSettingsResponseOneWidthMmMin).max(getQrStickerSettingsResponseOneWidthMmMax),
+  "heightMm": zod.number().min(getQrStickerSettingsResponseOneHeightMmMin).max(getQrStickerSettingsResponseOneHeightMmMax),
+  "orientation": zod.enum(['portrait', 'landscape']),
+  "marginMm": zod.number().min(getQrStickerSettingsResponseOneMarginMmMin).max(getQrStickerSettingsResponseOneMarginMmMax),
+  "qrSizeMm": zod.number().min(getQrStickerSettingsResponseOneQrSizeMmMin).max(getQrStickerSettingsResponseOneQrSizeMmMax),
+  "fontSizeLine1Pt": zod.number().min(getQrStickerSettingsResponseOneFontSizeLine1PtMin).max(getQrStickerSettingsResponseOneFontSizeLine1PtMax),
+  "fontSizeLine2Pt": zod.number().min(getQrStickerSettingsResponseOneFontSizeLine2PtMin).max(getQrStickerSettingsResponseOneFontSizeLine2PtMax),
+  "nameMaxLines": zod.number().int().min(1).max(getQrStickerSettingsResponseOneNameMaxLinesMax)
+}).and(zod.object({
+  "defaultsUnconfirmed": zod.boolean(),
+  "updatedBy": zod.string().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}))
+
+
+/**
+ * @summary Update QR sticker settings
+ */
+export const updateQrStickerSettingsBodyWidthMmMin = 20;
+export const updateQrStickerSettingsBodyWidthMmMax = 150;
+
+export const updateQrStickerSettingsBodyHeightMmMin = 15;
+export const updateQrStickerSettingsBodyHeightMmMax = 150;
+
+export const updateQrStickerSettingsBodyMarginMmMin = 0;
+export const updateQrStickerSettingsBodyMarginMmMax = 20;
+
+export const updateQrStickerSettingsBodyQrSizeMmMin = 10;
+export const updateQrStickerSettingsBodyQrSizeMmMax = 100;
+
+export const updateQrStickerSettingsBodyFontSizeLine1PtMin = 4;
+export const updateQrStickerSettingsBodyFontSizeLine1PtMax = 24;
+
+export const updateQrStickerSettingsBodyFontSizeLine2PtMin = 4;
+export const updateQrStickerSettingsBodyFontSizeLine2PtMax = 24;
+
+export const updateQrStickerSettingsBodyNameMaxLinesMax = 5;
+
+
+
+export const UpdateQrStickerSettingsBody = zod.object({
+  "widthMm": zod.number().min(updateQrStickerSettingsBodyWidthMmMin).max(updateQrStickerSettingsBodyWidthMmMax),
+  "heightMm": zod.number().min(updateQrStickerSettingsBodyHeightMmMin).max(updateQrStickerSettingsBodyHeightMmMax),
+  "orientation": zod.enum(['portrait', 'landscape']),
+  "marginMm": zod.number().min(updateQrStickerSettingsBodyMarginMmMin).max(updateQrStickerSettingsBodyMarginMmMax),
+  "qrSizeMm": zod.number().min(updateQrStickerSettingsBodyQrSizeMmMin).max(updateQrStickerSettingsBodyQrSizeMmMax),
+  "fontSizeLine1Pt": zod.number().min(updateQrStickerSettingsBodyFontSizeLine1PtMin).max(updateQrStickerSettingsBodyFontSizeLine1PtMax),
+  "fontSizeLine2Pt": zod.number().min(updateQrStickerSettingsBodyFontSizeLine2PtMin).max(updateQrStickerSettingsBodyFontSizeLine2PtMax),
+  "nameMaxLines": zod.number().int().min(1).max(updateQrStickerSettingsBodyNameMaxLinesMax)
+})
+
+export const updateQrStickerSettingsResponseOneWidthMmMin = 20;
+export const updateQrStickerSettingsResponseOneWidthMmMax = 150;
+
+export const updateQrStickerSettingsResponseOneHeightMmMin = 15;
+export const updateQrStickerSettingsResponseOneHeightMmMax = 150;
+
+export const updateQrStickerSettingsResponseOneMarginMmMin = 0;
+export const updateQrStickerSettingsResponseOneMarginMmMax = 20;
+
+export const updateQrStickerSettingsResponseOneQrSizeMmMin = 10;
+export const updateQrStickerSettingsResponseOneQrSizeMmMax = 100;
+
+export const updateQrStickerSettingsResponseOneFontSizeLine1PtMin = 4;
+export const updateQrStickerSettingsResponseOneFontSizeLine1PtMax = 24;
+
+export const updateQrStickerSettingsResponseOneFontSizeLine2PtMin = 4;
+export const updateQrStickerSettingsResponseOneFontSizeLine2PtMax = 24;
+
+export const updateQrStickerSettingsResponseOneNameMaxLinesMax = 5;
+
+
+
+export const UpdateQrStickerSettingsResponse = zod.object({
+  "widthMm": zod.number().min(updateQrStickerSettingsResponseOneWidthMmMin).max(updateQrStickerSettingsResponseOneWidthMmMax),
+  "heightMm": zod.number().min(updateQrStickerSettingsResponseOneHeightMmMin).max(updateQrStickerSettingsResponseOneHeightMmMax),
+  "orientation": zod.enum(['portrait', 'landscape']),
+  "marginMm": zod.number().min(updateQrStickerSettingsResponseOneMarginMmMin).max(updateQrStickerSettingsResponseOneMarginMmMax),
+  "qrSizeMm": zod.number().min(updateQrStickerSettingsResponseOneQrSizeMmMin).max(updateQrStickerSettingsResponseOneQrSizeMmMax),
+  "fontSizeLine1Pt": zod.number().min(updateQrStickerSettingsResponseOneFontSizeLine1PtMin).max(updateQrStickerSettingsResponseOneFontSizeLine1PtMax),
+  "fontSizeLine2Pt": zod.number().min(updateQrStickerSettingsResponseOneFontSizeLine2PtMin).max(updateQrStickerSettingsResponseOneFontSizeLine2PtMax),
+  "nameMaxLines": zod.number().int().min(1).max(updateQrStickerSettingsResponseOneNameMaxLinesMax)
+}).and(zod.object({
+  "defaultsUnconfirmed": zod.boolean(),
+  "updatedBy": zod.string().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}))
 
 
 /**
@@ -5263,6 +5574,8 @@ export const updateOrderWindowResponseMeshShutterCountMin = 0;
 
 
 
+export const updateOrderWindowResponsePiecesItemQrPrintPrintCountMin = 0;
+
 export const updateOrderWindowResponseMeshShutterReadyCountMin = 0;
 
 
@@ -5283,9 +5596,17 @@ export const UpdateOrderWindowResponse = zod.object({
   "frameCount": zod.number().int().min(1),
   "pieces": zod.array(zod.object({
   "id": zod.string(),
+  "displayId": zod.string(),
   "kind": zod.enum(['frame', 'glass_shutter', 'mesh_shutter']),
   "pieceNo": zod.number().int().min(1),
-  "status": zod.enum(['pending', 'ready'])
+  "status": zod.enum(['pending', 'ready']),
+  "qrPrint": zod.object({
+  "status": zod.enum(['pending', 'printed']),
+  "printCount": zod.number().int().min(updateOrderWindowResponsePiecesItemQrPrintPrintCountMin),
+  "firstPrintedAt": zod.coerce.date().nullable(),
+  "lastPrintedAt": zod.coerce.date().nullable(),
+  "lastPrintedBy": zod.string().nullable()
+})
 })),
   "meshShutterReadyCount": zod.number().int().min(updateOrderWindowResponseMeshShutterReadyCountMin).nullable(),
   "lotId": zod.string().nullable(),
@@ -5294,6 +5615,7 @@ export const UpdateOrderWindowResponse = zod.object({
   "glassStatus": zod.enum(['pending', 'partial', 'received']),
   "pendingReason": zod.string().nullable(),
   "sqFt": zod.number().nullable(),
+  "pieceCountWarning": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })

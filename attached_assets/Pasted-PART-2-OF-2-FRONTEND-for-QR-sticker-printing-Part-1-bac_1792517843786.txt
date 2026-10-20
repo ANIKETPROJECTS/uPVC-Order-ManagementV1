@@ -1,0 +1,45 @@
+PART 2 OF 2: FRONTEND for QR sticker printing. Part 1 (backend, jobs, settings, displayId, print state) is done. Read the Windows tab (WindowsPanel in order-detail.tsx), the existing PieceQrLabelSheet in order-window-operations.tsx (leave it unchanged in the Overview tab), the new /qr-print-jobs and settings APIs and the existing qrcode.react usage first. Reuse components, styles and permissions. Do not change the scanner, dashboard, dispatch or any other module.
+
+1. WINDOWS TAB
+- Add a "QR stickers" toolbar above the Windows table with: "Print all", "Pick and choose", "Pending QR codes (N)" (N = pending count from the API), and a small "Label settings" icon (Master Admin only).
+- Make windows expandable to show one row per piece: checkbox, displayId, kind (Frame / Glass shutter / Mesh shutter), status pill, and a QR badge: "Pending", "Printed (x times)", or "In progress by <name>". Add select-all per window and select-all for the order, and a counter "N selected".
+- "Pick and choose": enters selection mode; the "Print selected (N)" button creates a `selected` job.
+- "Print all": creates an `all` job; if some pieces are already printed, show a clear warning ("N pieces already have stickers, this will reprint them") and require the reprint permission; hide or disable the button with a tooltip when the user lacks it.
+- "Pending QR codes": creates a `pending` job; if the count is 0 show "All pieces already have QR stickers" and do nothing. Never includes printed pieces.
+- Respect permissions: users without order.qr.print do not see the toolbar; reprint requires order.qr.reprint.
+- Fix the Windows table status pills: they still show G1 / M1; show GS1 / MS1 (display text only, no logic change).
+- Master Admin only: a "Mark as pending" action for selected pieces (for old pieces that were never actually printed), with a confirm dialog.
+- Project and retail orders both supported. Archived windows are excluded from normal printing.
+
+2. STICKER PRINT LAYOUT (new component, separate from the old label sheet)
+- A print-only container rendered from the job response, one sticker per page. Scope all print CSS to this component so other prints in the app are unaffected.
+- @page { size: <width>mm <height>mm; margin: 0 } using the saved sticker settings (default 60 x 40 mm placeholder), each sticker in a box of exactly that size with the configured inner margin, page-break-after: always, no headers/footers, no extra blank page after the last sticker.
+- Content per sticker: QR (qrcode.react, error correction level M, quiet zone kept, centered at the top, size from settings), line 1 = displayId (bold, single line, shrink-to-fit with a minimum font size, never wrapped mid-id), line 2 = client name (two lines max, wrap, then ellipsis). No status text, no extra decoration, black on white, high contrast for thermal printing.
+- The QR encodes the existing payload FRAMEWISE_PIECE:<orderId>:<windowId>:<pieceId> (stored piece id, not displayId).
+- Large orders: render in chunks (for example 50 stickers) with a progress indicator, warn above 200 stickers, avoid freezing the browser.
+- "Label settings" dialog (Master Admin): width, height, orientation, margin, QR size, font sizes with a live preview of one sticker and a "Print test sticker" button. Show a visible notice "Size not confirmed with the label supplier" while defaultsUnconfirmed is true. Include a short hint: in the print dialog choose the TSC TE 210 driver, paper size equal to the label size, margins None, scale 100%.
+
+3. PRINT FLOW WITH CONFIRMATION (Option B)
+- Click a print button, the job is created, the preview renders, the browser print dialog opens.
+- After the dialog closes, show a confirmation dialog: "Did the stickers print correctly?" with "Yes, mark N pieces as printed", "Some failed" (shows the piece list with checkboxes to mark only those that printed) and "No, keep pending". Yes/Some calls confirm; No calls cancel. If the user closes the page before confirming, the pieces stay pending (job expires).
+- After confirm, refresh the pending count and badges.
+- Show the "print in progress by <name>" state and exclude those pieces from Pending.
+
+4. ACTIVITY AND LOG
+- Confirmed prints appear in the order's User log with who, when, mode and count (use the existing event display; do not change the dashboard).
+
+5. UI QUALITY
+Loading, empty and error states, responsive layout (Windows table on 1280px screens, toolbar wraps), no horizontal scroll, light theme with the always-dark sidebar, permission-based hiding, Indian/IST dates.
+
+DELIVERABLES: files changed (confirm nothing else was touched), and a manual checklist with exact menu paths:
+(1) Client & Orders > an order > Windows tab shows the toolbar and expandable piece rows with displayId and QR badges;
+(2) Pending QR codes prints only pending pieces, then after confirming those pieces show Printed and the button count drops;
+(3) printing the same pieces again through Print all/Pick and choose shows the reprint warning and needs reprint permission;
+(4) one sticker per page at the configured size, no blank last page (test with "Save as PDF" first, then the real TSC TE 210);
+(5) sticker shows QR + displayId + client name; QR scans with the existing scanner and updates the piece;
+(6) old printed labels still scan;
+(7) cancelling the print dialog and choosing "No, keep pending" leaves pieces pending;
+(8) Master Admin can change label size and mark pieces pending; others cannot;
+(9) Windows pills show GS1/MS1;
+(10) Overview tab's old label sheet, Dashboard, Dispatch and scanner behave as before.
+Also list anything you could not verify (for example signed-in screens and the physical printer).

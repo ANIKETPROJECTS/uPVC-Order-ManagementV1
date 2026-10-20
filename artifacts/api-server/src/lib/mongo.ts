@@ -43,6 +43,8 @@ export const MODULES = [
   { id: "confirmation", label: "Confirmation / Purchase Order" },
   { id: "measurements", label: "Measurement Database" },
   { id: "qr-assembly", label: "QR Code & Assembly Tracking" },
+  { id: "order.qr.print", label: "QR Sticker Printing" },
+  { id: "order.qr.reprint", label: "QR Sticker Reprinting" },
   { id: "window-readiness", label: "Window-wise Readiness" },
   { id: "glass-procurement", label: "Glass Procurement & Delivery" },
   { id: "payments", label: "Order Value & Payment Tracking" },
@@ -238,6 +240,14 @@ export interface OrderWindowPieceDocument {
   kind: OrderWindowPieceKind;
   pieceNo: number;
   status: "pending" | "ready";
+  qrPrint?: {
+    status: "pending" | "printed";
+    printCount: number;
+    firstPrintedAt: Date | null;
+    lastPrintedAt: Date | null;
+    lastPrintedBy: string | null;
+    lastPrintJobId?: string;
+  };
 }
 export interface OrderWindowDocument {
   _id: string; orderRecordId: string; windowNo: string; widthMm: number | null; heightMm: number | null;
@@ -250,6 +260,49 @@ export interface OrderWindowDocument {
   frameStatus: WindowReadiness; shutterStatus: WindowReadiness;
   glassStatus: GlassStatus; pendingReason: string | null; sqFt: number | null;
   createdBy: string; createdAt: Date; updatedBy: string; updatedAt: Date; archivedAt?: Date | null;
+}
+export interface QrStickerSettingsDocument {
+  _id: "qrStickerSettings";
+  widthMm: number;
+  heightMm: number;
+  orientation: "portrait" | "landscape";
+  marginMm: number;
+  qrSizeMm: number;
+  fontSizeLine1Pt: number;
+  fontSizeLine2Pt: number;
+  nameMaxLines: number;
+  updatedBy: string;
+  updatedAt: Date;
+}
+export interface QrPrintJobPieceDocument {
+  windowId: string;
+  pieceId: string;
+  storedPieceId: string;
+  displayId: string;
+  payload: string;
+  clientName: string;
+}
+export interface QrPrintJobDocument {
+  _id: string;
+  orderRecordId: string;
+  orderId: string;
+  mode: "all" | "selected" | "pending" | "reprint";
+  pieceIds: string[];
+  pieces: QrPrintJobPieceDocument[];
+  createdBy: string;
+  createdByName: string;
+  createdAt: Date;
+  state: "requested" | "confirmed" | "cancelled" | "expired";
+  confirmedAt: Date | null;
+  confirmedPieceIds: string[];
+  note: string | null;
+}
+export interface QrStickerSettingsAuditDocument {
+  _id: string;
+  actorId: string;
+  actorName: string;
+  createdAt: Date;
+  settings: Omit<QrStickerSettingsDocument, "_id" | "updatedBy" | "updatedAt">;
 }
 export interface GlassTrackingItemDocument {
   id: string;
@@ -752,6 +805,9 @@ export function getCounters(db: Db): Collection<CounterDocument> {
   return db.collection<CounterDocument>("counters");
 }
 export function getOrderWindows(db: Db) { return db.collection<OrderWindowDocument>("order_windows"); }
+export function getQrStickerSettings(db: Db) { return db.collection<QrStickerSettingsDocument>("app_settings"); }
+export function getQrPrintJobs(db: Db) { return db.collection<QrPrintJobDocument>("qr_print_jobs"); }
+export function getQrStickerSettingsAudit(db: Db) { return db.collection<QrStickerSettingsAuditDocument>("qr_sticker_settings_audit"); }
 export function getGlassTrackingOrders(db: Db) { return db.collection<GlassTrackingOrderDocument>("glass_tracking_orders"); }
 export function getGlassTrackingWorkbookImports(db: Db) { return db.collection<GlassTrackingWorkbookImportDocument>("glass_tracking_workbook_imports"); }
 export function getOrderPayments(db: Db) { return db.collection<OrderPaymentDocument>("order_payments"); }
@@ -1482,6 +1538,8 @@ export async function initializeMongo(): Promise<void> {
   const locations = getOrderLocations(db);
   const orders = getOrders(db);
   const orderWindows = getOrderWindows(db);
+  const qrPrintJobs = getQrPrintJobs(db);
+  const qrStickerSettingsAudit = getQrStickerSettingsAudit(db);
   const glassTrackingOrders = getGlassTrackingOrders(db);
   const glassTrackingWorkbookImports = getGlassTrackingWorkbookImports(db);
   const orderPayments = getOrderPayments(db);
@@ -1547,6 +1605,12 @@ export async function initializeMongo(): Promise<void> {
     orders.createIndex({ createdAt: -1 }, { name: "orders_by_created_date" }),
     orderWindows.createIndex({ orderRecordId: 1, windowNo: 1 }, { unique: true, partialFilterExpression: { archivedAt: null }, name: "active_window_no_unique" }),
     orderWindows.createIndex({ orderRecordId: 1, updatedAt: -1 }, { name: "windows_by_order" }),
+    qrPrintJobs.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "qr_print_jobs_by_order" }),
+    qrPrintJobs.createIndex(
+      { pieceIds: 1 },
+      { unique: true, partialFilterExpression: { state: "requested" }, name: "qr_print_job_active_piece_unique" },
+    ),
+    qrStickerSettingsAudit.createIndex({ createdAt: -1 }, { name: "qr_sticker_settings_audit_by_date" }),
     glassTrackingOrders.createIndex({ orderRecordId: 1 }, { unique: true, name: "glass_tracking_order_unique" }),
     glassTrackingWorkbookImports.createIndex({ uploadedAt: -1 }, { name: "glass_tracking_imports_by_date" }),
     orderPayments.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "payments_by_order" }),

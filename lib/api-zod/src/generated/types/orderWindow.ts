@@ -57,6 +57,8 @@ export interface OrderWindow {
   pendingReason: string | null;
   /** @nullable */
   sqFt: number | null;
+  /** @nullable */
+  pieceCountWarning: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

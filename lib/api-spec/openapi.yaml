@@ -2915,6 +2915,151 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrderWindow"
+  /orders/{id}/qr-print-summary:
+    get:
+      operationId: getOrderQrPrintSummary
+      tags: [orders]
+      summary: Get QR sticker print counts for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: QR print summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrPrintSummary"
+  /orders/{id}/qr-print-jobs:
+    post:
+      operationId: createOrderQrPrintJob
+      tags: [orders]
+      summary: Create an order QR sticker print job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QrPrintJobInput"
+      responses:
+        "201":
+          description: Created print job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrPrintJobResponse"
+        "403":
+          description: Printing permission required
+        "409":
+          description: One or more pieces are already in a print job
+  /qr-print-jobs/{jobId}/confirm:
+    post:
+      operationId: confirmQrPrintJob
+      tags: [orders]
+      summary: Confirm which labels were printed
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmQrPrintJobInput"
+      responses:
+        "200":
+          description: Confirmed print job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrPrintJob"
+        "409":
+          description: Job expired or is no longer open
+  /qr-print-jobs/{jobId}/cancel:
+    post:
+      operationId: cancelQrPrintJob
+      tags: [orders]
+      summary: Cancel a pending QR sticker print job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancelled print job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  state: { type: string, enum: [cancelled] }
+                required: [id, state]
+  /orders/{id}/qr-pieces/mark-pending:
+    post:
+      operationId: markOrderQrPiecesPending
+      tags: [orders]
+      summary: Mark selected QR pieces pending
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkOrderQrPiecesPendingInput"
+      responses:
+        "200":
+          description: Updated pending state
+  /settings/qr-stickers:
+    get:
+      operationId: getQrStickerSettings
+      tags: [settings]
+      summary: Get QR sticker settings
+      responses:
+        "200":
+          description: Sticker settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrStickerSettingsResponse"
+    put:
+      operationId: updateQrStickerSettings
+      tags: [settings]
+      summary: Update QR sticker settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QrStickerSettingsInput"
+      responses:
+        "200":
+          description: Saved sticker settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrStickerSettingsResponse"
+        "403":
+          description: Master Admin access required
   /orders/{id}/windows/{windowId}:
     patch:
       operationId: updateOrderWindow
@@ -4464,6 +4609,8 @@ components:
       properties:
         id:
           type: string
+        displayId:
+          type: string
         kind:
           type: string
           enum: [frame, glass_shutter, mesh_shutter]
@@ -4473,7 +4620,148 @@ components:
         status:
           type: string
           enum: [pending, ready]
-      required: [id, kind, pieceNo, status]
+        qrPrint:
+          $ref: "#/components/schemas/QrPrintState"
+      required: [id, displayId, kind, pieceNo, status, qrPrint]
+    QrPrintState:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, printed]
+        printCount:
+          type: integer
+          minimum: 0
+        firstPrintedAt:
+          type: ["string", "null"]
+          format: date-time
+        lastPrintedAt:
+          type: ["string", "null"]
+          format: date-time
+        lastPrintedBy:
+          type: ["string", "null"]
+      required: [status, printCount, firstPrintedAt, lastPrintedAt, lastPrintedBy]
+    QrPrintSummary:
+      type: object
+      properties:
+        totalPieces: { type: integer, minimum: 0 }
+        pendingPieces: { type: integer, minimum: 0 }
+        printedPieces: { type: integer, minimum: 0 }
+        inProgressPieces:
+          type: array
+          items:
+            type: object
+            properties:
+              pieceId: { type: string }
+              displayId: { type: string }
+              createdByName: { type: string }
+            required: [pieceId, displayId, createdByName]
+      required: [totalPieces, pendingPieces, printedPieces, inProgressPieces]
+    QrPrintJobInput:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [all, selected, pending]
+        pieceIds:
+          type: array
+          items: { type: string }
+      required: [mode]
+    ConfirmQrPrintJobInput:
+      type: object
+      properties:
+        printedPieceIds:
+          type: array
+          items: { type: string }
+    MarkOrderQrPiecesPendingInput:
+      type: object
+      properties:
+        pieceIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+      required: [pieceIds]
+    QrPrintJobPiece:
+      type: object
+      properties:
+        windowId: { type: string }
+        pieceId: { type: string }
+        displayId: { type: string }
+        payload: { type: string }
+        clientName: { type: string }
+      required: [windowId, pieceId, displayId, payload, clientName]
+    QrPrintJob:
+      type: object
+      properties:
+        id: { type: string }
+        orderId: { type: string }
+        mode:
+          type: string
+          enum: [all, selected, pending, reprint]
+        pieceIds:
+          type: array
+          items: { type: string }
+        pieces:
+          type: array
+          items: { $ref: "#/components/schemas/QrPrintJobPiece" }
+        createdBy: { type: string }
+        createdByName: { type: string }
+        createdAt: { type: string, format: date-time }
+        state:
+          type: string
+          enum: [requested, confirmed, cancelled, expired]
+        confirmedAt:
+          type: ["string", "null"]
+          format: date-time
+        confirmedPieceIds:
+          type: array
+          items: { type: string }
+        note:
+          type: ["string", "null"]
+      required: [id, orderId, mode, pieceIds, pieces, createdBy, createdByName, createdAt, state, confirmedAt, confirmedPieceIds, note]
+    QrPrintJobResponse:
+      type: object
+      properties:
+        job:
+          oneOf:
+            - $ref: "#/components/schemas/QrPrintJob"
+            - type: "null"
+        pieces:
+          type: array
+          items: { $ref: "#/components/schemas/QrPrintJobPiece" }
+        stickerSettings:
+          $ref: "#/components/schemas/QrStickerSettingsResponse"
+        inProgressPieces:
+          type: array
+          items:
+            type: object
+            properties:
+              pieceId: { type: string }
+              displayId: { type: string }
+              createdByName: { type: string }
+            required: [pieceId, displayId, createdByName]
+      required: [job, pieces, inProgressPieces]
+    QrStickerSettingsInput:
+      type: object
+      properties:
+        widthMm: { type: number, minimum: 20, maximum: 150 }
+        heightMm: { type: number, minimum: 15, maximum: 150 }
+        orientation: { type: string, enum: [portrait, landscape] }
+        marginMm: { type: number, minimum: 0, maximum: 20 }
+        qrSizeMm: { type: number, minimum: 10, maximum: 100 }
+        fontSizeLine1Pt: { type: number, minimum: 4, maximum: 24 }
+        fontSizeLine2Pt: { type: number, minimum: 4, maximum: 24 }
+        nameMaxLines: { type: integer, minimum: 1, maximum: 5 }
+      required: [widthMm, heightMm, orientation, marginMm, qrSizeMm, fontSizeLine1Pt, fontSizeLine2Pt, nameMaxLines]
+    QrStickerSettingsResponse:
+      allOf:
+        - $ref: "#/components/schemas/QrStickerSettingsInput"
+        - type: object
+          properties:
+            defaultsUnconfirmed: { type: boolean }
+            updatedBy: { type: string }
+            updatedAt: { type: string, format: date-time }
+          required: [defaultsUnconfirmed]
     OrderWindow:
       type: object
       properties:
@@ -4526,6 +4814,8 @@ components:
           type: ["string", "null"]
         sqFt:
           type: ["number", "null"]
+        pieceCountWarning:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -4554,6 +4844,7 @@ components:
         - glassStatus
         - pendingReason
         - sqFt
+        - pieceCountWarning
         - createdAt
         - updatedAt
     OrderWindowInput:

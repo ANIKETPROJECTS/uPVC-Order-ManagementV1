@@ -1,0 +1,49 @@
+PART 1 OF 2: BACKEND for QR sticker printing (TSC TE 210). Do NOT build UI in this part. Change only what this feature needs. Do not touch the scanner, order-identifiers.ts, dashboard, dispatch, glass tracking, quotations, imports, communication, order-status/installation QR flows, or existing saved IDs. Keep the QR payload FRAMEWISE_PIECE:<orderId>:<windowId>:<pieceId> exactly as it is. Keep the existing "Print label sheet" in the Overview tab unchanged.
+
+REQUIREMENT (client)
+Every piece gets its own QR sticker: every frame, every glass shutter, every mesh shutter. In the Windows section the user can (1) print all pieces of an order at once, (2) pick and choose pieces with checkboxes, (3) use a "Pending QR codes" button that prints only pieces that do not have a QR sticker yet and skips the others, so the same label is never printed twice. Under each QR two lines of text: line 1 Order ID and piece ID, line 2 the client/project full name. Stickers must fit the TSC TE 210 label size.
+
+DECISIONS
+- Display ID (new, additive): add a `displayId` string to every piece in the window API response, computed by a NEW helper (do not edit order-identifiers.ts; call its existing functions).
+  - Project windows with a lot: the current formatted ID, except that the first frame shows F1 (F becomes F1, F2 stays F2). Example: P-26-0293-L1-W3-F1, P-26-0293-L1-W3-GS1, P-26-0293-L1-W3-MS1.
+  - Retail windows (stored UUID piece ids): <orderId>-W<window>-<F|GS|MS><n>, for example R-26-0293-W3-GS1 (frame F1, F2...). Display only; the stored UUID stays the piece id and stays in the QR payload.
+  - The QR payload keeps using the existing piece id (not displayId), so old labels and the scanner keep working.
+- Print state per piece (additive fields on the embedded piece): qrPrint { status: "pending" | "printed", printCount, firstPrintedAt, lastPrintedAt, lastPrintedBy }.
+- Existing pieces without qrPrint are treated as PRINTED (before tracking existed). No migration, no data rewrite. Pieces created from now on get qrPrint.status = "pending". Provide a Master Admin action "Mark as pending" for selected pieces, in case some old pieces were never printed.
+- "Printed" is set only after the user confirms a print job (see jobs below), never automatically when the dialog opens.
+
+1. DATA MODEL
+- Embedded piece: add the optional qrPrint object above. Existing fields (id, kind, pieceNo, status) unchanged.
+- New collection `qr_print_jobs`: id, orderId, mode (all | selected | pending | reprint), pieceIds[], createdBy, createdAt, state (requested | confirmed | cancelled | expired), confirmedAt, confirmedPieceIds[], note.
+- New setting `qrStickerSettings` (use the existing settings mechanism if one exists, otherwise a small settings document): widthMm, heightMm, orientation, marginMm, qrSizeMm, fontSizeLine1Pt, fontSizeLine2Pt, nameMaxLines (default 2). Placeholder default 60 x 40 mm, margin 2 mm, flagged in the API response as `defaultsUnconfirmed: true` until a Master Admin saves it. Editable only by Master Admin.
+
+2. API
+- GET window list (existing): add displayId and qrPrint to each piece; add order-level summary: totalPieces, pendingPieces, printedPieces. Existing fields unchanged.
+- POST /orders/:id/qr-print-jobs { mode: all | selected | pending, pieceIds? }: the SERVER decides the piece list. For `pending` it computes pieces whose qrPrint.status is pending (and not in another user's open job). For `selected` it validates the ids belong to the order and are not archived. Returns the job id, the ordered list of pieces with displayId, payload string, clientName, and the sticker settings. Printing pieces that are already printed (modes all/selected) requires the reprint permission and is marked mode "reprint" in the job; pending mode never includes printed pieces.
+- POST /qr-print-jobs/:jobId/confirm { printedPieceIds? }: marks those pieces printed (printCount + 1, timestamps, user). Default is all pieces of the job. POST /qr-print-jobs/:jobId/cancel keeps pieces pending. Jobs expire after 15 minutes without confirmation (state expired, pieces stay pending).
+- Two users at once: pieces in another user's open (not expired) job are excluded from `pending` mode and shown as "print in progress by <name>"; return that info in the response.
+- POST /orders/:id/qr-pieces/mark-pending { pieceIds } (Master Admin only, logged).
+- GET/PUT /settings/qr-stickers (PUT: Master Admin only; validate sensible ranges, e.g. width 20-150 mm, height 15-150 mm).
+- Permissions: order.qr.print (create jobs of pending/selected/all for pieces that are not yet printed), order.qr.reprint (print pieces already printed), settings change = Master Admin. Master/Super Admin have all. Use the existing permission system.
+- Logging: every confirmed job, reprint, mark-pending and settings change goes to the User log / activity events (who, when, how many pieces, mode).
+
+3. KEEP PIECES IN SYNC WITH SHUTTER COUNTS
+Today the window edit path changes frame/glass/mesh counts but does not rebuild the pieces array, so the print list can be stale. Fix this for the print feature:
+- Windows that have no stored pieces array (older records): the first time a job or a count edit touches them, materialize the pieces array using the same ids windowPieces() synthesizes today (stable, no id changes) and mark those pieces printed (legacy rule).
+- Count increased: add the missing pieces (next pieceNo, status as for new pieces, qrPrint pending).
+- Count decreased: remove only the highest-numbered pieces, and only if they are not ready/progressed. If a piece to be removed is already ready, reject the edit with a clear message. If a removed piece was already printed, allow it, log it, and return a warning so the UI can tell the user a physical sticker exists for a piece that no longer exists.
+- Do not change readiness, status, glass state, dashboard or dispatch logic. Existing glass/mesh/frame status behaviour must stay exactly the same.
+
+4. EDGE CASES
+Zero shutters (frame labels only), several frames per window, archived windows excluded from normal printing (not from explicit reprint via selected mode by someone with reprint permission), very large orders (the job response must handle hundreds of pieces without timeouts), cancelled/expired jobs leave pieces pending, double confirm is idempotent.
+
+5. TESTS
+- displayId for project and retail pieces, frame F -> F1, F2 stays F2, GS/MS suffixes, payload unchanged.
+- pending job returns only pieces without printed state; legacy pieces (no qrPrint) are treated as printed and skipped; new pieces are pending.
+- confirm marks printed and increments the count; cancel and expiry keep pending; double confirm is idempotent.
+- two users: second user's pending job excludes pieces in the first user's open job.
+- permission checks: print vs reprint vs settings vs mark-pending.
+- count increase adds pending pieces; count decrease blocked for ready pieces; warning for printed removed piece.
+- old QR labels still scan; existing tests still pass.
+
+DELIVERABLES: files changed (and a statement that nothing else was touched), API list, data model additions, and a test checklist with the results. List anything you could not verify.
