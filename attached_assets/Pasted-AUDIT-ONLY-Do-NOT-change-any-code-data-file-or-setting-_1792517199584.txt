@@ -1,0 +1,55 @@
+AUDIT ONLY. Do NOT change any code, data, file or setting in this task. Read and report only.
+
+NEW FEATURE REQUEST (to be built later, not now)
+"We need a way to make and print QR code stickers, for a printer called the TSC TE 210. Every piece gets its own QR code: every frame gets one QR code, every glass shutter gets one QR code, every mesh shutter gets one QR code.
+In the Windows section, add a button that can print QR codes two ways: (1) All at once: print QR codes for every piece in an order, in one go. (2) Pick and choose: let the user tick a checkbox next to each piece, and print only those.
+Also add a button called 'Pending QR codes'. This only prints the pieces that do not have a QR code yet. If a piece already has a QR code, this button skips it. This matters when an order is only part-ready, we do not want to print the same label twice.
+Under each QR code, print two lines of text: the Order ID and piece ID, and the client or project's full name. Example stickers: 'R-26-0293-F1' / 'Rohan Deshmukh', 'R-26-0293-GS1' / 'Rohan Deshmukh', 'R-26-0293-MS1' / 'Rohan Deshmukh'.
+Every sticker must fit the size the TSC TE 210 prints. Please check the exact label size with whoever orders the label rolls, before building the print layout."
+
+TASK
+Study the existing software and report how it works today and what building this would involve. Search frontend, backend, models, templates and tests. Look at least at: Windows section on the order detail page, the factory QR label sheet (order-window-operations.tsx), the piece scanner (order-scanner.tsx), order-identifiers.ts (formatProjectPieceId and the piece ID logic), windowPieces() and the piece status route in order-workspace.ts, the order_windows model and its embedded pieces[], QR libraries in package.json, print CSS / print dialogs already used anywhere, and any "printed" or "QR generated" tracking.
+
+REPORT THE FOLLOWING
+
+1. EXISTING QR LABELS TODAY
+- What the current factory QR label sheet does: where it is opened from (exact screen and button), what it prints, which pieces it includes (frames? glass shutters? mesh shutters?), label layout, text lines under the QR, size/page setup, how printing is triggered (window.print, PDF, other), and whether it supports selecting pieces.
+- Exact QR payload for each piece kind (FRAMEWISE_PIECE:<orderId>:<windowId>:<pieceId>) and how the scanner resolves it, including legacy alias handling if any.
+- Whether FRAMES currently get a piece entry, a piece ID and a QR, or only glass and mesh shutters.
+
+2. PIECE IDS AND DISPLAY IDS
+- The exact piece ID format today for project windows and for retail windows (give real examples from code/data), for frames, glass shutters and mesh shutters. Say if the GS/MS code change (GS1, MS1) has already been applied or not.
+- The client's example IDs look like R-26-0293-F1, R-26-0293-GS1, R-26-0293-MS1 (order ID + piece suffix, no lot or window part). Compare that with what the software shows today. What is the "Order ID" format today (for example R-26-0293 or P1431 or R1430), where is it generated, and can the sticker text be built as <Order ID>-<F|GS|MS><n>? What would be needed so that the printed ID is unique per piece (for example two windows in the same order each have F1, GS1: how is that disambiguated today)? Describe any conflict between the client's example and the real IDs.
+
+3. PRINT TRACKING (needed for "Pending QR codes")
+- Does the software store anywhere that a piece's QR has been generated or printed (a flag, timestamp, count, user, print history)? Give the model and field names. If not, say so.
+- What does "already has a QR code" mean in this software: is a QR created when the piece exists, or when someone prints it? Explain the options for defining "pending" and what data would be needed (for example qrPrintedAt, qrPrintCount, qrPrintedBy per piece, and a print log).
+- What happens for part-ready orders: how pieces are created (when windows are imported or when counts are set), and how adding/removing shutters later changes pieces, so that "pending" stays correct and no label prints twice by accident.
+
+4. WINDOWS SECTION UI
+- The Windows section on order detail: file, component structure, how the table rows are built, whether it already has row selection/checkboxes, per-window and per-piece rows, and where new buttons (Print all, Pick and choose, Pending QR codes) would fit with the least change. Note permissions (who can print) and how the section looks for project vs retail orders.
+- Which data is available per piece row (window no, kind, piece no, status, client name, order ID, project name) for the sticker text.
+
+5. PRINTING TECHNICALLY (TSC TE 210)
+- How printing can work for a thermal label printer from a browser app: browser print dialog with a custom page size (CSS @page size in mm), PDF output with exact label size, or other options. State what the codebase already uses for printing and what the simplest reliable approach would be here. TSC TE 210 specifics you know (203 dpi thermal transfer, common label widths, driver-based printing from Windows via the browser, TSPL not required if printing via driver) and what you are not sure about. Do not invent details; say what must be confirmed.
+- What label size information is needed and what to ask the label roll supplier (width, height, gap, number of labels across, margins, roll core size, direct thermal vs thermal transfer, driver name). Suggest a default layout to build once the size is known and how the QR size and two text lines would scale for small labels (for example 50x25 mm, 50x30 mm, 60x40 mm, 100x50 mm). Check how long order IDs and client names fit and propose truncation or wrapping rules.
+- Whether multi-label print jobs (many pieces, one label per page) are supported cleanly by the current print approach (page breaks, one label per page, no extra margins).
+
+6. DATA AND EXISTING LABELS
+- How many orders/windows/pieces exist (if it can be determined from source/seed data; if not say unknown). What happens to QR labels already printed from the existing label sheet once new stickers are introduced: do old QRs still scan, and does the new sticker use the same QR payload?
+- Which QR payload should the new stickers use (keep the existing FRAMEWISE_PIECE payload so the scanner keeps working)? Any reason to change it?
+
+7. IMPACT AND RISKS
+- Which existing sections would be affected (Windows section, factory label sheet, scanner, QR production, window status flow, dashboard, dispatch). What could break. What must not be touched.
+- Edge cases: windows with zero shutters, several frames per window, archived windows, orders changed after printing, reprint after a damaged sticker, two users printing at the same time, very large orders (hundreds of pieces).
+
+8. PROPOSAL (no code yet)
+- The smallest set of changes to deliver: the three print buttons, the sticker layout, print-state tracking and any ID display change. List files/models/APIs you would change and files you would NOT change.
+- Whether to extend the existing label sheet or create a new sticker print component, with the reason.
+- Data model additions (fields on pieces, a print log), including migration needs for existing pieces (treat existing pieces as pending or printed?).
+- Permissions.
+
+9. QUESTIONS FOR ME
+List everything I should confirm with the client or the label supplier (label size and roll details, ID format difference, whether frames need QR for retail orders, whether previously printed pieces should count as "already printed", reprint rule, who may print, whether the client name or project name goes on the second line, how to handle long names).
+
+End with two plain lists: "Files I would change" and "Files I would NOT change".

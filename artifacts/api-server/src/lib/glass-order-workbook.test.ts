@@ -10,6 +10,71 @@ function buffer(rows: unknown[][], secondSheet?: unknown[][]): Buffer {
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 
+function mergedHeaderWorkbook(): Buffer {
+  const rows: unknown[][] = Array.from({ length: 42 }, () => []);
+  rows[1][3] = "CELESTIA";
+  rows[2][3] = "1st Lot · E-Wing · 5mm Clear Glass";
+  rows[3][1] = "Flat no";
+  rows[3][2] = "sr no";
+  rows[4][3] = "w";
+  rows[4][4] = "h";
+  rows[4][5] = "qty";
+  rows[5] = [null, "101", "1", 458.5, 680, 2];
+
+  rows[37][3] = "CELESTIA";
+  rows[38][3] = "2nd Lot · E-Wing · 5mm Clear Glass";
+  rows[39][1] = "Flat no";
+  rows[39][2] = "sr no";
+  rows[40][3] = "w";
+  rows[40][4] = "h";
+  rows[40][5] = "qty";
+  rows[41] = [null, "102", "2", 500, 700, 1];
+
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet["!merges"] = [
+    { s: { r: 1, c: 3 }, e: { r: 1, c: 4 } },
+    { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },
+    { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } },
+    { s: { r: 37, c: 3 }, e: { r: 37, c: 4 } },
+    { s: { r: 39, c: 1 }, e: { r: 40, c: 1 } },
+    { s: { r: 39, c: 2 }, e: { r: 40, c: 2 } },
+  ];
+  XLSX.utils.book_append_sheet(workbook, sheet, "Glass");
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
+test("reads vertically merged header labels and each block's merged client title", async () => {
+  const parsed = await parseGlassOrderWorkbook(mergedHeaderWorkbook());
+
+  assert.equal(parsed.length, 2);
+  assert.deepEqual(parsed.map((section) => section.columns), [
+    ["Flat no", "sr no", "w", "h", "qty"],
+    ["Flat no", "sr no", "w", "h", "qty"],
+  ]);
+  assert.deepEqual(parsed.map((section) => section.clientLabel), ["CELESTIA", "CELESTIA"]);
+  assert.deepEqual(parsed.map((section) => section.lot), ["1st Lot · E-Wing · 5mm Clear Glass", "2nd Lot · E-Wing · 5mm Clear Glass"]);
+  assert.ok(parsed.every((section) => !section.warnings.includes("Client name was carried forward from the previous group.")));
+  assert.deepEqual(parsed.map((section) => section.mapping), [
+    { width: 2, height: 3, quantity: 4, serial: 1, flat: 0 },
+    { width: 2, height: 3, quantity: 4, serial: 1, flat: 0 },
+  ]);
+});
+
+test("warns about a carried-forward client only when a block has no own client title", async () => {
+  const parsed = await parseGlassOrderWorkbook(buffer([
+    ["CELESTIA"], ["1st Lot · E-Wing · 5mm Clear Glass"],
+    ["Flat no", "sr no", "w", "h", "qty"], ["101", "1", 458, 680, 1],
+    [],
+    ["2nd Lot · E-Wing · 5mm Clear Glass"],
+    ["Flat no", "sr no", "w", "h", "qty"], ["102", "2", 500, 700, 1],
+  ]));
+
+  assert.deepEqual(parsed.map((section) => section.clientLabel), ["CELESTIA", "CELESTIA"]);
+  assert.ok(!parsed[0].warnings.includes("Client name was carried forward from the previous group."));
+  assert.ok(parsed[1].warnings.includes("Client name was carried forward from the previous group."));
+});
+
 test("keeps same-client lot/type blocks separate and never treats a leading date as a client", async () => {
   const parsed = await parseGlassOrderWorkbook(buffer([
     ["19-12-2025"], ["Mr Deepak Pawar"], ["5mm Clear Glass"],

@@ -99,6 +99,14 @@ function actualRows(sheet: XLSX.WorkSheet): Row[] {
   }));
 }
 
+function mergedTopLeftValue(sheet: XLSX.WorkSheet, rowIndex: number, columnIndex: number): unknown {
+  const range = sheet["!merges"]?.find(({ s, e }) =>
+    rowIndex >= s.r && rowIndex <= e.r && columnIndex >= s.c && columnIndex <= e.c,
+  );
+  if (!range) return undefined;
+  return sheet[XLSX.utils.encode_cell(range.s)]?.v;
+}
+
 function findColumns(rows: Row[], start = 0): Columns | null {
   for (let rowIndex = start; rowIndex < rows.length; rowIndex += 1) {
     const labels = rows[rowIndex].cells.map(key);
@@ -201,23 +209,30 @@ export async function parseGlassOrderWorkbook(bytes: Buffer, mappingOverrides: G
         flat: physicalColumn(override.flat),
       } : detected;
       const headerRow = block[columns.headerRow];
-      const rawColumnLabels = sourceColumnIndexes.map((index) => String(headerRow.cells[index] ?? "").trim());
+      const rawColumnLabels = sourceColumnIndexes.map((index) => {
+        const value = populated(headerRow.cells[index])
+          ? headerRow.cells[index]
+          : mergedTopLeftValue(workbook.Sheets[sheetName], headerRow.excelRow - 1, index);
+        return String(value ?? "").trim();
+      });
       const columnLabels = rawColumnLabels.map((label, index) => label || (
         sourceColumnIndexes[index] === columns.qty ? "Qty" : `Column ${XLSX.utils.encode_col(sourceColumnIndexes[index])}`
       ));
       const titleRows = block.slice(0, columns.headerRow);
       const titleValues = titleRows.flatMap((row) => row.cells.filter(populated));
-      let clientLabel = titleValues.map(text).find((value, index) => {
+      const ownClientLabel = titleValues.map(text).find((value, index) => {
         const keyValue = key(value);
         const previousLine = text(titleValues[index - 1]);
         return value.length > 1 && !isDate(value) && !/^\d+$/.test(value)
-        && !["glass", "w", "h", "sr no", "s no", "serial", "flat no", "villa no", "unit", "room"].includes(keyValue)
+        && !["glass", "w", "h", "sr no", "s no", "serial", "flat no", "villa no", "unit", "room", "lot", "wing"].includes(keyValue)
+          && !/\b(?:lot|wing)\b/i.test(value)
           && !/^\d+(?:\.\d+)?\s*mm\b/i.test(value)
           && !supplierLabel(value)
           && !isGlassType(value)
           && !(previousLine && /glass$/i.test(value) && !/^glass$/i.test(value));
       }) ?? "";
-      if (!clientLabel) clientLabel = previousClient;
+      const carriedForwardClient = !ownClientLabel && Boolean(previousClient);
+      let clientLabel = ownClientLabel || previousClient;
       if (!clientLabel) {
         const start = block[0]?.excelRow ?? 1;
         throw new Error(`${sheetName}, row ${start}: client name could not be identified. Add a client heading before the glass table.`);
@@ -233,7 +248,7 @@ export async function parseGlassOrderWorkbook(bytes: Buffer, mappingOverrides: G
       const sectionWarnings: string[] = [];
       if (!clientLabel) sectionWarnings.push("Client name is missing.");
       if (clientLabel.length < 4) sectionWarnings.push("Client name is very short.");
-      if (clientLabel === previousClient) sectionWarnings.push("Client name was carried forward from the previous group.");
+      if (carriedForwardClient) sectionWarnings.push("Client name was carried forward from the previous group.");
       if (glassType === "Glass type not identified") sectionWarnings.push("Glass type could not be identified.");
       if (columns.width < 0) sectionWarnings.push("Width column is not mapped.");
       if (columns.height < 0) sectionWarnings.push("Height column is not mapped.");
