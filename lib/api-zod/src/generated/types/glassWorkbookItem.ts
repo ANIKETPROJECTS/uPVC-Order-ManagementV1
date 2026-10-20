@@ -19,4 +19,5 @@ export interface GlassWorkbookItem {
   /** @minimum 1 */
   sourceRow: number;
   warnings: string[];
+  rawValues: string[];
 }

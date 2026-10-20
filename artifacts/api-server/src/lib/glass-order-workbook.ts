@@ -11,6 +11,15 @@ export interface ParsedGlassWorkbookItem {
   ordered: number;
   sourceRow: number;
   warnings: string[];
+  rawValues: string[];
+}
+
+export interface GlassWorkbookColumnMapping {
+  width: number | null;
+  height: number | null;
+  quantity: number | null;
+  serial: number | null;
+  flat: number | null;
 }
 
 export interface ParsedGlassWorkbookSection {
@@ -25,6 +34,8 @@ export interface ParsedGlassWorkbookSection {
   sourceRowEnd: number;
   warnings: string[];
   needsAttention: boolean;
+  columns: string[];
+  mapping: GlassWorkbookColumnMapping;
   items: ParsedGlassWorkbookItem[];
 }
 
@@ -166,7 +177,7 @@ function stableId(
   return createHash("sha256").update([sheet, row, key(client), key(glass), key(flat ?? ""), key(serial), width, height].join("|")).digest("hex").slice(0, 32);
 }
 
-export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlassWorkbookSection[]> {
+export async function parseGlassOrderWorkbook(bytes: Buffer, mappingOverrides: GlassWorkbookColumnMapping[] = []): Promise<ParsedGlassWorkbookSection[]> {
   const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true, raw: true });
   const sections: ParsedGlassWorkbookSection[] = [];
   let itemCount = 0;
@@ -174,8 +185,26 @@ export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlas
   for (const sheetName of workbook.SheetNames) {
     const rows = actualRows(workbook.Sheets[sheetName]);
     for (const block of splitBlocks(rows)) {
-      const columns = findColumns(block);
-      if (!columns) continue;
+      const detected = findColumns(block);
+      if (!detected) continue;
+      const tableRows = block.slice(detected.headerRow);
+      const sourceColumnIndexes = Array.from({ length: Math.max(0, ...tableRows.flatMap((row) => row.cells.flatMap((cell, index) => populated(cell) ? [index + 1] : []))) }, (_, index) => index)
+        .filter((index) => populated(block[detected.headerRow].cells[index]) || tableRows.some((row) => populated(row.cells[index])));
+      const physicalColumn = (index: number | null) => index == null ? -1 : sourceColumnIndexes[index] ?? -1;
+      const override = mappingOverrides[sections.length];
+      const columns: Columns = override ? {
+        ...detected,
+        width: physicalColumn(override.width),
+        height: physicalColumn(override.height),
+        qty: physicalColumn(override.quantity),
+        sr: physicalColumn(override.serial),
+        flat: physicalColumn(override.flat),
+      } : detected;
+      const headerRow = block[columns.headerRow];
+      const rawColumnLabels = sourceColumnIndexes.map((index) => String(headerRow.cells[index] ?? "").trim());
+      const columnLabels = rawColumnLabels.map((label, index) => label || (
+        sourceColumnIndexes[index] === columns.qty ? "Qty" : `Column ${XLSX.utils.encode_col(sourceColumnIndexes[index])}`
+      ));
       const titleRows = block.slice(0, columns.headerRow);
       const titleValues = titleRows.flatMap((row) => row.cells.filter(populated));
       let clientLabel = titleValues.map(text).find((value, index) => {
@@ -206,11 +235,14 @@ export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlas
       if (clientLabel.length < 4) sectionWarnings.push("Client name is very short.");
       if (clientLabel === previousClient) sectionWarnings.push("Client name was carried forward from the previous group.");
       if (glassType === "Glass type not identified") sectionWarnings.push("Glass type could not be identified.");
+      if (columns.width < 0) sectionWarnings.push("Width column is not mapped.");
+      if (columns.height < 0) sectionWarnings.push("Height column is not mapped.");
+      if (columns.qty < 0) sectionWarnings.push("Quantity column is not mapped.");
       const groupKey = `${sheetName}:${block[0]?.excelRow ?? 1}:${sections.length}`;
       const items: ParsedGlassWorkbookItem[] = [];
       for (const row of block.slice(columns.headerRow + 1)) {
-        const widthMm = number(row.cells[columns.width]);
-        const heightMm = number(row.cells[columns.height]);
+        const widthMm = columns.width < 0 ? null : number(row.cells[columns.width]);
+        const heightMm = columns.height < 0 ? null : number(row.cells[columns.height]);
         const anyCells = row.cells.some(populated);
         if (!anyCells) continue;
         if (widthMm == null && heightMm == null) {
@@ -238,6 +270,10 @@ export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlas
           ordered,
           sourceRow: row.excelRow,
           warnings,
+          rawValues: sourceColumnIndexes.map((sourceIndex) => {
+            const value = row.cells[sourceIndex];
+            return value instanceof Date ? value.toISOString().slice(0, 10) : value == null ? "" : String(value).trim();
+          }),
         });
       }
       if (items.length) {
@@ -256,6 +292,14 @@ export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlas
           sourceRowEnd: dataRows.at(-1)?.excelRow ?? block[columns.headerRow].excelRow,
           warnings: sectionWarnings,
           needsAttention: sectionWarnings.length > 0 || items.some((item) => item.warnings.length > 0),
+          columns: columnLabels,
+          mapping: {
+            width: columns.width >= 0 ? sourceColumnIndexes.indexOf(columns.width) : null,
+            height: columns.height >= 0 ? sourceColumnIndexes.indexOf(columns.height) : null,
+            quantity: columns.qty >= 0 ? sourceColumnIndexes.indexOf(columns.qty) : null,
+            serial: columns.sr >= 0 ? sourceColumnIndexes.indexOf(columns.sr) : null,
+            flat: columns.flat >= 0 ? sourceColumnIndexes.indexOf(columns.flat) : null,
+          },
           items,
         });
         itemCount += items.length;

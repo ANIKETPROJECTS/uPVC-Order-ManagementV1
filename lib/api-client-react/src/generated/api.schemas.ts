@@ -1158,9 +1158,23 @@ export interface GlassWorkbookItem {
   /** @minimum 1 */
   sourceRow: number;
   warnings: string[];
+  rawValues: string[];
 }
 
 export type GlassWorkbookItemList = GlassWorkbookItem[];
+
+export interface GlassWorkbookColumnMapping {
+  /** @nullable */
+  width: number | null;
+  /** @nullable */
+  height: number | null;
+  /** @nullable */
+  quantity: number | null;
+  /** @nullable */
+  serial: number | null;
+  /** @nullable */
+  flat: number | null;
+}
 
 export interface GlassWorkbookSection {
   clientLabel: string;
@@ -1178,6 +1192,8 @@ export interface GlassWorkbookSection {
   sourceRowEnd: number;
   warnings: string[];
   needsAttention: boolean;
+  columns: string[];
+  mapping: GlassWorkbookColumnMapping;
   items: GlassWorkbookItemList;
 }
 

@@ -1,0 +1,26 @@
+AUDIT ONLY. Do NOT change any code, data, file or setting in this task. Read and report only.
+
+CLIENT REQUIREMENT (to be implemented later, not now)
+"Use GS1, GS2, GS3 and so on for glass shutters. Use MS1, MS2, MS3 and so on for mesh shutters. These codes are easier to read, and they will cause fewer mix-ups than what we use now."
+
+TASK
+Search the whole codebase (frontend, backend, database models, migrations, seed data, tests, PDFs/templates, QR generation, scanner, exports, communication templates) and find EVERY place where codes/IDs for glass shutters and mesh shutters are created, stored, displayed, searched, scanned or printed. Search terms to try: shutter, glass shutter, mesh shutter, mesh, jali, screen, sash, code, qr, label, sequence, counter, prefix, "QR-", barcode, tracking id, piece id, window part, frame, plus anything similar you find.
+
+REPORT THE FOLLOWING
+
+1. CURRENT SCHEME: how shutter codes are generated today. Give the exact format with real examples from the data/code (for example "QR-SSW-1003"), what each part means, the file and function that creates it, and whether the code is generated once and stored or computed on the fly. Say whether glass shutters and mesh shutters currently share one numbering or have different ones, and what the numbering scope is (global, per order, per lot, per window, per client, per year).
+
+2. CODE MAP (table): Section / screen / API / model / file | What it does with the code (create, store, display, search, scan, print, export) | Field name it uses | Is the code used as a key or lookup (matching, URL, QR content, foreign key) or only for display.
+Cover at least: QR production, Window tracking, Glass tracking, QR scanner and the QR status page, order detail (windows table, lifecycle), Operations Dashboard (Live activity, Needs attention, search), Orders list search, Dispatch and challan (window lists), Measurement and confirmation imports, Quotations, Documents/PDF templates, Communication/stage messages, User log and activity events, notifications, exports/print, APIs and database indexes. Add every other place you find.
+
+3. QR DETAILS: what exactly is encoded in the QR labels (URL, token, code), whether QR labels already printed on the shop floor depend on the old code, and what happens if the code text changes (does the scan still resolve?).
+
+4. EXISTING DATA: how many shutter records exist with old codes, whether old codes are referenced anywhere else (activity events, logs, documents, dispatch snapshots such as windows_snapshot), and what would break if old codes were renamed.
+
+5. RISKS: a list of things that could break if codes change (QR scans of old labels, search by old code, unique indexes, matching logic, saved documents/challans that print codes, imports that map by code, dashboards, tests).
+
+6. PROPOSAL (no code yet): how to introduce GS<n> and MS<n> with the smallest possible change while keeping the current numbering scope (do not invent a new scope). Explain: where the format is generated (one helper), how old records should be handled (rename vs keep old code as an alias so old QR labels and old searches still work), numbering rules (never reuse a number, never duplicate under concurrent creation), and what must not be touched.
+
+7. QUESTIONS for me: anything ambiguous that I should confirm with the client (for example: should numbering restart per order or run globally; should old records be renamed; should "GS" apply to every glass shutter even if it also has mesh).
+
+End the reply with a plain list: "Files I would change" and "Files I would NOT change".

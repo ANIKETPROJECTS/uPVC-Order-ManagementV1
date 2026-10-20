@@ -2771,7 +2771,7 @@ paths:
           schema:
             type: string
             pattern: "^[A-Za-z0-9_-]+$"
-            maxLength: 8192
+            maxLength: 20000
       requestBody:
         required: true
         content:
@@ -4781,7 +4781,11 @@ components:
           type: array
           items:
             type: string
-      required: [id, villaNo, windowNo, glassType, widthMm, heightMm, ordered, sourceRow, warnings]
+        rawValues:
+          type: array
+          items:
+            type: string
+      required: [id, villaNo, windowNo, glassType, widthMm, heightMm, ordered, sourceRow, warnings, rawValues]
     GlassWorkbookItemList:
       type: array
       items:
@@ -4813,9 +4817,29 @@ components:
             type: string
         needsAttention:
           type: boolean
+        columns:
+          type: array
+          items:
+            type: string
+        mapping:
+          $ref: "#/components/schemas/GlassWorkbookColumnMapping"
         items:
           $ref: "#/components/schemas/GlassWorkbookItemList"
-      required: [clientLabel, glassType, lot, wing, date, supplier, sourceSheet, sourceRowStart, sourceRowEnd, warnings, needsAttention, items]
+      required: [clientLabel, glassType, lot, wing, date, supplier, sourceSheet, sourceRowStart, sourceRowEnd, warnings, needsAttention, columns, mapping, items]
+    GlassWorkbookColumnMapping:
+      type: object
+      properties:
+        width:
+          type: ["integer", "null"]
+        height:
+          type: ["integer", "null"]
+        quantity:
+          type: ["integer", "null"]
+        serial:
+          type: ["integer", "null"]
+        flat:
+          type: ["integer", "null"]
+      required: [width, height, quantity, serial, flat]
     GlassWorkbookSectionList:
       type: array
       items:

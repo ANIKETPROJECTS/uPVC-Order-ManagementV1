@@ -4788,6 +4788,14 @@ export const PreviewGlassOrderWorkbookResponse = zod.object({
   "sourceRowEnd": zod.number().int(),
   "warnings": zod.array(zod.string()),
   "needsAttention": zod.boolean(),
+  "columns": zod.array(zod.string()),
+  "mapping": zod.object({
+  "width": zod.number().int().nullable(),
+  "height": zod.number().int().nullable(),
+  "quantity": zod.number().int().nullable(),
+  "serial": zod.number().int().nullable(),
+  "flat": zod.number().int().nullable()
+}),
   "items": zod.array(zod.object({
   "id": zod.string(),
   "villaNo": zod.string().nullable(),
@@ -4797,7 +4805,8 @@ export const PreviewGlassOrderWorkbookResponse = zod.object({
   "heightMm": zod.number(),
   "ordered": zod.number().int().min(1),
   "sourceRow": zod.number().int().min(1),
-  "warnings": zod.array(zod.string())
+  "warnings": zod.array(zod.string()),
+  "rawValues": zod.array(zod.string())
 }))
 }))
 })
@@ -4808,7 +4817,7 @@ export const PreviewGlassOrderWorkbookResponse = zod.object({
  */
 export const importGlassOrderWorkbookPathFilenameMax = 255;
 
-export const importGlassOrderWorkbookPathMappingTokenMax = 8192;
+export const importGlassOrderWorkbookPathMappingTokenMax = 20000;
 
 
 export const importGlassOrderWorkbookPathMappingTokenRegExp = new RegExp('^[A-Za-z0-9_-]+$');

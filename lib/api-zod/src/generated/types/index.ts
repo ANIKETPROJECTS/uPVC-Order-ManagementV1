@@ -87,6 +87,7 @@ export * from './glassTrackingQuantityInput';
 export * from './glassTrackingQuantityInputList';
 export * from './glassTrackingStatus';
 export * from './glassTrackingUpdate';
+export * from './glassWorkbookColumnMapping';
 export * from './glassWorkbookItem';
 export * from './glassWorkbookItemList';
 export * from './glassWorkbookPreview';

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { GlassWorkbookColumnMapping } from './glassWorkbookColumnMapping';
 import type { GlassWorkbookItemList } from './glassWorkbookItemList';
 
 export interface GlassWorkbookSection {
@@ -23,5 +24,7 @@ export interface GlassWorkbookSection {
   sourceRowEnd: number;
   warnings: string[];
   needsAttention: boolean;
+  columns: string[];
+  mapping: GlassWorkbookColumnMapping;
   items: GlassWorkbookItemList;
 }

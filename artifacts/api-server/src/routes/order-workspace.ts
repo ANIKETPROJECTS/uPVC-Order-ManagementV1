@@ -51,7 +51,7 @@ import {
   resolveProjectUploadPath,
   storeProjectUpload,
 } from "../lib/project-upload-storage";
-import { parseGlassOrderWorkbook, type ParsedGlassWorkbookSection } from "../lib/glass-order-workbook";
+import { parseGlassOrderWorkbook, type GlassWorkbookColumnMapping, type ParsedGlassWorkbookSection } from "../lib/glass-order-workbook";
 import { createWindowListTemplate, parseWindowListPdf, parseWindowListWorkbook } from "../lib/window-list-import";
 import { formatProjectPieceId } from "../lib/order-identifiers";
 import { extractConfirmationInfo } from "../lib/confirmation-extraction";
@@ -357,14 +357,21 @@ router.post("/glass-tracking/workbooks/:filename/import/:mappingToken", async (r
     let sections: ParsedGlassWorkbookSection[];
     let orderRecordIds: string[];
     try {
-      sections = await parseGlassOrderWorkbook(body);
       const decoded = Buffer.from(p.data.mappingToken, "base64url").toString("utf8");
       const parsedMapping: unknown = JSON.parse(decoded);
-      if (!Array.isArray(parsedMapping) || !parsedMapping.every((id) => typeof id === "string" && id.length > 0)) {
+      const mappingObject = !Array.isArray(parsedMapping) && parsedMapping && typeof parsedMapping === "object"
+        ? parsedMapping as { orderRecordIds?: unknown; columnMappings?: unknown }
+        : null;
+      const rawIds = mappingObject?.orderRecordIds ?? parsedMapping;
+      if (!Array.isArray(rawIds) || !rawIds.every((id) => typeof id === "string" && id.length > 0)) {
         res.status(400).json({ error: "Choose an order for every client section before importing." });
         return;
       }
-      orderRecordIds = parsedMapping as string[];
+      orderRecordIds = rawIds as string[];
+      const columnMappings = Array.isArray(mappingObject?.columnMappings)
+        ? mappingObject.columnMappings as GlassWorkbookColumnMapping[]
+        : [];
+      sections = await parseGlassOrderWorkbook(body, columnMappings);
       if (orderRecordIds.length !== sections.length) {
         res.status(400).json({ error: "The workbook sections changed after preview. Preview the file again before importing." });
         return;
@@ -415,7 +422,13 @@ router.post("/glass-tracking/workbooks/:filename/import/:mappingToken", async (r
       const items: GlassTrackingItemDocument[] = mapped.items.map((item) => {
         const old = previousItems.get(item.id);
         return {
-          ...item,
+          id: item.id,
+          villaNo: item.villaNo,
+          windowNo: item.windowNo,
+          glassType: item.glassType,
+          widthMm: item.widthMm,
+          heightMm: item.heightMm,
+          ordered: item.ordered,
           received: old?.received ?? 0,
           broken: old?.broken ?? 0,
         };

@@ -60,3 +60,51 @@ test("supports text numbers, Marathi names, flexible columns, hidden used-range 
   assert.notEqual(parsed[0].clientLabel, parsed[0].supplier);
   assert.equal(parsed[0].date, "03-07-2025");
 });
+
+test("returns Excel-shaped columns and raw values for different block layouts", async () => {
+  const parsed = await parseGlassOrderWorkbook(buffer([
+    ["Client Alpha"], ["5mm Clear Glass"],
+    ["sr no", "w", "h", "qty"],
+    ["1", 458.5, 680, "2nos"],
+    ["2", 500, 900, "1nos"],
+    [],
+    ["Client Beta"], ["5mm Clear Glass"],
+    ["Flat no", "sr no", "w", "h", "qty", "remarks"],
+    [104, "1", 370, 453, "2 pcs", "Kitchen"],
+    ["F-304", "2", 387.5, 1373, "1nos", "Balcony"],
+    [],
+    ["Client Gamma"], ["5mm Clear Glass"],
+    ["Flat no", "", "sr no", "w", "h", ""],
+    ["", "", "3", 600, 700, "2nos"],
+  ]));
+  assert.equal(parsed.length, 3);
+  assert.deepEqual(parsed[0].columns, ["sr no", "w", "h", "qty"]);
+  assert.deepEqual(parsed[0].items[0].rawValues, ["1", "458.5", "680", "2nos"]);
+  assert.deepEqual(parsed[1].columns, ["Flat no", "sr no", "w", "h", "qty", "remarks"]);
+  assert.deepEqual(parsed[1].items.map((item) => item.rawValues[0]), ["104", "F-304"]);
+  assert.equal(parsed[1].items[0].villaNo, "104");
+  assert.deepEqual(parsed[0].mapping, { width: 1, height: 2, quantity: 3, serial: 0, flat: null });
+  assert.deepEqual(parsed[2].columns, ["Flat no", "sr no", "w", "h", "Qty"]);
+  assert.deepEqual(parsed[2].items[0].rawValues, ["", "3", "600", "700", "2nos"]);
+  assert.equal(parsed[2].mapping.serial, 1);
+  assert.equal(parsed[2].mapping.flat, 0);
+  assert.equal(parsed[2].mapping.quantity, 4);
+  assert.equal(parsed[0].items.reduce((sum, item) => sum + item.ordered, 0), 3);
+  const area = parsed[0].items.reduce((sum, item) => sum + item.widthMm * item.heightMm * item.ordered / 92903, 0);
+  assert.equal(Number(area.toFixed(2)), 11.56);
+});
+
+test("default mapped identities and quantity fields preserve the pre-preview import behavior", async () => {
+  const parsed = await parseGlassOrderWorkbook(buffer([
+    ["Client Regression"], ["5mm Clear Glass"],
+    ["Flat no", "sr no", "w", "h", "qty"],
+    ["F-402", "1", 1378.5, 1948, "2nos"],
+    ["F-402", "2", 458.5, 680, "1nos"],
+  ]));
+  const [section] = parsed;
+  assert.deepEqual(section.items.map((item) => `${item.villaNo} · ${item.windowNo}`), ["F-402 · 1", "F-402 · 2"]);
+  assert.deepEqual(section.items.map((item) => item.ordered), [2, 1]);
+  assert.equal(section.items.reduce((sum, item) => sum + item.ordered, 0), 3);
+  assert.equal(section.items[0].widthMm, 1378.5);
+  assert.equal(section.items[0].heightMm, 1948);
+});

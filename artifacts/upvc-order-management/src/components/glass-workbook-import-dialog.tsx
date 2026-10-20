@@ -15,6 +15,16 @@ function normalize(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
+function numericCell(value: string | undefined) {
+  const parsed = Number((value ?? '').replace(/,/g, '').replace(/[^\d.+-]/g, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function piecesCell(value: string | undefined) {
+  const match = /^\s*(\d+)\s*(?:nos?|pcs?|pieces?)?\s*$/i.exec(value ?? '');
+  return match ? Number(match[1]) : null;
+}
+
 function errorMessage(error: unknown, fallback: string) {
   if (error && typeof error === 'object' && 'data' in error) {
     const data = (error as { data?: unknown }).data;
@@ -25,8 +35,11 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-function encodeMapping(orderRecordIds: string[]) {
-  const bytes = new TextEncoder().encode(JSON.stringify(orderRecordIds));
+function encodeMapping(orderRecordIds: string[], preview: GlassWorkbookPreview) {
+  const bytes = new TextEncoder().encode(JSON.stringify({
+    orderRecordIds,
+    columnMappings: preview.sections.map((section) => section.mapping),
+  }));
   let binary = '';
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
   return window.btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
@@ -46,6 +59,7 @@ export function GlassWorkbookImportDialog({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<GlassWorkbookPreview | null>(null);
   const [mapping, setMapping] = useState<string[]>([]);
+  const [tableView, setTableView] = useState<'excel' | 'software'>('excel');
   const previewWorkbook = usePreviewGlassOrderWorkbook();
   const importWorkbook = useImportGlassOrderWorkbook();
 
@@ -63,6 +77,7 @@ export function GlassWorkbookImportDialog({
     setFile(selectedFile);
     setPreview(null);
     setMapping([]);
+    setTableView('excel');
     setOpen(true);
     previewWorkbook.mutate({ filename: encodeURIComponent(selectedFile.name), data: selectedFile }, {
       onSuccess: (result) => {
@@ -93,10 +108,11 @@ export function GlassWorkbookImportDialog({
   };
 
   const importPreview = () => {
-    if (!file || !preview || mapping.length !== preview.sections.length || mapping.some((id) => !id)) return;
+    if (!file || !preview || mapping.length !== preview.sections.length || mapping.some((id) => !id)
+      || preview.sections.some((section) => section.mapping.width == null || section.mapping.height == null || section.mapping.quantity == null)) return;
     importWorkbook.mutate({
       filename: encodeURIComponent(file.name),
-      mappingToken: encodeMapping(mapping),
+      mappingToken: encodeMapping(mapping, preview),
       data: file,
     }, {
       onSuccess: () => {
@@ -159,8 +175,13 @@ export function GlassWorkbookImportDialog({
         {preview ? <div className="space-y-3">
           {(() => {
             const rowCount = preview.sections.reduce((sum, section) => sum + section.items.length, 0);
-            const pieces = preview.sections.reduce((sum, section) => sum + section.items.reduce((subtotal, item) => subtotal + item.ordered, 0), 0);
-            const area = preview.sections.reduce((sum, section) => sum + section.items.reduce((subtotal, item) => subtotal + item.widthMm * item.heightMm * item.ordered / 92903, 0), 0);
+            const pieces = preview.sections.reduce((sum, section) => sum + section.items.reduce((subtotal, item) => subtotal + (piecesCell(item.rawValues[section.mapping.quantity ?? -1]) ?? 0), 0), 0);
+            const area = preview.sections.reduce((sum, section) => sum + section.items.reduce((subtotal, item) => {
+              const width = numericCell(item.rawValues[section.mapping.width ?? -1]);
+              const height = numericCell(item.rawValues[section.mapping.height ?? -1]);
+              const qty = piecesCell(item.rawValues[section.mapping.quantity ?? -1]);
+              return subtotal + (width && height && qty ? width * height * qty / 92903 : 0);
+            }, 0), 0);
             const clients = new Set(preview.sections.map((section) => normalize(section.clientLabel)).filter(Boolean)).size;
             return <div className="space-y-3 rounded-xl border border-primary/15 bg-primary/[0.045] p-3">
               <p className="text-xs leading-5 text-muted-foreground"><strong className="text-foreground">Workbook review.</strong> Assign each group to an existing order. Matching rows retain recorded received and broken quantities.</p>
@@ -180,10 +201,20 @@ export function GlassWorkbookImportDialog({
             </div>;
           })()}
           {preview.sections.map((section, index) => {
-            const glassTypes = [...new Set(section.items.map((item) => item.glassType))];
-            const ordered = section.items.reduce((sum, item) => sum + item.ordered, 0);
-            const area = section.items.reduce((sum, item) => sum + item.widthMm * item.heightMm * item.ordered / 92903, 0);
+            const ordered = section.items.reduce((sum, item) => sum + (piecesCell(item.rawValues[section.mapping.quantity ?? -1]) ?? 0), 0);
+            const area = section.items.reduce((sum, item) => {
+              const width = numericCell(item.rawValues[section.mapping.width ?? -1]);
+              const height = numericCell(item.rawValues[section.mapping.height ?? -1]);
+              const qty = piecesCell(item.rawValues[section.mapping.quantity ?? -1]);
+              return sum + (width && height && qty ? width * height * qty / 92903 : 0);
+            }, 0);
             const warnings = [...section.warnings, ...section.items.flatMap((item) => item.warnings.map((warning) => `Excel row ${item.sourceRow}: ${warning}`))];
+            const setColumn = (role: keyof typeof section.mapping, value: string) => setPreview((current) => current ? ({
+              ...current,
+              sections: current.sections.map((entry, sectionIndex) => sectionIndex === index
+                ? { ...entry, mapping: { ...entry.mapping, [role]: value === '' ? null : Number(value) } }
+                : entry),
+            }) : current);
             return <section key={`${section.clientLabel}-${index}`} className="overflow-hidden rounded-xl border border-border/75 bg-card" data-testid={`glass-workbook-section-${index}`}>
               <div className="grid gap-3 border-b border-border/70 bg-muted/20 p-4 sm:grid-cols-[minmax(150px,.75fr)_minmax(230px,1.25fr)] sm:items-center">
                 <div className="min-w-0">
@@ -195,7 +226,7 @@ export function GlassWorkbookImportDialog({
                   <p className="mt-2 text-xs text-muted-foreground">
                     {section.items.length} rows <span className="mx-1 text-border">/</span> <strong className="font-mono text-foreground">{ordered}</strong> pieces <span className="mx-1 text-border">/</span>{area.toFixed(1)} sq ft
                   </p>
-                  <p className="mt-1 truncate text-[10px] leading-5 text-muted-foreground" title={glassTypes.join(' · ')}>{glassTypes.join(' · ')}</p>
+                  <p className="mt-1 truncate text-[10px] leading-5 text-muted-foreground" title={section.glassType}>{section.glassType}</p>
                   <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{[section.lot, section.wing, section.date, section.supplier].filter(Boolean).join(' · ') || 'Lot, wing, date, and supplier not found'}</p>
                   <p className="mt-1 text-[10px] font-medium text-muted-foreground">{section.sourceSheet}, rows {section.sourceRowStart} to {section.sourceRowEnd}</p>
                   {warnings.length > 0 && <ul className="mt-2 space-y-1 text-[10px] text-amber-800">{warnings.map((warning, warningIndex) => <li key={warningIndex}>• {warning}</li>)}</ul>}
@@ -215,17 +246,64 @@ export function GlassWorkbookImportDialog({
                   </select>
                 </label>
               </div>
+              <div className="border-b border-border/60 bg-muted/10 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <strong className="text-[10px] uppercase tracking-wider text-muted-foreground">Columns</strong>
+                  <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-[10px]" role="group" aria-label="Preview table view">
+                    <button type="button" onClick={() => setTableView('excel')} className={`rounded px-2 py-1 ${tableView === 'excel' ? 'bg-primary text-primary-foreground' : ''}`}>Excel view</button>
+                    <button type="button" onClick={() => setTableView('software')} className={`rounded px-2 py-1 ${tableView === 'software' ? 'bg-primary text-primary-foreground' : ''}`}>Software view</button>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  {([
+                    ['width', 'Width'],
+                    ['height', 'Height'],
+                    ['quantity', 'Quantity'],
+                    ['serial', 'Sr no'],
+                    ['flat', 'Flat / Unit'],
+                  ] as const).map(([role, label]) => <label key={role} className="text-[10px] font-medium text-muted-foreground">
+                    {label}
+                    <select value={section.mapping[role] ?? ''} onChange={(event) => setColumn(role, event.target.value)} className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-[10px]" aria-label={`${label} column`}>
+                      <option value="">Not mapped</option>
+                      {section.columns.map((column, columnIndex) => <option key={`${column}-${columnIndex}`} value={columnIndex}>{column}</option>)}
+                    </select>
+                  </label>)}
+                </div>
+                {(section.mapping.width == null || section.mapping.height == null || section.mapping.quantity == null) && <p className="mt-2 text-[10px] font-semibold text-amber-800">Map Width, Height, and Quantity to continue.</p>}
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[600px] text-left text-[11px]">
-                  <thead><tr className="border-b border-border/60 text-[9px] uppercase tracking-[.12em] text-muted-foreground">
-                    <th className="px-4 py-2.5">Window</th><th className="px-4 py-2.5">Glass type</th><th className="px-4 py-2.5">Dimensions</th><th className="px-4 py-2.5 text-right">Ordered</th>
-                  </tr></thead>
-                  <tbody>{section.items.map((item) => <tr key={item.id} className="glass-spec-row border-b border-border/50 last:border-0">
-                    <td className="px-4 py-2.5 font-semibold">{item.villaNo ? `${item.villaNo} · ` : ''}{item.windowNo}</td>
-                    <td className="px-4 py-2.5 font-medium">{item.glassType}</td>
-                    <td className="px-4 py-2.5 font-mono text-muted-foreground">{item.widthMm} × {item.heightMm} mm</td>
-                    <td className="px-4 py-2.5 text-right font-mono font-semibold">{item.ordered}</td>
-                  </tr>)}</tbody>
+                  {tableView === 'excel' ? <>
+                    <thead><tr className="border-b border-border/60 text-[9px] uppercase tracking-[.12em] text-muted-foreground">
+                      {section.columns.map((column, columnIndex) => <th key={`${column}-${columnIndex}`} className="px-3 py-2.5 text-left">{column}</th>)}
+                      <th className="px-3 py-2.5 text-right">Area (sq ft)</th><th className="px-3 py-2.5 text-right">Pieces</th><th className="px-3 py-2.5 text-right">Excel row</th>
+                    </tr></thead>
+                    <tbody>{section.items.map((item) => {
+                      const width = numericCell(item.rawValues[section.mapping.width ?? -1]);
+                      const height = numericCell(item.rawValues[section.mapping.height ?? -1]);
+                      const qty = piecesCell(item.rawValues[section.mapping.quantity ?? -1]);
+                      const rowArea = width && height && qty ? width * height * qty / 92903 : null;
+                      return <tr key={item.id} className="glass-spec-row border-b border-border/50 last:border-0">
+                        {section.columns.map((_, columnIndex) => <td key={columnIndex} className="px-3 py-2.5">{item.rawValues[columnIndex]}</td>)}
+                        <td className="px-3 py-2.5 text-right font-mono">{rowArea === null ? '—' : rowArea.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{qty ?? '—'}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">{item.sourceRow}</td>
+                      </tr>;
+                    })}</tbody>
+                  </> : <>
+                    <thead><tr className="border-b border-border/60 text-[9px] uppercase tracking-[.12em] text-muted-foreground"><th className="px-4 py-2.5">Window</th><th className="px-4 py-2.5">Glass type</th><th className="px-4 py-2.5">Dimensions</th><th className="px-4 py-2.5 text-right">Ordered</th></tr></thead>
+                    <tbody>{section.items.map((item) => {
+                      const serial = section.mapping.serial == null ? '' : item.rawValues[section.mapping.serial] ?? '';
+                      const flat = section.mapping.flat == null ? '' : item.rawValues[section.mapping.flat] ?? '';
+                      const width = numericCell(item.rawValues[section.mapping.width ?? -1]);
+                      const height = numericCell(item.rawValues[section.mapping.height ?? -1]);
+                      const qty = piecesCell(item.rawValues[section.mapping.quantity ?? -1]);
+                      return <tr key={item.id} className="glass-spec-row border-b border-border/50 last:border-0">
+                        <td className="px-4 py-2.5 font-semibold">{flat ? `${flat} · ` : ''}{serial || item.windowNo}</td><td className="px-4 py-2.5">{section.glassType}</td>
+                        <td className="px-4 py-2.5 font-mono text-muted-foreground">{width ?? '—'} × {height ?? '—'} mm</td><td className="px-4 py-2.5 text-right font-mono font-semibold">{qty ?? '—'}</td>
+                      </tr>;
+                    })}</tbody>
+                  </>}
                 </table>
               </div>
             </section>;
@@ -239,7 +317,9 @@ export function GlassWorkbookImportDialog({
           <Button
             type="button"
             onClick={importPreview}
-            disabled={!preview || mapping.some((id) => !id) || importWorkbook.isPending}
+            disabled={!preview || mapping.some((id) => !id)
+              || preview.sections.some((section) => section.mapping.width == null || section.mapping.height == null || section.mapping.quantity == null)
+              || importWorkbook.isPending}
             data-testid="button-glass-workbook-import"
           >
             {importWorkbook.isPending ? <><LoaderCircle size={14} className="mr-2 animate-spin" /> Importing…</> : <><FileSpreadsheet size={14} className="mr-2" /> Import workbook</>}
