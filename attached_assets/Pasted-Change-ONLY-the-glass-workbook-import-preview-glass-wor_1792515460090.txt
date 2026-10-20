@@ -1,0 +1,39 @@
+Change ONLY the glass-workbook import preview (glass-workbook-import-dialog.tsx, the glass preview response in order-workspace.ts and glass-order-workbook.ts). Do not touch any other module, page, style or saved data.
+
+STEP 0: AUDIT AND SAFETY (do this BEFORE changing any code, then report it in your reply)
+Glass Tracking is connected to other parts of the software and I must not break them. Search the whole codebase (frontend, backend, database models) for everything related to glass: glass tracking pages, glass invoices/shipments (INV-GLS-...), received / broken / ordered quantities, glass state on orders and windows, glass revisions, the glass workbook import and re-upload, activity events about glass.
+Give me:
+1. A HOW IT WORKS explanation in simple words: how a glass Excel becomes glass records today (upload, preview, assign section to order, matching window rows, saving, re-upload/revision rules such as "revision cannot fall below recorded counts", received and broken tracking).
+2. A CONNECTION MAP table: Section / screen / API / model | What it reads or writes from glass data | Which fields it depends on. Cover at least: Glass Tracking page, Order detail (Glass state card, Windows table Glass column, lot/window readiness), Operations Dashboard (Glass readiness filter, Broken glass and Glass shipments flagged attention rows, Live Activity events, KPI window readiness), Dispatch (lot readiness check before creating a dispatch), Window Tracking, QR production, Quotation/Orders lists, Communication/stage messages, Documents, User log, exports/print, notifications. Add any other place you find.
+3. A list of the FIELDS and KEYS that other modules depend on and must stay unchanged: the window identity key used for matching (for example "F-402 · 1" built from flat no + sr no), ordered / received / broken quantities, glass type text, glass state values, invoice ids, revision counters, API response fields. Do not rename, remove, retype or re-format any of these.
+Then proceed with the change below using ADDITIVE changes only.
+
+SAFETY RULES
+- Add new fields to the preview API response; never remove or change existing ones. Existing clients of the API must keep working.
+- The window identity key, matching logic, quantity retention and revision rules must produce exactly the same results as before for the same file. Prove this with a before/after comparison on the same Excel (same keys, same quantities).
+- The save step must write the same glass records as today (same fields, same values). New data (raw Excel row, column labels) is stored as extra metadata only.
+- Do not change how already-saved glass data is displayed in Glass Tracking, Order detail, Dashboard or Dispatch.
+- Do not change the saved glass state, received/broken flows, invoice handling, activity events or dashboard queries.
+- If you find that a requested change would affect another module, stop that part, tell me, and leave it out.
+
+PROBLEM
+After upload, the preview converts every Excel into a fixed layout: Window ("F-402 · 1"), Glass type, Dimensions ("1378.5 × 1948 mm"), Ordered. But the Excel has its own columns (for example: Flat no | sr no | w | h | qty) and every Excel can have a different format. The preview must show the data the way the Excel has it, dynamically.
+
+REQUIRED BEHAVIOUR
+1. Parser output per block: keep the detected header columns exactly as in the Excel, in the same left-to-right order, with the original label text (trimmed), e.g. ["Flat no", "sr no", "w", "h", "qty"] or ["sr no", "w", "h", "qty"], and include any extra columns found (remarks, wing, etc.). For each data row return the raw cell value for each of those columns (original text as written, e.g. "2nos", "F-402", 1378.5) plus the Excel row number. Columns with no header label but with data (like the quantity column) get the label "Qty" if its values look like "2nos"/"2 pcs"/numbers, otherwise "Column X" (Excel letter).
+2. Also return a column MAPPING: which column is width, height, quantity, sr no, flat/unit (optional), and which columns together form the window identity used for matching with the order. Detect it from header text and content (never from fixed cell positions). This mapping is used for calculations and saving. Keep the current matching behaviour for existing orders: the identity must produce the same window keys as today (for example "F-402 · 1" from flat no + sr no) so received/broken quantities are still retained.
+3. Preview UI: render each client section as a table whose columns are the Excel's own columns, same names, same order, same values as in the file (do not reformat "2nos" or the decimals). Add small extra columns on the right: "Area (sq ft)" and "Pieces" (computed from the mapped width, height, qty), and a muted "Excel row" column. Keep the section header (client name, glass type, row count, pieces) and the "Assign section to order" control as they are.
+4. Add a "Columns" mapping bar above each table: dropdowns for Width, Height, Quantity, Sr no, Flat/Unit, showing the detected column; the user can change them and the Area/Pieces totals and window identity update live. Show a warning if width, height or quantity cannot be detected, and block import for that section until mapped.
+5. Add a toggle "Excel view / Software view": Excel view is the default; Software view shows the current Window / Glass type / Dimensions / Ordered table so users can see how it will be saved.
+6. Different blocks in the same file may have different columns (one with Flat no, one without). Each block shows its own columns and its own mapping.
+7. Store the original Excel columns/values of each imported row (as metadata/raw row) so the saved glass records can show the original format later. Do not change how already-saved data is displayed, and do not change the API contract in a breaking way (add fields, keep existing ones).
+8. Add tests using these formats: [sr no, w, h, qty], [Flat no, sr no, w, h, qty], flat no missing/empty with sr no in column C, qty like "2nos", "1nos", "2 pcs", decimals like 458.5, flat no as number (104) and text (F-304), an extra remarks column, and two blocks in one file with different columns. Assert the displayed columns match the Excel header exactly and pieces/area totals are correct. Add a regression test that the window identity keys, ordered quantities and totals are identical to the previous behaviour for the same inputs. The existing glass and window-list tests must still pass.
+
+DELIVERABLES (in your final reply):
+1. The HOW IT WORKS explanation and the CONNECTION MAP table from Step 0.
+2. The list of fields/keys that must not change, and confirmation that none changed.
+3. Files changed, and a clear statement that no other module, page, API contract or saved data was changed (list anything you had to touch beyond the glass import and why).
+4. Before/after proof on the same Excel: the same window keys and quantities as before.
+5. The exact menu path to test (Materials → Glass tracking → Upload / re-upload glass Excel) and a regression checklist for every connected section from the map: Order detail glass state and windows column, Dashboard glass widgets and filter, Dispatch readiness, Window tracking, activity/user log.
+6. A before/after description for the 5mm_Clear_Glass file (CELESTIA: 31 rows, 61 pieces).
+7. Anything you could not verify (for example signed-in screens).
