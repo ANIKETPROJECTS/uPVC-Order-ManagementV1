@@ -1,0 +1,22 @@
+Part 2 of the glass Excel import fix. The parser now splits blocks and rejects dates as client names. Change ONLY the glass import (parser, preview dialog, save step). Do not touch any other module.
+
+Read glass-workbook-import-dialog.tsx, glass-tracking.tsx, the preview/import routes in order-workspace.ts and glass-order-workbook.ts first.
+
+1. PARSER OUTPUT: for every block also return lot (e.g. "2nd Lot"), wing (e.g. "E-Wing"), date, supplier (a line like "Saint Gobain Glass" that follows the client name must be the supplier, never a client), glass type, source sheet name and Excel row range, plus per-row warnings.
+
+2. REVIEW SCREEN (before saving, same check-before-save style as window list import):
+- Summary: N clients, M groups, R rows, total pieces, total area.
+- One card per block: editable client name, editable glass type, lot / wing / date / supplier, row count, qty total, area total, "Sheet1, rows 54 to 85", and an editable rows table (add row, delete row, edit every field, live area = width x height x qty / 92903 sq ft).
+- Warning badge when the name looks like a date, a glass type, a vendor, is missing, is very short, or was inferred. Confirm stays disabled until these are fixed or acknowledged.
+- Per card: rename, delete group, merge into another client, and a dropdown of existing clients so "Mr Prashant B3" can be matched. Do not auto-create clients without confirmation.
+- Show skipped or invalid rows with Excel row numbers. Blocks the parser cannot understand show as "Needs attention" with the raw rows, never guessed.
+
+3. SAVE: only after Confirm. Keep each client's glass list separate and store glass type, lot, wing, date, supplier. Attach the original Excel and add a User log entry. If a step fails, remove what this import inserted (MongoDB has no multi-document transactions, so validate first and use compensating cleanup) and tell me the limitation.
+
+4. TESTS: add the 4 sample files as fixtures (I will upload them to attached_assets, or create equivalent fixtures from this description) and assert:
+- Glass_Order_19-12-2025: 1 block, Mr. Deepak Pawar, date 19-12-2025, 5mm Clear Glass, 3 rows (370x453, 458.5x680, 387.5x1373, qty 2).
+- 5mm_Clear_Glass_: 3 blocks, Mr Prashant B3 (3), Mr Prashant B2 (2), Crown (1, flat F303, 782x2211, qty 1). 6 rows.
+- 5mm_Clear_Glass: client CELESTIA, "2nd Lot" "E-Wing" 31 rows and "3rd Lot" "D-Wing" 16 rows. 47 rows.
+- Glass_Order_24-9-2026: Mumbai D4 "5mm Frosted Glass" 47 rows and "5mm Clear Glass" 28 rows (one client, two groups, supplier "Saint Gobain Glass"), Aakar Solitaire 4 rows (flat 104), Avdhoot 1 row (no flat no). 80 rows.
+
+DELIVERABLES: files changed, a table of expected vs actual for the 4 files, manual checklist with the menu path, and anything you could not verify.
