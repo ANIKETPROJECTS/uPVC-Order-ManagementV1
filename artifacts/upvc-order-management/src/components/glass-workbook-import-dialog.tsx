@@ -157,24 +157,48 @@ export function GlassWorkbookImportDialog({
         </div> : null}
 
         {preview ? <div className="space-y-3">
-          <div className="grid gap-3 rounded-xl border border-primary/15 bg-primary/[0.045] p-3 text-xs leading-5 sm:grid-cols-[1fr_auto] sm:items-center">
-            <p className="text-muted-foreground"><strong className="text-foreground">{preview.sections.length} client section{preview.sections.length === 1 ? '' : 's'} found.</strong> Assign each section to an existing order. Matching window rows retain their recorded received and broken quantities.</p>
-            <span className="rounded-lg border border-border/70 bg-card px-3 py-2 text-[10px] font-semibold text-muted-foreground">Revision cannot fall below recorded counts</span>
-          </div>
+          {(() => {
+            const rowCount = preview.sections.reduce((sum, section) => sum + section.items.length, 0);
+            const pieces = preview.sections.reduce((sum, section) => sum + section.items.reduce((subtotal, item) => subtotal + item.ordered, 0), 0);
+            const area = preview.sections.reduce((sum, section) => sum + section.items.reduce((subtotal, item) => subtotal + item.widthMm * item.heightMm * item.ordered / 92903, 0), 0);
+            const clients = new Set(preview.sections.map((section) => normalize(section.clientLabel)).filter(Boolean)).size;
+            return <div className="space-y-3 rounded-xl border border-primary/15 bg-primary/[0.045] p-3">
+              <p className="text-xs leading-5 text-muted-foreground"><strong className="text-foreground">Workbook review.</strong> Assign each group to an existing order. Matching rows retain recorded received and broken quantities.</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {[
+                  ['Clients', clients],
+                  ['Groups', preview.sections.length],
+                  ['Rows', rowCount],
+                  ['Pieces', pieces],
+                  ['Area', `${area.toFixed(1)} sq ft`],
+                ].map(([label, value]) => <div key={label} className="rounded-lg border border-border/70 bg-card px-3 py-2">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-sm font-bold tabular-nums">{value}</p>
+                </div>)}
+              </div>
+              <p className="text-[10px] text-muted-foreground">Revision cannot fall below recorded received and broken counts.</p>
+            </div>;
+          })()}
           {preview.sections.map((section, index) => {
             const glassTypes = [...new Set(section.items.map((item) => item.glassType))];
             const ordered = section.items.reduce((sum, item) => sum + item.ordered, 0);
+            const area = section.items.reduce((sum, item) => sum + item.widthMm * item.heightMm * item.ordered / 92903, 0);
+            const warnings = [...section.warnings, ...section.items.flatMap((item) => item.warnings.map((warning) => `Excel row ${item.sourceRow}: ${warning}`))];
             return <section key={`${section.clientLabel}-${index}`} className="overflow-hidden rounded-xl border border-border/75 bg-card" data-testid={`glass-workbook-section-${index}`}>
               <div className="grid gap-3 border-b border-border/70 bg-muted/20 p-4 sm:grid-cols-[minmax(150px,.75fr)_minmax(230px,1.25fr)] sm:items-center">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 font-mono text-[10px] font-bold text-primary">{String(index + 1).padStart(2, '0')}</span>
                     <p className="truncate text-sm font-bold" title={section.clientLabel}>{section.clientLabel}</p>
+                    {section.needsAttention && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900">Needs attention</span>}
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {section.items.length} window line{section.items.length === 1 ? '' : 's'} <span className="mx-1 text-border">/</span> <strong className="font-mono text-foreground">{ordered}</strong> pieces
+                    {section.items.length} rows <span className="mx-1 text-border">/</span> <strong className="font-mono text-foreground">{ordered}</strong> pieces <span className="mx-1 text-border">/</span>{area.toFixed(1)} sq ft
                   </p>
                   <p className="mt-1 truncate text-[10px] leading-5 text-muted-foreground" title={glassTypes.join(' · ')}>{glassTypes.join(' · ')}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{[section.lot, section.wing, section.date, section.supplier].filter(Boolean).join(' · ') || 'Lot, wing, date, and supplier not found'}</p>
+                  <p className="mt-1 text-[10px] font-medium text-muted-foreground">{section.sourceSheet}, rows {section.sourceRowStart} to {section.sourceRowEnd}</p>
+                  {warnings.length > 0 && <ul className="mt-2 space-y-1 text-[10px] text-amber-800">{warnings.map((warning, warningIndex) => <li key={warningIndex}>• {warning}</li>)}</ul>}
                 </div>
                 <label className="block">
                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Assign section to order</span>

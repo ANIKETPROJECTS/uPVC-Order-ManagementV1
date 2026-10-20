@@ -4774,7 +4774,14 @@ components:
         ordered:
           type: integer
           minimum: 1
-      required: [id, villaNo, windowNo, glassType, widthMm, heightMm, ordered]
+        sourceRow:
+          type: integer
+          minimum: 1
+        warnings:
+          type: array
+          items:
+            type: string
+      required: [id, villaNo, windowNo, glassType, widthMm, heightMm, ordered, sourceRow, warnings]
     GlassWorkbookItemList:
       type: array
       items:
@@ -4784,9 +4791,31 @@ components:
       properties:
         clientLabel:
           type: string
+        glassType:
+          type: string
+        lot:
+          type: ["string", "null"]
+        wing:
+          type: ["string", "null"]
+        date:
+          type: ["string", "null"]
+        supplier:
+          type: ["string", "null"]
+        sourceSheet:
+          type: string
+        sourceRowStart:
+          type: integer
+        sourceRowEnd:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+        needsAttention:
+          type: boolean
         items:
           $ref: "#/components/schemas/GlassWorkbookItemList"
-      required: [clientLabel, items]
+      required: [clientLabel, glassType, lot, wing, date, supplier, sourceSheet, sourceRowStart, sourceRowEnd, warnings, needsAttention, items]
     GlassWorkbookSectionList:
       type: array
       items:

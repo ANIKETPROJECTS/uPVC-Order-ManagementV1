@@ -4773,10 +4773,21 @@ export const PreviewGlassOrderWorkbookParams = zod.object({
 
 
 
+
 export const PreviewGlassOrderWorkbookResponse = zod.object({
   "filename": zod.string(),
   "sections": zod.array(zod.object({
   "clientLabel": zod.string(),
+  "glassType": zod.string(),
+  "lot": zod.string().nullable(),
+  "wing": zod.string().nullable(),
+  "date": zod.string().nullable(),
+  "supplier": zod.string().nullable(),
+  "sourceSheet": zod.string(),
+  "sourceRowStart": zod.number().int(),
+  "sourceRowEnd": zod.number().int(),
+  "warnings": zod.array(zod.string()),
+  "needsAttention": zod.boolean(),
   "items": zod.array(zod.object({
   "id": zod.string(),
   "villaNo": zod.string().nullable(),
@@ -4784,7 +4795,9 @@ export const PreviewGlassOrderWorkbookResponse = zod.object({
   "glassType": zod.string(),
   "widthMm": zod.number(),
   "heightMm": zod.number(),
-  "ordered": zod.number().int().min(1)
+  "ordered": zod.number().int().min(1),
+  "sourceRow": zod.number().int().min(1),
+  "warnings": zod.array(zod.string())
 }))
 }))
 })

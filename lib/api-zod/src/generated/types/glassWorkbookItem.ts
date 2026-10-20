@@ -16,4 +16,7 @@ export interface GlassWorkbookItem {
   heightMm: number;
   /** @minimum 1 */
   ordered: number;
+  /** @minimum 1 */
+  sourceRow: number;
+  warnings: string[];
 }

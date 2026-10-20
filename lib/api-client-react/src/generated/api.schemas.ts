@@ -1155,12 +1155,29 @@ export interface GlassWorkbookItem {
   heightMm: number;
   /** @minimum 1 */
   ordered: number;
+  /** @minimum 1 */
+  sourceRow: number;
+  warnings: string[];
 }
 
 export type GlassWorkbookItemList = GlassWorkbookItem[];
 
 export interface GlassWorkbookSection {
   clientLabel: string;
+  glassType: string;
+  /** @nullable */
+  lot: string | null;
+  /** @nullable */
+  wing: string | null;
+  /** @nullable */
+  date: string | null;
+  /** @nullable */
+  supplier: string | null;
+  sourceSheet: string;
+  sourceRowStart: number;
+  sourceRowEnd: number;
+  warnings: string[];
+  needsAttention: boolean;
   items: GlassWorkbookItemList;
 }
 

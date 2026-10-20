@@ -9,10 +9,22 @@ export interface ParsedGlassWorkbookItem {
   widthMm: number;
   heightMm: number;
   ordered: number;
+  sourceRow: number;
+  warnings: string[];
 }
 
 export interface ParsedGlassWorkbookSection {
   clientLabel: string;
+  glassType: string;
+  lot: string | null;
+  wing: string | null;
+  date: string | null;
+  supplier: string | null;
+  sourceSheet: string;
+  sourceRowStart: number;
+  sourceRowEnd: number;
+  warnings: string[];
+  needsAttention: boolean;
   items: ParsedGlassWorkbookItem[];
 }
 
@@ -44,6 +56,17 @@ function isDate(value: unknown): boolean {
     || /^\d{4}-\d{2}-\d{2}T/.test(valueText);
 }
 function populated(value: unknown): boolean { return text(value) !== ""; }
+function dateLabel(value: unknown): string | null {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString().slice(0, 10);
+  const candidate = text(value);
+  return isDate(value) ? candidate : null;
+}
+function supplierLabel(value: string): boolean {
+  return /\b(saint\s*gobain|saint-gobain|asahi|guardian|gold\s*plus|glass\s*vendor|supplier)\b/i.test(value);
+}
+function isGlassType(value: string): boolean {
+  return /(?:\d+(?:\.\d+)?\s*mm\b.*(?:glass|toughened|frosted|clear)|\b(?:clear|toughened|frosted|laminated|reflective)\s+glass\b)/i.test(value);
+}
 
 function actualRows(sheet: XLSX.WorkSheet): Row[] {
   const cells = new Map<number, Map<number, unknown>>();
@@ -161,6 +184,8 @@ export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlas
         return value.length > 1 && !isDate(value) && !/^\d+$/.test(value)
         && !["glass", "w", "h", "sr no", "s no", "serial", "flat no", "villa no", "unit", "room"].includes(keyValue)
           && !/^\d+(?:\.\d+)?\s*mm\b/i.test(value)
+          && !supplierLabel(value)
+          && !isGlassType(value)
           && !(previousLine && /glass$/i.test(value) && !/^glass$/i.test(value));
       }) ?? "";
       if (!clientLabel) clientLabel = previousClient;
@@ -170,8 +195,17 @@ export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlas
       }
       previousClient = clientLabel;
       const glassType = (columns.glass >= 0 ? text(block[columns.headerRow].cells[columns.glass]) : "")
-        || titleValues.map(text).find((value) => /(?:\d+(?:\.\d+)?\s*mm\b.*(?:glass|toughened|frosted|clear)|\bglass\b)/i.test(value) && !/^glass$/i.test(value) && !/saint\s+gobain/i.test(value))
+        || titleValues.map(text).find(isGlassType)
         || "Glass type not identified";
+      const lot = titleValues.map(text).find((value) => /\b\d+(?:st|nd|rd|th)?\s*lot\b|\blot\s*\d+\b/i.test(value)) ?? null;
+      const wing = titleValues.map(text).find((value) => /\b[\w-]+\s*wing\b/i.test(value)) ?? null;
+      const date = titleValues.map((value) => dateLabel(value)).find((value) => value !== null) ?? null;
+      const supplier = titleValues.map(text).find(supplierLabel) ?? null;
+      const sectionWarnings: string[] = [];
+      if (!clientLabel) sectionWarnings.push("Client name is missing.");
+      if (clientLabel.length < 4) sectionWarnings.push("Client name is very short.");
+      if (clientLabel === previousClient) sectionWarnings.push("Client name was carried forward from the previous group.");
+      if (glassType === "Glass type not identified") sectionWarnings.push("Glass type could not be identified.");
       const groupKey = `${sheetName}:${block[0]?.excelRow ?? 1}:${sections.length}`;
       const items: ParsedGlassWorkbookItem[] = [];
       for (const row of block.slice(columns.headerRow + 1)) {
@@ -193,6 +227,7 @@ export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlas
         const serial = columns.sr >= 0 ? text(row.cells[columns.sr]) : "";
         const flat = columns.flat >= 0 ? text(row.cells[columns.flat]) || null : null;
         const windowNo = serial || `Row ${row.excelRow}`;
+        const warnings = serial ? [] : [`Window number was inferred from Excel row ${row.excelRow}.`];
         items.push({
           id: stableId(groupKey, row.excelRow, clientLabel, glassType, flat, windowNo, widthMm, heightMm),
           villaNo: flat,
@@ -201,10 +236,28 @@ export async function parseGlassOrderWorkbook(bytes: Buffer): Promise<ParsedGlas
           widthMm,
           heightMm,
           ordered,
+          sourceRow: row.excelRow,
+          warnings,
         });
       }
       if (items.length) {
-        sections.push({ clientLabel, items });
+        const dataRows = block.slice(columns.headerRow + 1).filter((row) =>
+          number(row.cells[columns.width]) !== null || number(row.cells[columns.height]) !== null,
+        );
+        sections.push({
+          clientLabel,
+          glassType,
+          lot,
+          wing,
+          date,
+          supplier,
+          sourceSheet: sheetName,
+          sourceRowStart: dataRows[0]?.excelRow ?? block[columns.headerRow].excelRow,
+          sourceRowEnd: dataRows.at(-1)?.excelRow ?? block[columns.headerRow].excelRow,
+          warnings: sectionWarnings,
+          needsAttention: sectionWarnings.length > 0 || items.some((item) => item.warnings.length > 0),
+          items,
+        });
         itemCount += items.length;
         if (sections.length > MAX_SECTIONS || itemCount > MAX_ITEMS) throw new Error("This workbook exceeds the supported number of glass groups or rows.");
       }
