@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Check, ChevronDown, ChevronRight, Printer, Settings2, ShieldAlert, X } from 'lucide-react';
@@ -134,6 +135,101 @@ const istStamp = (value: string | null) => value
   ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
   : 'Not printed';
 
+function stickerPrintCss(
+  rootId: string,
+  settings: QrStickerSettingsResponse | QrStickerSettingsInput,
+) {
+  const pageWidth = settings.orientation === 'landscape' ? Math.max(settings.widthMm, settings.heightMm) : Math.min(settings.widthMm, settings.heightMm);
+  const pageHeight = settings.orientation === 'landscape' ? Math.min(settings.widthMm, settings.heightMm) : Math.max(settings.widthMm, settings.heightMm);
+  return `
+    @page { size: ${pageWidth}mm ${pageHeight}mm; margin: 0; }
+    @media print {
+      html, body {
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        position: static !important;
+      }
+      body.printing-stickers > :not(#${rootId}) { display: none !important; }
+      body.printing-stickers > #${rootId} {
+        display: block !important;
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        position: static !important;
+      }
+      body.printing-stickers > #${rootId},
+      body.printing-stickers > #${rootId} * {
+        visibility: visible !important;
+      }
+      body.printing-stickers #${rootId} .qr-sticker-page {
+        display: flex !important;
+        position: static !important;
+        width: ${pageWidth}mm !important;
+        height: ${pageHeight}mm !important;
+        min-height: 0 !important;
+        box-sizing: border-box !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1mm;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: ${settings.marginMm}mm !important;
+        background: #fff !important;
+        color: #000 !important;
+        page-break-after: always;
+        break-after: page;
+        font-family: Arial, sans-serif;
+      }
+      body.printing-stickers #${rootId} .qr-sticker-page:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+      body.printing-stickers #${rootId} .qr-sticker-qr {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+      }
+      body.printing-stickers #${rootId} .qr-sticker-qr canvas {
+        display: block;
+        width: ${settings.qrSizeMm}mm !important;
+        height: ${settings.qrSizeMm}mm !important;
+        image-rendering: pixelated;
+      }
+      body.printing-stickers #${rootId} .qr-sticker-id {
+        width: 100%;
+        flex: none;
+        overflow: hidden;
+        white-space: nowrap;
+        text-align: center;
+        font-weight: 700;
+        line-height: 1.12;
+      }
+      body.printing-stickers #${rootId} .qr-sticker-client {
+        display: -webkit-box;
+        width: 100%;
+        flex: none;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        text-align: center;
+        line-height: 1.12;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: ${settings.nameMaxLines};
+        text-overflow: ellipsis;
+      }
+    }
+  `;
+}
+
 function StickerPrintDocument({
   pieces,
   settings,
@@ -143,25 +239,12 @@ function StickerPrintDocument({
   settings: QrStickerSettingsResponse | QrStickerSettingsInput;
   rootId: string;
 }) {
-  const pageWidth = settings.orientation === 'landscape' ? Math.max(settings.widthMm, settings.heightMm) : Math.min(settings.widthMm, settings.heightMm);
-  const pageHeight = settings.orientation === 'landscape' ? Math.min(settings.widthMm, settings.heightMm) : Math.max(settings.widthMm, settings.heightMm);
-  return <div id={rootId} className="qr-sticker-print-root" aria-hidden="true">
-    <style>{`
-      @page { size: ${pageWidth}mm ${pageHeight}mm; margin: 0; }
-      .qr-sticker-print-root { display:none; }
-      @media print {
-        body.print-qr-stickers > * { visibility:hidden!important; }
-        body.print-qr-stickers #${rootId},
-        body.print-qr-stickers #${rootId} * { visibility:visible!important; }
-        body.print-qr-stickers #${rootId} { display:block!important; position:absolute; inset:0 auto auto 0; }
-        body.print-qr-stickers .qr-sticker-page { display:flex!important; width:${pageWidth}mm; height:${pageHeight}mm; box-sizing:border-box; flex-direction:column; align-items:center; justify-content:flex-start; overflow:hidden; padding:${settings.marginMm}mm; background:#fff; color:#000; page-break-after:always; break-after:page; font-family:Arial,sans-serif; }
-        body.print-qr-stickers .qr-sticker-page:last-child { page-break-after:auto; break-after:auto; }
-        body.print-qr-stickers .qr-sticker-qr { flex:none; display:flex; align-items:center; justify-content:center; margin:0 auto 1.2mm; }
-        body.print-qr-stickers .qr-sticker-qr canvas { width:${settings.qrSizeMm}mm!important; height:${settings.qrSizeMm}mm!important; image-rendering:pixelated; }
-        body.print-qr-stickers .qr-sticker-id { width:100%; overflow:hidden; white-space:nowrap; text-align:center; font-weight:700; line-height:1.12; }
-        body.print-qr-stickers .qr-sticker-client { width:100%; overflow:hidden; text-align:center; line-height:1.12; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:${settings.nameMaxLines}; }
-      }
-    `}</style>
+  return createPortal(<div
+    id={rootId}
+    className="qr-sticker-print-root"
+    aria-hidden="true"
+    style={{ display: 'none' }}
+  >
     {pieces.map((piece, index) => {
       const scale = Math.max(0.62, Math.min(1, 22 / Math.max(22, piece.displayId.length)));
       return <article className="qr-sticker-page" key={`${piece.pieceId}-${index}`}>
@@ -170,7 +253,7 @@ function StickerPrintDocument({
         <div className="qr-sticker-client" style={{ fontSize: `${settings.fontSizeLine2Pt}pt` }}>{piece.clientName}</div>
       </article>;
     })}
-  </div>;
+  </div>, document.body);
 }
 
 export function OrderQrStickerControls({
@@ -253,27 +336,63 @@ export function OrderQrStickerControls({
     const count = testPrint ? 1 : jobToPrint?.pieces.length ?? 0;
     if ((!jobToPrint && !testPrint) || count === 0 || renderedCount < count) return;
     let cancelled = false;
+    let completed = false;
+    let printStyle: HTMLStyleElement | null = null;
+    let afterPrintHandler: (() => void) | null = null;
+    let timeoutId: number | undefined;
+    let secondFrame: number | undefined;
+    const rootId = testPrint ? 'qr-sticker-test-print-root' : 'qr-sticker-job-print-root';
+    const finishPrint = () => {
+      if (completed) return;
+      completed = true;
+      document.body.classList.remove('printing-stickers');
+      printStyle?.remove();
+      if (afterPrintHandler) window.removeEventListener('afterprint', afterPrintHandler);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      if (!testPrint && jobToPrint) {
+        setPrintedIds(jobToPrint.pieces.map((piece) => piece.pieceId));
+        setConfirmOpen(true);
+      } else {
+        setTestPrint(false);
+      }
+    };
     const doPrint = () => {
       if (cancelled) return;
-      let completed = false;
-      document.body.classList.add('print-qr-stickers');
-      const afterPrint = () => {
-        if (completed) return;
-        completed = true;
-        document.body.classList.remove('print-qr-stickers');
-        window.removeEventListener('afterprint', afterPrint);
-        if (!testPrint && jobToPrint) {
-          setPrintedIds(jobToPrint.pieces.map((piece) => piece.pieceId));
-          setConfirmOpen(true);
-        } else {
+      const renderedStickerCount = document.querySelectorAll(`#${rootId} .qr-sticker-page`).length;
+      if (renderedStickerCount !== count) {
+        toast({
+          title: 'Sticker print stopped',
+          description: `Expected ${count} stickers but found ${renderedStickerCount}. Nothing was sent to the printer.`,
+          variant: 'destructive',
+        });
+        if (testPrint) {
           setTestPrint(false);
+        } else if (jobToPrint) {
+          cancelJob.mutate({ jobId: jobToPrint.jobId }, {
+            onSuccess: () => {
+              invalidatePrintData();
+              setInProgress({});
+              setJobToPrint(null);
+            },
+            onError: () => setJobToPrint(null),
+          });
         }
-      };
-      window.addEventListener('afterprint', afterPrint, { once: true });
+        return;
+      }
+      printStyle = document.createElement('style');
+      printStyle.dataset.qrStickerPrint = 'true';
+      printStyle.textContent = stickerPrintCss(
+        rootId,
+        testPrint ? settingsDraft : jobToPrint!.settings,
+      );
+      document.head.appendChild(printStyle);
+      document.body.classList.add('printing-stickers');
+      afterPrintHandler = finishPrint;
+      window.addEventListener('afterprint', finishPrint, { once: true });
       window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
+        secondFrame = window.requestAnimationFrame(() => {
           window.print();
-          window.setTimeout(afterPrint, 500);
+          timeoutId = window.setTimeout(finishPrint, 500);
         });
       });
     };
@@ -281,6 +400,13 @@ export function OrderQrStickerControls({
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(frame);
+      if (secondFrame !== undefined) window.cancelAnimationFrame(secondFrame);
+      if (!completed) {
+        document.body.classList.remove('printing-stickers');
+        printStyle?.remove();
+        if (afterPrintHandler) window.removeEventListener('afterprint', afterPrintHandler);
+        if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      }
     };
   }, [jobToPrint, testPrint, renderedCount]);
 
@@ -463,7 +589,7 @@ export function OrderQrStickerControls({
               <p className="line-clamp-2 max-w-full text-center leading-tight" style={{ fontSize: `${Math.min(13, settingsDraft.fontSizeLine2Pt * 1.15)}px` }}>{testPiece.clientName}</p>
             </div>
             <Button type="button" variant="outline" className="mt-3 w-full" disabled={testPrint} onClick={() => { setRenderedCount(0); setTestPrint(true); }} data-testid="button-print-test-qr"><Printer size={13} /> Print test sticker</Button>
-            <p className="mt-3 text-[10px] leading-4 text-muted-foreground">In print dialog choose the TSC TE 210 driver, paper size equal to the label size, margins None, scale 100%.</p>
+            <p className="mt-3 text-[10px] leading-4 text-muted-foreground">In the print dialog, choose the TSC TE 210 driver, set paper size to the label size, set Margins to None, uncheck Headers and footers, and use Scale 100%.</p>
           </div>
         </div>}
         <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-border pt-4"><Button variant="outline" onClick={() => setSettingsOpen(false)}>Cancel</Button><Button disabled={updateSettings.isPending || settingsQuery.isLoading} onClick={saveSettings} data-testid="button-save-qr-settings">{updateSettings.isPending ? 'Saving…' : 'Save settings'}</Button></div>
@@ -477,7 +603,7 @@ export function OrderQrStickerControls({
     />}
     {confirmOpen && jobToPrint && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="qr-print-confirm-title">
       <div className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-2xl">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Print job · {jobToPrint.pieces.length} labels</p><h2 id="qr-print-confirm-title" className="mt-1 font-display text-lg font-bold">Did the stickers print correctly?</h2><p className="mt-1 text-sm text-muted-foreground">The job remains pending until you record which labels came out successfully.</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Print job · {jobToPrint.pieces.length} labels</p><h2 id="qr-print-confirm-title" className="mt-1 font-display text-lg font-bold">Did the stickers print correctly?</h2><p className="mt-1 text-sm text-muted-foreground">The job remains pending until you record which labels came out successfully.</p><p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-[11px] text-muted-foreground">In the print dialog: Margins = None, uncheck Headers and footers, Scale = 100%, Paper size = label size.</p>
         <div className="mt-4 flex flex-wrap gap-2"><Button disabled={confirmJob.isPending || cancelJob.isPending} onClick={() => closeConfirmation(false, jobToPrint.pieces.map((piece) => piece.pieceId))} data-testid="button-qr-confirm-all"><Check size={14} /> Yes, mark {jobToPrint.pieces.length} pieces as printed</Button><Button variant="outline" disabled={confirmJob.isPending || cancelJob.isPending} onClick={() => { setPrintedIds([]); setPartialConfirm(true); }} data-testid="button-qr-some-failed">Some failed</Button><Button variant="ghost" disabled={confirmJob.isPending || cancelJob.isPending} onClick={() => closeConfirmation(true, [])} data-testid="button-qr-cancel-job">No, keep pending</Button></div>
         {partialConfirm && <p className="mt-3 text-xs text-muted-foreground">Select only the stickers that printed successfully, then confirm below.</p>}
         <div className="mt-3 max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
