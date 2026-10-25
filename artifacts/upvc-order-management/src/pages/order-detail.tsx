@@ -1597,16 +1597,58 @@ function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; 
 }
 
 function ConfirmationInfoPanel({ orderId }: { orderId: string }) {
+  const { toast } = useToast();
+  const client = useQueryClient();
+  const [view, setView] = useState<"document" | "software">("document");
+  const [reextracting, setReextracting] = useState(false);
   const query = useListOrderDocuments(orderId, { query: { queryKey: getListOrderDocumentsQueryKey(orderId) } });
   const documentRecord = (query.data ?? []).filter((item) => item.category === 'confirmation').sort((a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt))[0];
   const info = documentRecord?.confirmationInfo;
+  const reextract = async () => {
+    if (!documentRecord || !info || reextracting) return;
+    setReextracting(true);
+    try {
+      const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+      const response = await fetch(`${base}/api/orders/${encodeURIComponent(orderId)}/documents/${encodeURIComponent(documentRecord.id)}/re-extract-preview`, { method: "POST" });
+      const payload = await response.json() as { confirmationInfo?: NonNullable<typeof info>; error?: string };
+      if (!response.ok || !payload.confirmationInfo) throw new Error(payload.error || "Re-extraction preview failed.");
+      const candidate = payload.confirmationInfo;
+      const currentCells = new Map((info.windows ?? []).flatMap((row) => (row.originalCells ?? []).map((cell) => [`${row.windowNo}|${cell.columnLabel}`, cell.text] as const)));
+      const nextCells = new Map(candidate.windows.flatMap((row) => (row.originalCells ?? []).map((cell) => [`${row.windowNo}|${cell.columnLabel}`, cell.text] as const)));
+      const keys = new Set([...currentCells.keys(), ...nextCells.keys()]);
+      const changed = [...keys].filter((key) => currentCells.get(key) !== nextCells.get(key)).length;
+      const summary = `Re-extraction preview for ${documentRecord.filename}\n\nRows: ${info.windows.length} → ${candidate.windows.length}\nChanged cells: ${changed}\n\nApply these extracted values? Existing data remains unchanged if you cancel.`;
+      if (!window.confirm(summary)) return;
+      const saved = await fetch(`${base}/api/orders/${encodeURIComponent(orderId)}/documents/${encodeURIComponent(documentRecord.id)}/re-extract`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedExtractedAt: info.extractedAt }),
+      });
+      const result = await saved.json() as { error?: string };
+      if (!saved.ok) throw new Error(result.error || "The extraction changed before it could be saved.");
+      await client.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) });
+      toast({ title: "Confirmation re-extracted", description: `${candidate.windows.length} rows saved after confirmation.` });
+    } catch (error) {
+      toast({ title: "Re-extraction failed", description: error instanceof Error ? error.message : "The document could not be re-extracted.", variant: "destructive" });
+    } finally { setReextracting(false); }
+  };
   return <div className="space-y-4" data-testid="panel-confirmation-info">
     <Card className="border-border/80"><CardHeader><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Confirmation document extraction</p><CardTitle className="text-base">Confirmation info</CardTitle><p className="text-xs text-muted-foreground">Extracted from the latest document in the Order confirmation category. Review the original PDF for any uncertain OCR values.</p></CardHeader>
       <CardContent>{query.isLoading ? <p className="text-sm text-muted-foreground">Loading confirmation documents…</p> : query.isError ? <p className="text-sm text-destructive">Confirmation details could not be loaded.</p> : !documentRecord ? <p className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">No order confirmation document is uploaded yet. Upload one in the Documents tab to extract its details.</p> : !info ? <p className="text-sm text-muted-foreground">This older confirmation file has no extraction yet. Replace it with the PDF or image to extract its details.</p> : <>
      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs"><span className="font-semibold">{documentRecord.filename}</span><span>{info.status === 'extracted' ? /\.(xlsx|xlsm|xls|csv)$/i.test(documentRecord.filename) ? 'Extracted from workbook' : `Extracted with ${info.method === 'ocr' ? 'OCR' : 'PDF text recognition'}` : info.status === 'unsupported' ? 'File type not supported for extraction' : info.status === 'failed' ? 'Extraction failed' : 'No readable text found'}</span></div>
         {info.error && <p className="mb-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{info.error}</p>}
         <div className="grid gap-3 md:grid-cols-2">{info.sections.map((section) => <section key={section.title} className="overflow-hidden rounded-xl border border-border bg-card"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">{section.title}</h3><table className="w-full text-left text-xs"><tbody>{section.fields.map((field) => <tr key={field.label} className="border-b border-border/60 last:border-0"><th className="w-2/5 px-3 py-2 font-medium text-muted-foreground">{field.label}</th><td className="px-3 py-2 font-semibold">{field.value}</td></tr>)}</tbody></table></section>)}</div>
-        {info.windows.length > 0 && <section className="overflow-hidden rounded-xl border border-border bg-card"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">Window schedule ({info.windows.length})</h3><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead><tr className="bg-muted/20 text-[10px] uppercase text-muted-foreground">{['Window','Location','Width','Height','Sq ft','Qty','Type','Glass','Lock','Profile','Mesh'].map((name) => <th key={name} className="border-b border-border px-3 py-2">{name}</th>)}</tr></thead><tbody>{info.windows.map((row) => <tr key={row.windowNo} className="border-b border-border/60 last:border-0">{[row.windowNo,row.location,row.width,row.height,row.area,row.quantity,row.windowType,row.glass,row.lockType,row.profile,row.mesh].map((value, index) => <td key={`${row.windowNo}-${index}`} className="px-3 py-2">{value || '—'}</td>)}</tr>)}</tbody></table></div></section>}
+         {info.windows.length > 0 && <section className="overflow-hidden rounded-xl border border-border bg-card">
+           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/35 px-3 py-2"><h3 className="text-xs font-bold">Window schedule ({info.windows.length})</h3><div className="flex gap-1"><Button size="sm" variant={view === "document" ? "default" : "outline"} onClick={() => setView("document")}>Document view</Button><Button size="sm" variant={view === "software" ? "default" : "outline"} onClick={() => setView("software")}>Software view</Button><Button size="sm" variant="outline" disabled={reextracting} onClick={() => void reextract()}>{reextracting ? "Re-extracting…" : "Re-extract"}</Button></div></div>
+           <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead><tr className="bg-muted/20 text-[10px] uppercase text-muted-foreground">{(view === "document" && info.columns?.length ? info.columns : ["Window","Location","Width","Height","Sq ft","Qty","Type","Glass","Lock","Profile","Mesh"]).map((name, index) => <th key={`${name}-${index}`} className="border-b border-border px-3 py-2">{name}</th>)}<th className="border-b border-border px-3 py-2 text-muted-foreground">Page</th><th className="border-b border-border px-3 py-2 text-muted-foreground">Check</th></tr></thead><tbody>{info.windows.map((row, rowIndex) => {
+             const software = [row.windowNo,row.location,row.width,row.height,row.area,row.quantity,row.windowType,row.glass,row.lockType,row.profile,row.mesh];
+             return <tr key={`${row.windowNo}-${rowIndex}`} className="border-b border-border/60 last:border-0">{view === "document" && info.columns?.length
+               ? info.columns.map((label, index) => <td key={`${label}-${index}`} className="px-3 py-2">{row.originalCells?.[index]?.text ?? ""}</td>)
+               : software.map((value, index) => <td key={index} className="px-3 py-2">{value ?? ""}</td>)}
+               <td className="px-3 py-2">{row.page ? <a className="text-primary underline" target="_blank" rel="noreferrer" href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/orders/${encodeURIComponent(orderId)}/documents/${encodeURIComponent(documentRecord.id)}/content?inline=1#page=${row.page}`}>Page {row.page}</a> : ""}</td>
+               <td className="px-3 py-2 text-amber-800">{row.confidence != null ? `${Math.round(row.confidence * 100)}% confidence` : ""}{row.warnings?.length ? ` · ${row.warnings.join(" ")}` : ""}</td></tr>;
+           })}</tbody></table></div>
+           {info.checksum && <p className={`border-t border-border px-3 py-2 text-xs ${info.checksum.matches === false ? "text-amber-800" : "text-muted-foreground"}`}>Rows found: {info.checksum.rowsFound}, Qty total: {info.checksum.quantity}, Sq ft total: {info.checksum.calculatedAreaSqFt.toFixed(2)} (document total: {info.checksum.documentAreaSqFt?.toFixed(2) ?? "not found"}) {info.checksum.matches === true ? "matches" : info.checksum.matches === false ? "does not match; verify" : "please verify"}.</p>}
+           {documentRecord.filename.toLowerCase().endsWith(".pdf") && <p className="px-3 py-1 text-[11px] text-muted-foreground">Extracted from PDF, please verify.</p>}
+         </section>}
         {info.terms.length > 0 && <section className="rounded-xl border border-border bg-card p-4"><h3 className="text-xs font-bold">Terms and conditions</h3><ol className="mt-2 list-decimal space-y-2 pl-5 text-xs text-muted-foreground">{info.terms.map((term, index) => <li key={index}>{term}</li>)}</ol></section>}
         {info.rawText && <details className="rounded-xl border border-border bg-card p-4"><summary className="cursor-pointer text-xs font-semibold">View all extracted text</summary><pre className="mt-3 max-h-[32rem] overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{info.rawText}</pre></details>}
       </>}</CardContent>

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { ObjectId } from "mongodb";
 import { Router as ExpressRouter, type RequestHandler } from "express";
 import {
@@ -2064,7 +2065,7 @@ router.get("/orders/:id/documents/:documentId/content", async (req, res, next): 
   if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
   const safeFilename = meta.filename.replace(/[\x00-\x1f\x7f"]/g, "_") || "order-document";
   res.setHeader("Content-Type", meta.contentType);
-  res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+  res.setHeader("Content-Disposition", `${req.query.inline === "1" ? "inline" : "attachment"}; filename="${safeFilename}"`);
   res.setHeader("X-Content-Type-Options", "nosniff");
   if (meta.storagePath) {
     const filePath = resolveProjectUploadPath(meta.storagePath);
@@ -2082,6 +2083,61 @@ router.get("/orders/:id/documents/:documentId/content", async (req, res, next): 
   const stream = getOrderDocumentsBucket(db).openDownloadStream(gridId);
   stream.on("error", next);
   stream.pipe(res);
+});
+async function orderDocumentBytes(meta: any, db: Awaited<ReturnType<typeof getMongoDb>>): Promise<Buffer> {
+  if (meta.storagePath) {
+    const filePath = resolveProjectUploadPath(meta.storagePath);
+    if (!filePath) throw new Error("Document content not found.");
+    return readFile(filePath);
+  }
+  if (!meta.gridFsId || !ObjectId.isValid(meta.gridFsId)) throw new Error("Document content not found.");
+  const stream = getOrderDocumentsBucket(db).openDownloadStream(new ObjectId(meta.gridFsId));
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+router.post("/orders/:id/documents/:documentId/re-extract-preview", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  if (!actor) return;
+  const db = await getMongoDb();
+  const meta = await getOrderDocumentMetadata(db).findOne({ _id: String(req.params.documentId), orderRecordId: String(req.params.id), archivedAt: { $exists: false } });
+  if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
+  if (meta.category !== "confirmation") { res.status(400).json({ error: "Only confirmation documents can be re-extracted." }); return; }
+  const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
+  if (!category || !requireModuleEdit(actor, res, category.requiredModule)) return;
+  try {
+    const confirmationInfo = await extractConfirmationInfo(await orderDocumentBytes(meta, db), meta.filename);
+    res.json({ confirmationInfo });
+  } catch (error) {
+    res.status(422).json({ error: error instanceof Error ? error.message : "The stored file could not be re-extracted." });
+  }
+});
+router.post("/orders/:id/documents/:documentId/re-extract", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  if (!actor) return;
+  const expectedExtractedAt = req.body?.expectedExtractedAt;
+  if (typeof expectedExtractedAt !== "string" || !expectedExtractedAt) { res.status(400).json({ error: "Refresh the extraction preview and try again." }); return; }
+  const db = await getMongoDb();
+  const documents = getOrderDocumentMetadata(db);
+  const meta = await documents.findOne({ _id: String(req.params.documentId), orderRecordId: String(req.params.id), archivedAt: { $exists: false } });
+  if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
+  if (meta.category !== "confirmation") { res.status(400).json({ error: "Only confirmation documents can be re-extracted." }); return; }
+  const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
+  if (!category || !requireModuleEdit(actor, res, category.requiredModule)) return;
+  if (meta.confirmationInfo?.extractedAt !== expectedExtractedAt) { res.status(409).json({ error: "The saved extraction changed. Refresh and review the new preview." }); return; }
+  try {
+    const confirmationInfo = await extractConfirmationInfo(await orderDocumentBytes(meta, db), meta.filename);
+    const updated = await documents.updateOne(
+      { _id: meta._id, orderRecordId: meta.orderRecordId, archivedAt: { $exists: false }, "confirmationInfo.extractedAt": expectedExtractedAt },
+      { $set: { confirmationInfo } },
+    );
+    if (updated.modifiedCount !== 1) { res.status(409).json({ error: "The document changed while extraction was running. Refresh and review again." }); return; }
+    const saved = await documents.findOne({ _id: meta._id });
+    if (!saved) { res.status(404).json({ error: "Document not found after extraction." }); return; }
+    res.json(docResponse(saved));
+  } catch (error) {
+    res.status(422).json({ error: error instanceof Error ? error.message : "The stored file could not be re-extracted." });
+  }
 });
 router.put("/orders/:id/documents/:documentId/content/:filename", async (req, res, next): Promise<void> => {
   const p = ReplaceOrderDocumentParams.safeParse(req.params);

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ConfirmationInfoChecksum } from './confirmationInfoChecksum';
 import type { ConfirmationInfoMethod } from './confirmationInfoMethod';
 import type { ConfirmationInfoSection } from './confirmationInfoSection';
 import type { ConfirmationInfoStatus } from './confirmationInfoStatus';
@@ -16,6 +17,8 @@ export interface ConfirmationInfo {
   extractedAt: Date;
   sections: ConfirmationInfoSection[];
   windows: ConfirmationWindowRow[];
+  columns?: string[];
+  checksum?: ConfirmationInfoChecksum;
   terms: string[];
   rawText: string;
   /** @nullable */

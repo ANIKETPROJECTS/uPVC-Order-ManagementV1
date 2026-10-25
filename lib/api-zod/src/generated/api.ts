@@ -5882,8 +5882,26 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
-  "mesh": zod.string()
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
 })),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
   "terms": zod.array(zod.string()),
   "rawText": zod.string(),
   "error": zod.string().nullable()
@@ -5921,8 +5939,26 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
-  "mesh": zod.string()
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
 })),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
   "terms": zod.array(zod.string()),
   "rawText": zod.string(),
   "error": zod.string().nullable()
@@ -5999,8 +6035,26 @@ export const ListOrderDocumentsResponseItem = zod.object({
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
-  "mesh": zod.string()
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
 })),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
   "terms": zod.array(zod.string()),
   "rawText": zod.string(),
   "error": zod.string().nullable()
@@ -6138,8 +6192,26 @@ export const UploadOrderDocumentResponse = zod.object({
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
-  "mesh": zod.string()
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
 })),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
   "terms": zod.array(zod.string()),
   "rawText": zod.string(),
   "error": zod.string().nullable()
@@ -6198,8 +6270,26 @@ export const UploadQuotationConfirmationDocumentResponse = zod.object({
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
-  "mesh": zod.string()
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
 })),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
   "terms": zod.array(zod.string()),
   "rawText": zod.string(),
   "error": zod.string().nullable()
@@ -6216,6 +6306,139 @@ export const DownloadOrderDocumentParams = zod.object({
 })
 
 export const DownloadOrderDocumentResponse = zod.unknown()
+
+
+/**
+ * @summary Preview re-extraction without changing saved confirmation data
+ */
+export const PreviewOrderDocumentReextractionParams = zod.object({
+  "id": zod.coerce.string(),
+  "documentId": zod.coerce.string()
+})
+
+export const PreviewOrderDocumentReextractionResponse = zod.object({
+  "confirmationInfo": zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
+})),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+})
+})
+
+
+/**
+ * @summary Save a reviewed confirmation re-extraction
+ */
+export const ReextractOrderDocumentParams = zod.object({
+  "id": zod.coerce.string(),
+  "documentId": zod.coerce.string()
+})
+
+export const ReextractOrderDocumentBody = zod.object({
+  "expectedExtractedAt": zod.string()
+})
+
+export const reextractOrderDocumentResponseCategoryMax = 64;
+
+
+
+export const ReextractOrderDocumentResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string(),
+  "quotationRequestId": zod.string().nullable(),
+  "filename": zod.string(),
+  "category": zod.string().min(1).max(reextractOrderDocumentResponseCategoryMax),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date(),
+  "confirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
+})),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()])
+})
 
 
 /**
@@ -6267,8 +6490,26 @@ export const ReplaceOrderDocumentResponse = zod.object({
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
-  "mesh": zod.string()
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
 })),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
   "terms": zod.array(zod.string()),
   "rawText": zod.string(),
   "error": zod.string().nullable()

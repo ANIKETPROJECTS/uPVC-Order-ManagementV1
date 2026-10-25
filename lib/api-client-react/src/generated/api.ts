@@ -40,6 +40,7 @@ import type {
   ClientList,
   ClientUpdate,
   ConfirmQrPrintJobInput,
+  ConfirmationReextractInput,
   CreateOrderGrievance,
   Dashboard,
   DashboardPreferences,
@@ -124,6 +125,7 @@ import type {
   PaymentFlagResolution,
   PaymentFlagUpdate,
   PaymentOverview,
+  PreviewOrderDocumentReextraction200,
   ProjectLotInput,
   ProjectLotUpdate,
   PublicInstallationShare,
@@ -13042,6 +13044,173 @@ export function useDownloadOrderDocument<TData = Awaited<ReturnType<typeof downl
 
 
 
+
+export const getPreviewOrderDocumentReextractionUrl = (id: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/documents/${documentId}/re-extract-preview`
+}
+
+/**
+ * @summary Preview re-extraction without changing saved confirmation data
+ */
+export const previewOrderDocumentReextraction = async (id: string,
+    documentId: string, options?: Parameters<typeof customFetch>[1]): Promise<PreviewOrderDocumentReextraction200> => {
+
+  return customFetch<PreviewOrderDocumentReextraction200>(getPreviewOrderDocumentReextractionUrl(id,documentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreviewOrderDocumentReextractionMutationKey = () => ['previewOrderDocumentReextraction'] as const;
+
+export const getPreviewOrderDocumentReextractionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewOrderDocumentReextraction>>, TError,PreviewOrderDocumentReextractionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewOrderDocumentReextraction>>, TError,PreviewOrderDocumentReextractionMutationVariables, TContext> => {
+
+const mutationKey = getPreviewOrderDocumentReextractionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewOrderDocumentReextraction>>, PreviewOrderDocumentReextractionMutationVariables> = (props) => {
+          const {id,documentId} = props ?? {};
+
+          return  previewOrderDocumentReextraction(id,documentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewOrderDocumentReextractionMutationResult = NonNullable<Awaited<ReturnType<typeof previewOrderDocumentReextraction>>>
+
+    export type PreviewOrderDocumentReextractionMutationError = ErrorType<unknown>
+    export type PreviewOrderDocumentReextractionMutationVariables = {id: string;documentId: string}
+
+    /**
+ * @summary Preview re-extraction without changing saved confirmation data
+ */
+export const usePreviewOrderDocumentReextraction = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewOrderDocumentReextraction>>, TError,PreviewOrderDocumentReextractionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewOrderDocumentReextraction>>,
+        TError,
+        PreviewOrderDocumentReextractionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPreviewOrderDocumentReextractionMutationOptions(options));
+    }
+
+export const getReextractOrderDocumentUrl = (id: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/documents/${documentId}/re-extract`
+}
+
+/**
+ * @summary Save a reviewed confirmation re-extraction
+ */
+export const reextractOrderDocument = async (id: string,
+    documentId: string,
+    confirmationReextractInput: ConfirmationReextractInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocument>(getReextractOrderDocumentUrl(id,documentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(confirmationReextractInput)
+  }
+);}
+
+
+
+
+
+export const getReextractOrderDocumentMutationKey = () => ['reextractOrderDocument'] as const;
+
+export const getReextractOrderDocumentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reextractOrderDocument>>, TError,ReextractOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reextractOrderDocument>>, TError,ReextractOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getReextractOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reextractOrderDocument>>, ReextractOrderDocumentMutationVariables> = (props) => {
+          const {id,documentId,data} = props ?? {};
+
+          return  reextractOrderDocument(id,documentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReextractOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof reextractOrderDocument>>>
+    export type ReextractOrderDocumentMutationBody = BodyType<ConfirmationReextractInput>
+    export type ReextractOrderDocumentMutationError = ErrorType<void>
+    export type ReextractOrderDocumentMutationVariables = {id: string;documentId: string;data: BodyType<ConfirmationReextractInput>}
+
+    /**
+ * @summary Save a reviewed confirmation re-extraction
+ */
+export const useReextractOrderDocument = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reextractOrderDocument>>, TError,ReextractOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reextractOrderDocument>>,
+        TError,
+        ReextractOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReextractOrderDocumentMutationOptions(options));
+    }
 
 export const getReplaceOrderDocumentUrl = (id: string,
     documentId: string,

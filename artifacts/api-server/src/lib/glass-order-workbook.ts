@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
+import { canonicalizeHeader, parseDocumentNumber } from "./document-extraction";
 
 export interface ParsedGlassWorkbookItem {
   id: string;
@@ -50,8 +51,8 @@ function text(value: unknown): string {
 }
 function key(value: unknown): string { return text(value).toLocaleLowerCase().replace(/[.\s_-]+/g, " ").trim(); }
 function number(value: unknown): number | null {
-  const parsed = Number(text(value).replace(/,/g, "").replace(/[^\d.+-]/g, ""));
-  return text(value) && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  const parsed = parseDocumentNumber(value);
+  return parsed != null && parsed > 0 ? parsed : null;
 }
 function quantity(value: unknown): number | null {
   if (value == null || text(value) === "") return 1;
@@ -110,15 +111,26 @@ function mergedTopLeftValue(sheet: XLSX.WorkSheet, rowIndex: number, columnIndex
 function findColumns(rows: Row[], start = 0): Columns | null {
   for (let rowIndex = start; rowIndex < rows.length; rowIndex += 1) {
     const labels = rows[rowIndex].cells.map(key);
-    const width = labels.findIndex((label) => ["w", "width", "width mm", "width mm"].includes(label));
-    const height = labels.findIndex((label) => ["h", "height", "height mm"].includes(label));
+    const findCanonical = (field: "serial" | "flat" | "width" | "height" | "quantity" | "glass", from = labels) =>
+      from.findIndex((label) => canonicalizeHeader(label).field === field);
+    const width = findCanonical("width");
+    const height = findCanonical("height");
     if (width < 0 || height < 0) continue;
     const find = (names: string[]) => labels.findIndex((label) => names.includes(label));
-    let sr = find(["sr no", "s no", "serial", "serial number"]);
-    if (sr < 0 && rowIndex > 0) sr = rows[rowIndex - 1].cells.map(key).findIndex((label) => ["sr no", "s no", "serial", "serial number"].includes(label));
-    let flat = find(["flat", "flat no", "unit", "room", "villa", "villa no"]);
-    if (flat < 0 && rowIndex > 0) flat = rows[rowIndex - 1].cells.map(key).findIndex((label) => ["flat", "flat no", "unit", "room", "villa", "villa no"].includes(label));
-    let qty = find(["qty", "quantity", "nos", "pieces"]);
+    let sr = findCanonical("serial");
+    if (sr < 0) sr = find(["sr no", "s no", "serial", "serial number"]);
+    if (sr < 0 && rowIndex > 0) {
+      sr = findCanonical("serial", rows[rowIndex - 1].cells.map(key));
+      if (sr < 0) sr = rows[rowIndex - 1].cells.map(key).findIndex((label) => ["sr no", "s no", "serial", "serial number"].includes(label));
+    }
+    let flat = findCanonical("flat");
+    if (flat < 0) flat = find(["flat", "flat no", "unit", "room", "villa", "villa no"]);
+    if (flat < 0 && rowIndex > 0) {
+      flat = findCanonical("flat", rows[rowIndex - 1].cells.map(key));
+      if (flat < 0) flat = rows[rowIndex - 1].cells.map(key).findIndex((label) => ["flat", "flat no", "unit", "room", "villa", "villa no"].includes(label));
+    }
+    let qty = findCanonical("quantity");
+    if (qty < 0) qty = find(["qty", "quantity", "nos", "pieces"]);
     if (qty < 0) {
       const candidate = Math.max(width, height) + 1;
       if (rows.slice(rowIndex + 1, rowIndex + 6).some((row) => quantity(row.cells[candidate]) !== null && populated(row.cells[candidate]))) qty = candidate;

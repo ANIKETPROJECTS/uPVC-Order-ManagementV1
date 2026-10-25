@@ -3502,6 +3502,60 @@ paths:
               schema:
                 type: string
                 format: binary
+  /orders/{id}/documents/{documentId}/re-extract-preview:
+    post:
+      operationId: previewOrderDocumentReextraction
+      tags: [orders]
+      summary: Preview re-extraction without changing saved confirmation data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Candidate extraction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  confirmationInfo:
+                    $ref: "#/components/schemas/ConfirmationInfo"
+                required: [confirmationInfo]
+  /orders/{id}/documents/{documentId}/re-extract:
+    post:
+      operationId: reextractOrderDocument
+      tags: [orders]
+      summary: Save a reviewed confirmation re-extraction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmationReextractInput"
+      responses:
+        "200":
+          description: Updated order document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDocument"
+        "409":
+          description: Saved extraction changed after the preview
   /orders/{id}/documents/{documentId}/content/{filename}:
     put:
       operationId: replaceOrderDocument
@@ -5629,6 +5683,22 @@ components:
         lockType: { type: string }
         profile: { type: string }
         mesh: { type: string }
+        originalCells:
+          type: array
+          items:
+            type: object
+            properties:
+              columnLabel: { type: string }
+              text: { type: string }
+              page: { type: ["integer", "null"] }
+              rowPosition: { type: number }
+            required: [columnLabel, text, page, rowPosition]
+        page: { type: ["integer", "null"] }
+        rowPosition: { type: number }
+        warnings:
+          type: array
+          items: { type: string }
+        confidence: { type: number }
       required: [windowNo, location, width, height, area, quantity, windowType, glass, lockType, profile, mesh]
     ConfirmationInfo:
       type: object
@@ -5650,6 +5720,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConfirmationWindowRow"
+        columns:
+          type: array
+          items: { type: string }
+        checksum:
+          type: object
+          properties:
+            rowsFound: { type: integer }
+            quantity: { type: number }
+            calculatedAreaSqFt: { type: number }
+            documentAreaSqFt: { type: ["number", "null"] }
+            matches: { type: ["boolean", "null"] }
+          required: [rowsFound, quantity, calculatedAreaSqFt, documentAreaSqFt, matches]
         terms:
           type: array
           items: { type: string }
@@ -5658,6 +5740,11 @@ components:
         error:
           type: ["string", "null"]
       required: [status, method, extractedAt, sections, windows, terms, rawText, error]
+    ConfirmationReextractInput:
+      type: object
+      properties:
+        expectedExtractedAt: { type: string }
+      required: [expectedExtractedAt]
     OrderDocument:
       type: object
       properties:

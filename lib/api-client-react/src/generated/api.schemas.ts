@@ -1749,6 +1749,14 @@ export interface ConfirmationInfoSection {
   fields: ConfirmationInfoField[];
 }
 
+export type ConfirmationWindowRowOriginalCellsItem = {
+  columnLabel: string;
+  text: string;
+  /** @nullable */
+  page: number | null;
+  rowPosition: number;
+};
+
 export interface ConfirmationWindowRow {
   windowNo: string;
   location: string;
@@ -1761,6 +1769,12 @@ export interface ConfirmationWindowRow {
   lockType: string;
   profile: string;
   mesh: string;
+  originalCells?: ConfirmationWindowRowOriginalCellsItem[];
+  /** @nullable */
+  page?: number | null;
+  rowPosition?: number;
+  warnings?: string[];
+  confidence?: number;
 }
 
 export type ConfirmationInfoStatus = typeof ConfirmationInfoStatus[keyof typeof ConfirmationInfoStatus];
@@ -1782,16 +1796,32 @@ export const ConfirmationInfoMethod = {
   none: 'none',
 } as const;
 
+export type ConfirmationInfoChecksum = {
+  rowsFound: number;
+  quantity: number;
+  calculatedAreaSqFt: number;
+  /** @nullable */
+  documentAreaSqFt: number | null;
+  /** @nullable */
+  matches: boolean | null;
+};
+
 export interface ConfirmationInfo {
   status: ConfirmationInfoStatus;
   method: ConfirmationInfoMethod;
   extractedAt: string;
   sections: ConfirmationInfoSection[];
   windows: ConfirmationWindowRow[];
+  columns?: string[];
+  checksum?: ConfirmationInfoChecksum;
   terms: string[];
   rawText: string;
   /** @nullable */
   error: string | null;
+}
+
+export interface ConfirmationReextractInput {
+  expectedExtractedAt: string;
 }
 
 export interface OrderDocument {
@@ -3199,5 +3229,9 @@ export const CancelQrPrintJob200State = {
 export type CancelQrPrintJob200 = {
   id: string;
   state: CancelQrPrintJob200State;
+};
+
+export type PreviewOrderDocumentReextraction200 = {
+  confirmationInfo: ConfirmationInfo;
 };
 

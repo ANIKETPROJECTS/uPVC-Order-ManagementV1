@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ConfirmationWindowRowOriginalCellsItem } from './confirmationWindowRowOriginalCellsItem';
 
 export interface ConfirmationWindowRow {
   windowNo: string;
@@ -18,4 +19,10 @@ export interface ConfirmationWindowRow {
   lockType: string;
   profile: string;
   mesh: string;
+  originalCells?: ConfirmationWindowRowOriginalCellsItem[];
+  /** @nullable */
+  page?: number | null;
+  rowPosition?: number;
+  warnings?: string[];
+  confidence?: number;
 }

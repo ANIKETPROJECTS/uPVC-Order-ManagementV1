@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { parseWindowListWorkbook } from "./window-list-import";
+import { parseWindowListPdf, parseWindowListWorkbook, type NormalizedWindowImport } from "./window-list-import";
 
 const execFile = promisify(execFileCallback);
 
@@ -12,7 +12,9 @@ export type ConfirmationInfo = {
   method: "pdf_text" | "ocr" | "none";
   extractedAt: string;
   sections: Array<{ title: string; fields: Array<{ label: string; value: string }> }>;
-  windows: Array<{ windowNo: string; location: string; width: string; height: string; area: string; quantity: string; windowType: string; glass: string; lockType: string; profile: string; mesh: string }>;
+  windows: Array<{ windowNo: string; location: string; width: string; height: string; area: string; quantity: string; windowType: string; glass: string; lockType: string; profile: string; mesh: string; originalCells?: Array<{ columnLabel: string; text: string; page: number | null; rowPosition: number }>; page?: number | null; rowPosition?: number; warnings?: string[]; confidence?: number }>;
+  columns?: string[];
+  checksum?: { rowsFound: number; quantity: number; calculatedAreaSqFt: number; documentAreaSqFt: number | null; matches: boolean | null };
   terms: string[];
   rawText: string;
   error: string | null;
@@ -95,14 +97,26 @@ function extractWindows(text: string) {
   }).filter((row) => row.windowNo);
 }
 
-function buildInfo(text: string, method: ConfirmationInfo["method"]): ConfirmationInfo {
+function buildInfo(text: string, method: ConfirmationInfo["method"], table?: NormalizedWindowImport): ConfirmationInfo {
   const sections = fieldGroups.map((group) => ({
     title: group.title,
     fields: group.fields.map(([label, pattern]) => ({ label, value: valueFor(text, pattern) })).filter((field) => field.value),
   })).filter((group) => group.fields.length);
   const termSection = text.split(/TERMS\s*(?:&|AND)\s*CONDITIONS\s*:?\s*/i)[1]?.split(/PAYMENT\s+TERMS/i)[0] ?? "";
   const terms = termSection.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^\d{1,2}\s+\S/.test(line)).map((line) => line.replace(/^\d{1,2}\s+/, "").trim());
-  const windows = extractWindows(text);
+  const windows = table ? table.rows.map((row) => ({
+    windowNo: row.windowNo, location: row.location, width: row.widthMm == null ? "" : String(row.widthMm),
+    height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : String(row.areaSqFt),
+    quantity: String(row.quantity), windowType: row.windowType, glass: row.glass,
+    lockType: row.lockType === "TOUCH LOCK" ? "Touch lock" : row.lockType,
+    profile: row.profile === "UPVC WHITE" ? "UPVC" : row.profile,
+    mesh: /ALLUMINIUM/i.test(row.mesh) ? "Aluminium" : row.mesh === "SS MESH" ? "" : row.mesh,
+    originalCells: row.originalCells, page: row.page, rowPosition: row.originalCells[0]?.rowPosition,
+    warnings: row.warnings, confidence: row.confidence,
+  })) : extractWindows(text);
+  const paymentTerms = [...text.matchAll(/(ADVANCE PAYMENT|BEFORE DISPATCH|ON INSTALLATION)\s+(?:₹\s*)?([\d,]+(?:\.\d+)?)/gi)]
+    .map((match) => ({ label: match[1].replace(/\b\w/g, (letter) => letter.toUpperCase()), value: match[2] }));
+  if (paymentTerms.length) sections.push({ title: "Payment terms", fields: paymentTerms });
   const hasContent = sections.length > 0 || windows.length > 0 || text.trim().length > 40;
   return {
     status: hasContent ? "extracted" : "no_text",
@@ -110,6 +124,19 @@ function buildInfo(text: string, method: ConfirmationInfo["method"]): Confirmati
     extractedAt: new Date().toISOString(),
     sections,
     windows,
+    ...(table ? {
+      columns: table.columns,
+      checksum: {
+        rowsFound: table.rows.length,
+        quantity: table.totals.quantity,
+        calculatedAreaSqFt: table.totals.areaSqFt,
+        documentAreaSqFt: table.totals.sourceAreaSqFt,
+        matches: table.totals.sourceQuantity == null && table.totals.sourceAreaSqFt == null
+          ? null
+          : (table.totals.sourceQuantity == null || table.totals.sourceQuantity === table.totals.quantity)
+            && (table.totals.sourceAreaSqFt == null || Math.abs(table.totals.areaSqFt - table.totals.sourceAreaSqFt) <= 0.005),
+      },
+    } : {}),
     terms,
     rawText: text.slice(0, 100_000).trim(),
     error: null,
@@ -138,8 +165,11 @@ export async function extractConfirmationInfo(bytes: Buffer, filename: string): 
           windowNo: row.windowNo, location: row.location, width: row.widthMm == null ? "" : String(row.widthMm),
           height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : String(row.areaSqFt),
           quantity: String(row.quantity), windowType: row.windowType, glass: row.glass, lockType: row.lockType,
-          profile: row.profile, mesh: row.mesh,
+          profile: row.profile, mesh: row.mesh, originalCells: row.originalCells,
+          page: null, rowPosition: row.sourceRow, warnings: row.warnings, confidence: row.confidence,
         })),
+        columns: selected.columns,
+        checksum: { rowsFound: selected.rows.length, quantity: selected.totals.quantity, calculatedAreaSqFt: selected.totals.areaSqFt, documentAreaSqFt: selected.totals.sourceAreaSqFt, matches: selected.warnings.length ? false : true },
         terms: [], rawText: "", error: null,
       };
     } catch (error) {
@@ -171,6 +201,22 @@ export async function extractConfirmationInfo(bytes: Buffer, filename: string): 
         text = pageTexts.join("\n");
       } else {
         text = (await execFile("tesseract", [input, "stdout", "-l", "eng"], { timeout: 45_000, maxBuffer: 4 * 1024 * 1024 })).stdout;
+      }
+    }
+    if (isPdf) {
+      try {
+        const table = await parseWindowListPdf(bytes, filename);
+        return buildInfo(text, method, table);
+      } catch (error) {
+        const info = buildInfo(text, method, {
+          columns: [], header: {}, rows: [],
+          totals: { areaSqFt: 0, quantity: 0, sourceAreaSqFt: null, sourceQuantity: null },
+          paymentSummary: {}, warnings: [], source: "pdf", confidence: 0, sheetName: filename,
+        });
+        info.status = "failed";
+        info.windows = [];
+        info.error = error instanceof Error ? error.message.slice(0, 500) : "The PDF window table could not be read.";
+        return info;
       }
     }
     return buildInfo(text, method);

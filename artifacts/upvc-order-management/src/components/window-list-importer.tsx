@@ -9,9 +9,11 @@ type ImportedRow = {
   heightMm: number | null; areaSqFt: number | null; quantity: number;
   windowType: string; glass: string; lockType: string; profile: string; mesh: string;
   finalMeasurementSqFt: number | null; warnings: string[];
+  originalCells?: Array<{ columnLabel: string; text: string; page: number | null; rowPosition: number }>;
+  page?: number | null; confidence?: number;
 };
 type ImportSheet = {
-  sheetName: string; header: Record<string, string>; rows: ImportedRow[];
+  sheetName: string; columns?: string[]; header: Record<string, string>; rows: ImportedRow[];
   totals: { areaSqFt: number; quantity: number; sourceAreaSqFt: number | null; sourceQuantity: number | null };
   paymentSummary: Record<string, string>;
   warnings: string[]; source: "excel" | "pdf"; confidence: number;
@@ -30,6 +32,7 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [displayMode, setDisplayMode] = useState<"document" | "software">("document");
   const preview = async (selectedFile: File, sheet?: string) => {
     setLoading(true); setError("");
     try {
@@ -131,11 +134,29 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
       {loading && <span className="text-xs text-muted-foreground">Reading workbook…</span>}
     </div>
     {sheets.length > 1 && <label className="mt-3 block max-w-sm text-xs font-semibold">Worksheet<select className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2" value={selectedSheet} onChange={(event) => { setSelectedSheet(event.target.value); if (file) void preview(file, event.target.value); }}><option value="">Choose sheet</option>{sheets.map((sheet) => <option key={sheet.sheetName}>{sheet.sheetName}</option>)}</select></label>}
-    {activeSheet && <><div className="mt-3 flex flex-wrap gap-3 text-xs"><span><strong>{rows.length}</strong> rows</span><span><strong>{totalQuantity}</strong> windows</span><span><strong>{totalAreaSqFt.toFixed(2)}</strong> sq ft</span><span>Source: <strong>{activeSheet.source.toUpperCase()}</strong></span><span className="max-w-64 truncate">{file?.name}</span></div>
+    {activeSheet && <><div className="mt-3 flex flex-wrap items-center gap-3 text-xs"><span><strong>{rows.length}</strong> rows</span><span><strong>{totalQuantity}</strong> windows</span><span><strong>{totalAreaSqFt.toFixed(2)}</strong> sq ft</span><span>Source: <strong>{activeSheet.source.toUpperCase()}</strong></span><span className="max-w-64 truncate">{file?.name}</span><div className="ml-auto flex gap-1"><Button size="sm" variant={displayMode === "document" ? "default" : "outline"} onClick={() => setDisplayMode("document")}>Document view</Button><Button size="sm" variant={displayMode === "software" ? "default" : "outline"} onClick={() => setDisplayMode("software")}>Software view</Button></div></div>
       {activeSheet.source === "pdf" && <p className="mt-2 rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">PDF import, please verify.</p>}
       {activeSheet.warnings.map((warning) => <p key={warning} className="mt-2 text-xs text-amber-800">{warning}</p>)}
       {Object.keys(activeSheet.paymentSummary).length > 0 && <section className="mt-3 rounded-lg border border-border bg-muted/20 p-3"><h4 className="text-xs font-bold">Payment block (source values; read-only)</h4><div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{Object.entries(activeSheet.paymentSummary).map(([label,value]) => <div key={label} className="rounded border border-border bg-card p-2 text-xs"><span className="block text-muted-foreground">{label}</span><strong>{value}</strong></div>)}</div></section>}
-      <div className="mt-3 max-h-80 overflow-auto rounded-lg border border-border"><table className="w-full min-w-[1450px] text-left text-xs"><thead className="sticky top-0 bg-muted"><tr>{["Window no.", "Location", "Width mm", "Height mm", "Qty", "Window type", "Glass", "Lock type", "Profile", "Mesh", "Sq ft", "Source row / warnings", ""].map((title) => <th key={title} className="border-b border-border px-2 py-2">{title}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.sourceRow}-${index}`} className={row.warnings.length ? "bg-amber-50/70" : "even:bg-muted/20"}>{(["windowNo","location","widthMm","heightMm","quantity","windowType","glass","lockType","profile","mesh"] as const).map((field) => <td key={field} className="p-1"><input type={field === "widthMm" || field === "heightMm" || field === "quantity" ? "number" : "text"} min={field === "quantity" ? 1 : undefined} aria-label={`${field} row ${row.sourceRow}`} className="w-28 rounded border border-input bg-background px-1.5 py-1" value={row[field] ?? ""} onChange={(e) => editCell(index, field, e.target.value)} /></td>)}<td className="px-2 py-1">{row.widthMm && row.heightMm ? (row.widthMm * row.heightMm * row.quantity / 92903.04).toFixed(2) : "—"}</td><td className="p-2"><span>{row.sourceRow}</span>{row.warnings.map((warning) => <p key={warning} className="mt-1 text-[10px] text-amber-800">{warning}</p>)}</td><td className="p-1"><Button size="sm" variant="ghost" onClick={() => deleteRow(index)} aria-label={`Delete row ${row.sourceRow}`}>Delete</Button></td></tr>)}</tbody></table></div>
+      <div className="mt-3 max-h-80 overflow-auto rounded-lg border border-border">
+        <table className="w-full min-w-[900px] text-left text-xs">
+          <thead className="sticky top-0 bg-muted"><tr>{(displayMode === "document" ? [...(activeSheet.columns ?? []), ...(activeSheet.source === "pdf" ? ["Page"] : []), "Check"] : ["Window no.", "Location", "Width mm", "Height mm", "Qty", "Window type", "Glass", "Lock type", "Profile", "Mesh", "Sq ft", "Source row / warnings", ""]).map((title, index) => <th key={`${title}-${index}`} className="border-b border-border px-2 py-2">{title}</th>)}</tr></thead>
+          <tbody>
+            {displayMode === "document"
+              ? rows.map((row, index) => <tr key={`${row.sourceRow}-${index}`} className={row.warnings.length ? "bg-amber-50/70" : "even:bg-muted/20"}>
+                  {(activeSheet.columns ?? []).map((label, cellIndex) => <td key={`${label}-${cellIndex}`} className="px-2 py-1">{row.originalCells?.[cellIndex]?.text ?? ""}</td>)}
+                  {activeSheet.source === "pdf" && <td className="px-2 py-1">{row.page ? `Page ${row.page}` : ""}</td>}
+                  <td className="px-2 py-1 text-amber-800">{row.warnings.join(" ")}</td>
+                </tr>)
+              : rows.map((row, index) => <tr key={`${row.sourceRow}-${index}`} className={row.warnings.length ? "bg-amber-50/70" : "even:bg-muted/20"}>
+                  {(["windowNo","location","widthMm","heightMm","quantity","windowType","glass","lockType","profile","mesh"] as const).map((field) => <td key={field} className="p-1"><input type={field === "widthMm" || field === "heightMm" || field === "quantity" ? "number" : "text"} min={field === "quantity" ? 1 : undefined} aria-label={`${field} row ${row.sourceRow}`} className="w-28 rounded border border-input bg-background px-1.5 py-1" value={row[field] ?? ""} onChange={(e) => editCell(index, field, e.target.value)} /></td>)}
+                  <td className="px-2 py-1">{row.widthMm && row.heightMm ? (row.widthMm * row.heightMm * row.quantity / 92903.04).toFixed(2) : ""}</td>
+                  <td className="p-2"><span>{row.sourceRow}</span>{row.warnings.map((warning) => <p key={warning} className="mt-1 text-[10px] text-amber-800">{warning}</p>)}</td>
+                  <td className="p-1"><Button size="sm" variant="ghost" onClick={() => deleteRow(index)} aria-label={`Delete row ${row.sourceRow}`}>Delete</Button></td>
+                </tr>)}
+          </tbody>
+        </table>
+      </div>
       <div className="mt-3 flex justify-between"><Button size="sm" variant="outline" onClick={addRow}>Add row</Button><Button size="sm" disabled={saving || loading || !rows.length} onClick={() => void confirmImport()}>{saving ? "Importing…" : `Confirm import ${rows.length} rows`}</Button></div></>}
     {error && <p className="mt-3 rounded-md bg-destructive/10 p-2 text-xs text-destructive">{error}</p>}
   </section>;
