@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  Archive,
   BookOpen,
   Calculator,
   Check,
@@ -186,7 +185,7 @@ function StatePanel({ kind, onRetry }: { kind: 'loading' | 'error' | 'empty'; on
   return <div className="grid min-h-56 place-items-center rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center" data-testid="state-quotation-error"><div><CircleAlert className="mx-auto text-destructive" size={22} /><h3 className="mt-3 font-display text-sm font-bold">Quotation desk is offline</h3><p className="mt-1 text-xs text-muted-foreground">The saved records could not be loaded.</p><Button size="sm" variant="outline" className="mt-4" onClick={onRetry} data-testid="button-retry-quotations"><RefreshCw size={13} /> Retry</Button></div></div>;
 }
 
-function ProfileDialog({ open, onOpenChange, editing, onDone }: { open: boolean; onOpenChange: (value: boolean) => void; editing: WindowProfile | null; onDone: () => void }) {
+function ProfileDialog({ open, onOpenChange, editing, readOnly = false, onDone }: { open: boolean; onOpenChange: (value: boolean) => void; editing: WindowProfile | null; readOnly?: boolean; onDone: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const create = useCreateWindowProfile();
@@ -213,6 +212,7 @@ function ProfileDialog({ open, onOpenChange, editing, onDone }: { open: boolean;
   }, [editing, form, open]);
 
   const save = (values: ProfileValues) => {
+    if (readOnly) return;
     const data: WindowProfileInput = values;
     const done = () => {
       void queryClient.invalidateQueries({ queryKey: getListWindowProfilesQueryKey() });
@@ -237,11 +237,12 @@ function ProfileDialog({ open, onOpenChange, editing, onDone }: { open: boolean;
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? 'Edit window profile' : 'Add window profile'}</DialogTitle>
-          <DialogDescription>Keep the report labels consistent. Change the profile values, drawing, and notes for this catalogue entry.</DialogDescription>
+          <DialogTitle>{readOnly ? 'View window profile' : editing ? 'Edit window profile' : 'Add window profile'}</DialogTitle>
+          <DialogDescription>{readOnly ? 'Saved profile details and reusable rate information.' : 'Keep the report labels consistent. Change the profile values, drawing, and notes for this catalogue entry.'}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(save)} className="space-y-4" data-testid="form-window-profile">
+            <fieldset disabled={readOnly} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-3">
               {field('code', 'Catalogue code', 'SIM-060-CAS')}
               {field('name', 'Profile name', 'OPANABLE AND EXZ')}
@@ -270,7 +271,7 @@ function ProfileDialog({ open, onOpenChange, editing, onDone }: { open: boolean;
               <FormField control={form.control} name="imageDataUrl" render={({ field: input }) => (
                 <FormItem>
                   <FormLabel>Window drawing image</FormLabel>
-                  <FormControl><WindowProfileImageInput value={input.value} onChange={input.onChange} disabled={busy} /></FormControl>
+                  <FormControl><WindowProfileImageInput value={input.value} onChange={input.onChange} disabled={busy || readOnly} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -298,9 +299,10 @@ function ProfileDialog({ open, onOpenChange, editing, onDone }: { open: boolean;
                 <FormMessage />
               </FormItem>
             )} />
+            </fieldset>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-cancel-profile">Cancel</Button>
-              <Button type="submit" disabled={busy} data-testid="button-save-profile">{busy ? 'Saving…' : editing ? 'Save profile' : 'Add profile'}</Button>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-cancel-profile">{readOnly ? 'Close' : 'Cancel'}</Button>
+              {!readOnly && <Button type="submit" disabled={busy} data-testid="button-save-profile">{busy ? 'Saving…' : editing ? 'Save profile' : 'Add profile'}</Button>}
             </DialogFooter>
           </form>
         </Form>
@@ -309,7 +311,7 @@ function ProfileDialog({ open, onOpenChange, editing, onDone }: { open: boolean;
   );
 }
 
-function ProfileCatalogue({ profiles, canEdit, loading, error, onRetry, onEdit, onAdd }: { profiles: WindowProfile[]; canEdit: boolean; loading: boolean; error: boolean; onRetry: () => void; onEdit: (profile: WindowProfile) => void; onAdd: () => void }) {
+function ProfileCatalogue({ profiles, canEdit, loading, error, onRetry, onView, onEdit, onAdd }: { profiles: WindowProfile[]; canEdit: boolean; loading: boolean; error: boolean; onRetry: () => void; onView: (profile: WindowProfile) => void; onEdit: (profile: WindowProfile) => void; onAdd: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const archive = useArchiveWindowProfile();
@@ -368,10 +370,11 @@ function ProfileCatalogue({ profiles, canEdit, loading, error, onRetry, onEdit, 
                         <p className="font-display text-sm font-bold text-foreground">{money(profile.ratePerSqFt)}</p>
                         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">per sq.ft.</p>
                       </div>
-                      {canEdit && <div className="flex gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
-                        <Button size="icon" variant="ghost" onClick={() => onEdit(profile)} aria-label={`Edit ${profile.code}`} data-testid={`button-edit-profile-${profile.id}`}><Pencil size={15} /></Button>
-                        <Button size="icon" variant="ghost" onClick={() => removeProfile(profile)} aria-label={`Remove ${profile.code}`} data-testid={`button-archive-profile-${profile.id}`}><Trash2 size={15} /></Button>
-                      </div>}
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button size="sm" variant="outline" onClick={() => onView(profile)} data-testid={`button-view-profile-${profile.id}`}><Eye size={13} /> View</Button>
+                        {canEdit && <Button size="sm" variant="outline" onClick={() => onEdit(profile)} data-testid={`button-edit-profile-${profile.id}`}><Pencil size={13} /> Edit</Button>}
+                        {canEdit && <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => removeProfile(profile)} data-testid={`button-delete-profile-${profile.id}`}><Trash2 size={13} /> Delete</Button>}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -476,7 +479,7 @@ function QuoteEditor({ quote, clients, profiles, canEdit, onSaved, onNew }: { qu
   const customerField = (name: 'customerName' | 'customerPhone' | 'customerAddress' | 'customerGstin', label: string, multiline = false) => <FormField control={form.control} name={name} render={({ field }) => <FormItem className={multiline ? 'sm:col-span-2' : ''}><FormLabel>{label}</FormLabel><FormControl>{multiline ? <Textarea {...field} rows={2} readOnly={Boolean(form.watch('clientId'))} data-testid={`input-quotation-${name}`} /> : <Input {...field} readOnly={Boolean(form.watch('clientId'))} data-testid={`input-quotation-${name}`} />}</FormControl><FormMessage /></FormItem>} />;
   const busy = create.isPending || update.isPending;
 
-  return <Card className="border-border/80" data-testid="card-quote-editor"><CardHeader className="border-b border-border/70 pb-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{quote ? quote.quoteNo : 'New quotation'}</p><CardTitle className="mt-1 font-display text-lg">{quote ? 'Edit quotation draft' : 'Prepare a new quotation'}</CardTitle><p className="mt-1 text-xs text-muted-foreground">Server-calculated totals are authoritative after save.</p></div>{canEdit && <Button variant="outline" size="sm" onClick={onNew} data-testid="button-new-quotation"><FilePlus2 size={15} /> New draft</Button>}</div></CardHeader><CardContent className="p-5"><Form {...form}><form onSubmit={form.handleSubmit(save)} data-testid="form-quotation"><fieldset disabled={!canEdit} className="space-y-6"><section><div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"><UserRound size={14} className="text-primary" /> Customer & project</div><div className="grid gap-4 sm:grid-cols-2"><ClientSelect form={form} clients={clients} />{customerField('customerName', 'Customer name')}{customerField('customerPhone', 'Phone')}{customerField('customerGstin', 'GSTIN')}{customerField('customerAddress', 'Address', true)}<FormField control={form.control} name="projectName" render={({ field }) => <FormItem className="sm:col-span-2"><FormLabel>Project name</FormLabel><FormControl><Input {...field} data-testid="input-quotation-project" /></FormControl></FormItem>} /><FormField control={form.control} name="quotationDate" render={({ field }) => <FormItem><FormLabel>Quotation date</FormLabel><FormControl><Input {...field} type="date" data-testid="input-quotation-date" /></FormControl></FormItem>} /></div></section>
+  return <Card className="border-border/80" data-testid="card-quote-editor"><CardHeader className="border-b border-border/70 pb-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{quote ? quote.quoteNo : 'New quotation'}</p><CardTitle className="mt-1 font-display text-lg">{quote ? canEdit ? 'Edit quotation draft' : 'View quotation' : 'Prepare a new quotation'}</CardTitle><p className="mt-1 text-xs text-muted-foreground">Server-calculated totals are authoritative after save.</p></div>{canEdit && <Button variant="outline" size="sm" onClick={onNew} data-testid="button-new-quotation"><FilePlus2 size={15} /> New draft</Button>}</div></CardHeader><CardContent className="p-5"><Form {...form}><form onSubmit={form.handleSubmit(save)} data-testid="form-quotation"><fieldset disabled={!canEdit} className="space-y-6"><section><div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"><UserRound size={14} className="text-primary" /> Customer & project</div><div className="grid gap-4 sm:grid-cols-2"><ClientSelect form={form} clients={clients} />{customerField('customerName', 'Customer name')}{customerField('customerPhone', 'Phone')}{customerField('customerGstin', 'GSTIN')}{customerField('customerAddress', 'Address', true)}<FormField control={form.control} name="projectName" render={({ field }) => <FormItem className="sm:col-span-2"><FormLabel>Project name</FormLabel><FormControl><Input {...field} data-testid="input-quotation-project" /></FormControl></FormItem>} /><FormField control={form.control} name="quotationDate" render={({ field }) => <FormItem><FormLabel>Quotation date</FormLabel><FormControl><Input {...field} type="date" data-testid="input-quotation-date" /></FormControl></FormItem>} /></div></section>
 <section><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"><LayoutGrid size={14} className="text-primary" /> Window schedule</div><span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-bold">{items.length} lines</span></div><div className="grid gap-3 rounded-xl border border-border/80 bg-muted/20 p-3 md:grid-cols-[1.2fr_.75fr_1fr_.7fr_.7fr_.55fr_.8fr_auto]"><Select value={draft.profileId} onValueChange={(value) => setDraftValue('profileId', value)}><SelectTrigger data-testid="select-line-profile"><SelectValue placeholder="Choose profile" /></SelectTrigger><SelectContent>{profiles.map((profile) => <SelectItem key={profile.id} value={profile.id}>{profile.code} · {profile.name}</SelectItem>)}</SelectContent></Select><Input value={draft.code} onChange={(event) => setDraftValue('code', event.target.value)} placeholder="Code" data-testid="input-line-code" /><Input value={draft.location} onChange={(event) => setDraftValue('location', event.target.value)} placeholder="Location" data-testid="input-line-location" /><Input type="number" value={draft.widthMm || ''} onChange={(event) => setDraftValue('widthMm', event.target.value)} placeholder="W mm" data-testid="input-line-width" /><Input type="number" value={draft.heightMm || ''} onChange={(event) => setDraftValue('heightMm', event.target.value)} placeholder="H mm" data-testid="input-line-height" /><Input type="number" min="1" value={draft.quantity} onChange={(event) => setDraftValue('quantity', event.target.value)} data-testid="input-line-quantity" /><Input type="number" value={draft.ratePerSqFt ?? ''} onChange={(event) => setDraftValue('ratePerSqFt', event.target.value)} placeholder="Rate override" data-testid="input-line-rate" /><Button type="button" size="icon" onClick={addLine} aria-label="Add window line" data-testid="button-add-window-line"><Plus size={16} /></Button></div>{items.length > 0 && <div className="mt-3 overflow-x-auto rounded-xl border border-border/80"><table className="w-full min-w-[650px] text-left text-xs"><thead className="bg-secondary/60 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Profile</th><th className="p-3">Location</th><th className="p-3">Dimensions</th><th className="p-3">Qty</th><th className="p-3">Rate</th><th /></tr></thead><tbody className="divide-y divide-border/70">{items.map((line, index) => <tr key={`${line.profileId}-${index}`} data-testid={`row-quotation-line-${index}`}><td className="p-3 font-semibold">{line.profileName || profiles.find((profile) => profile.id === line.profileId)?.name || profiles.find((profile) => profile.id === line.profileId)?.code || line.code}</td><td className="p-3">{line.location || '—'}</td><td className="p-3 font-mono">{line.widthMm} × {line.heightMm} mm</td><td className="p-3">{line.quantity}</td><td className="p-3">{line.ratePerSqFt === undefined ? 'Profile default' : money(line.ratePerSqFt)}</td><td className="p-3 text-right"><Button type="button" size="icon" variant="ghost" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} data-testid={`button-remove-line-${index}`}><Trash2 size={14} /></Button></td></tr>)}</tbody></table></div>}</section>
 <section className="rounded-xl border border-primary/20 bg-primary/5 p-4" data-testid="card-quotation-estimate"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-primary"><Calculator size={14} /> Live calculation estimate</div><p className="mt-1 text-[11px] text-muted-foreground">Preview only; API totals are authoritative after save.</p></div><span className="rounded-full border border-primary/20 bg-card px-2 py-1 text-[10px] font-bold text-primary">Estimate</span></div><div className="mt-3 overflow-x-auto rounded-lg border border-primary/10 bg-card"><table className="w-full min-w-[760px] text-left text-[11px]"><thead className="bg-secondary/50 text-[9px] uppercase tracking-wide text-muted-foreground"><tr><th className="p-2.5">Line</th><th className="p-2.5">Area / window</th><th className="p-2.5">Rate / sq.ft.</th><th className="p-2.5">Unit price</th><th className="p-2.5">Qty</th><th className="p-2.5">Line value</th><th className="p-2.5">Weight / window</th></tr></thead><tbody className="divide-y divide-border/60">{estimate.lines.length ? estimate.lines.map((line, index) => <tr key={`${line.profileId}-${index}`} data-testid={`row-estimate-line-${index}`}><td className="p-2.5 font-semibold">{line.profileName || line.profile?.name || line.profile?.code || line.code || '—'}</td><td className="p-2.5 font-mono">{line.sqFtPerWindow.toFixed(3)} sq.ft.</td><td className="p-2.5">{money(line.ratePerSqFt)}</td><td className="p-2.5">{money(line.unitPrice)}</td><td className="p-2.5">{line.quantity}</td><td className="p-2.5 font-semibold">{money(line.value)}</td><td className="p-2.5">{line.weightKgPerWindow.toFixed(3)} kg</td></tr>) : <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Add a window line to see the estimate.</td></tr>}</tbody></table></div><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5"><div className="rounded-lg bg-card px-3 py-2"><span className="block text-[9px] uppercase tracking-wide text-muted-foreground">Components</span><strong className="font-display text-sm" data-testid="estimate-component-count">{estimate.componentCount}</strong></div><div className="rounded-lg bg-card px-3 py-2"><span className="block text-[9px] uppercase tracking-wide text-muted-foreground">Area</span><strong className="font-display text-sm" data-testid="estimate-total-area">{estimate.totalAreaSqFt.toFixed(2)} sq.ft.</strong></div><div className="rounded-lg bg-card px-3 py-2"><span className="block text-[9px] uppercase tracking-wide text-muted-foreground">Subtotal</span><strong className="font-display text-sm" data-testid="estimate-subtotal">{money(estimate.subtotal)}</strong></div><div className="rounded-lg bg-card px-3 py-2"><span className="block text-[9px] uppercase tracking-wide text-muted-foreground">GST ({estimate.gstPercent}%)</span><strong className="font-display text-sm" data-testid="estimate-gst">{money(estimate.gstAmount)}</strong></div><div className="rounded-lg bg-primary px-3 py-2 text-primary-foreground"><span className="block text-[9px] uppercase tracking-wide opacity-75">Grand total</span><strong className="font-display text-sm" data-testid="estimate-grand-total">{money(estimate.grandTotal)}</strong></div></div></section>
 <section><div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"><Calculator size={14} className="text-primary" /> Charges & notes</div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><FormField control={form.control} name="transportationCost" render={({ field }) => <FormItem><FormLabel>Transportation</FormLabel><FormControl><Input {...field} type="number" min="0" data-testid="input-quotation-transportation" /></FormControl></FormItem>} /><FormField control={form.control} name="loadingUnloadingCost" render={({ field }) => <FormItem><FormLabel>Loading / unloading</FormLabel><FormControl><Input {...field} type="number" min="0" data-testid="input-quotation-loading" /></FormControl></FormItem>} /><FormField control={form.control} name="additionalChargeRate" render={({ field }) => <FormItem><FormLabel>Additional rate</FormLabel><FormControl><Input {...field} type="number" min="0" data-testid="input-quotation-additional-rate" /></FormControl></FormItem>} /><FormField control={form.control} name="additionalChargeAreaSqFt" render={({ field }) => <FormItem><FormLabel>Additional area sq.ft.</FormLabel><FormControl><Input {...field} type="number" min="0" data-testid="input-quotation-additional-area" /></FormControl></FormItem>} /><FormField control={form.control} name="additionalChargeDescription" render={({ field }) => <FormItem><FormLabel>Additional charge</FormLabel><FormControl><Input {...field} data-testid="input-quotation-additional-description" /></FormControl></FormItem>} /><FormField control={form.control} name="gstPercent" render={({ field }) => <FormItem><FormLabel>GST %</FormLabel><FormControl><Input {...field} type="number" min="0" max="100" data-testid="input-quotation-gst" /></FormControl></FormItem>} /><FormField control={form.control} name="notes" render={({ field }) => <FormItem className="sm:col-span-2"><FormLabel>Internal / customer note</FormLabel><FormControl><Textarea {...field} rows={2} data-testid="input-quotation-notes" /></FormControl></FormItem>} /></div></section><div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4"><p className="text-[11px] text-muted-foreground">{canEdit ? 'Save to let the API calculate authoritative values and totals.' : 'View-only access: inspect saved data and print.'}</p>{canEdit && <Button type="submit" disabled={busy} data-testid="button-save-quotation">{busy ? 'Saving…' : quote ? 'Save quotation' : 'Save draft quotation'}</Button>}</div></fieldset></form></Form></CardContent></Card>;
@@ -929,6 +932,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
   const [location] = useLocation();
   const canEdit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('quote'));
+  const [selectedQuoteMode, setSelectedQuoteMode] = useState<'view' | 'edit'>(() => new URLSearchParams(window.location.search).get('edit') === '1' ? 'edit' : 'view');
   const [activeSection, setActiveSection] = useState<'new' | 'profiles' | 'drafts' | 'rates'>(() => {
     const initialSection = new URLSearchParams(window.location.search).get('section');
     if (new URLSearchParams(window.location.search).get('quote')) return 'drafts';
@@ -939,6 +943,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
     const quoteId = params.get('quote');
     if (quoteId) {
       setSelectedQuoteId(quoteId);
+      setSelectedQuoteMode(params.get('edit') === '1' ? 'edit' : 'view');
       setActiveSection('drafts');
       return;
     }
@@ -950,6 +955,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
   const [search, setSearch] = useState('');
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<WindowProfile | null>(null);
+  const [profileDialogReadOnly, setProfileDialogReadOnly] = useState(false);
   const quotationQuery = useListQuotations({ query: { queryKey: getListQuotationsQueryKey() } });
   const profilesQuery = useListWindowProfiles({ query: { queryKey: getListWindowProfilesQueryKey() } });
   const clientsQuery = useListClients({ includeInactive: false }, { query: { queryKey: getListClientsQueryKey({ includeInactive: false }) } });
@@ -996,25 +1002,32 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
     });
   };
   const archiveQuote = (quote: Quotation) => {
-    if (!window.confirm(`Archive ${quote.quoteNo}? It will no longer appear in the draft register.`)) return;
+    if (quote.status !== 'draft') return;
+    if (!window.confirm(`Delete ${quote.quoteNo}? It will be removed from the active quotation register.`)) return;
     archive.mutate({ quotationId: quote.id }, {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getListQuotationsQueryKey() });
-        if (selectedQuoteId === quote.id) setSelectedQuoteId(null);
-        toast({ title: 'Quotation archived', description: quote.quoteNo });
+        if (selectedQuoteId === quote.id) {
+          setSelectedQuoteId(null);
+          setSelectedQuoteMode('view');
+        }
+        toast({ title: 'Quotation deleted', description: `${quote.quoteNo} was removed from the active register.` });
       },
+      onError: () => toast({ title: 'Could not delete quotation', description: 'The quotation remains in the register. Refresh and try again.', variant: 'destructive' }),
     });
   };
   const openNew = () => {
     setSelectedQuoteId(null);
     setActiveSection('new');
   };
-  const openQuote = (quote: Quotation) => {
+  const openQuote = (quote: Quotation, mode: 'view' | 'edit' = 'view') => {
     setSelectedQuoteId(quote.id);
+    setSelectedQuoteMode(mode);
     setActiveSection('drafts');
   };
   const onQuotationSaved = (saved: Quotation) => {
     setSelectedQuoteId(saved.id);
+    setSelectedQuoteMode('view');
     setActiveSection('drafts');
   };
 
@@ -1062,8 +1075,9 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
               loading={profilesQuery.isLoading}
               error={Boolean(profilesQuery.isError)}
               onRetry={() => void profilesQuery.refetch()}
-              onAdd={() => { setEditingProfile(null); setProfileDialogOpen(true); }}
-              onEdit={(profile) => { setEditingProfile(profile); setProfileDialogOpen(true); }}
+              onView={(profile) => { setEditingProfile(profile); setProfileDialogReadOnly(true); setProfileDialogOpen(true); }}
+              onAdd={() => { setEditingProfile(null); setProfileDialogReadOnly(false); setProfileDialogOpen(true); }}
+              onEdit={(profile) => { setEditingProfile(profile); setProfileDialogReadOnly(false); setProfileDialogOpen(true); }}
             />
           </TabsContent>
 
@@ -1083,16 +1097,23 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
                       : !visibleQuotes.length ? <div className="p-6"><StatePanel kind="empty" /></div>
                         : <div className="divide-y divide-border/70">
                           {visibleQuotes.map((quote) => (
-                            <button key={quote.id} type="button" onClick={() => openQuote(quote)} className={`group w-full p-4 text-left transition-colors hover:bg-secondary/35 ${selectedQuoteId === quote.id ? 'bg-secondary/50' : ''}`} data-testid={`button-open-quotation-${quote.id}`}>
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                   <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[10px] font-bold text-primary">{quote.quoteNo}</span>{quote.sampleOnly && <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Sample</span>}<span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent-foreground">{quote.status.replace('_', ' ')}</span>{quote.requiresRateApproval && <span className="rounded-full border border-destructive/20 bg-destructive/5 px-2 py-0.5 text-[9px] font-bold text-destructive">Rate override</span>}</div>
-                                  <p className="mt-2 truncate text-sm font-semibold">{quote.customerName || 'Unnamed customer'}</p>
-                                  <p className="mt-1 truncate text-[11px] text-muted-foreground">{quote.projectName || 'No project name'} · {dateLabel(quote.quotationDate)}</p>
+                            <article key={quote.id} className={`p-4 transition-colors ${selectedQuoteId === quote.id ? 'bg-secondary/50' : 'hover:bg-secondary/25'}`} data-testid={`row-quotation-${quote.id}`}>
+                              <button type="button" onClick={() => openQuote(quote, 'view')} className="w-full text-left" data-testid={`button-open-quotation-${quote.id}`}>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[10px] font-bold text-primary">{quote.quoteNo}</span>{quote.sampleOnly && <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Sample</span>}<span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent-foreground">{quote.status.replace('_', ' ')}</span>{quote.requiresRateApproval && <span className="rounded-full border border-destructive/20 bg-destructive/5 px-2 py-0.5 text-[9px] font-bold text-destructive">Rate override</span>}</div>
+                                    <p className="mt-2 truncate text-sm font-semibold">{quote.customerName || 'Unnamed customer'}</p>
+                                    <p className="mt-1 truncate text-[11px] text-muted-foreground">{quote.projectName || 'No project name'} · {dateLabel(quote.quotationDate)}</p>
+                                  </div>
+                                  <span className="text-right font-display text-sm font-bold">{money(quote.totals.grandTotal)}<span className="mt-1 block font-sans text-[10px] font-normal text-muted-foreground">{quote.totals.componentCount} windows</span></span>
                                 </div>
-                                <span className="text-right font-display text-sm font-bold">{money(quote.totals.grandTotal)}<span className="mt-1 block font-sans text-[10px] font-normal text-muted-foreground">{quote.totals.componentCount} windows</span></span>
+                              </button>
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                <Button type="button" size="sm" variant="outline" onClick={() => openQuote(quote, 'view')} data-testid={`button-view-quotation-${quote.id}`}><Eye size={13} /> View</Button>
+                                {canEdit && ['draft', 'rejected'].includes(quote.status) && <Button type="button" size="sm" variant="outline" onClick={() => openQuote(quote, 'edit')} data-testid={`button-edit-quotation-${quote.id}`}><Pencil size={13} /> Edit</Button>}
+                                {canEdit && quote.status === 'draft' && <Button type="button" size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => archiveQuote(quote)} data-testid={`button-delete-quotation-${quote.id}`}><Trash2 size={13} /> Delete</Button>}
                               </div>
-                            </button>
+                            </article>
                           ))}
                         </div>}
                 </CardContent>
@@ -1100,7 +1121,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
 
               <div className="min-w-0 space-y-6">
                 {selectedQuote
-                  ? <QuoteEditor quote={selectedQuote} clients={clients} profiles={profiles} canEdit={canEdit} onNew={openNew} onSaved={onQuotationSaved} />
+                  ? <QuoteEditor quote={selectedQuote} clients={clients} profiles={profiles} canEdit={canEdit && selectedQuoteMode === 'edit' && ['draft', 'rejected'].includes(selectedQuote.status)} onNew={openNew} onSaved={onQuotationSaved} />
                   : selectedQuoteId && selectedQuery.isLoading
                     ? <div className="rounded-xl border border-border/80 bg-card p-5"><StatePanel kind="loading" /></div>
                     : selectedQuoteId && selectedQuery.isError
@@ -1116,9 +1137,10 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
                 {selectedQuote && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 shadow-sm">
                   <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Saved document</p><p className="mt-1 text-xs text-foreground">{selectedQuote.quoteNo} · {selectedQuote.totals.componentCount} components · {money(selectedQuote.totals.grandTotal)}</p></div>
                   <div className="flex flex-wrap gap-2">
+                    {selectedQuoteMode !== 'edit' && canEdit && ['draft', 'rejected'].includes(selectedQuote.status) && <Button size="sm" variant="outline" onClick={() => setSelectedQuoteMode('edit')} data-testid="button-edit-selected-quotation"><Pencil size={13} /> Edit</Button>}
+                    {selectedQuoteMode === 'edit' && selectedQuote.status === 'draft' && canEdit && <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => archiveQuote(selectedQuote)} disabled={archive.isPending} data-testid="button-delete-selected-quotation"><Trash2 size={13} /> Delete</Button>}
                     {(selectedQuote.status === 'draft' || selectedQuote.status === 'rejected') && canEdit && <Button size="sm" onClick={sendForApproval} disabled={submitApproval.isPending} data-testid="button-submit-quotation-approval">{submitApproval.isPending ? 'Sending…' : selectedQuote.status === 'rejected' ? 'Resubmit for approval' : 'Send for approval'}</Button>}
                     <Button variant="outline" size="sm" onClick={print} disabled={selectedQuery.isLoading || (selectedQuote.requiresRateApproval && selectedQuote.status !== 'approved')} title={selectedQuote.requiresRateApproval && selectedQuote.status !== 'approved' ? 'Approval is required before printing' : undefined} data-testid="button-print-quotation"><Printer size={14} /> Print / PDF</Button>
-                    {canEdit && <Button variant="ghost" size="sm" onClick={() => archiveQuote(selectedQuote)} data-testid="button-archive-quotation"><Archive size={14} /> Archive</Button>}
                   </div>
                 </div>}
                 {selectedQuote?.approvalHistory.length ? <section className="rounded-xl border border-border/80 bg-card p-4 shadow-sm" aria-label="Quotation approval history">
@@ -1139,7 +1161,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
           </TabsContent>
         </Tabs>
 
-        <ProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} editing={editingProfile} onDone={() => setProfileDialogOpen(false)} />
+        <ProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} editing={editingProfile} readOnly={profileDialogReadOnly} onDone={() => setProfileDialogOpen(false)} />
         {selectedQuote && <QuotationPrintDocument quote={selectedQuote} />}
       </div>
     </AppShell>
