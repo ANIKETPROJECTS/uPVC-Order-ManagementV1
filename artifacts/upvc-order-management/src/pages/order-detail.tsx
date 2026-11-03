@@ -1010,12 +1010,18 @@ function WindowsPanel({ orderId, user, allowMultiple = false }: { orderId: strin
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const query = useListOrderWindows(orderId, { query: { queryKey: getListOrderWindowsQueryKey(orderId) } });
+  const documentsQuery = useListOrderDocuments(orderId, { query: { queryKey: getListOrderDocumentsQueryKey(orderId) } });
   const orderQuery = useGetOrder(orderId, { query: { queryKey: getGetOrderQueryKey(orderId) } });
   const archive = useArchiveOrderWindow();
   const canMeasure = hasPermission(user, 'measurements');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingWindow, setEditingWindow] = useState<OrderWindow | null>(null);
   const windows = query.data || [];
+  const latestConfirmation = (documentsQuery.data ?? [])
+    .filter((item) => item.category === 'confirmation' && item.confirmationInfo)
+    .sort((a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt))[0];
+  const confirmationDetails = latestConfirmation?.confirmationInfo?.sections
+    .filter((section) => section.title === 'Workbook confirmation details') ?? [];
   const distinctMeshTypes = [...new Set(windows.map((item) => item.meshType).filter((value): value is string => Boolean(value)))];
   const universalMeshType = orderQuery.data?.meshType ?? (distinctMeshTypes.length === 1 ? distinctMeshTypes[0] : '');
   const readyCount = windows.filter((item) => item.frameStatus === OrderWindowReadiness.ready && item.shutterStatus === OrderWindowReadiness.ready && item.glassStatus === OrderGlassStatus.received).length;
@@ -1025,10 +1031,84 @@ function WindowsPanel({ orderId, user, allowMultiple = false }: { orderId: strin
     archive.mutate({ id: orderId, windowId: window.id }, { onSuccess: () => { toast({ title: 'Window archived' }); void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Window could not be archived', variant: 'destructive' as const }) });
   };
   return <Card className="border-border/80" data-testid="card-order-windows"><CardHeader className="flex-row items-start justify-between gap-3 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Manufacturing register</p><CardTitle className="mt-1 text-base">Windows <span className="font-mono text-xs font-normal text-muted-foreground">{windows.length} · {readyCount} fully ready</span></CardTitle><p className="mt-1 text-xs text-muted-foreground">Measurements, frame, shutter, and glass state per opening.</p></div>{canMeasure && <Button size="sm" onClick={openAdd} data-testid="button-add-window"><Plus size={14} /> Add window</Button>}</CardHeader><CardContent>
+      {documentsQuery.isLoading ? <p className="mb-4 text-xs text-muted-foreground">Loading confirmation workbook details…</p> : confirmationDetails.map((section) => <section key={section.title} className="mb-4 overflow-hidden rounded-xl border border-border bg-card" data-testid="section-workbook-confirmation-details-windows"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">{section.title}</h3><table className="w-full text-left text-xs"><tbody>{section.fields.map((field) => <tr key={field.label} className="border-b border-border/60 last:border-0"><th className="w-2/5 px-3 py-2 font-medium text-muted-foreground">{field.label}</th><td className="px-3 py-2 font-semibold">{field.value}</td></tr>)}</tbody></table></section>)}
+      {!query.isLoading && !query.isError && latestConfirmation?.confirmationInfo?.windows.length ? <ConfirmationScheduleImport orderId={orderId} documentRecord={latestConfirmation} windows={windows} meshType={universalMeshType} canMeasure={canMeasure} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /> : null}
     {canMeasure && <WindowListImporter orderId={orderId} meshType={universalMeshType} user={user} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) }); }} />}
      {!query.isLoading && !query.isError && windows.length > 0 && <OrderQrStickerControls orderId={orderId} order={orderQuery.data} windows={windows} user={user} />}
      {query.isLoading ? <div className="space-y-3" data-testid="state-windows-loading">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/55" />)}</div> : query.isError ? <InlineError onRetry={() => void query.refetch()} label="Windows could not be loaded." testId="state-windows-error" /> : windows.length === 0 ? <ZeroState icon={Wrench} title="No window records yet" description={canMeasure ? 'Add the first opening to begin the manufacturing register.' : 'No window records have been persisted for this order.'} testId="state-windows-empty" /> : <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-xs"><thead><tr className="border-b border-border/70 text-[10px] uppercase tracking-[0.13em] text-muted-foreground"><th className="px-3 py-3">Window</th><th className="px-3 py-3">Dimensions</th><th className="px-3 py-3">Area</th><th className="px-3 py-3">Frame</th><th className="px-3 py-3">Shutter</th><th className="px-3 py-3">Glass</th><th className="px-3 py-3 text-right">Actions</th></tr></thead><tbody>{windows.map((item) => <tr key={item.id} className="group border-b border-border/50 last:border-0" data-testid={`row-window-${item.id}`}><td className="px-3 py-3"><p className="font-semibold" data-testid={`text-window-no-${item.id}`}>{item.windowNo}</p><p className="mt-1 text-[11px] text-muted-foreground">{item.windowType || 'Type pending'}</p>{item.pendingReason && <p className="mt-1 max-w-[180px] truncate text-[10px] text-amber-700" title={item.pendingReason}>{item.pendingReason}</p>}</td><td className="px-3 py-3 font-mono text-[11px]">{item.widthMm === null || item.heightMm === null ? 'Measurements pending' : `${item.widthMm} × ${item.heightMm} mm`}</td><td className="px-3 py-3 font-mono">{item.sqFt === null ? '—' : `${item.sqFt.toFixed(2)} sq ft`}</td><td className="px-3 py-3"><ReadinessPill value={item.frameStatus} /><PieceStatusList pieces={item.pieces.filter((piece) => piece.kind === 'frame')} /></td><td className="px-3 py-3"><ReadinessPill value={item.shutterStatus} /><PieceStatusList pieces={item.pieces.filter((piece) => piece.kind !== 'frame')} /></td><td className="px-3 py-3"><GlassPill value={item.glassStatus} /></td><td className="px-3 py-3"><div className="flex justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"><Button variant="ghost" size="icon" disabled={!canMeasure && !hasPermission(user, 'window-readiness') && !hasPermission(user, 'glass-procurement')} onClick={() => { setEditingWindow(item); setDialogOpen(true); }} data-testid={`button-edit-window-${item.id}`}><Pencil size={14} /></Button>{canMeasure && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={archive.isPending} onClick={() => archiveWindow(item)} data-testid={`button-archive-window-${item.id}`}><Archive size={14} /></Button>}</div></td></tr>)}</tbody></table></div>}
    </CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} allowMultiple={allowMultiple} universalMeshType={universalMeshType} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>;
+}
+
+function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType, canMeasure, onComplete }: {
+  orderId: string;
+  documentRecord: OrderDocument;
+  windows: OrderWindow[];
+  meshType: string;
+  canMeasure: boolean;
+  onComplete: () => void;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const extractedRows = documentRecord.confirmationInfo?.windows ?? [];
+  const existingNumbers = new Set(windows.map((item) => item.windowNo.trim().toLocaleLowerCase()));
+  const seenNumbers = new Set<string>();
+  const rowsToAdd = extractedRows.filter((row) => {
+    const number = row.windowNo.trim().toLocaleLowerCase();
+    if (!number || existingNumbers.has(number) || seenNumbers.has(number)) return false;
+    seenNumbers.add(number);
+    const width = Number(row.width);
+    const height = Number(row.height);
+    const quantity = Number(row.quantity);
+    return Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
+      && Number.isInteger(quantity) && quantity > 0;
+  });
+  const alreadyPresent = extractedRows.filter((row) => existingNumbers.has(row.windowNo.trim().toLocaleLowerCase())).length;
+  const skipped = extractedRows.length - rowsToAdd.length - alreadyPresent;
+  const addToWindows = async () => {
+    if (!canMeasure || saving || rowsToAdd.length === 0) return;
+    const summary = `Add ${rowsToAdd.length} extracted window${rowsToAdd.length === 1 ? '' : 's'} from ${documentRecord.filename} to this order's Windows register?${alreadyPresent ? ` ${alreadyPresent} already-listed row${alreadyPresent === 1 ? ' will' : 's will'} be skipped.` : ''}${skipped ? ` ${skipped} incomplete row${skipped === 1 ? ' will' : 's will'} be skipped.` : ''}`;
+    if (!window.confirm(summary)) return;
+    setSaving(true);
+    try {
+      const payloadRows = rowsToAdd.map((row) => ({
+        windowNo: row.windowNo.trim(),
+        widthMm: Number(row.width),
+        heightMm: Number(row.height),
+        windowType: row.windowType.trim() || 'Confirmation schedule',
+        location: row.location.trim() || null,
+        glassType: row.glass.trim() || null,
+        meshType: meshType || null,
+        frameCount: Number(row.quantity),
+        lotId: null,
+        frameStatus: OrderWindowReadiness.pending,
+        shutterStatus: OrderWindowReadiness.pending,
+        glassStatus: OrderGlassStatus.pending,
+        pendingReason: null,
+        lockType: row.lockType,
+        profile: row.profile,
+        mesh: row.mesh,
+      }));
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const response = await fetch(`${base}/api/orders/${encodeURIComponent(orderId)}/windows/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: documentRecord.filename, source: 'confirmation', rows: payloadRows }),
+      });
+      const result = await response.json() as { created?: number; error?: string };
+      if (!response.ok) throw new Error(result.error || 'The extracted schedule could not be added to Windows.');
+      onComplete();
+      toast({ title: 'Confirmation windows added', description: `${result.created ?? rowsToAdd.length} windows added. ${alreadyPresent} already listed${skipped ? ` · ${skipped} incomplete rows skipped` : ''}.` });
+    } catch (error) {
+      toast({ title: 'Windows could not be added', description: error instanceof Error ? error.message : 'The extracted schedule could not be added.', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+  if (!extractedRows.length) return null;
+  return <section className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3" data-testid="confirmation-schedule-import">
+    <div><h3 className="text-xs font-bold">Extracted window schedule</h3><p className="mt-1 text-xs text-muted-foreground">{rowsToAdd.length} ready to add · {alreadyPresent} already listed{skipped ? ` · ${skipped} incomplete` : ''}.</p></div>
+    {canMeasure && <Button type="button" size="sm" variant="outline" onClick={() => void addToWindows()} disabled={saving || rowsToAdd.length === 0} data-testid="button-add-confirmation-windows">{saving ? 'Adding windows…' : rowsToAdd.length ? 'Add extracted windows' : 'No new windows to add'}</Button>}
+  </section>;
 }
 
 function PieceStatusList({ pieces }: { pieces: OrderWindow['pieces'] }) {
