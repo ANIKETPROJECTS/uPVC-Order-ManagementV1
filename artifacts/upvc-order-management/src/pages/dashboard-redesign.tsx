@@ -755,7 +755,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
       <div className="dashboard-page -mx-5 -my-6 min-h-[calc(100dvh-76px)] px-5 py-6 md:-mx-8 md:-my-8 md:px-8 md:py-8">
         <div className="dashboard-layout mx-auto max-w-[1600px] pb-8">
           <DashboardWidgetBoundary name="Dashboard overview" onRetry={refresh}>
-            <header className="dashboard-hero relative z-20 col-span-12 rounded-[18px] px-4 py-3 shadow-md md:px-6">
+            <header className="dashboard-hero relative z-0 col-span-12 rounded-[18px] px-4 py-3 shadow-md md:px-6">
               <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
                 <div className="absolute -right-12 -top-20 size-72 rounded-full border border-white/10" />
                 <div className="absolute right-16 top-10 size-28 rounded-full border border-white/10" />
