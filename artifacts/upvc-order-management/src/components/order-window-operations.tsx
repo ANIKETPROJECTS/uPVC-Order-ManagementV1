@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { QRCodeCanvas } from 'qrcode.react';
+import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
 import { Check, ChevronDown, ChevronRight, Printer, Settings2, ShieldAlert, X } from 'lucide-react';
 import {
   getGetOrderQrPrintSummaryQueryKey,
@@ -141,8 +141,11 @@ function stickerPrintCss(
 ) {
   const pageWidth = settings.orientation === 'landscape' ? Math.max(settings.widthMm, settings.heightMm) : Math.min(settings.widthMm, settings.heightMm);
   const pageHeight = settings.orientation === 'landscape' ? Math.min(settings.widthMm, settings.heightMm) : Math.max(settings.widthMm, settings.heightMm);
+  const gutterMm = 2;
+  const columns = Math.max(1, Math.floor((190 + gutterMm) / (pageWidth + gutterMm)));
+  const rows = Math.max(1, Math.floor((277 + gutterMm) / (pageHeight + gutterMm)));
   return `
-    @page { size: ${pageWidth}mm ${pageHeight}mm; margin: 0; }
+    @page { size: A4 portrait; margin: 0; }
     @media print {
       html, body {
         width: auto !important;
@@ -156,7 +159,7 @@ function stickerPrintCss(
       body.printing-stickers > :not(#${rootId}) { display: none !important; }
       body.printing-stickers > #${rootId} {
         display: block !important;
-        width: auto !important;
+        width: 210mm !important;
         height: auto !important;
         min-height: 0 !important;
         margin: 0 !important;
@@ -167,6 +170,28 @@ function stickerPrintCss(
       body.printing-stickers > #${rootId},
       body.printing-stickers > #${rootId} * {
         visibility: visible !important;
+      }
+      body.printing-stickers #${rootId} .qr-sticker-sheet {
+        display: grid !important;
+        width: 210mm !important;
+        height: 297mm !important;
+        box-sizing: border-box !important;
+        grid-template-columns: repeat(${columns}, ${pageWidth}mm);
+        grid-template-rows: repeat(${rows}, ${pageHeight}mm);
+        grid-auto-flow: row;
+        align-content: start;
+        justify-content: center;
+        gap: ${gutterMm}mm;
+        margin: 0 !important;
+        padding: 10mm !important;
+        page-break-after: always;
+        break-after: page;
+        overflow: hidden !important;
+        background: #fff !important;
+      }
+      body.printing-stickers #${rootId} .qr-sticker-sheet:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
       }
       body.printing-stickers #${rootId} .qr-sticker-page {
         display: flex !important;
@@ -182,15 +207,11 @@ function stickerPrintCss(
         overflow: hidden !important;
         margin: 0 !important;
         padding: ${settings.marginMm}mm !important;
+        border: 0.2mm dashed #9ca3af !important;
         background: #fff !important;
         color: #000 !important;
-        page-break-after: always;
-        break-after: page;
+        break-inside: avoid;
         font-family: Arial, sans-serif;
-      }
-      body.printing-stickers #${rootId} .qr-sticker-page:last-child {
-        page-break-after: auto !important;
-        break-after: auto !important;
       }
       body.printing-stickers #${rootId} .qr-sticker-qr {
         display: flex;
@@ -199,11 +220,11 @@ function stickerPrintCss(
         justify-content: center;
         margin: 0 auto;
       }
-      body.printing-stickers #${rootId} .qr-sticker-qr canvas {
+      body.printing-stickers #${rootId} .qr-sticker-qr svg {
         display: block;
         width: ${settings.qrSizeMm}mm !important;
         height: ${settings.qrSizeMm}mm !important;
-        image-rendering: pixelated;
+        shape-rendering: crispEdges;
       }
       body.printing-stickers #${rootId} .qr-sticker-id {
         width: 100%;
@@ -239,20 +260,31 @@ function StickerPrintDocument({
   settings: QrStickerSettingsResponse | QrStickerSettingsInput;
   rootId: string;
 }) {
+  const labelWidth = settings.orientation === 'landscape' ? Math.max(settings.widthMm, settings.heightMm) : Math.min(settings.widthMm, settings.heightMm);
+  const labelHeight = settings.orientation === 'landscape' ? Math.min(settings.widthMm, settings.heightMm) : Math.max(settings.widthMm, settings.heightMm);
+  const columns = Math.max(1, Math.floor((190 + 2) / (labelWidth + 2)));
+  const rows = Math.max(1, Math.floor((277 + 2) / (labelHeight + 2)));
+  const labelsPerSheet = columns * rows;
+  const sheets: QrPrintJobPiece[][] = [];
+  for (let index = 0; index < pieces.length; index += labelsPerSheet) {
+    sheets.push(pieces.slice(index, index + labelsPerSheet));
+  }
   return createPortal(<div
     id={rootId}
     className="qr-sticker-print-root"
     aria-hidden="true"
     style={{ display: 'none' }}
   >
-    {pieces.map((piece, index) => {
-      const scale = Math.max(0.62, Math.min(1, 22 / Math.max(22, piece.displayId.length)));
-      return <article className="qr-sticker-page" key={`${piece.pieceId}-${index}`}>
-        <div className="qr-sticker-qr"><QRCodeCanvas value={piece.payload} size={Math.round(settings.qrSizeMm * 3.78)} level="M" includeMargin /></div>
-        <div className="qr-sticker-id" style={{ fontSize: `${settings.fontSizeLine1Pt * scale}pt` }}>{piece.displayId}</div>
-        <div className="qr-sticker-client" style={{ fontSize: `${settings.fontSizeLine2Pt}pt` }}>{piece.clientName}</div>
-      </article>;
-    })}
+    {sheets.map((sheet, sheetIndex) => <section className="qr-sticker-sheet" key={`sheet-${sheetIndex}`}>
+      {sheet.map((piece) => {
+        const scale = Math.max(0.62, Math.min(1, 22 / Math.max(22, piece.displayId.length)));
+        return <article className="qr-sticker-page" key={piece.pieceId}>
+          <div className="qr-sticker-qr"><QRCodeSVG value={piece.payload} size={512} level="M" includeMargin /></div>
+          <div className="qr-sticker-id" style={{ fontSize: `${settings.fontSizeLine1Pt * scale}pt` }}>{piece.displayId}</div>
+          <div className="qr-sticker-client" style={{ fontSize: `${settings.fontSizeLine2Pt}pt` }}>{piece.clientName}</div>
+        </article>;
+      })}
+    </section>)}
   </div>, document.body);
 }
 
@@ -589,7 +621,7 @@ export function OrderQrStickerControls({
               <p className="line-clamp-2 max-w-full text-center leading-tight" style={{ fontSize: `${Math.min(13, settingsDraft.fontSizeLine2Pt * 1.15)}px` }}>{testPiece.clientName}</p>
             </div>
             <Button type="button" variant="outline" className="mt-3 w-full" disabled={testPrint} onClick={() => { setRenderedCount(0); setTestPrint(true); }} data-testid="button-print-test-qr"><Printer size={13} /> Print test sticker</Button>
-            <p className="mt-3 text-[10px] leading-4 text-muted-foreground">In the print dialog, choose the TSC TE 210 driver, set paper size to the label size, set Margins to None, uncheck Headers and footers, and use Scale 100%.</p>
+            <p className="mt-3 text-[10px] leading-4 text-muted-foreground">Print on A4 paper. In the print dialog, choose the TSC TE 210 driver, set Margins to None, uncheck Headers and footers, and use Scale 100%.</p>
           </div>
         </div>}
         <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-border pt-4"><Button variant="outline" onClick={() => setSettingsOpen(false)}>Cancel</Button><Button disabled={updateSettings.isPending || settingsQuery.isLoading} onClick={saveSettings} data-testid="button-save-qr-settings">{updateSettings.isPending ? 'Saving…' : 'Save settings'}</Button></div>
@@ -603,7 +635,7 @@ export function OrderQrStickerControls({
     />}
     {confirmOpen && jobToPrint && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="qr-print-confirm-title">
       <div className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-2xl">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Print job · {jobToPrint.pieces.length} labels</p><h2 id="qr-print-confirm-title" className="mt-1 font-display text-lg font-bold">Did the stickers print correctly?</h2><p className="mt-1 text-sm text-muted-foreground">The job remains pending until you record which labels came out successfully.</p><p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-[11px] text-muted-foreground">In the print dialog: Margins = None, uncheck Headers and footers, Scale = 100%, Paper size = label size.</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Print job · {jobToPrint.pieces.length} labels</p><h2 id="qr-print-confirm-title" className="mt-1 font-display text-lg font-bold">Did the stickers print correctly?</h2><p className="mt-1 text-sm text-muted-foreground">The job remains pending until you record which labels came out successfully.</p><p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-[11px] text-muted-foreground">Print on A4 paper. In the print dialog: Margins = None, uncheck Headers and footers, and use Scale = 100%.</p>
         <div className="mt-4 flex flex-wrap gap-2"><Button disabled={confirmJob.isPending || cancelJob.isPending} onClick={() => closeConfirmation(false, jobToPrint.pieces.map((piece) => piece.pieceId))} data-testid="button-qr-confirm-all"><Check size={14} /> Yes, mark {jobToPrint.pieces.length} pieces as printed</Button><Button variant="outline" disabled={confirmJob.isPending || cancelJob.isPending} onClick={() => { setPrintedIds([]); setPartialConfirm(true); }} data-testid="button-qr-some-failed">Some failed</Button><Button variant="ghost" disabled={confirmJob.isPending || cancelJob.isPending} onClick={() => closeConfirmation(true, [])} data-testid="button-qr-cancel-job">No, keep pending</Button></div>
         {partialConfirm && <p className="mt-3 text-xs text-muted-foreground">Select only the stickers that printed successfully, then confirm below.</p>}
         <div className="mt-3 max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
