@@ -5076,6 +5076,13 @@ export const ListOrderWindowsResponseItem = zod.object({
   "location": zod.string().nullable(),
   "glassType": zod.string().nullable(),
   "meshType": zod.string().nullable(),
+  "source": zod.enum(['manual', 'window_list', 'confirmation', 'legacy']),
+  "sourceFilename": zod.string().nullable(),
+  "importedDetails": zod.union([zod.object({
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+}),zod.null()]),
   "glassShutterCount": zod.number().int().min(listOrderWindowsResponseGlassShutterCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(listOrderWindowsResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(listOrderWindowsResponseMeshShutterCountMin).nullable(),
@@ -5189,6 +5196,13 @@ export const CreateOrderWindowResponse = zod.object({
   "location": zod.string().nullable(),
   "glassType": zod.string().nullable(),
   "meshType": zod.string().nullable(),
+  "source": zod.enum(['manual', 'window_list', 'confirmation', 'legacy']),
+  "sourceFilename": zod.string().nullable(),
+  "importedDetails": zod.union([zod.object({
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+}),zod.null()]),
   "glassShutterCount": zod.number().int().min(createOrderWindowResponseGlassShutterCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(createOrderWindowResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(createOrderWindowResponseMeshShutterCountMin).nullable(),
@@ -5590,6 +5604,13 @@ export const UpdateOrderWindowResponse = zod.object({
   "location": zod.string().nullable(),
   "glassType": zod.string().nullable(),
   "meshType": zod.string().nullable(),
+  "source": zod.enum(['manual', 'window_list', 'confirmation', 'legacy']),
+  "sourceFilename": zod.string().nullable(),
+  "importedDetails": zod.union([zod.object({
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string()
+}),zod.null()]),
   "glassShutterCount": zod.number().int().min(updateOrderWindowResponseGlassShutterCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(updateOrderWindowResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(updateOrderWindowResponseMeshShutterCountMin).nullable(),

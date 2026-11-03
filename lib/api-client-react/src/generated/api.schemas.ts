@@ -1057,6 +1057,22 @@ export interface QrPrintJobResponse {
   inProgressPieces: QrPrintJobResponseInProgressPiecesItem[];
 }
 
+export type OrderWindowSource = typeof OrderWindowSource[keyof typeof OrderWindowSource];
+
+
+export const OrderWindowSource = {
+  manual: 'manual',
+  window_list: 'window_list',
+  confirmation: 'confirmation',
+  legacy: 'legacy',
+} as const;
+
+export interface OrderWindowImportedDetails {
+  lockType: string;
+  profile: string;
+  mesh: string;
+}
+
 export interface OrderWindow {
   id: string;
   orderRecordId: string;
@@ -1073,6 +1089,10 @@ export interface OrderWindow {
   glassType: string | null;
   /** @nullable */
   meshType: string | null;
+  source: OrderWindowSource;
+  /** @nullable */
+  sourceFilename: string | null;
+  importedDetails: OrderWindowImportedDetails | null;
   /**
      * @minimum 0
      * @nullable

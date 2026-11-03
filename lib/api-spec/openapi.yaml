@@ -4837,6 +4837,15 @@ components:
           type: ["string", "null"]
         meshType:
           type: ["string", "null"]
+        source:
+          type: string
+          enum: [manual, window_list, confirmation, legacy]
+        sourceFilename:
+          type: ["string", "null"]
+        importedDetails:
+          oneOf:
+            - $ref: "#/components/schemas/OrderWindowImportedDetails"
+            - type: "null"
         glassShutterCount:
           type: ["integer", "null"]
           minimum: 0
@@ -4886,6 +4895,9 @@ components:
         - location
         - glassType
         - meshType
+        - source
+        - sourceFilename
+        - importedDetails
         - glassShutterCount
         - glassShutterReadyCount
         - meshShutterCount
@@ -4901,6 +4913,16 @@ components:
         - pieceCountWarning
         - createdAt
         - updatedAt
+    OrderWindowImportedDetails:
+      type: object
+      properties:
+        lockType:
+          type: string
+        profile:
+          type: string
+        mesh:
+          type: string
+      required: [lockType, profile, mesh]
     OrderWindowInput:
       type: object
       properties:

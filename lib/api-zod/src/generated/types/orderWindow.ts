@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { OrderGlassStatus } from './orderGlassStatus';
+import type { OrderWindowImportedDetails } from './orderWindowImportedDetails';
 import type { OrderWindowPiece } from './orderWindowPiece';
 import type { OrderWindowReadiness } from './orderWindowReadiness';
+import type { OrderWindowSource } from './orderWindowSource';
 
 export interface OrderWindow {
   id: string;
@@ -25,6 +27,10 @@ export interface OrderWindow {
   glassType: string | null;
   /** @nullable */
   meshType: string | null;
+  source: OrderWindowSource;
+  /** @nullable */
+  sourceFilename: string | null;
+  importedDetails: OrderWindowImportedDetails | null;
   /**
      * @minimum 0
      * @nullable

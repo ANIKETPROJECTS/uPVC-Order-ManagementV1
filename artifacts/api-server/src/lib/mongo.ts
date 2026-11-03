@@ -253,6 +253,9 @@ export interface OrderWindowDocument {
   _id: string; orderRecordId: string; windowNo: string; widthMm: number | null; heightMm: number | null;
   lotId?: string | null;
   windowType: string | null; location?: string | null; glassType?: string | null; meshType?: string | null;
+  source?: "manual" | "window_list" | "confirmation";
+  sourceFilename?: string | null;
+  importedDetails?: { lockType: string; profile: string; mesh: string };
   frameCount?: number;
   glassShutterCount?: number | null; glassShutterReadyCount?: number | null;
   meshShutterCount?: number | null; meshShutterReadyCount?: number | null;

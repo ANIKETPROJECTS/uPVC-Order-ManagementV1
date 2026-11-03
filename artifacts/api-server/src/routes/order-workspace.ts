@@ -110,6 +110,8 @@ function windowPieces(w: OrderWindowDocument): OrderWindowPieceDocument[] {
 const windowResponse = (w: OrderWindowDocument, order?: OrderDocument, pieceCountWarning: string | null = null) => ({
   id: w._id, orderRecordId: w.orderRecordId, windowNo: w.windowNo, widthMm: w.widthMm, heightMm: w.heightMm,
   windowType: w.windowType, location: w.location ?? null, glassType: w.glassType ?? null, meshType: w.meshType ?? null,
+  source: w.source ?? "legacy",
+  sourceFilename: w.sourceFilename ?? null, importedDetails: w.importedDetails ?? null,
   frameCount: w.frameCount ?? 1, glassShutterCount: w.glassShutterCount ?? null,
   glassShutterReadyCount: w.glassShutterReadyCount ?? null, meshShutterCount: w.meshShutterCount ?? null,
   meshShutterReadyCount: w.meshShutterReadyCount ?? null,
@@ -1156,6 +1158,8 @@ router.post("/orders/:id/windows/import", async (req, res): Promise<void> => {
         profile: typeof sourceRow.profile === "string" ? sourceRow.profile : "",
         mesh: typeof sourceRow.mesh === "string" ? sourceRow.mesh : "",
       },
+      source: req.body.source === "confirmation" ? "confirmation" : "window_list",
+      sourceFilename: typeof req.body.filename === "string" ? req.body.filename.slice(0, 255) : null,
       createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now,
     } as OrderWindowDocument;
   });
@@ -1181,7 +1185,7 @@ router.post("/orders/:id/windows", async (req, res): Promise<void> => {
        ...Array.from({ length: frameCount }, (_, i) => ({ id: randomUUID(), kind: "frame" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
        ...Array.from({ length: b.data.glassShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "glass_shutter" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
        ...Array.from({ length: b.data.meshShutterCount ?? 0 }, (_, i) => ({ id: randomUUID(), kind: "mesh_shutter" as const, pieceNo: i + 1, status: "pending" as const, qrPrint: { status: "pending" as const, printCount: 0, firstPrintedAt: null, lastPrintedAt: null, lastPrintedBy: null } })),
-    ], location: b.data.location ?? null, glassType: b.data.glassType ?? null, meshType: order.meshType ?? null, glassShutterCount: b.data.glassShutterCount ?? null, glassShutterReadyCount: b.data.glassShutterReadyCount ?? 0, meshShutterCount: b.data.meshShutterCount ?? null, meshShutterReadyCount: b.data.meshShutterReadyCount ?? 0, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
+      ], location: b.data.location ?? null, glassType: b.data.glassType ?? null, meshType: order.meshType ?? null, glassShutterCount: b.data.glassShutterCount ?? null, glassShutterReadyCount: b.data.glassShutterReadyCount ?? 0, meshShutterCount: b.data.meshShutterCount ?? null, meshShutterReadyCount: b.data.meshShutterReadyCount ?? 0, frameStatus: hasModuleEdit(actor, "window-readiness") ? b.data.frameStatus : "pending", shutterStatus: hasModuleEdit(actor, "window-readiness") ? b.data.shutterStatus : "pending", glassStatus: hasModuleEdit(actor, "glass-procurement") ? b.data.glassStatus : "pending", pendingReason: hasModuleEdit(actor, "window-readiness") ? b.data.pendingReason ?? null : null, sqFt: Math.round((b.data.widthMm * b.data.heightMm / 92903.04) * 1000) / 1000, source: "manual", sourceFilename: null, createdBy: actor.id, createdAt: now, updatedBy: actor.id, updatedAt: now };
   try { await getOrderWindows(await getMongoDb()).insertOne(w); } catch (e) { if ((e as any)?.code === 11000) { res.status(409).json({ error: "Window number already exists for this order." }); return; } throw e; }
    await event(p.data.id, actor, "window.created", `Added window ${w.windowNo}.`); res.status(201).json(CreateOrderWindowResponse.parse(windowResponse(w, order)));
 });
