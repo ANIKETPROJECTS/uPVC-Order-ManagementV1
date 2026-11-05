@@ -199,7 +199,10 @@ export default function ConfirmationFirstRegister({ user }: { user: User }) {
     const nextVersion = latest + 1;
     setBusy(true);
     try {
-      if (versionEditor.pdfFile) await uploadFileVersion(versionEditor.record._id, 'pdf', versionEditor.pdfFile, nextVersion, versionEditor.reason.trim());
+      if (versionEditor.pdfFile) {
+        await uploadFileVersion(versionEditor.record._id, 'pdf', versionEditor.pdfFile, nextVersion, versionEditor.reason.trim());
+        setVersionEditor((current) => current ? { ...current, pdfFile: null } : current);
+      }
       if (versionEditor.excelFile) await uploadFileVersion(versionEditor.record._id, 'excel', versionEditor.excelFile, nextVersion, versionEditor.reason.trim());
       await refresh();
       toast({ title: `Version v${nextVersion} added`, description: versionEditor.record.confirmationId });
@@ -259,6 +262,7 @@ export default function ConfirmationFirstRegister({ user }: { user: User }) {
                           {record.pdfVersions.length > 0 ? <a className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-800" href={apiUrl(`/confirmation-records/${record._id}/file-versions/pdf/${pdfVersion}`)}>✓ PDF v{pdfVersion}</a> : <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-900">PDF missing</span>}
                           {record.excelVersions.length > 0 ? <a className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-800" href={apiUrl(`/confirmation-records/${record._id}/file-versions/excel/${excelVersion}`)}>✓ Excel v{excelVersion}</a> : <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-900">Excel missing</span>}
                           {mismatch && <span className="w-full text-[10px] font-semibold text-amber-800">Warning: file versions do not match</span>}
+                          {record.versionHistory.length > 0 && <details className="w-full text-[10px]"><summary className="cursor-pointer font-semibold text-primary">Version history</summary><div className="mt-1 space-y-1.5">{record.versionHistory.map((revision) => <div key={revision.versionNumber} className="rounded border border-border/60 p-1.5"><p className="font-semibold">v{revision.versionNumber} · {revision.reason}</p><div className="flex gap-2">{record.pdfVersions.some((file) => file.versionNumber === revision.versionNumber) && <a className="text-primary underline" href={apiUrl(`/confirmation-records/${record._id}/file-versions/pdf/${revision.versionNumber}`)}>PDF</a>}{record.excelVersions.some((file) => file.versionNumber === revision.versionNumber) && <a className="text-primary underline" href={apiUrl(`/confirmation-records/${record._id}/file-versions/excel/${revision.versionNumber}`)}>Excel</a>}</div></div>)}</div></details>}
                           {editable && <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={busy} onClick={() => setVersionEditor({ record, reason: '', pdfFile: null, excelFile: null })}>Upload v{version + 1}</Button>}
                         </div></td>
                         <td className="px-3 py-3"><DecisionCell record={record} editable={editable} onSaved={() => void refresh()} /></td>

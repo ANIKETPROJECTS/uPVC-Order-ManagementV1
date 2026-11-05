@@ -771,23 +771,35 @@ router.get("/confirmation-records", async (req, res): Promise<void> => {
     ? await getOrders(db).find({ _id: { $in: linkedOrderIds } }, { projection: { _id: 1, orderId: 1 } }).toArray()
     : [];
   const orderIdByRecord = new Map(orders.map((order) => [order._id, order.orderId]));
-  res.json(rows.map((record) => ({
-    ...record,
-    pdfVersions: record.pdfVersions.map((version, index) => ({ ...version, versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version" })),
-    excelVersions: record.excelVersions.map((version, index) => ({ ...version, versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version" })),
-    versionHistory: record.versionHistory ?? [...new Map([
-      ...record.pdfVersions.map((version, index) => [version.versionNumber ?? index + 1, { versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version", createdAt: version.uploadedAt, uploadedBy: version.uploadedBy, pdfFilename: version.filename }] as const),
-      ...record.excelVersions.map((version, index) => [version.versionNumber ?? index + 1, { versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version", createdAt: version.uploadedAt, uploadedBy: version.uploadedBy, excelFilename: version.filename }] as const),
-    ])].map(([versionNumber, revision]) => ({ versionNumber, ...revision })).sort((a, b) => a.versionNumber - b.versionNumber),
-    linkedVersionNumber: record.linkedVersionNumber ?? null,
-    quotationRecordId: record.quotationRecordId ?? null,
-    measurementRecordId: record.measurementRecordId ?? null,
-    orderId: record.orderRecordId ? orderIdByRecord.get(record.orderRecordId) ?? null : null,
-    clientDecisionStatus: record.clientDecisionStatus ?? null,
-    clientDecisionNote: record.clientDecisionNote ?? null,
-    clientDecisionUpdatedAt: record.clientDecisionUpdatedAt?.toISOString() ?? null,
-    clientDecisionUpdatedBy: record.clientDecisionUpdatedBy ?? null,
-  })));
+  res.json(rows.map((record) => {
+    const historyByVersion = new Map<number, any>();
+    for (const [kind, versions] of [["pdf", record.pdfVersions], ["excel", record.excelVersions]] as const) {
+      versions.forEach((version, index) => {
+        const versionNumber = version.versionNumber ?? index + 1;
+        const previous = historyByVersion.get(versionNumber) ?? {
+          versionNumber, reason: "Imported existing version", createdAt: version.uploadedAt, uploadedBy: version.uploadedBy,
+        };
+        historyByVersion.set(versionNumber, {
+          ...previous, reason: version.reason ?? previous.reason,
+          [`${kind}Filename`]: version.filename,
+        });
+      });
+    }
+    return {
+      ...record,
+      pdfVersions: record.pdfVersions.map((version, index) => ({ ...version, versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version" })),
+      excelVersions: record.excelVersions.map((version, index) => ({ ...version, versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version" })),
+      versionHistory: record.versionHistory ?? [...historyByVersion.values()].sort((a, b) => a.versionNumber - b.versionNumber),
+      linkedVersionNumber: record.linkedVersionNumber ?? null,
+      quotationRecordId: record.quotationRecordId ?? null,
+      measurementRecordId: record.measurementRecordId ?? null,
+      orderId: record.orderRecordId ? orderIdByRecord.get(record.orderRecordId) ?? null : null,
+      clientDecisionStatus: record.clientDecisionStatus ?? null,
+      clientDecisionNote: record.clientDecisionNote ?? null,
+      clientDecisionUpdatedAt: record.clientDecisionUpdatedAt?.toISOString() ?? null,
+      clientDecisionUpdatedBy: record.clientDecisionUpdatedBy ?? null,
+    };
+  }));
 });
 
 router.post("/confirmation-records", async (req, res): Promise<void> => {
@@ -922,7 +934,14 @@ router.post("/confirmation-records/:recordId/files/:kind/:filename", async (req,
       res.status(409).json({ error: `Upload the next shared version, v${latestVersion + 1}.` });
       return;
     }
-    const history = record.versionHistory ?? [];
+    const legacyHistory = new Map<number, { versionNumber: number; reason: string; createdAt: Date; uploadedBy: string; pdfFilename?: string; excelFilename?: string }>();
+    for (const [kind, versions] of [["pdf", pdfVersions], ["excel", excelVersions]] as const) {
+      versions.forEach((item) => {
+        const previous = legacyHistory.get(item.versionNumber) ?? { versionNumber: item.versionNumber, reason: item.reason, createdAt: item.uploadedAt, uploadedBy: item.uploadedBy };
+        legacyHistory.set(item.versionNumber, { ...previous, reason: item.reason, [`${kind}Filename`]: item.filename });
+      });
+    }
+    const history = record.versionHistory ?? [...legacyHistory.values()];
     const existingRevision = history.find((item) => item.versionNumber === requestedVersion);
     if (existingRevision && existingRevision.reason !== reason) {
       res.status(409).json({ error: "Both files in a version must use the same reason." });
@@ -942,6 +961,7 @@ router.post("/confirmation-records/:recordId/files/:kind/:filename", async (req,
     await getConfirmationRecords(db).updateOne({ _id: recordId }, { $set: {
       [fields]: [...currentFileVersions, version],
       versionHistory: [...history.filter((item) => item.versionNumber !== requestedVersion), revision].sort((a, b) => a.versionNumber - b.versionNumber),
+      ...(record.orderRecordId ? { linkedVersionNumber: record.linkedVersionNumber ?? latestVersion } : {}),
       ...(info ? { excelConfirmationInfo: info } : {}),
       updatedAt: new Date(),
     } as any });

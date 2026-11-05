@@ -149,7 +149,7 @@ const STATUS_OPTIONS: { value: Status; label: string; tone: string }[] = [
 const ORDER_LIFECYCLE_STAGES = [
   'Measurement',
   'Quotation',
-  'Confirmation / PO',
+  'Confirmations',
   'Production',
   'Dispatch',
   'Installation',
