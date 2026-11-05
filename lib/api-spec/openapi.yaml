@@ -2179,7 +2179,7 @@ paths:
     get:
       operationId: listQuotationRateSubmissions
       tags: [quotations]
-      summary: List the current user's rate submissions and assigned approval queue
+      summary: List rate request history and assigned requests
       responses:
         "200":
           description: Accessible rate submissions
@@ -2190,7 +2190,7 @@ paths:
     post:
       operationId: createQuotationRateSubmission
       tags: [quotations]
-      summary: Submit quotation details for rate approval
+      summary: Create a rate request
       requestBody:
         required: true
         content:
@@ -2207,7 +2207,7 @@ paths:
         "400":
           description: Invalid submission details
         "503":
-          description: No active rate approver is available
+          description: No active rate request manager is available
   /quotation-rate-submissions/{submissionId}:
     patch:
       operationId: updateQuotationRateSubmission
@@ -2393,7 +2393,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuotationRateSubmission"
         "403":
-          description: Rate approval access required
+          description: Rate request manager access required
         "404":
           description: Submission not found
         "409":
@@ -7178,6 +7178,9 @@ components:
     QuotationRateSubmissionStatus:
       type: string
       enum: [awaiting_pdf, pending_review, approved, rejected]
+    RateRequestPriority:
+      type: string
+      enum: [normal, urgent]
     QuotationRateSubmission:
       type: object
       properties:
@@ -7201,6 +7204,8 @@ components:
           type: number
         glassType:
           type: string
+        priority:
+          $ref: "#/components/schemas/RateRequestPriority"
         averageSqFtPerQty:
           type: number
         status:
@@ -7235,7 +7240,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, clientName, location, windowQty, totalSqFt, glassType, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
+      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, clientName, location, windowQty, totalSqFt, glassType, priority, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
     QuotationRateSubmissionRevision:
       type: object
       properties:
@@ -7325,6 +7330,10 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        priority:
+          $ref: "#/components/schemas/RateRequestPriority"
+        measurementRecordId:
+          type: ["string", "null"]
       required: [clientName, location, windowQty, totalSqFt, glassType]
     QuotationRateDecisionInput:
       type: object

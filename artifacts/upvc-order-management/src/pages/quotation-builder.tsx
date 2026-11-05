@@ -603,7 +603,7 @@ function QuotationPrintDocument({ quote }: { quote: Quotation }) {
   );
 }
 
-function RateApprovalDesk({ user }: { user: User }) {
+function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePane: 'create' | 'requests'; onCreate: () => void }) {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -616,14 +616,17 @@ function RateApprovalDesk({ user }: { user: User }) {
   const decide = useDecideQuotationRateSubmission();
   const deleteSubmission = useDeleteQuotationRateSubmission();
   const linkOrder = useLinkQuotationRateSubmissionOrder();
-  const [pane, setPane] = useState<'create' | 'requests'>(() => new URLSearchParams(window.location.search).get('pane') === 'requests' ? 'requests' : 'create');
   const [clientName, setClientName] = useState('');
   const [location, setLocation] = useState('');
   const [windowQty, setWindowQty] = useState('');
   const [totalSqFt, setTotalSqFt] = useState('');
   const [glassType, setGlassType] = useState('');
+  const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
+  const [measurementId, setMeasurementId] = useState<string | null>(null);
+  const [measurementLabel, setMeasurementLabel] = useState('');
   const [pdf, setPdf] = useState<File | null>(null);
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [historySearch, setHistorySearch] = useState('');
   const [linkingSubmission, setLinkingSubmission] = useState<QuotationRateSubmission | null>(null);
   const [linkOrderRecordId, setLinkOrderRecordId] = useState('');
   const [linkMeasurementSheet, setLinkMeasurementSheet] = useState(false);
@@ -632,7 +635,16 @@ function RateApprovalDesk({ user }: { user: User }) {
   const submissions = submissionsQuery.data || [];
   const pending = submissions.filter((item) => item.status === 'pending_review');
   const awaiting = submissions.filter((item) => item.status === 'awaiting_pdf');
-  const approved = submissions.filter((item) => item.status === 'approved');
+  const visibleSubmissions = useMemo(() => {
+    const normalized = historySearch.trim().toLowerCase();
+    if (!normalized) return submissions;
+    return submissions.filter((item) =>
+      [item.id, item.clientName, item.location ?? '', item.glassType, item.orderId ?? '', item.measurementSheetId ?? '', item.status]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalized),
+    );
+  }, [historySearch, submissions]);
 
   const validatePdf = (file: File | undefined) => {
     if (!file) return false;
@@ -675,16 +687,20 @@ function RateApprovalDesk({ user }: { user: User }) {
         windowQty: Number(windowQty),
         totalSqFt: Number(totalSqFt),
         glassType: glassType.trim(),
+         priority,
+         measurementRecordId: measurementId,
       },
     }, {
       onSuccess: (submission) => {
         refreshSubmissions();
-        setPane('requests');
         setClientName('');
         setLocation('');
         setWindowQty('');
         setTotalSqFt('');
         setGlassType('');
+        setPriority('normal');
+        setMeasurementId(null);
+        setMeasurementLabel('');
         const attached = pdf;
         setPdf(null);
         if (attached) uploadPdf(submission.id, attached);
@@ -770,30 +786,12 @@ function RateApprovalDesk({ user }: { user: User }) {
 
   return (
     <div className="space-y-5" data-testid="section-rate-approval-desk">
-      <div className="grid gap-3 sm:grid-cols-2" data-testid="rate-approval-summary">
-        <Card className="border-amber-200/70 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20">
-          <CardContent className="flex items-center justify-between p-4">
-            <div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-amber-800 dark:text-amber-300">Awaiting Approval</p><p className="mt-1 text-xs text-muted-foreground">Requests waiting for a decision</p></div>
-            <strong className="font-display text-3xl font-bold text-amber-900 dark:text-amber-200">{pending.length}</strong>
-          </CardContent>
-        </Card>
-        <Card className="border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-          <CardContent className="flex items-center justify-between p-4">
-            <div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-emerald-800 dark:text-emerald-300">Approved</p><p className="mt-1 text-xs text-muted-foreground">Rate requests approved</p></div>
-            <strong className="font-display text-3xl font-bold text-emerald-900 dark:text-emerald-200">{approved.length}</strong>
-          </CardContent>
-        </Card>
-      </div>
-      <Tabs value={pane} onValueChange={(value) => setPane(value as 'create' | 'requests')} data-testid="tabs-rate-request-sections">
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl bg-secondary/70 p-1">
-          <TabsTrigger value="create" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-create-rate-request"><FilePlus2 size={14} /> Create request</TabsTrigger>
-          <TabsTrigger value="requests" className="gap-2 py-2.5 text-xs sm:text-sm" data-testid="tab-saved-rate-requests"><FileText size={14} /> Saved requests ({submissions.length})</TabsTrigger>
-        </TabsList>
-        <TabsContent value="create" className="mt-4" data-testid="section-create-rate-request">
+      <div data-testid="tabs-rate-request-sections">
+        {activePane === 'create' && <section className="mt-0" data-testid="section-create-rate-request">
         <Card className="border-border/80" data-testid="card-rate-request-form">
           <CardHeader className="border-b border-border/70 pb-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Rate request</p>
-            <CardTitle className="mt-1 font-display text-lg">Send a rate for review</CardTitle>
+            <CardTitle className="mt-1 font-display text-lg">Create a rate request</CardTitle>
             <p className="text-xs leading-5 text-muted-foreground">Enter Eva Software totals. The average area per window is calculated by the server.</p>
           </CardHeader>
           <CardContent className="p-5">
@@ -805,6 +803,8 @@ function RateApprovalDesk({ user }: { user: User }) {
                 <label className="space-y-1.5 text-xs font-semibold">Total sq. ft.<Input type="number" min="0.01" step="0.01" value={totalSqFt} onChange={(event) => setTotalSqFt(event.target.value)} required data-testid="input-rate-total-sqft" /></label>
                 <label className="space-y-1.5 text-xs font-semibold">Average (SqFt / Qty)<Input readOnly value={Number(windowQty) > 0 && Number(totalSqFt) > 0 ? (Number(totalSqFt) / Number(windowQty)).toFixed(2) : ''} placeholder="Calculated from total area and quantity" data-testid="input-rate-average-sqft" /></label>
                 <label className="space-y-1.5 text-xs font-semibold sm:col-span-2">Glass type<Input value={glassType} onChange={(event) => setGlassType(event.target.value)} maxLength={120} required placeholder="Clear, toughened, laminated…" data-testid="input-rate-glass-type" /></label>
+                 <label className="space-y-1.5 text-xs font-semibold">Priority<Select value={priority} onValueChange={(value) => setPriority(value as 'normal' | 'urgent')}><SelectTrigger data-testid="select-rate-request-priority"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="normal">Normal</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select></label>
+                 <div className="space-y-1.5 text-xs font-semibold sm:col-span-2">Measurement sheet <span className="font-normal text-muted-foreground">· optional</span><MeasurementSheetLookup selectedId={measurementId} selectedLabel={measurementLabel} currentQuotationRequestId="" onSelect={(item) => { setMeasurementId(item.id); setMeasurementLabel(`${measurementSheetIdLabel(item.id, item.sheetId)} · ${item.clientName}`); }} />{measurementId && <button type="button" onClick={() => { setMeasurementId(null); setMeasurementLabel(''); }} className="text-[11px] font-semibold text-primary hover:underline" data-testid="button-clear-rate-measurement">Remove linked sheet</button>}</div>
               </div>
               <label className="block rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs font-semibold" data-testid="label-rate-pdf">
                 Eva Software PDF <span className="font-normal text-muted-foreground">· PDF, up to 10 MiB</span>
@@ -821,30 +821,36 @@ function RateApprovalDesk({ user }: { user: User }) {
             </form> : <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-submit-read-only">You have view access to this desk. A quotation team member can prepare a rate request.</div>}
           </CardContent>
         </Card>
-        </TabsContent>
-        <TabsContent value="requests" className="mt-4" data-testid="section-saved-rate-requests">
+        </section>}
+        {activePane === 'requests' && <section className="mt-0" data-testid="section-saved-rate-rate-request-history">
         <Card className="border-border/80" data-testid="card-rate-queue">
           <CardHeader className="border-b border-border/70 pb-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Live workflow</p><CardTitle className="mt-1 font-display text-lg">Quotation requests</CardTitle><p className="mt-1 text-xs text-muted-foreground">QTR IDs, approval history, order links, and Eva PDFs stay together.</p></div>
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Rate request history</p><CardTitle className="mt-1 font-display text-lg">All requests</CardTitle><p className="mt-1 text-xs text-muted-foreground">Request details, status, measurement sheet, and Eva PDFs stay together.</p></div>
               <div className="flex flex-wrap items-center gap-2">
-                {canSubmit && <Button size="sm" variant="outline" onClick={() => setPane('create')} data-testid="button-new-rate-request"><FilePlus2 size={13} /> New request</Button>}
+                {canSubmit && <Button size="sm" variant="outline" onClick={onCreate} data-testid="button-new-rate-request"><FilePlus2 size={13} /> New request</Button>}
                 <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">{pending.length} to review</span>
                 <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">{awaiting.length} awaiting PDF</span>
               </div>
             </div>
+            <label className="relative mt-3 block w-full sm:max-w-sm">
+              <span className="sr-only">Search rate request history</span>
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} className="pl-9" placeholder="Search ID, client, location, or glass" data-testid="input-search-rate-history" />
+            </label>
           </CardHeader>
           <CardContent className="p-0">
             {submissionsQuery.isLoading ? <div className="space-y-3 p-5" data-testid="state-rate-submissions-loading"><div className="h-24 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted/70" /></div>
               : submissionsQuery.isError ? <div className="p-5" data-testid="state-rate-submissions-error"><StatePanel kind="error" onRetry={() => void submissionsQuery.refetch()} /></div>
-                : submissions.length === 0 ? <div className="grid min-h-52 place-items-center p-7 text-center" data-testid="state-rate-submissions-empty"><div><div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Calculator size={18} /></div><p className="mt-3 text-sm font-bold">No rate requests yet</p><p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">A new submission will appear here with its PDF and decision history.</p></div></div>
+                : submissions.length === 0 ? <div className="grid min-h-52 place-items-center p-7 text-center" data-testid="state-rate-submissions-empty"><div><div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Calculator size={18} /></div><p className="mt-3 text-sm font-bold">No rate requests yet</p><p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">A new submission will appear here with its PDF and request history.</p></div></div>
+                  : visibleSubmissions.length === 0 ? <div className="p-6 text-center text-sm text-muted-foreground" data-testid="state-rate-submissions-no-results">No requests match this search.</div>
                   : <div className="overflow-x-auto">
-                     <table className="w-full min-w-[1260px] border-collapse text-left text-xs" data-testid="table-rate-submissions">
+                     <table className="w-full min-w-[1100px] border-collapse text-left text-xs" data-testid="table-rate-submissions">
                       <thead className="bg-muted/50 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">
-                        <tr><th className="px-4 py-3">Request ID</th><th className="px-4 py-3">Client / Order</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Sq.Ft</th><th className="px-3 py-3">Glass Type</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Status</th><th className="px-4 py-3">Action</th></tr>
+                         <tr><th className="px-4 py-3">Request ID</th><th className="px-4 py-3">Client / Order</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Sq.Ft</th><th className="px-3 py-3">Glass Type</th><th className="px-3 py-3">Priority</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Status</th><th className="px-4 py-3">Action</th></tr>
                       </thead>
                       <tbody className="divide-y divide-border/70">
-                        {submissions.map((submission) => <tr key={submission.id} className="align-top" data-testid={`row-rate-submission-${submission.id}`}>
+                        {visibleSubmissions.map((submission) => <tr key={submission.id} className="align-top" data-testid={`row-rate-submission-${submission.id}`}>
                           <td className="px-4 py-3">
                             <code className="font-mono text-[11px] font-bold text-primary" data-testid={`text-rate-request-id-${submission.id}`}>{submission.id}</code>
                             <p className="mt-1 text-[10px] text-muted-foreground">Avg. {Number(submission.averageSqFtPerQty).toFixed(2)} sq. ft. / window</p>
@@ -863,6 +869,7 @@ function RateApprovalDesk({ user }: { user: User }) {
                           <td className="px-3 py-3 tabular-nums">{submission.windowQty}</td>
                           <td className="px-3 py-3 tabular-nums">{submission.totalSqFt.toLocaleString('en-IN')}</td>
                           <td className="px-3 py-3">{submission.glassType}</td>
+                           <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${submission.priority === 'urgent' ? 'bg-rose-50 text-rose-700' : 'bg-muted text-muted-foreground'}`}>{submission.priority === 'urgent' ? 'Urgent' : 'Normal'}</span></td>
                           <td className="px-3 py-3">{submission.location || <span className="text-muted-foreground">—</span>}</td>
                           <td className="px-3 py-3">
                             <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.12em] ${statusStyle(submission.status)}`} data-testid={`status-rate-submission-${submission.id}`}>{statusName(submission.status)}</span>
@@ -871,8 +878,8 @@ function RateApprovalDesk({ user }: { user: User }) {
                           </td>
                           <td className="min-w-[260px] px-4 py-3">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <Button size="sm" variant="outline" onClick={() => navigate(`/quotation-builder/requests/${submission.id}`)} data-testid={`button-view-rate-request-${submission.id}`}><Eye size={13} /> View</Button>
-                              {canManageSubmission(submission) && <Button size="sm" variant="outline" onClick={() => navigate(`/quotation-builder/requests/${submission.id}?edit=1`)} data-testid={`button-edit-rate-request-${submission.id}`}><Pencil size={13} /> Edit</Button>}
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/quotations-rates/requests/${submission.id}`)} data-testid={`button-view-rate-request-${submission.id}`}><Eye size={13} /> View</Button>
+                              {canManageSubmission(submission) && <Button size="sm" variant="outline" onClick={() => navigate(`/quotations-rates/requests/${submission.id}?edit=1`)} data-testid={`button-edit-rate-request-${submission.id}`}><Pencil size={13} /> Edit</Button>}
                               {canManageSubmission(submission) && <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={deleteSubmission.isPending} onClick={() => removeSubmission(submission)} data-testid={`button-delete-rate-request-${submission.id}`}><Trash2 size={13} /> Delete</Button>}
                               {canLinkSubmission(submission) && <Button size="sm" variant="outline" onClick={() => openOrderLink(submission)} data-testid={`button-link-rate-order-${submission.id}`}><Link2 size={13} /> {submission.orderId ? 'Update links' : 'Link to order'}</Button>}
                               {submission.status === 'pending_review' && rateDesk ? <><Button size="sm" onClick={() => makeDecision(submission, 'approved')} disabled={decide.isPending} data-testid={`button-approve-rate-${submission.id}`}><Check size={13} /> Approve</Button><Button size="sm" variant="outline" className="text-destructive" onClick={() => makeDecision(submission, 'rejected')} disabled={decide.isPending} data-testid={`button-reject-rate-${submission.id}`}><X size={13} /> Reject</Button></> : submission.status === 'approved' || submission.status === 'rejected' ? <span className="px-2 text-muted-foreground" data-testid={`text-rate-action-complete-${submission.id}`}>—</span> : null}
@@ -885,9 +892,9 @@ function RateApprovalDesk({ user }: { user: User }) {
                   </div>}
           </CardContent>
         </Card>
-        </TabsContent>
-      </Tabs>
-      <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-desk-note"><MapPin size={15} className="mt-0.5 shrink-0 text-primary" /><p>Quotation request IDs use QTR-001-DDMMYYYY format. The server calculates Average (SqFt / Qty). Linking an order is optional and can be done later.</p></div>
+        </section>}
+      </div>
+      <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-desk-note"><MapPin size={15} className="mt-0.5 shrink-0 text-primary" /><p>The server calculates Average (SqFt / Qty). Linking a measurement sheet is optional and can be done later.</p></div>
       <Dialog open={Boolean(linkingSubmission)} onOpenChange={(open) => { if (!open) setLinkingSubmission(null); }}>
         <DialogContent className="max-w-none sm:max-h-[90vh] sm:w-[min(90vw,52rem)] sm:max-w-none" data-testid="dialog-link-quotation-order">
           <DialogHeader>
@@ -928,7 +935,7 @@ function RateApprovalDesk({ user }: { user: User }) {
   );
 }
 
-export default function QuotationBuilderPage({ user }: { user: User }) {
+export function LegacyQuotationBuilderPage({ user }: { user: User }) {
   const [location] = useLocation();
   const canEdit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('quote'));
@@ -1157,11 +1164,130 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
           </TabsContent>
 
           <TabsContent value="rates" className="mt-5" data-testid="section-rate-approval">
-            <RateApprovalDesk user={user} />
+            <RateApprovalDesk user={user} activePane="create" onCreate={() => {}} />
           </TabsContent>
         </Tabs>
 
         <ProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} editing={editingProfile} readOnly={profileDialogReadOnly} onDone={() => setProfileDialogOpen(false)} />
+        {selectedQuote && <QuotationPrintDocument quote={selectedQuote} />}
+      </div>
+    </AppShell>
+  );
+}
+
+type QuotationsRatesSection = 'quotations' | 'create' | 'history';
+
+function sectionFromUrl(value: string): QuotationsRatesSection {
+  const params = new URLSearchParams(value.split('?')[1] || '');
+  if (params.get('quote')) return 'quotations';
+  if (params.get('section') === 'rates') {
+    return params.get('pane') === 'requests' ? 'history' : 'create';
+  }
+  return 'quotations';
+}
+
+export default function QuotationBuilderPage({ user }: { user: User }) {
+  const [location] = useLocation();
+  const [activeSection, setActiveSection] = useState<QuotationsRatesSection>(() => sectionFromUrl(location));
+  const [search, setSearch] = useState('');
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(() => new URLSearchParams(location.split('?')[1] || '').get('quote'));
+  const quotationQuery = useListQuotations({
+    query: { queryKey: getListQuotationsQueryKey(), refetchOnWindowFocus: true },
+  });
+  const selectedQuery = useGetQuotation(selectedQuoteId || '', {
+    query: { enabled: Boolean(selectedQuoteId), queryKey: getGetQuotationQueryKey(selectedQuoteId || '') },
+  });
+  const quotations = quotationQuery.data ?? [];
+  const selectedQuote = selectedQuery.data ?? quotations.find((quote) => quote.id === selectedQuoteId) ?? null;
+  const visibleQuotes = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+    if (!normalized) return quotations;
+    return quotations.filter((quote) =>
+      `${quote.quoteNo} ${quote.customerName} ${quote.projectName}`.toLowerCase().includes(normalized),
+    );
+  }, [quotations, search]);
+
+  useEffect(() => {
+    setActiveSection(sectionFromUrl(location));
+    const quoteId = new URLSearchParams(location.split('?')[1] || '').get('quote');
+    if (quoteId) setSelectedQuoteId(quoteId);
+  }, [location]);
+
+  const printSelected = () => {
+    if (!selectedQuote) return;
+    document.body.classList.add('print-quotation');
+    window.setTimeout(() => {
+      window.print();
+      window.setTimeout(() => document.body.classList.remove('print-quotation'), 300);
+    }, 80);
+  };
+
+  return (
+    <AppShell user={user} title="Quotations & Rates" eyebrow="Quotations and rate requests">
+      <div className="quotation-builder-page min-w-0 max-w-full space-y-5 overflow-x-hidden" data-testid="page-quotations-rates">
+        <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as QuotationsRatesSection)} className="w-full">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl bg-secondary/70 p-1" data-testid="tabs-quotations-rates">
+            <TabsTrigger value="quotations" className="py-2.5 text-xs sm:text-sm" data-testid="tab-quotations">Quotations</TabsTrigger>
+            <TabsTrigger value="create" className="py-2.5 text-xs sm:text-sm" data-testid="tab-create-rate-requests">Create Rate Requests</TabsTrigger>
+            <TabsTrigger value="history" className="py-2.5 text-xs sm:text-sm" data-testid="tab-rate-request-history">Rate Request History</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="quotations" className="mt-4" data-testid="section-quotations">
+            <Card className="overflow-hidden border-border/80">
+              <CardHeader className="border-b border-border/70 pb-4">
+                <CardTitle className="font-display text-lg">Quotations</CardTitle>
+                <p className="text-xs text-muted-foreground">Existing quotation records are available for viewing and printing.</p>
+                <div className="relative mt-2">
+                  <Search size={15} className="absolute left-3 top-2.5 text-muted-foreground" />
+                  <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search by quotation ID or client" data-testid="input-search-quotations" />
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {quotationQuery.isLoading
+                  ? <div className="p-5"><StatePanel kind="loading" /></div>
+                  : quotationQuery.isError
+                    ? <div className="p-5"><StatePanel kind="error" onRetry={() => void quotationQuery.refetch()} /></div>
+                    : visibleQuotes.length === 0
+                      ? <div className="p-6"><StatePanel kind="empty" /></div>
+                      : <div className="divide-y divide-border/70">
+                        {visibleQuotes.map((quote) => (
+                          <article key={quote.id} className={`flex flex-wrap items-center justify-between gap-3 p-4 ${selectedQuoteId === quote.id ? 'bg-secondary/40' : ''}`} data-testid={`row-quotation-${quote.id}`}>
+                            <button type="button" onClick={() => setSelectedQuoteId(quote.id)} className="min-w-0 flex-1 text-left" data-testid={`button-open-quotation-${quote.id}`}>
+                              <span className="font-mono text-xs font-bold text-primary">{quote.quoteNo}</span>
+                              <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">{quote.status.replace('_', ' ')}</span>
+                              <p className="mt-1 truncate text-sm font-semibold">{quote.customerName || 'Unnamed customer'}</p>
+                              <p className="mt-1 truncate text-[11px] text-muted-foreground">{quote.projectName || 'No project name'} · {dateLabel(quote.quotationDate)}</p>
+                            </button>
+                            <div className="flex items-center gap-3">
+                              <span className="text-right font-display text-sm font-bold">{money(quote.totals.grandTotal)}<span className="mt-1 block font-sans text-[10px] font-normal text-muted-foreground">{quote.totals.componentCount} windows</span></span>
+                              <Button type="button" size="sm" variant="outline" onClick={() => setSelectedQuoteId(quote.id)} data-testid={`button-view-quotation-${quote.id}`}><Eye size={13} /> View</Button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>}
+              </CardContent>
+            </Card>
+            {selectedQuote && <Card className="mt-4 border-border/80" data-testid="card-selected-quotation">
+              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 border-b border-border/70">
+                <div><p className="font-mono text-xs font-bold text-primary">{selectedQuote.quoteNo}</p><CardTitle className="mt-1 font-display text-lg">{selectedQuote.customerName}</CardTitle><p className="mt-1 text-xs text-muted-foreground">{selectedQuote.projectName || 'No project name'} · {selectedQuote.totals.componentCount} windows</p></div>
+                <Button type="button" size="sm" variant="outline" onClick={printSelected} data-testid="button-print-quotation"><Printer size={14} /> Print / PDF</Button>
+              </CardHeader>
+              <CardContent className="grid gap-3 p-4 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Status</p><p className="mt-1 font-semibold capitalize">{selectedQuote.status.replace('_', ' ')}</p></div>
+                <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Quotation date</p><p className="mt-1 font-semibold">{dateLabel(selectedQuote.quotationDate)}</p></div>
+                <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Grand total</p><p className="mt-1 font-semibold">{money(selectedQuote.totals.grandTotal)}</p></div>
+                <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Windows</p><p className="mt-1 font-semibold">{selectedQuote.totals.componentCount}</p></div>
+              </CardContent>
+            </Card>}
+          </TabsContent>
+
+          <TabsContent value="create" className="mt-4" data-testid="section-create-rate-requests">
+            <RateApprovalDesk user={user} activePane="create" onCreate={() => setActiveSection('create')} />
+          </TabsContent>
+          <TabsContent value="history" className="mt-4" data-testid="section-rate-request-history">
+            <RateApprovalDesk user={user} activePane="requests" onCreate={() => setActiveSection('create')} />
+          </TabsContent>
+        </Tabs>
         {selectedQuote && <QuotationPrintDocument quote={selectedQuote} />}
       </div>
     </AppShell>

@@ -50,6 +50,8 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/admin/roles" component={() => <RolesPage user={user} />} />
     <Route path="/admin/groups" component={() => <ChatGroupsPage user={user} />} />
     <Route path="/communication" component={() => <CommunicationPage user={user} />} />
+    <Route path="/quotations-rates/requests/:submissionId" component={() => <QuotationRateRequestDetailPage user={user} />} />
+    <Route path="/quotations-rates" component={() => <QuotationBuilderPage user={user} />} />
     <Route path="/quotation-builder/requests/:submissionId" component={() => <QuotationRateRequestDetailPage user={user} />} />
     <Route path="/quotation-builder" component={() => <QuotationBuilderPage user={user} />} />
     <Route path="/quotation-approvals" component={() => <QuotationApprovalsPage user={user} />} />

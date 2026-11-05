@@ -260,6 +260,7 @@ export * from './quotationRateSubmissionRevision';
 export * from './quotationRateSubmissionStatus';
 export * from './quotationStatus';
 export * from './quotationTotals';
+export * from './rateRequestPriority';
 export * from './recentPaymentUpdate';
 export * from './recentPaymentUpdateList';
 export * from './role';

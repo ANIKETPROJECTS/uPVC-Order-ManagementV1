@@ -106,6 +106,7 @@ function response(item: QuotationRateSubmissionDocument, measurementSheetId: str
     windowQty: item.windowQty,
     totalSqFt: item.totalSqFt,
     glassType: item.glassType,
+    priority: item.priority ?? "normal",
     averageSqFtPerQty: item.averageSqFtPerQty,
     status: item.status,
     pdfFilename: item.pdfFilename,
@@ -265,6 +266,19 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
   }
   const now = new Date();
   const { clientName, location, windowQty, totalSqFt, glassType } = parsed.data;
+  const measurementRecordId = parsed.data.measurementRecordId ?? null;
+  if (measurementRecordId) {
+    const measurement = await getMeasurementRecords(db).findOne({ _id: measurementRecordId });
+    if (!measurement) {
+      res.status(404).json({ error: "The selected measurement sheet could not be found." });
+      return;
+    }
+    const existingLink = await getQuotationRateSubmissions(db).findOne({ measurementRecordId });
+    if (existingLink) {
+      res.status(409).json({ error: "This measurement sheet is already linked to another rate request." });
+      return;
+    }
+  }
   const counters = getCounters(db);
   const counter = await counters.findOneAndUpdate(
     { _id: "quotation-request-sequence" },
@@ -279,13 +293,14 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     _id: formatQuotationRequestId(counter.value, now),
     orderRecordId: null,
     orderId: null,
-    measurementRecordId: null,
+    measurementRecordId,
     clientName: clientName.trim(),
     clientNameLower: clientName.trim().toLowerCase(),
     location: location?.trim() || null,
     windowQty,
     totalSqFt,
     glassType: glassType.trim(),
+    priority: parsed.data.priority ?? "normal",
     averageSqFtPerQty: Math.round((totalSqFt / windowQty + Number.EPSILON) * 10000) / 10000,
     status: "awaiting_pdf",
     pdfFilename: null,
@@ -302,7 +317,15 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     createdAt: now,
     updatedAt: now,
   };
-  await getQuotationRateSubmissions(db).insertOne(item);
+  try {
+    await getQuotationRateSubmissions(db).insertOne(item);
+  } catch (error) {
+    if (isDuplicateKeyError(error) && measurementRecordId) {
+      res.status(409).json({ error: "This measurement sheet is already linked to another rate request." });
+      return;
+    }
+    throw error;
+  }
   res.status(201).json(CreateQuotationRateSubmissionResponse.parse(await responseOne(item)));
 });
 
@@ -331,6 +354,25 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
 
   const now = new Date();
   const { clientName, location, windowQty, totalSqFt, glassType } = parsedBody.data;
+  const measurementRecordId =
+    parsedBody.data.measurementRecordId === undefined
+      ? item.measurementRecordId ?? null
+      : parsedBody.data.measurementRecordId;
+  if (measurementRecordId) {
+    const measurement = await getMeasurementRecords(db).findOne({ _id: measurementRecordId });
+    if (!measurement) {
+      res.status(404).json({ error: "The selected measurement sheet could not be found." });
+      return;
+    }
+    const existingLink = await submissions.findOne({
+      _id: { $ne: item._id },
+      measurementRecordId,
+    });
+    if (existingLink) {
+      res.status(409).json({ error: "This measurement sheet is already linked to another rate request." });
+      return;
+    }
+  }
   const revisionHistory = item.revisionHistory ?? [];
   const revision = {
     revisionNumber: revisionHistory.length + 1,
@@ -339,6 +381,7 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
     windowQty: item.windowQty,
     totalSqFt: item.totalSqFt,
     glassType: item.glassType,
+    priority: item.priority ?? "normal",
     averageSqFtPerQty: item.averageSqFtPerQty,
     previousStatus: item.status,
     revisedBy: actor.id,
@@ -349,28 +392,39 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
     decidedByName: item.decidedByName,
     decisionComment: item.decisionComment,
   };
-  const updated = await submissions.findOneAndUpdate(
-    { _id: item._id, updatedAt: item.updatedAt },
-    {
-      $set: {
-        clientName: clientName.trim(),
-        clientNameLower: clientName.trim().toLowerCase(),
-        location: location?.trim() || null,
-        windowQty,
-        totalSqFt,
-        glassType: glassType.trim(),
-        averageSqFtPerQty: Math.round((totalSqFt / windowQty + Number.EPSILON) * 10000) / 10000,
-        status: "awaiting_pdf",
-        pdfNeedsRefresh: Boolean(item.pdfFilename || item.pdfStoragePath || item.pdfGridFsId),
-        decisionComment: null,
-        decidedBy: null,
-        decidedByName: null,
-        updatedAt: now,
+  let updated: QuotationRateSubmissionDocument | null;
+  try {
+    updated = await submissions.findOneAndUpdate(
+      { _id: item._id, updatedAt: item.updatedAt },
+      {
+        $set: {
+          clientName: clientName.trim(),
+          clientNameLower: clientName.trim().toLowerCase(),
+          location: location?.trim() || null,
+          windowQty,
+          totalSqFt,
+          glassType: glassType.trim(),
+          priority: parsedBody.data.priority ?? item.priority ?? "normal",
+          measurementRecordId,
+          averageSqFtPerQty: Math.round((totalSqFt / windowQty + Number.EPSILON) * 10000) / 10000,
+          status: "awaiting_pdf",
+          pdfNeedsRefresh: Boolean(item.pdfFilename || item.pdfStoragePath || item.pdfGridFsId),
+          decisionComment: null,
+          decidedBy: null,
+          decidedByName: null,
+          updatedAt: now,
+        },
+        $push: { revisionHistory: revision },
       },
-      $push: { revisionHistory: revision },
-    },
-    { returnDocument: "after" },
-  );
+      { returnDocument: "after" },
+    );
+  } catch (error) {
+    if (isDuplicateKeyError(error) && measurementRecordId) {
+      res.status(409).json({ error: "This measurement sheet is already linked to another rate request." });
+      return;
+    }
+    throw error;
+  }
   if (!updated) {
     res.status(409).json({ error: "This request changed while you were editing it. Refresh and try again." });
     return;

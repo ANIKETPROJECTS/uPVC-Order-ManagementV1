@@ -655,9 +655,9 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     "master-admin": "System overview",
     operator: "Production floor",
     manager: "Operations overview",
-    "rate-approver": "Rate approval queue",
+    "rate-approver": "Rate request history",
     accounts: "Payments and collections",
-    "quotation-team": "Quotation workspace",
+    "quotation-team": "Quotations & Rates",
   };
   res.json(
     GetDashboardResponse.parse({

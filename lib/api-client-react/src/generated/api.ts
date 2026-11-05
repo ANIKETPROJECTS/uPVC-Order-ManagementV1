@@ -8280,7 +8280,7 @@ export const getListQuotationRateSubmissionsUrl = () => {
 }
 
 /**
- * @summary List the current user's rate submissions and assigned approval queue
+ * @summary List rate request history and assigned requests
  */
 export const listQuotationRateSubmissions = async ( options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmissionList> => {
 
@@ -8327,7 +8327,7 @@ export type ListQuotationRateSubmissionsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List the current user's rate submissions and assigned approval queue
+ * @summary List rate request history and assigned requests
  */
 
 export function useListQuotationRateSubmissions<TData = Awaited<ReturnType<typeof listQuotationRateSubmissions>>, TError = ErrorType<unknown>>(
@@ -8357,7 +8357,7 @@ export const getCreateQuotationRateSubmissionUrl = () => {
 }
 
 /**
- * @summary Submit quotation details for rate approval
+ * @summary Create a rate request
  */
 export const createQuotationRateSubmission = async (quotationRateSubmissionInput: QuotationRateSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmission> => {
 
@@ -8423,7 +8423,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateQuotationRateSubmissionMutationVariables = {data: BodyType<QuotationRateSubmissionInput>}
 
     /**
- * @summary Submit quotation details for rate approval
+ * @summary Create a rate request
  */
 export const useCreateQuotationRateSubmission = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createQuotationRateSubmission>>, TError,CreateQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -3928,7 +3928,7 @@ export const SendTestNotificationResponse = zod.object({
 
 
 /**
- * @summary List the current user's rate submissions and assigned approval queue
+ * @summary List rate request history and assigned requests
  */
 export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "id": zod.string(),
@@ -3941,6 +3941,7 @@ export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "windowQty": zod.number().int(),
   "totalSqFt": zod.number(),
   "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
   "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
@@ -3976,7 +3977,7 @@ export const ListQuotationRateSubmissionsResponse = zod.array(ListQuotationRateS
 
 
 /**
- * @summary Submit quotation details for rate approval
+ * @summary Create a rate request
  */
 export const createQuotationRateSubmissionBodyClientNameMax = 160;
 
@@ -3996,7 +3997,9 @@ export const CreateQuotationRateSubmissionBody = zod.object({
   "location": zod.string().max(createQuotationRateSubmissionBodyLocationMax).nullable(),
   "windowQty": zod.number().int().min(1).max(createQuotationRateSubmissionBodyWindowQtyMax),
   "totalSqFt": zod.number().min(createQuotationRateSubmissionBodyTotalSqFtMin).max(createQuotationRateSubmissionBodyTotalSqFtMax),
-  "glassType": zod.string().min(1).max(createQuotationRateSubmissionBodyGlassTypeMax)
+  "glassType": zod.string().min(1).max(createQuotationRateSubmissionBodyGlassTypeMax),
+  "priority": zod.enum(['normal', 'urgent']).optional(),
+  "measurementRecordId": zod.string().nullish()
 })
 
 export const CreateQuotationRateSubmissionResponse = zod.object({
@@ -4010,6 +4013,7 @@ export const CreateQuotationRateSubmissionResponse = zod.object({
   "windowQty": zod.number().int(),
   "totalSqFt": zod.number(),
   "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
   "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
@@ -4072,7 +4076,9 @@ export const UpdateQuotationRateSubmissionBody = zod.object({
   "location": zod.string().max(updateQuotationRateSubmissionBodyLocationMax).nullable(),
   "windowQty": zod.number().int().min(1).max(updateQuotationRateSubmissionBodyWindowQtyMax),
   "totalSqFt": zod.number().min(updateQuotationRateSubmissionBodyTotalSqFtMin).max(updateQuotationRateSubmissionBodyTotalSqFtMax),
-  "glassType": zod.string().min(1).max(updateQuotationRateSubmissionBodyGlassTypeMax)
+  "glassType": zod.string().min(1).max(updateQuotationRateSubmissionBodyGlassTypeMax),
+  "priority": zod.enum(['normal', 'urgent']).optional(),
+  "measurementRecordId": zod.string().nullish()
 })
 
 export const UpdateQuotationRateSubmissionResponse = zod.object({
@@ -4086,6 +4092,7 @@ export const UpdateQuotationRateSubmissionResponse = zod.object({
   "windowQty": zod.number().int(),
   "totalSqFt": zod.number(),
   "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
   "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
@@ -4179,6 +4186,7 @@ export const LinkQuotationRateSubmissionOrderResponse = zod.object({
   "windowQty": zod.number().int(),
   "totalSqFt": zod.number(),
   "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
   "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
@@ -4235,6 +4243,7 @@ export const UploadQuotationRateSubmissionPdfResponse = zod.object({
   "windowQty": zod.number().int(),
   "totalSqFt": zod.number(),
   "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
   "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
@@ -4305,6 +4314,7 @@ export const DecideQuotationRateSubmissionResponse = zod.object({
   "windowQty": zod.number().int(),
   "totalSqFt": zod.number(),
   "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
   "status": zod.enum(['awaiting_pdf', 'pending_review', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),

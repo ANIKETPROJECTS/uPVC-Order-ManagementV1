@@ -50,9 +50,9 @@ function NotificationCenter({ navigate }: { navigate: (path: string) => void }) 
   };
   const openNotification = (item: NonNullable<typeof center>['items'][number]) => {
     markOne.mutate({ notificationId: item.id }, { onSuccess: () => void queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() }) });
-    const target = item.quotationId ? (item.type === 'approval_request' || item.type === 'approval_reminder' ? `/quotation-approvals?quote=${item.quotationId}` : `/quotation-builder?quote=${item.quotationId}&section=drafts`) : item.url;
+    const target = item.quotationId ? (item.type === 'approval_request' || item.type === 'approval_reminder' ? `/quotation-approvals?quote=${item.quotationId}` : `/quotations-rates?quote=${item.quotationId}`) : item.url;
     setOpen(false);
-    navigate(target || '/quotation-builder');
+    navigate(target || '/quotations-rates');
   };
   return <div className="relative">
     <Button variant="ghost" size="icon" aria-label={`Notifications${center?.unreadCount ? `, ${center.unreadCount} unread` : ''}`} onClick={() => setOpen((value) => !value)} data-testid="button-notification-bell" className="relative">
@@ -88,7 +88,7 @@ const iconMap: Record<string, SidebarIconName> = {
   installation: 'installation',
 };
 
-const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : `/${key}`;
+const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : key === 'quotation-builder' ? '/quotations-rates' : `/${key}`;
 const SIDEBAR_SCROLL_STORAGE_KEY = 'framewise-sidebar-scroll-position';
 const isModuleActive = (key: string, location: string) => {
   const isDispatchScanner = location.startsWith('/order-scanner')
@@ -99,7 +99,9 @@ const isModuleActive = (key: string, location: string) => {
       ? location.startsWith('/order-hub') || location.startsWith('/order-status')
       : key === 'dispatch'
         ? location.startsWith('/dispatch') || isDispatchScanner
-    : location.startsWith(pathForModule(key));
+    : key === 'quotation-builder'
+      ? location.startsWith('/quotations-rates') || location.startsWith('/quotation-builder')
+      : location.startsWith(pathForModule(key));
 };
 
 const navigationGroups: { id: string; label: string; moduleKeys: string[] }[] = [
@@ -120,9 +122,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
   const logout = useLogout();
   const isMasterAdmin = user.roleId === 'master-admin';
   const canManageApprover = isMasterAdmin || user.permissions?.['user-access'] === 'edit';
-  const canOpenApprovalQueue = canManageApprover
-    || user.roleId === 'approver'
-    || user.permissions?.['rate-approval'] === 'edit';
 
   const signOut = () => {
     logout.mutate(undefined, {
@@ -265,10 +264,6 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
               {!collapsed && <span className="flex-1">QR scanner</span>}
               {collapsed && <span className="sr-only">QR scanner</span>}
             </Link>}
-            {canOpenApprovalQueue && <Link href="/quotation-approvals" onClick={preserveSidebarScroll} title={collapsed ? 'Quotation approvals' : undefined} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${location.startsWith('/quotation-approvals') ? 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-quotation-approvals">
-              <Bell size={22} className="mx-[3px] shrink-0" />
-              {!collapsed && <span className="flex-1">Quotation approvals</span>}
-            </Link>}
             <div aria-hidden="true" className="mx-3 my-3 border-t border-sidebar-border" />
             {orderHubModule && canOpenOrderScanner && renderModuleLink(orderHubModule)}
             {navigationGroups.map((group) => {
@@ -313,7 +308,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
       <main className={`min-h-[100dvh] transition-[margin] duration-200 ${collapsed ? 'md:ml-[76px]' : 'md:ml-[260px]'}`}>
          <header className="sticky top-0 z-20 flex min-h-[76px] items-center justify-between gap-3 border-b border-border bg-background/90 px-4 pl-[72px] backdrop-blur sm:px-5 md:px-8">
            <div className="min-w-0"><p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">{eyebrow || 'Workspace'}</p><h1 className="mt-1 break-words font-display text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">{title}</h1></div>
-            <div className="flex items-center gap-2 sm:gap-3"><NotificationCenter navigate={(path) => setLocation(path)} />{canOpenApprovalQueue && <Link href="/quotation-approvals" className="hidden rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-primary sm:inline-flex">Approvals</Link>}<div className="hidden items-center gap-3 sm:flex"><span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground"><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />{user.roleName}</span><UserAvatar name={user.name} src={user.avatarUrl} size="md" /></div></div>
+            <div className="flex items-center gap-2 sm:gap-3"><NotificationCenter navigate={(path) => setLocation(path)} /><div className="hidden items-center gap-3 sm:flex"><span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground"><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />{user.roleName}</span><UserAvatar name={user.name} src={user.avatarUrl} size="md" /></div></div>
         </header>
         <div className="app-grid min-h-[calc(100dvh-76px)] px-5 py-6 md:px-8 md:py-8">{children}</div>
       </main>

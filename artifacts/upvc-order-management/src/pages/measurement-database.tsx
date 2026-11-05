@@ -418,7 +418,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
         <Card className="overflow-hidden border-border/80" data-testid="card-measurement-register">
           <CardHeader className="border-b border-border/70">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Register</p><CardTitle className="mt-1 font-display text-lg">Client measurement sheets</CardTitle><p className="mt-1 text-xs text-muted-foreground">One record per list or grid card, with a permanent sheet ID, Rate Approval link, and retained versions.</p></div>
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Register</p><CardTitle className="mt-1 font-display text-lg">Client measurement sheets</CardTitle><p className="mt-1 text-xs text-muted-foreground">One record per list or grid card, with a permanent sheet ID, Quotations & Rates link, and retained versions.</p></div>
               <span className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground"><ClipboardList size={13} /> {records.length} records</span>
             </div>
             {canEdit && <div className="mt-3">
@@ -493,7 +493,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                           <div className="min-w-0 space-y-1">
                             <p className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">Measurement Sheet ID</p>
                             <code className="block break-all font-mono text-xs font-semibold text-primary" title={record.sheetId} data-testid={`text-measurement-sheet-id-${record.id}`}>{measurementSheetIdLabel(record.id, record.sheetId)}</code>
-                            {record.quotationRequestId && <p className="text-[10px] text-muted-foreground">Rate Approval request <code className="font-mono font-semibold text-foreground" data-testid={`text-measurement-quotation-id-${record.id}`}>{record.quotationRequestId}</code></p>}
+                            {record.quotationRequestId && <p className="text-[10px] text-muted-foreground">Rate request <code className="font-mono font-semibold text-foreground" data-testid={`text-measurement-quotation-id-${record.id}`}>{record.quotationRequestId}</code></p>}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             {!isEditing && <Button type="button" variant="outline" size="sm" onClick={() => navigate(`/measurements/${record.id}`)} data-testid={`button-view-measurement-record-${record.id}`}><Eye size={14} /> View</Button>}
@@ -534,7 +534,7 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
                               className="h-4 w-4 accent-primary"
                               data-testid={`checkbox-link-quotation-${record.id}`}
                             />
-                            Link directly to a Rate Approval request ID
+                            Link directly to a rate request ID
                           </label>
                           {edit.linkQuotation && <QuotationRequestLookup
                             selectedId={edit.linkQuotationSubmissionId}

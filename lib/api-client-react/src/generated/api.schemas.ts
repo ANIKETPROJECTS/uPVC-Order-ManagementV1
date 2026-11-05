@@ -2837,6 +2837,14 @@ export interface NotificationCenter {
   unreadCount: number;
 }
 
+export type RateRequestPriority = typeof RateRequestPriority[keyof typeof RateRequestPriority];
+
+
+export const RateRequestPriority = {
+  normal: 'normal',
+  urgent: 'urgent',
+} as const;
+
 export interface QuotationRateSubmissionRevision {
   revisionNumber: number;
   clientName: string;
@@ -2876,6 +2884,7 @@ export interface QuotationRateSubmission {
   windowQty: number;
   totalSqFt: number;
   glassType: string;
+  priority: RateRequestPriority;
   averageSqFtPerQty: number;
   status: QuotationRateSubmissionStatus;
   /** @nullable */
@@ -2945,6 +2954,9 @@ export interface QuotationRateSubmissionInput {
      * @maxLength 120
      */
   glassType: string;
+  priority?: RateRequestPriority;
+  /** @nullable */
+  measurementRecordId?: string | null;
 }
 
 export type QuotationRateDecisionInputDecision = typeof QuotationRateDecisionInputDecision[keyof typeof QuotationRateDecisionInputDecision];

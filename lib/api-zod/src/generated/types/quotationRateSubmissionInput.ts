@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { RateRequestPriority } from './rateRequestPriority';
 
 export interface QuotationRateSubmissionInput {
   /**
@@ -32,4 +33,7 @@ export interface QuotationRateSubmissionInput {
      * @maxLength 120
      */
   glassType: string;
+  priority?: RateRequestPriority;
+  /** @nullable */
+  measurementRecordId?: string | null;
 }

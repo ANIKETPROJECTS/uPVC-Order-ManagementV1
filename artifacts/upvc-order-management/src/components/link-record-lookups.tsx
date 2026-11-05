@@ -51,8 +51,8 @@ export function QuotationRequestLookup({
           if (selected) onSelect(selected);
         }}
       >
-        <SelectTrigger className="min-w-0 overflow-hidden" aria-label="Select a Rate Approval request" data-testid="select-quotation-request">
-          <SelectValue className="min-w-0 flex-1 truncate" placeholder={results.isLoading ? 'Loading current requests…' : 'Choose from current Rate Approval requests'}>
+        <SelectTrigger className="min-w-0 overflow-hidden" aria-label="Select a rate request" data-testid="select-quotation-request">
+          <SelectValue className="min-w-0 flex-1 truncate" placeholder={results.isLoading ? 'Loading current requests…' : 'Choose from current rate requests'}>
             {selectedId ? selectedLabel || selectedId : undefined}
           </SelectValue>
         </SelectTrigger>

@@ -3,14 +3,14 @@ name: Quotation request lifecycle
 description: Owner-approved rules for editing, deleting, and reopening quotation rate requests.
 ---
 
-Status alone must not prevent a request's authorized owner from editing or deleting it. Editing a decided request returns it to the PDF-submission step for a fresh approval cycle, and prior request and decision details remain in revision history. Deleting a request also removes its approval history and associated PDF.
+Status alone must not prevent a request's authorized owner from editing or deleting it. Editing a decided request returns it to the PDF-submission step for a fresh rate-assignment cycle, and prior request and decision details remain in revision history. Deleting a request also removes its history and associated PDF.
 
-**Why:** The project owner chose edits and deletes in every status, with edits returning decided requests to approval and deletion removing the request and its approval record.
+**Why:** The project owner chose edits and deletes in every status, with edits returning decided requests to rate assignment and deletion removing the request and its history.
 
 **How to apply:** Preserve existing owner/master-admin authorization boundaries. Mark a retained Eva PDF as stale on edit and keep its bytes until an updated PDF replaces it or the whole request is deleted.
 
-In the Quotation approvals queue, list cards should stay compact because the separate View action opens the full request. Keep the summary, status, row controls, decision note, and Approve/Reject actions available inline; leave the grid card detail layout unchanged.
+For new rate requests, higher-ups provide a rate; they do not approve or reject the request. Keep existing in-flight approval records accessible during migration, but do not make approval decisions the new request workflow.
 
-**Why:** The project owner asked for a less expanded list view while retaining inline review actions and a separate full-detail View.
+**Why:** The project owner clarified that managers give a rate rather than approve anything.
 
-**How to apply:** Scope compact spacing and summary-only metrics to list mode. Do not hide existing View/Edit/Delete/Link/PDF actions or approval controls.
+**How to apply:** Build a rate-assignment action for new requests and preserve historical approval data until its migration is explicitly defined. Ask for the rate's value/unit if it is not specified.

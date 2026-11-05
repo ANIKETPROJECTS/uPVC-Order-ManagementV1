@@ -88,7 +88,7 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
       queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() }),
     ]);
   };
-  const backToRequests = () => setLocation('/quotation-builder?section=rates&pane=requests');
+  const backToRequests = () => setLocation('/quotations-rates?section=rates&pane=requests');
   const validatePdf = (file: File | null) => {
     if (!file) return true;
     if (!file.name.toLowerCase().endsWith('.pdf') || (file.type && file.type !== 'application/pdf' && file.type !== 'application/octet-stream')) {
@@ -130,7 +130,7 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
     await refresh();
     setIsEditing(false);
     setReplacementPdf(null);
-    setLocation(`/quotation-builder/requests/${submissionId}`);
+    setLocation(`/quotations-rates/requests/${submissionId}`);
     if (!replacementPdf) {
       toast({ title: 'Request updated', description: 'It is back in Awaiting PDF until an updated Eva PDF is attached.' });
       return;
@@ -158,7 +158,7 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
   };
 
   return (
-    <AppShell user={user} title="Quotation request details" eyebrow="Module 3 · rate approval">
+    <AppShell user={user} title="Rate Request Details" eyebrow="Quotations & Rates">
       <div className="space-y-5" data-testid="page-quotation-rate-request-detail">
         <Button type="button" variant="outline" onClick={backToRequests} data-testid="button-back-to-quotation-requests">
           <ArrowLeft size={15} /> Back to quotation requests
@@ -186,7 +186,7 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`inline-flex rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] ${statusStyle(submission.status)}`} data-testid="status-quotation-request-detail">{statusName(submission.status)}</span>
-                    {canManage && !isEditing && <Button type="button" variant="outline" size="sm" onClick={() => { setValues(editValues(submission)); setIsEditing(true); setLocation(`/quotation-builder/requests/${submissionId}?edit=1`); }} data-testid="button-edit-quotation-request-detail"><Pencil size={14} /> Edit</Button>}
+                    {canManage && !isEditing && <Button type="button" variant="outline" size="sm" onClick={() => { setValues(editValues(submission)); setIsEditing(true); setLocation(`/quotations-rates/requests/${submissionId}?edit=1`); }} data-testid="button-edit-quotation-request-detail"><Pencil size={14} /> Edit</Button>}
                     {canManage && !isEditing && <Button type="button" variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={remove.isPending} onClick={() => void deleteRequest()} data-testid="button-delete-quotation-request-detail"><Trash2 size={14} /> Delete</Button>}
                   </div>
                 </div>
@@ -213,12 +213,13 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
                       {replacementPdf && <p className="mt-2 truncate text-[11px] text-primary">{replacementPdf.name} · {(replacementPdf.size / 1024 / 1024).toFixed(2)} MiB</p>}
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => { setIsEditing(false); setReplacementPdf(null); setLocation(`/quotation-builder/requests/${submissionId}`); }} data-testid="button-cancel-edit-quotation-request">Cancel</Button>
+                      <Button type="button" variant="outline" onClick={() => { setIsEditing(false); setReplacementPdf(null); setLocation(`/quotations-rates/requests/${submissionId}`); }} data-testid="button-cancel-edit-quotation-request">Cancel</Button>
                       <Button type="submit" disabled={update.isPending || upload.isPending} data-testid="button-save-quotation-request">{update.isPending || upload.isPending ? 'Saving…' : 'Save changes'} <FileText size={14} /></Button>
                     </div>
                   </form>
                 ) : (
-                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4" data-testid="quotation-request-details">
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4" data-testid="quotation-request-details">
+                      <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Priority</p><p className="mt-1 text-sm font-semibold">{submission.priority === 'urgent' ? 'Urgent' : 'Normal'}</p></div>
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Window quantity</p><p className="mt-1 text-sm font-semibold">{submission.windowQty.toLocaleString('en-IN')}</p></div>
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Total area</p><p className="mt-1 text-sm font-semibold">{submission.totalSqFt.toLocaleString('en-IN')} sq. ft.</p></div>
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Average area / window</p><p className="mt-1 text-sm font-semibold">{Number(submission.averageSqFtPerQty).toFixed(2)} sq. ft.</p></div>

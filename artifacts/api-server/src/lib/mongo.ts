@@ -38,8 +38,8 @@ export type ClientType = "Project" | "Retail";
 export const MODULES = [
   { id: "user-access", label: "Multi-User Access & Roles" },
   { id: "order-hub", label: "Client & Order ID Hub" },
-  { id: "quotation-builder", label: "Quotation & Rate Approval" },
-  { id: "rate-approval", label: "Rate Approval Queue" },
+  { id: "quotation-builder", label: "Quotations & Rates" },
+  { id: "rate-approval", label: "Rate Request History" },
   { id: "confirmation", label: "Confirmation / Purchase Order" },
   { id: "measurements", label: "Measurement Database" },
   { id: "qr-assembly", label: "QR Code & Assembly Tracking" },
@@ -624,6 +624,7 @@ export type QuotationRateSubmissionStatus =
   | "pending_review"
   | "approved"
   | "rejected";
+export type RateRequestPriority = "normal" | "urgent";
 export interface QuotationRateSubmissionRevisionDocument {
   revisionNumber: number;
   clientName: string;
@@ -631,6 +632,7 @@ export interface QuotationRateSubmissionRevisionDocument {
   windowQty: number;
   totalSqFt: number;
   glassType: string;
+  priority?: RateRequestPriority;
   averageSqFtPerQty: number;
   previousStatus: QuotationRateSubmissionStatus;
   revisedBy: string;
@@ -652,6 +654,7 @@ export interface QuotationRateSubmissionDocument {
   windowQty: number;
   totalSqFt: number;
   glassType: string;
+  priority?: RateRequestPriority;
   averageSqFtPerQty: number;
   status: QuotationRateSubmissionStatus;
   pdfFilename: string | null;

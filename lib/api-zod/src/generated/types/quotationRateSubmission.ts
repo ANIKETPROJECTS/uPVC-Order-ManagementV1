@@ -7,6 +7,7 @@
  */
 import type { QuotationRateSubmissionRevision } from './quotationRateSubmissionRevision';
 import type { QuotationRateSubmissionStatus } from './quotationRateSubmissionStatus';
+import type { RateRequestPriority } from './rateRequestPriority';
 
 export interface QuotationRateSubmission {
   id: string;
@@ -24,6 +25,7 @@ export interface QuotationRateSubmission {
   windowQty: number;
   totalSqFt: number;
   glassType: string;
+  priority: RateRequestPriority;
   averageSqFtPerQty: number;
   status: QuotationRateSubmissionStatus;
   /** @nullable */

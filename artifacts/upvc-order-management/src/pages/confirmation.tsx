@@ -579,7 +579,7 @@ function QuotationRequestsPanel({
       </div>
     </div>
     {entry.quotationRequests.length === 0
-      ? <p className="mt-3 rounded-lg border border-dashed border-border/75 px-3 py-3 text-[11px] text-muted-foreground" data-testid={`state-no-linked-quotations-${entry.orderRecordId}`}>No quotation request is linked to this order yet. Link one from Rate Approval to upload a request-specific confirmation.</p>
+      ? <p className="mt-3 rounded-lg border border-dashed border-border/75 px-3 py-3 text-[11px] text-muted-foreground" data-testid={`state-no-linked-quotations-${entry.orderRecordId}`}>No quotation request is linked to this order yet. Link one from Quotations & Rates to upload a request-specific confirmation.</p>
       : <div className="mt-3 space-y-2">
         {entry.quotationRequests.map((request) => {
           const requestConfirmations = entry.confirmationDocuments.filter((document) => document.quotationRequestId === request.id);
