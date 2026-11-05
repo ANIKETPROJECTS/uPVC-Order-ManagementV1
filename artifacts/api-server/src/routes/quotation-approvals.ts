@@ -49,19 +49,15 @@ class LinkConflict extends Error {}
 const isDuplicateKeyError = (error: unknown) =>
   Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000);
 
-function quotationRequestDateCode(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
+function quotationRequestYearCode(date: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    year: "2-digit",
     timeZone: "Asia/Kolkata",
-  }).formatToParts(date);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
-  return `${part("day")}${part("month")}${part("year")}`;
+  }).format(date);
 }
 
 function formatQuotationRequestId(sequence: number, createdAt: Date): string {
-  return `QTR-${String(sequence).padStart(3, "0")}-${quotationRequestDateCode(createdAt)}`;
+  return `QT-${quotationRequestYearCode(createdAt)}-${String(sequence).padStart(4, "0")}`;
 }
 
 type Actor = {
@@ -289,8 +285,9 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     }
   }
   const counters = getCounters(db);
+  const year = quotationRequestYearCode(now);
   const counter = await counters.findOneAndUpdate(
-    { _id: "quotation-request-sequence" },
+    { _id: `quotation-year-sequence:${year}` },
     { $inc: { value: 1 }, $set: { updatedAt: now } },
     { returnDocument: "after", upsert: true },
   );
@@ -356,7 +353,7 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
   if (!actor) return;
   const db = await getMongoDb();
   const submissions = getQuotationRateSubmissions(db);
-  const item = await submissions.findOne({ _id: parsedParams.data.submissionId });
+  const item = await submissions.findOne({ $or: [{ _id: parsedParams.data.submissionId }, { legacyId: parsedParams.data.submissionId }] });
   if (!item) {
     res.status(404).json({ error: "Quotation rate submission not found." });
     return;
@@ -464,7 +461,7 @@ router.delete("/quotation-rate-submissions/:submissionId", async (req, res): Pro
   if (!actor) return;
   const db = await getMongoDb();
   const submissions = getQuotationRateSubmissions(db);
-  const item = await submissions.findOne({ _id: parsedParams.data.submissionId });
+  const item = await submissions.findOne({ $or: [{ _id: parsedParams.data.submissionId }, { legacyId: parsedParams.data.submissionId }] });
   if (!item) {
     res.status(404).json({ error: "Quotation rate submission not found." });
     return;
@@ -497,7 +494,7 @@ router.patch(
     if (!actor) return;
     const db = await getMongoDb();
     const submissions = getQuotationRateSubmissions(db);
-    const item = await submissions.findOne({ _id: parsedParams.data.submissionId });
+    const item = await submissions.findOne({ $or: [{ _id: parsedParams.data.submissionId }, { legacyId: parsedParams.data.submissionId }] });
     if (!item) {
       res.status(404).json({ error: "Quotation rate submission not found." });
       return;
@@ -615,7 +612,7 @@ router.post(
     if (!actor) return;
     const db = await getMongoDb();
     const submissions = getQuotationRateSubmissions(db);
-    const item = await submissions.findOne({ _id: parsed.data.submissionId });
+    const item = await submissions.findOne({ $or: [{ _id: parsed.data.submissionId }, { legacyId: parsed.data.submissionId }] });
     if (!item) {
       res.status(404).json({ error: "Quotation rate submission not found." });
       return;
@@ -688,7 +685,7 @@ router.get("/quotation-rate-submissions/:submissionId/pdf", async (req, res, nex
   const actor = await getActor(req, res);
   if (!actor) return;
   const db = await getMongoDb();
-  const item = await getQuotationRateSubmissions(db).findOne({ _id: parsed.data.submissionId });
+  const item = await getQuotationRateSubmissions(db).findOne({ $or: [{ _id: parsed.data.submissionId }, { legacyId: parsed.data.submissionId }] });
   if (!item || (!item.pdfStoragePath && !item.pdfGridFsId)) {
     res.status(404).json({ error: "Quotation PDF not found." });
     return;
@@ -771,7 +768,7 @@ router.post("/quotation-rate-submissions/:submissionId/decision", async (req, re
     { returnDocument: "after" },
   );
   if (!updated) {
-    const existing = await collection.findOne({ _id: parsedParams.data.submissionId });
+    const existing = await collection.findOne({ $or: [{ _id: parsedParams.data.submissionId }, { legacyId: parsedParams.data.submissionId }] });
     if (!existing) {
       res.status(404).json({ error: "Quotation rate submission not found." });
       return;
@@ -812,7 +809,7 @@ router.post("/quotation-rate-submissions/:submissionId/rate", async (req, res): 
     { returnDocument: "after" },
   );
   if (!updated) {
-    const existing = await getQuotationRateSubmissions(db).findOne({ _id: parsedParams.data.submissionId });
+    const existing = await getQuotationRateSubmissions(db).findOne({ $or: [{ _id: parsedParams.data.submissionId }, { legacyId: parsedParams.data.submissionId }] });
     if (!existing) {
       res.status(404).json({ error: "Quotation rate submission not found." });
       return;

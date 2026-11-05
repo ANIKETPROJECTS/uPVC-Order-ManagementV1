@@ -691,7 +691,7 @@ router.post(
           ? formatQuotationOrderId(clientType, quotation.quoteNo)
           : `TMP-${String(sequenceNo).padStart(6, "0")}`;
     if (!generatedOrderId) {
-      res.status(400).json({ error: "The quotation number must use the QT- followed by digits format." });
+      res.status(400).json({ error: "The quotation number must use the QT-YY-#### format." });
       return;
     }
     if (quotation && await getOrders(db).findOne({ quotationId: quotation._id })) {

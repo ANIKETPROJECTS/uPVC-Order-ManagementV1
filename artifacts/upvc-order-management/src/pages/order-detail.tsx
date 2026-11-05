@@ -284,7 +284,7 @@ function OrderRecordCard({ order, user, id }: { order: Order; user: User; id: st
   const [selectedQuotationId, setSelectedQuotationId] = useState('');
   const availableQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
     !quotation.sampleOnly &&
-    /^QT-\d+$/i.test(quotation.quoteNo.trim()),
+    /^QT-\d{2}-\d{4,}$/i.test(quotation.quoteNo.trim()),
   );
   const editRequested = new URLSearchParams(window.location.search).get('edit') === 'true';
   const [editing, setEditing] = useState(() => canEdit && editRequested);

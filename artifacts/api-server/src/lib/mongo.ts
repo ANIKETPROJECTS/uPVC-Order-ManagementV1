@@ -555,6 +555,7 @@ export interface QuotationDocument {
   _id: string;
   sequenceNo: number;
   quoteNo: string;
+  legacyQuoteNo?: string | null;
   clientId: string | null;
   customerName: string;
   customerPhone: string;
@@ -649,6 +650,7 @@ export interface QuotationRateSubmissionRevisionDocument {
 }
 export interface QuotationRateSubmissionDocument {
   _id: string;
+  legacyId?: string | null;
   orderRecordId: string | null;
   orderId: string | null;
   measurementRecordId?: string | null;
@@ -1170,6 +1172,134 @@ async function migrateOrderIds(db: Db, now: Date): Promise<void> {
       "Migrated order IDs to date/location sequence format",
     );
   }
+}
+
+function quotationYearCode(date: Date): string {
+  const year = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    year: "2-digit",
+  }).format(date);
+  return year;
+}
+
+function quotationYearSequenceCounterId(year: string): string {
+  return `quotation-year-sequence:${year}`;
+}
+
+async function migrateQuotationDocumentIds(db: Db, now: Date): Promise<void> {
+  const counters = getCounters(db);
+  const migrationMarkerId = "quotationDocumentIdFormatV1";
+  const marker = await counters.findOne({ _id: migrationMarkerId });
+  if (marker?.value === 1) return;
+
+  const quotations = await getQuotations(db)
+    .find({})
+    .sort({ createdAt: 1, sequenceNo: 1, _id: 1 })
+    .toArray();
+  const sequenceByYear = new Map<string, number>();
+  const plans = quotations.map((quotation) => {
+    const year = quotationYearCode(quotation.createdAt);
+    const sequence = (sequenceByYear.get(year) ?? 0) + 1;
+    sequenceByYear.set(year, sequence);
+    return {
+      quotation,
+      quoteNo: `QT-${year}-${String(sequence).padStart(4, "0")}`,
+    };
+  });
+
+  // Move through unique temporary values first so the unique quoteNo index
+  // cannot reject a target ID that is currently held by another legacy row.
+  if (plans.length) {
+    await getQuotations(db).bulkWrite(plans.map(({ quotation }) => ({
+      updateOne: {
+        filter: { _id: quotation._id },
+        update: {
+          $set: {
+            quoteNo: `__QT_MIGRATING__${quotation._id}`,
+            legacyQuoteNo: quotation.legacyQuoteNo ?? quotation.quoteNo,
+          },
+        },
+      },
+    })));
+
+    await getQuotations(db).bulkWrite(plans.map(({ quotation, quoteNo }) => ({
+      updateOne: {
+        filter: { _id: quotation._id },
+        update: { $set: { quoteNo } },
+      },
+    })));
+
+    await getOrders(db).bulkWrite(plans.map(({ quotation, quoteNo }) => ({
+      updateMany: {
+        filter: { quotationId: quotation._id },
+        update: { $set: { quotationNo: quoteNo } },
+      },
+    })));
+  }
+
+  for (const [year, value] of sequenceByYear) {
+    await counters.updateOne(
+      { _id: quotationYearSequenceCounterId(year) },
+      { $max: { value }, $set: { updatedAt: now } },
+      { upsert: true },
+    );
+  }
+  await counters.updateOne(
+    { _id: migrationMarkerId },
+    { $set: { value: 1, updatedAt: now } },
+    { upsert: true },
+  );
+  logger.info({ migratedQuotations: plans.length }, "Migrated quotation IDs to year/sequence format");
+}
+
+async function migrateQuotationRateRequestIds(db: Db, now: Date): Promise<void> {
+  const counters = getCounters(db);
+  const migrationMarkerId = "quotationRateRequestIdFormatV1";
+  const marker = await counters.findOne({ _id: migrationMarkerId });
+  if (marker?.value === 1) return;
+
+  const submissions = getQuotationRateSubmissions(db);
+  const legacyRequests = await submissions
+    .find({ _id: /^QTR-/ })
+    .sort({ createdAt: 1, _id: 1 })
+    .toArray();
+  for (const item of legacyRequests) {
+    let migrated = await submissions.findOne({ legacyId: item._id });
+    if (!migrated) {
+      const year = quotationYearCode(item.createdAt);
+      const counter = await counters.findOneAndUpdate(
+        { _id: quotationYearSequenceCounterId(year) },
+        { $inc: { value: 1 }, $set: { updatedAt: now } },
+        { returnDocument: "after", upsert: true },
+      );
+      if (!counter || !Number.isSafeInteger(counter.value) || counter.value < 1) {
+        throw new Error("The quotation rate-request ID sequence could not be allocated.");
+      }
+      const nextId = `QT-${year}-${String(counter.value).padStart(4, "0")}`;
+      const replacement = { ...item, _id: nextId, legacyId: item.legacyId ?? item._id };
+      await submissions.insertOne(replacement);
+      migrated = replacement;
+    }
+
+    await Promise.all([
+      getMeasurementRecords(db).updateMany(
+        { quotationRequestId: item._id },
+        { $set: { quotationRequestId: migrated._id } },
+      ),
+      getOrderDocumentMetadata(db).updateMany(
+        { quotationRequestId: item._id },
+        { $set: { quotationRequestId: migrated._id } },
+      ),
+    ]);
+    await submissions.deleteOne({ _id: item._id });
+  }
+
+  await counters.updateOne(
+    { _id: migrationMarkerId },
+    { $set: { value: 1, updatedAt: now } },
+    { upsert: true },
+  );
+  logger.info({ migratedRateRequests: legacyRequests.length }, "Migrated quotation rate-request IDs");
 }
 
 async function migrateQuotationOrderIds(db: Db, now: Date): Promise<void> {
@@ -1745,6 +1875,8 @@ export async function initializeMongo(): Promise<void> {
     }
   }
 
+  await migrateQuotationDocumentIds(db, now);
+  await migrateQuotationRateRequestIds(db, now);
   await migrateQuotationOrderIds(db, now);
   await migrateOrderIds(db, now);
   await migrateProjectIdentifiers(db, now);

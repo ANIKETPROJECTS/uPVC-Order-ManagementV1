@@ -362,8 +362,15 @@ async function buildQuotationValues(
   return { ...customer, items, totals };
 }
 
-function quotationNumber(sequenceNo: number): string {
-  return `QT-${String(sequenceNo).padStart(7, "0")}`;
+function quotationYearCode(date: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    year: "2-digit",
+  }).format(date);
+}
+
+function quotationNumber(year: string, sequenceNo: number): string {
+  return `QT-${year}-${String(sequenceNo).padStart(4, "0")}`;
 }
 
 router.get("/window-profiles", async (req, res): Promise<void> => {
@@ -554,20 +561,29 @@ router.post("/quotations", async (req, res): Promise<void> => {
   try {
     const values = await buildQuotationValues(parsed.data);
     const db = await getMongoDb();
+    const now = new Date();
+    const year = quotationYearCode(now);
     const counter = await getCounters(db).findOneAndUpdate(
+      { _id: `quotation-year-sequence:${year}` },
+      { $inc: { value: 1 }, $set: { updatedAt: now } },
+      { returnDocument: "after", upsert: true },
+    );
+    if (!counter || !Number.isSafeInteger(counter.value) || counter.value < 1) {
+      throw new Error("The quotation ID sequence could not be allocated.");
+    }
+    const legacySequenceCounter = await getCounters(db).findOneAndUpdate(
       { _id: "quotation-sequence" },
       { $inc: { value: 1 }, $set: { updatedAt: new Date() } },
       { returnDocument: "after", upsert: true },
     );
-    if (!counter || !Number.isSafeInteger(counter.value) || counter.value < 1) {
+    if (!legacySequenceCounter || !Number.isSafeInteger(legacySequenceCounter.value) || legacySequenceCounter.value < 1) {
       throw new Error("The quotation sequence counter could not be allocated.");
     }
-    const sequenceNo = counter.value;
-    const now = new Date();
+    const sequenceNo = legacySequenceCounter.value;
     const document: QuotationDocument = {
       _id: randomUUID(),
       sequenceNo,
-      quoteNo: quotationNumber(sequenceNo),
+      quoteNo: quotationNumber(year, counter.value),
       clientId: values.clientId,
       customerName: values.customerName,
       customerPhone: values.customerPhone,

@@ -39,10 +39,9 @@ export function formatQuotationOrderId(
   clientType: "Project" | "Retail",
   quoteNo: string,
 ): string | null {
-  const match = /^QT-(\d+)$/i.exec(quoteNo.trim());
+  const match = /^QT-(\d{2})-(\d{4,})$/i.exec(quoteNo.trim());
   if (!match) return null;
-  const number = match[1].replace(/^0+/, "") || "0";
-  return `${clientType === "Project" ? "P" : "R"}${number}`;
+  return `${clientType === "Project" ? "P" : "R"}-${match[1]}-${match[2].padStart(4, "0")}`;
 }
 
 export function formatProjectOrderId(createdAt: Date, sequenceNo: number): string {

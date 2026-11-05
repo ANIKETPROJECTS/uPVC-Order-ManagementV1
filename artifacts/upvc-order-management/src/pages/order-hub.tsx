@@ -99,9 +99,9 @@ function OrderRowActions({
 
 const orderIdPreview = (type: Client['type'], quoteNo: string | undefined) => {
   if (!type || !quoteNo) return null;
-  const match = /^QT-(\d+)$/i.exec(quoteNo.trim());
+  const match = /^QT-(\d{2})-(\d{4,})$/i.exec(quoteNo.trim());
   if (!match) return null;
-  return `${type === 'Project' ? 'P' : 'R'}${match[1].replace(/^0+/, '') || '0'}`;
+  return `${type === 'Project' ? 'P' : 'R'}-${match[1]}-${match[2].padStart(4, '0')}`;
 };
 
 const orderSchema = z.object({
@@ -180,7 +180,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
   const siteLongitude = form.watch('siteLongitude');
   const availableQuotations = (quotationsQuery.data ?? []).filter((quotation: Quotation) =>
     !quotation.sampleOnly &&
-    /^QT-\d+$/i.test(quotation.quoteNo.trim()),
+    /^QT-\d{2}-\d{4,}$/i.test(quotation.quoteNo.trim()),
   );
   const selectedQuotation = availableQuotations.find((quotation) => quotation.id === form.watch('quotationId'));
   const previewId = orderIdPreview(clientType ?? null, selectedQuotation?.quoteNo);
