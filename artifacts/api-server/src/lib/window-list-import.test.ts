@@ -120,6 +120,7 @@ test("confirmation extraction uses the exact PDF window cells and retains normal
   assert.deepEqual(info.columns, ["SR NO", "Location", "Width", "Height", "Total Sq Feet", "Qty", "Window Type", "Glass", "Lock Type", "Profile", "Mesh"]);
   assert.equal(info.checksum?.quantity, 40);
   assert.equal(info.checksum?.calculatedAreaSqFt.toFixed(2), "1074.53");
+  assert.ok(info.windows.every((row) => !row.area || /^\d+(?:\.\d{1,2})?$/.test(row.area)), "extracted square-foot values should use at most two decimal places");
   const w1 = info.windows.find((row) => row.windowNo === "W1")!;
   assert.equal(w1.originalCells?.find((cell) => cell.columnLabel === "Glass")?.text, "6 MM CLEAR TOUGHENED GLASS");
   assert.equal(info.windows.find((row) => row.windowNo === "W13")?.page, 2);

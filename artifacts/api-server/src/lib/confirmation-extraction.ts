@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { parseWindowListPdf, parseWindowListWorkbook, type NormalizedWindowImport } from "./window-list-import";
 
 const execFile = promisify(execFileCallback);
+const roundSqFt = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 export type ConfirmationInfo = {
   status: "extracted" | "no_text" | "unsupported" | "failed";
@@ -86,7 +87,9 @@ function extractWindows(text: string) {
       location: match?.[2]?.trim() ?? "",
       width: match?.[3] ?? "",
       height: match?.[4] ?? "",
-      area: match?.[5] ?? "",
+      area: match?.[5] && Number.isFinite(Number(match[5].replace(/,/g, "")))
+        ? Number(match[5].replace(/,/g, "")).toFixed(2)
+        : match?.[5] ?? "",
       quantity: match?.[6] ?? "",
       windowType: trackType ? `${trackType}${/\bMESH\b/i.test(nearby) ? " MESH" : ""}` : louversType || "",
       glass: /\b4\s*MM\s+FROSTED\b/.test(upper) ? "4 MM Frosted glass" : upper.match(/\b\d+\s*MM\s+(?:FROSTED|CLEAR|TOUGHENED)?\s*GLASS\b/)?.[0] ?? "",
@@ -106,7 +109,7 @@ function buildInfo(text: string, method: ConfirmationInfo["method"], table?: Nor
   const terms = termSection.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^\d{1,2}\s+\S/.test(line)).map((line) => line.replace(/^\d{1,2}\s+/, "").trim());
   const windows = table ? table.rows.map((row) => ({
     windowNo: row.windowNo, location: row.location, width: row.widthMm == null ? "" : String(row.widthMm),
-    height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : String(row.areaSqFt),
+    height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : roundSqFt(row.areaSqFt).toFixed(2),
     quantity: String(row.quantity), windowType: row.windowType, glass: row.glass,
     lockType: row.lockType === "TOUCH LOCK" ? "Touch lock" : row.lockType,
     profile: row.profile === "UPVC WHITE" ? "UPVC" : row.profile,
@@ -129,7 +132,7 @@ function buildInfo(text: string, method: ConfirmationInfo["method"], table?: Nor
       checksum: {
         rowsFound: table.rows.length,
         quantity: table.totals.quantity,
-        calculatedAreaSqFt: table.totals.areaSqFt,
+         calculatedAreaSqFt: roundSqFt(table.totals.areaSqFt),
         documentAreaSqFt: table.totals.sourceAreaSqFt,
         matches: table.totals.sourceQuantity == null && table.totals.sourceAreaSqFt == null
           ? null
@@ -163,7 +166,7 @@ export async function extractConfirmationInfo(bytes: Buffer, filename: string): 
         sections: [{ title: "Workbook confirmation details", fields }],
         windows: selected.rows.map((row) => ({
           windowNo: row.windowNo, location: row.location, width: row.widthMm == null ? "" : String(row.widthMm),
-          height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : String(row.areaSqFt),
+          height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : roundSqFt(row.areaSqFt).toFixed(2),
           quantity: String(row.quantity), windowType: row.windowType, glass: row.glass, lockType: row.lockType,
           profile: row.profile, mesh: row.mesh, originalCells: row.originalCells,
           page: null, rowPosition: row.sourceRow, warnings: row.warnings, confidence: row.confidence,

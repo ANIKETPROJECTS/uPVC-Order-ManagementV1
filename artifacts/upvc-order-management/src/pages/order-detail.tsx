@@ -1040,12 +1040,13 @@ function WindowsPanel({ orderId, user, allowMultiple = false }: { orderId: strin
     </CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} allowMultiple={allowMultiple} universalMeshType={universalMeshType} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>{viewingWindow && <WindowDetailsDialog window={viewingWindow} onClose={() => setViewingWindow(null)} />}</>;
 }
 
-function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType, canMeasure, onComplete }: {
+function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType, canMeasure, lotId, onComplete }: {
   orderId: string;
   documentRecord: OrderDocument;
   windows: OrderWindow[];
   meshType: string;
   canMeasure: boolean;
+  lotId?: string | null;
   onComplete: () => void;
 }) {
   const { toast } = useToast();
@@ -1067,7 +1068,8 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
   const skipped = extractedRows.length - rowsToAdd.length - alreadyPresent;
   const addToWindows = async () => {
     if (!canMeasure || saving || rowsToAdd.length === 0) return;
-    const summary = `Add ${rowsToAdd.length} extracted window${rowsToAdd.length === 1 ? '' : 's'} from ${documentRecord.filename} to this order's Windows register?${alreadyPresent ? ` ${alreadyPresent} already-listed row${alreadyPresent === 1 ? ' will' : 's will'} be skipped.` : ''}${skipped ? ` ${skipped} incomplete row${skipped === 1 ? ' will' : 's will'} be skipped.` : ''}`;
+    const destination = lotId ? `Lot ${lotId}` : "this order's Windows register";
+    const summary = `Add ${rowsToAdd.length} extracted window${rowsToAdd.length === 1 ? '' : 's'} from ${documentRecord.filename} to ${destination}?${alreadyPresent ? ` ${alreadyPresent} already-listed row${alreadyPresent === 1 ? ' will' : 's will'} be skipped.` : ''}${skipped ? ` ${skipped} incomplete row${skipped === 1 ? ' will' : 's will'} be skipped.` : ''}`;
     if (!window.confirm(summary)) return;
     setSaving(true);
     try {
@@ -1080,7 +1082,7 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
         glassType: row.glass.trim() || null,
         meshType: meshType || null,
         frameCount: Number(row.quantity),
-        lotId: null,
+        lotId: lotId ?? null,
         frameStatus: OrderWindowReadiness.pending,
         shutterStatus: OrderWindowReadiness.pending,
         glassStatus: OrderGlassStatus.pending,
@@ -1098,7 +1100,7 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
       const result = await response.json() as { created?: number; error?: string };
       if (!response.ok) throw new Error(result.error || 'The extracted schedule could not be added to Windows.');
       onComplete();
-      toast({ title: 'Confirmation windows added', description: `${result.created ?? rowsToAdd.length} windows added. ${alreadyPresent} already listed${skipped ? ` · ${skipped} incomplete rows skipped` : ''}.` });
+      toast({ title: lotId ? `Windows added to ${lotId}` : 'Confirmation windows added', description: `${result.created ?? rowsToAdd.length} windows added. ${alreadyPresent} already listed${skipped ? ` · ${skipped} incomplete rows skipped` : ''}.` });
     } catch (error) {
       toast({ title: 'Windows could not be added', description: error instanceof Error ? error.message : 'The extracted schedule could not be added.', variant: 'destructive' });
     } finally {
@@ -1110,6 +1112,60 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
     <div><h3 className="text-xs font-bold">Extracted window schedule</h3><p className="mt-1 text-xs text-muted-foreground">{rowsToAdd.length} ready to add · {alreadyPresent} already listed{skipped ? ` · ${skipped} incomplete` : ''}.</p></div>
     {canMeasure && <Button type="button" size="sm" variant="outline" onClick={() => void addToWindows()} disabled={saving || rowsToAdd.length === 0} data-testid="button-add-confirmation-windows">{saving ? 'Adding windows…' : rowsToAdd.length ? 'Add extracted windows' : 'No new windows to add'}</Button>}
   </section>;
+}
+
+function ProjectLotConfirmationUpload({ orderId, lotId, windows, meshType, onComplete }: {
+  orderId: string;
+  lotId: string;
+  windows: OrderWindow[];
+  meshType: string;
+  onComplete: () => void;
+}) {
+  const upload = useUploadOrderDocument();
+  const [documentRecord, setDocumentRecord] = useState<OrderDocument | null>(null);
+  const [error, setError] = useState('');
+  const busy = upload.isPending;
+  const uploadConfirmation = async (file: File | undefined) => {
+    if (!file) return;
+    setError('');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Choose a confirmation file that is 10 MiB or smaller.');
+      return;
+    }
+    if (!/\.(pdf|png|jpe?g|webp|xlsx|xlsm|xls|csv)$/i.test(file.name)) {
+      setError('Choose a PDF, image, Excel, or CSV confirmation file.');
+      return;
+    }
+    try {
+      const saved = await upload.mutateAsync({ id: orderId, category: 'confirmation', filename: encodeURIComponent(file.name), data: file });
+      setDocumentRecord(saved);
+      onComplete();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The confirmation file could not be uploaded.');
+    }
+  };
+  return <div className="mt-3 border-t border-border pt-3" data-testid={`lot-confirmation-upload-${lotId}`}>
+    <label className={`inline-flex h-9 cursor-pointer items-center rounded-md border border-border bg-card px-3 text-xs font-semibold hover:bg-muted ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+      {busy ? 'Uploading and extracting…' : 'Upload confirmation file'}
+      <input className="sr-only" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xlsm,.xls,.csv" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; void uploadConfirmation(file); }} />
+    </label>
+    {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+    {documentRecord && <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+      <p className="text-xs font-semibold">{documentRecord.filename}</p>
+      {documentRecord.confirmationInfo?.status === 'extracted'
+        ? <p className="mt-1 text-xs text-muted-foreground">{documentRecord.confirmationInfo.windows.length} window rows extracted. Review the rows before adding them to {lotId}.</p>
+        : <p className="mt-1 text-xs text-amber-800">{documentRecord.confirmationInfo?.error || 'No window rows were extracted. Check the file in Confirmation info.'}</p>}
+      <ConfirmationScheduleImport
+        orderId={orderId}
+        documentRecord={documentRecord}
+        windows={windows}
+        meshType={meshType}
+        canMeasure
+        lotId={lotId}
+        onComplete={() => { setDocumentRecord(null); onComplete(); }}
+      />
+    </div>}
+  </div>;
 }
 
 function WindowDetailsDialog({ window, onClose }: { window: OrderWindow; onClose: () => void }) {
@@ -1293,10 +1349,30 @@ function ProjectLotCards({ order, windows, user, managementEnabled = false }: { 
       return <Card key={lot.id} className="border-border bg-card shadow-sm" data-testid={`card-project-lot-${lot.lotId}`}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2"><div><p className="font-mono text-xs font-bold text-primary">{lot.lotId}</p><h3 className="mt-1 font-display text-sm font-bold">{lot.name || `Lot ${String(lot.sequence).padStart(2, '0')}`}</h3></div><Link href={`/order-hub/${order.id}/lots/${encodeURIComponent(lot.lotId)}`} className="text-xs font-bold text-primary hover:underline" data-testid={`link-project-lot-${lot.lotId}`}>Open lot →</Link></div>
-          <p className="mt-3 text-xs text-muted-foreground">{lotWindows.length} {lotWindows.length === 1 ? 'window' : 'windows'} · {area ? `${area.toFixed(1)} sq ft` : 'Area not measured'}</p>
+           <p className="mt-3 text-xs text-muted-foreground">{lotWindows.length} {lotWindows.length === 1 ? 'window' : 'windows'} · {area ? `${area.toFixed(2)} sq ft` : 'Area not measured'}</p>
           <p className="mt-1 text-xs text-muted-foreground">{canViewDispatch ? `${ready} of ${lotWindows.length} fully ready · ${lastBatch ? `${lastBatch.code} ${readable(lastBatch.dispatchStatus)}` : 'No dispatch yet'}` : `${ready} of ${lotWindows.length} fully ready · Dispatch access restricted`}</p>
           {lotWindows.length > 0 && <p className="mt-2 truncate text-[10px] text-muted-foreground">{lotWindows.map((window) => window.windowNo).join(' · ')}</p>}
-          {canManage && <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={() => openEdit(lot)}><Pencil size={13} /> Edit</Button><Button size="sm" variant="outline" disabled={!canCreateWindow} onClick={() => setWindowLotId(lot.lotId)}><Plus size={13} /> Add window</Button><Button size="sm" variant="ghost" className="text-destructive" disabled={hasHistory || deleteLot.isPending} onClick={() => removeLot(lot, hasHistory)}><Trash2 size={13} /> Delete</Button>{hasHistory && <span className="self-center text-[10px] text-muted-foreground">Locked after dispatch</span>}</div>}
+            {canManage && (
+              <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+                <Button size="sm" variant="outline" onClick={() => openEdit(lot)}><Pencil size={13} /> Edit</Button>
+                <Button size="sm" variant="outline" disabled={!canCreateWindow} onClick={() => setWindowLotId(lot.lotId)}><Plus size={13} /> Add window</Button>
+                <Button size="sm" variant="ghost" className="text-destructive" disabled={hasHistory || deleteLot.isPending} onClick={() => removeLot(lot, hasHistory)}><Trash2 size={13} /> Delete</Button>
+                {hasHistory && <span className="self-center text-[10px] text-muted-foreground">Locked after dispatch</span>}
+              </div>
+            )}
+            {managementEnabled && canCreateWindow ? (
+              <ProjectLotConfirmationUpload
+                orderId={order.id}
+                lotId={lot.lotId}
+                windows={windows}
+                meshType={order.meshType ?? ''}
+                onComplete={() => {
+                  void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(order.id) });
+                  void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(order.id) });
+                  void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(order.id) });
+                }}
+              />
+            ) : null}
         </CardContent>
       </Card>;
     })}
@@ -1341,7 +1417,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
   const meshType = order.meshType || [...new Set(windows.map((window) => window.meshType).filter((value): value is string => Boolean(value)))].join(', ') || 'Not recorded';
   const paid = order.orderValue == null ? null : order.orderValue - received;
   const requestedTab = new URLSearchParams(window.location.search).get('tab');
-  const defaultTab = ['overview', 'lots', 'windows', 'payments', 'confirmation-info', 'documents', 'activity'].includes(requestedTab || '') ? requestedTab! : 'overview';
+  const defaultTab = ['overview', 'lots', 'payments', 'confirmation-info', 'documents', 'activity'].includes(requestedTab || '') ? requestedTab! : 'overview';
 
   return <AppShell user={user} title={order.orderId} eyebrow="Project · parent order">
     <div className="space-y-5" data-testid="page-project-order">
@@ -1365,8 +1441,8 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
         </div>)}</div>
       </section>
       <Tabs defaultValue={defaultTab} className="w-full" data-testid="tabs-project-detail">
-        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl bg-secondary/70 p-1 sm:grid-cols-7">
-          <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="lots">Lots</TabsTrigger><TabsTrigger value="windows">Windows</TabsTrigger><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="confirmation-info">Confirmation info</TabsTrigger><TabsTrigger value="documents">Documents</TabsTrigger><TabsTrigger value="activity">Activity</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl bg-secondary/70 p-1 sm:grid-cols-6">
+          <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="lots">Lots</TabsTrigger><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="confirmation-info">Confirmation info</TabsTrigger><TabsTrigger value="documents">Documents</TabsTrigger><TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-4 pt-4">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1381,7 +1457,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
               <SummaryStat label="Planned window qty" value={String(total)} detail="Counted from project windows" testId="project-stat-planned-windows" />
               <SummaryStat label="Planned sq ft" value="Not recorded" detail="No project area target is saved" testId="project-stat-planned-area" />
               <SummaryStat label="Windows in lots" value={`${assigned.length} / ${total}`} detail={`${assignedPercent}% of project windows assigned`} testId="project-stat-windows-in-lots" />
-              <SummaryStat label="Sq ft in lots" value={area ? area.toFixed(1) : '—'} detail="Measured area for lot-assigned windows" testId="project-stat-area-in-lots" />
+               <SummaryStat label="Sq ft in lots" value={area ? area.toFixed(2) : '—'} detail="Measured area for lot-assigned windows" testId="project-stat-area-in-lots" />
             </div>
             <div className="mt-5">
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold"><span>Windows added to lots</span><span>{assigned.length} of {total} · {assignedPercent}%</span></div>
@@ -1399,7 +1475,6 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
           <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-display text-base font-bold">Lots</h2><span className="text-xs text-muted-foreground">{order.lots?.length ?? 0} total · each opens its own lot page</span></div><ProjectLotCards order={order} windows={windows} user={user} /></section>
         </TabsContent>
          <TabsContent value="lots" className="space-y-3 pt-4"><div><h2 className="font-display text-base font-bold">Project lots</h2><p className="text-xs text-muted-foreground">Each lot owns its windows and dispatch history.</p></div><ProjectLotCards order={order} windows={windows} user={user} managementEnabled /></TabsContent>
-        <TabsContent value="windows" className="pt-4"><WindowsPanel orderId={order.id} user={user} allowMultiple /></TabsContent>
         <TabsContent value="payments" className="space-y-4 pt-4"><BillingPanel order={order} user={user} id={order.id} /><OrderPaymentFlagsPanel orderId={order.id} user={user} /><PaymentsPanel orderId={order.id} user={user} order={order} /></TabsContent>
          <TabsContent value="confirmation-info" className="pt-4"><ConfirmationInfoPanel orderId={order.id} /></TabsContent>
         <TabsContent value="documents" className="pt-4"><DocumentsPanel orderId={order.id} user={user} /></TabsContent>
