@@ -12,7 +12,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'order-hub', label: 'Client & Orders', short: 'Client & Orders', built: true },
   { key: 'quotation-builder', label: 'Quotations & Rates', short: 'Quotations & Rates', built: true },
   { key: 'rate-approval', label: 'Rate Request History', short: 'Rate requests' },
-  { key: 'confirmation', label: 'Confirmation / Purchase Order Register', short: 'Confirmation / PO', built: true },
+  { key: 'confirmation', label: 'Confirmation Register', short: 'Confirmations', built: true },
   { key: 'measurements', label: 'Measurement Database (Version Control)', short: 'Measurements', built: true },
   { key: 'qr-assembly', label: 'QR Code Generation & Assembly Tracking', short: 'QR assembly' },
   { key: 'window-readiness', label: 'Window-wise Readiness Tracking', short: 'Window readiness' },

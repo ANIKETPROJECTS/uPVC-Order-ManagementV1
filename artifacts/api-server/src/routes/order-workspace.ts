@@ -764,8 +764,30 @@ router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {
 
 router.get("/confirmation-records", async (req, res): Promise<void> => {
   if (!(await context(req, res, "confirmation"))) return;
-  const rows = await getConfirmationRecords(await getMongoDb()).find({}).sort({ updatedAt: -1 }).toArray();
-  res.json(rows);
+  const db = await getMongoDb();
+  const rows = await getConfirmationRecords(db).find({}).sort({ updatedAt: -1 }).toArray();
+  const linkedOrderIds = rows.flatMap((record) => record.orderRecordId ? [record.orderRecordId] : []);
+  const orders = linkedOrderIds.length
+    ? await getOrders(db).find({ _id: { $in: linkedOrderIds } }, { projection: { _id: 1, orderId: 1 } }).toArray()
+    : [];
+  const orderIdByRecord = new Map(orders.map((order) => [order._id, order.orderId]));
+  res.json(rows.map((record) => ({
+    ...record,
+    pdfVersions: record.pdfVersions.map((version, index) => ({ ...version, versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version" })),
+    excelVersions: record.excelVersions.map((version, index) => ({ ...version, versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version" })),
+    versionHistory: record.versionHistory ?? [...new Map([
+      ...record.pdfVersions.map((version, index) => [version.versionNumber ?? index + 1, { versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version", createdAt: version.uploadedAt, uploadedBy: version.uploadedBy, pdfFilename: version.filename }] as const),
+      ...record.excelVersions.map((version, index) => [version.versionNumber ?? index + 1, { versionNumber: version.versionNumber ?? index + 1, reason: version.reason ?? "Imported existing version", createdAt: version.uploadedAt, uploadedBy: version.uploadedBy, excelFilename: version.filename }] as const),
+    ])].map(([versionNumber, revision]) => ({ versionNumber, ...revision })).sort((a, b) => a.versionNumber - b.versionNumber),
+    linkedVersionNumber: record.linkedVersionNumber ?? null,
+    quotationRecordId: record.quotationRecordId ?? null,
+    measurementRecordId: record.measurementRecordId ?? null,
+    orderId: record.orderRecordId ? orderIdByRecord.get(record.orderRecordId) ?? null : null,
+    clientDecisionStatus: record.clientDecisionStatus ?? null,
+    clientDecisionNote: record.clientDecisionNote ?? null,
+    clientDecisionUpdatedAt: record.clientDecisionUpdatedAt?.toISOString() ?? null,
+    clientDecisionUpdatedBy: record.clientDecisionUpdatedBy ?? null,
+  })));
 });
 
 router.post("/confirmation-records", async (req, res): Promise<void> => {
@@ -808,8 +830,17 @@ router.post("/confirmation-records", async (req, res): Promise<void> => {
     clientName,
     location,
     quotationId: quotation?.quoteNo ?? null,
+    quotationRecordId: quotation?._id ?? null,
     measurementSheetId: measurement?.sheetId ?? measurement?.legacyId ?? measurement?._id ?? null,
+    measurementRecordId: measurement?._id ?? null,
     orderRecordId: null,
+    linkedVersionNumber: null,
+    reviewedVersionNumber: null,
+    versionHistory: [],
+    clientDecisionStatus: null,
+    clientDecisionNote: null,
+    clientDecisionUpdatedAt: null,
+    clientDecisionUpdatedBy: null,
     pdfVersions: [],
     excelVersions: [],
     excelConfirmationInfo: null,
@@ -817,7 +848,48 @@ router.post("/confirmation-records", async (req, res): Promise<void> => {
     updatedAt: now,
   };
   await getConfirmationRecords(db).insertOne(record);
-  res.status(201).json(record);
+  res.status(201).json({ ...record, orderId: null });
+});
+
+router.patch("/confirmation-records/:recordId/client-decision", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "confirmation", true);
+  if (!actor) return;
+  type ConfirmationDecisionStatus = "approved_by_client" | "rejected_by_client" | "revision_requested_by_client";
+  const status = req.body?.status as ConfirmationDecisionStatus;
+  const allowed: readonly ConfirmationDecisionStatus[] = ["approved_by_client", "rejected_by_client", "revision_requested_by_client"];
+  if (typeof req.body?.status !== "string" || !allowed.includes(status)) {
+    res.status(400).json({ error: "Choose a valid client decision." });
+    return;
+  }
+  const note = typeof req.body?.note === "string" ? req.body.note.trim() : "";
+  if (status !== "approved_by_client" && !note) {
+    res.status(400).json({ error: "A reason is required when the client rejects or requests a revision." });
+    return;
+  }
+  if (note.length > 2000) {
+    res.status(400).json({ error: "The decision note must be 2000 characters or fewer." });
+    return;
+  }
+  const db = await getMongoDb();
+  const records = getConfirmationRecords(db);
+  const record = await records.findOne({ _id: String(req.params.recordId) });
+  if (!record) {
+    res.status(404).json({ error: "Confirmation record not found." });
+    return;
+  }
+  const updatedAt = new Date();
+  const decisionNote = status === "approved_by_client" ? null : note;
+  await records.updateOne({ _id: record._id }, { $set: {
+    clientDecisionStatus: status,
+    clientDecisionNote: decisionNote,
+    clientDecisionUpdatedAt: updatedAt,
+    clientDecisionUpdatedBy: actor.name,
+    updatedAt,
+  } });
+  if (record.orderRecordId) {
+    await event(record.orderRecordId, actor, "client.confirmation.decision", `${status.replaceAll("_", " ")} on ${record.confirmationId}${decisionNote ? `: ${decisionNote}` : ""}`);
+  }
+  res.json({ status, note: decisionNote, updatedAt: updatedAt.toISOString(), updatedBy: actor.name });
 });
 
 router.post("/confirmation-records/:recordId/files/:kind/:filename", async (req, res, next): Promise<void> => {
@@ -833,37 +905,46 @@ router.post("/confirmation-records/:recordId/files/:kind/:filename", async (req,
   const db = await getMongoDb();
   const record = await getConfirmationRecords(db).findOne({ _id: recordId });
   if (!record) { res.status(404).json({ error: "Confirmation record not found." }); return; }
+  const requestedVersion = Number(req.headers["x-confirmation-version"] ?? 1);
+  const reason = String(req.headers["x-confirmation-version-reason"] ?? (requestedVersion === 1 ? "Initial version" : "")).trim();
+  if (!Number.isInteger(requestedVersion) || requestedVersion < 1 || (requestedVersion > 1 && !reason)) {
+    res.status(400).json({ error: "A valid version number and reason are required." });
+    return;
+  }
   expressRaw(req, res, next, async () => {
     const body = req.body as Buffer;
     if (!body?.length || body.length > 10 * 1024 * 1024) { res.status(400).json({ error: "File must be under 10 MiB." }); return; }
-    const storagePath = await storeProjectUpload("order-documents", filename, body);
-    const version = { filename, contentType: kind === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sizeBytes: body.length, storagePath, uploadedBy: actor.id, uploadedAt: new Date() };
     const fields: "pdfVersions" | "excelVersions" = kind === "pdf" ? "pdfVersions" : "excelVersions";
-    const info = kind === "excel" ? await extractConfirmationInfo(body, filename) : null;
-    await getConfirmationRecords(db).updateOne(
-      { _id: recordId },
-      { $push: { [fields]: version } as any, $set: { ...(info ? { excelConfirmationInfo: info } : {}), updatedAt: new Date() } },
-    );
-    if (record.orderRecordId) {
-      const documents = getOrderDocumentMetadata(db);
-      const linked = await documents.findOne({
-        orderRecordId: record.orderRecordId,
-        confirmationRecordId: record._id,
-        confirmationFileKind: kind,
-        archivedAt: { $exists: false },
-      } as any);
-      const values = {
-        filename, category: "confirmation", confirmationFileKind: kind,
-        contentType: version.contentType, sizeBytes: body.length, storagePath,
-        uploadedBy: actor.id, uploadedAt: version.uploadedAt,
-        ...(kind === "excel" ? { confirmationInfo: info } : {}),
-      };
-      if (linked) await documents.updateOne({ _id: linked._id }, { $set: values } as any);
-      else await documents.insertOne({
-        _id: randomUUID(), orderRecordId: record.orderRecordId, quotationRequestId: null,
-        confirmationRecordId: record._id, ...values, gridFsId: null,
-      } as any);
+    const pdfVersions = record.pdfVersions.map((item, index) => ({ ...item, versionNumber: item.versionNumber ?? index + 1, reason: item.reason ?? "Existing version" }));
+    const excelVersions = record.excelVersions.map((item, index) => ({ ...item, versionNumber: item.versionNumber ?? index + 1, reason: item.reason ?? "Existing version" }));
+    const latestVersion = Math.max(0, ...pdfVersions.map((item) => item.versionNumber), ...excelVersions.map((item) => item.versionNumber));
+    if (requestedVersion > latestVersion + 1 || requestedVersion < latestVersion) {
+      res.status(409).json({ error: `Upload the next shared version, v${latestVersion + 1}.` });
+      return;
     }
+    const history = record.versionHistory ?? [];
+    const existingRevision = history.find((item) => item.versionNumber === requestedVersion);
+    if (existingRevision && existingRevision.reason !== reason) {
+      res.status(409).json({ error: "Both files in a version must use the same reason." });
+      return;
+    }
+    const currentFileVersions = kind === "pdf" ? pdfVersions : excelVersions;
+    if (currentFileVersions.some((item) => item.versionNumber === requestedVersion)) {
+      res.status(409).json({ error: `A ${kind.toUpperCase()} file is already saved for v${requestedVersion}.` });
+      return;
+    }
+    const storagePath = await storeProjectUpload("order-documents", filename, body);
+    const version = { versionNumber: requestedVersion, reason, filename, contentType: kind === "pdf" ? "application/pdf" : extension === "xls" ? "application/vnd.ms-excel" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sizeBytes: body.length, storagePath, uploadedBy: actor.id, uploadedAt: new Date() };
+    const info = kind === "excel" ? await extractConfirmationInfo(body, filename) : null;
+    const revision = existingRevision
+      ? { ...existingRevision, ...(kind === "pdf" ? { pdfFilename: filename } : { excelFilename: filename }) }
+      : { versionNumber: requestedVersion, reason, createdAt: version.uploadedAt, uploadedBy: actor.id, ...(kind === "pdf" ? { pdfFilename: filename } : { excelFilename: filename }) };
+    await getConfirmationRecords(db).updateOne({ _id: recordId }, { $set: {
+      [fields]: [...currentFileVersions, version],
+      versionHistory: [...history.filter((item) => item.versionNumber !== requestedVersion), revision].sort((a, b) => a.versionNumber - b.versionNumber),
+      ...(info ? { excelConfirmationInfo: info } : {}),
+      updatedAt: new Date(),
+    } as any });
     res.status(201).json({ version, confirmationInfo: info });
   });
 });
@@ -874,10 +955,42 @@ router.get("/confirmation-records/:recordId/file-versions/:kind/:version", async
   const versionNumber = Number(req.params.version);
   if (!kind || !Number.isInteger(versionNumber) || versionNumber < 1) { res.status(400).json({ error: "Invalid file version." }); return; }
   const record = await getConfirmationRecords(await getMongoDb()).findOne({ _id: req.params.recordId });
-  const version = record?.[kind][versionNumber - 1];
+  const version = record?.[kind].find((file, index) => (file.versionNumber ?? index + 1) === versionNumber);
   const filePath = version ? resolveProjectUploadPath(version.storagePath) : null;
   if (!version || !filePath) { res.status(404).json({ error: "Confirmation file not found." }); return; }
   res.download(filePath, version.filename);
+});
+
+router.get("/orders/:id/confirmation-version-status", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "confirmation");
+  if (!actor || !(await orderExists(String(req.params.id), res))) return;
+  const records = await getConfirmationRecords(await getMongoDb()).find({ orderRecordId: String(req.params.id) }).toArray();
+  res.json(records.map((record) => {
+    const latestVersionNumber = Math.max(
+      0,
+      ...record.pdfVersions.map((file, index) => file.versionNumber ?? index + 1),
+      ...record.excelVersions.map((file, index) => file.versionNumber ?? index + 1),
+    );
+    const linkedVersionNumber = record.linkedVersionNumber ?? latestVersionNumber;
+    return {
+      recordId: record._id,
+      confirmationId: record.confirmationId,
+      linkedVersionNumber,
+      latestVersionNumber,
+      newerAvailable: latestVersionNumber > linkedVersionNumber && latestVersionNumber > (record.reviewedVersionNumber ?? linkedVersionNumber),
+    };
+  }));
+});
+
+router.post("/orders/:id/confirmation-records/:recordId/keep-current", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "confirmation", true);
+  if (!actor || !(await orderExists(String(req.params.id), res))) return;
+  const records = getConfirmationRecords(await getMongoDb());
+  const record = await records.findOne({ _id: String(req.params.recordId), orderRecordId: String(req.params.id) });
+  if (!record) { res.status(404).json({ error: "Linked confirmation record not found." }); return; }
+  const latestVersionNumber = Math.max(0, ...record.pdfVersions.map((file, index) => file.versionNumber ?? index + 1), ...record.excelVersions.map((file, index) => file.versionNumber ?? index + 1));
+  await records.updateOne({ _id: record._id }, { $set: { reviewedVersionNumber: latestVersionNumber, updatedAt: new Date() } });
+  res.json({ confirmationId: record.confirmationId, orderRecordId: String(req.params.id), filesAttached: 0, linkedVersionNumber: record.linkedVersionNumber ?? latestVersionNumber });
 });
 
 router.post("/orders/:id/confirmation-records/:recordId/attach", async (req, res): Promise<void> => {
@@ -889,9 +1002,13 @@ router.post("/orders/:id/confirmation-records/:recordId/attach", async (req, res
   if (!record) { res.status(404).json({ error: "Confirmation record not found." }); return; }
   if (record.orderRecordId && record.orderRecordId !== String(req.params.id)) { res.status(409).json({ error: "This confirmation is already attached to another order." }); return; }
   const orderRecordId = String(req.params.id);
+  const latestVersionNumber = Math.max(
+    0,
+    ...record.pdfVersions.map((file, index) => file.versionNumber ?? index + 1),
+    ...record.excelVersions.map((file, index) => file.versionNumber ?? index + 1),
+  );
+  if (!latestVersionNumber) { res.status(400).json({ error: "Upload a confirmation file before linking it to an order." }); return; }
   const orderDocuments = getOrderDocumentMetadata(db);
-  const existing = await orderDocuments.findOne({ orderRecordId, confirmationRecordId: record._id, archivedAt: { $exists: false } } as any);
-  if (existing) { res.status(409).json({ error: "This confirmation is already attached." }); return; }
   const now = new Date();
   const files = [
     ...record.pdfVersions.slice(-1).map((file) => ({ file, kind: "pdf" })),
@@ -899,15 +1016,19 @@ router.post("/orders/:id/confirmation-records/:recordId/attach", async (req, res
   ];
   for (const { file, kind } of files) {
     const confirmationInfo = file === record.excelVersions.at(-1) ? record.excelConfirmationInfo : null;
-    await orderDocuments.insertOne({
-      _id: randomUUID(), orderRecordId, quotationRequestId: null, confirmationRecordId: record._id, confirmationFileKind: kind,
-      filename: file.filename, category: "confirmation", contentType: file.contentType, sizeBytes: file.sizeBytes,
-      gridFsId: null, storagePath: file.storagePath, uploadedBy: actor.id, uploadedAt: now, confirmationInfo,
+    const existing = await orderDocuments.findOne({ orderRecordId, confirmationRecordId: record._id, confirmationFileKind: kind, archivedAt: { $exists: false } } as any);
+    const values = {
+      filename: file.filename, category: "confirmation", confirmationFileKind: kind, confirmationVersion: file.versionNumber ?? latestVersionNumber,
+      contentType: file.contentType, sizeBytes: file.sizeBytes, storagePath: file.storagePath, uploadedBy: actor.id, uploadedAt: now, confirmationInfo,
+    };
+    if (existing) await orderDocuments.updateOne({ _id: existing._id }, { $set: values } as any);
+    else await orderDocuments.insertOne({
+      _id: randomUUID(), orderRecordId, quotationRequestId: null, confirmationRecordId: record._id, ...values, gridFsId: null,
     } as any);
   }
-  await records.updateOne({ _id: record._id }, { $set: { orderRecordId, updatedAt: now } });
-  await event(orderRecordId, actor, "confirmation.attached", `Attached ${record.confirmationId} confirmation.`);
-  res.json({ confirmationId: record.confirmationId, orderRecordId, filesAttached: files.length });
+  await records.updateOne({ _id: record._id }, { $set: { orderRecordId, linkedVersionNumber: latestVersionNumber, reviewedVersionNumber: latestVersionNumber, updatedAt: now } });
+  await event(orderRecordId, actor, "confirmation.attached", `${record.confirmationId} linked at v${latestVersionNumber}.`);
+  res.json({ confirmationId: record.confirmationId, orderRecordId, filesAttached: files.length, linkedVersionNumber: latestVersionNumber });
 });
 
 router.patch("/confirmation/purchase-orders/:orderRecordId/client-decision", async (req, res): Promise<void> => {

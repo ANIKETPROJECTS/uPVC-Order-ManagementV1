@@ -1798,11 +1798,29 @@ function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; 
 function ConfirmationInfoPanel({ orderId }: { orderId: string }) {
   const { toast } = useToast();
   const client = useQueryClient();
+  const [newerConfirmations, setNewerConfirmations] = useState<{ recordId: string; confirmationId: string; linkedVersionNumber: number; latestVersionNumber: number; newerAvailable: boolean }[]>([]);
   const [view, setView] = useState<"document" | "software">("document");
   const [reextracting, setReextracting] = useState(false);
   const query = useListOrderDocuments(orderId, { query: { queryKey: getListOrderDocumentsQueryKey(orderId) } });
   const documentRecord = (query.data ?? []).filter((item) => item.category === 'confirmation').sort((a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt))[0];
   const info = documentRecord?.confirmationInfo;
+  const refreshConfirmationVersions = async () => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const response = await fetch(`${base}/api/orders/${encodeURIComponent(orderId)}/confirmation-version-status`);
+    if (response.ok) setNewerConfirmations(await response.json());
+  };
+  useEffect(() => { void refreshConfirmationVersions(); }, [orderId]);
+  const resolveNewerVersion = async (item: typeof newerConfirmations[number], action: "update" | "keep") => {
+    if (action === "update" && !window.confirm(`Update this order's confirmation files to ${item.confirmationId} v${item.latestVersionNumber}? Production data will not be changed.`)) return;
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const actionPath = action === "keep" ? "keep-current" : "attach";
+    const response = await fetch(`${base}/api/orders/${encodeURIComponent(orderId)}/confirmation-records/${encodeURIComponent(item.recordId)}/${actionPath}`, { method: "POST" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) { toast({ title: "Could not update confirmation", description: result.error || "Try again.", variant: "destructive" }); return; }
+    await refreshConfirmationVersions();
+    await client.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) });
+    toast({ title: action === "update" ? "Order confirmation updated" : "Current version kept" });
+  };
   const reextract = async () => {
     if (!documentRecord || !info || reextracting) return;
     setReextracting(true);
@@ -1830,6 +1848,10 @@ function ConfirmationInfoPanel({ orderId }: { orderId: string }) {
     } finally { setReextracting(false); }
   };
   return <div className="space-y-4" data-testid="panel-confirmation-info">
+    {newerConfirmations.filter((item) => item.newerAvailable).map((item) => <div key={item.recordId} role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+      <div><p className="font-semibold">Newer confirmation available, review</p><p className="text-xs">{item.confirmationId}: order v{item.linkedVersionNumber}, latest v{item.latestVersionNumber}. The order files were not changed automatically.</p><Link href="/confirmation" className="text-xs font-semibold underline">Review confirmation history</Link></div>
+      <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => void resolveNewerVersion(item, "keep")}>Keep current</Button><Button size="sm" onClick={() => void resolveNewerVersion(item, "update")}>Update order</Button></div>
+    </div>)}
     <Card className="border-border/80"><CardHeader><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Confirmation document extraction</p><CardTitle className="text-base">Confirmation info</CardTitle><p className="text-xs text-muted-foreground">Window details are extracted from the Excel workbook only. The PDF is retained as the official proof copy.</p></CardHeader>
       <CardContent>{query.isLoading ? <p className="text-sm text-muted-foreground">Loading confirmation documents…</p> : query.isError ? <p className="text-sm text-destructive">Confirmation details could not be loaded.</p> : !documentRecord ? <p className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">No order confirmation document is uploaded yet. Upload one in the Documents tab to extract its details.</p> : !info ? <p className="text-sm text-muted-foreground">This confirmation has no workbook extraction yet. Add or replace its Excel workbook to extract window details.</p> : <>
      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs"><span className="font-semibold">{documentRecord.filename}</span><span>{info.status === 'extracted' ? /\.(xlsx|xlsm|xls|csv)$/i.test(documentRecord.filename) ? 'Extracted from workbook' : `Extracted with ${info.method === 'ocr' ? 'OCR' : 'PDF text recognition'}` : info.status === 'unsupported' ? 'File type not supported for extraction' : info.status === 'failed' ? 'Extraction failed' : 'No readable text found'}</span></div>

@@ -28,7 +28,7 @@ import MeasurementRecordDetailPage from '@/pages/measurement-record-detail';
 import PaymentsPage from '@/pages/payments';
 import BalancePaymentPage from '@/pages/balance-payment';
 import GlassTrackingPage from '@/pages/glass-tracking';
-import ConfirmationPage from '@/pages/confirmation';
+import ConfirmationPage from '@/pages/confirmation-first-register';
 import QuotationApprovalsPage from '@/pages/quotation-approvals';
 import PublicInstallationSharePage from '@/pages/installation-share';
 

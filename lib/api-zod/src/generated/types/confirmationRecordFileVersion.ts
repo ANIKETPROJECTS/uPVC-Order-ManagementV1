@@ -7,6 +7,9 @@
  */
 
 export interface ConfirmationRecordFileVersion {
+  /** @minimum 1 */
+  versionNumber: number;
+  reason: string;
   filename: string;
   contentType: string;
   sizeBytes: number;

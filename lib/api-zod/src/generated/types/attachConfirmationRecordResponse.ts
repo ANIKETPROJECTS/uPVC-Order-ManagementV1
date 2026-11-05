@@ -10,4 +10,5 @@ export interface AttachConfirmationRecordResponse {
   confirmationId: string;
   orderRecordId: string;
   filesAttached: number;
+  linkedVersionNumber: number;
 }

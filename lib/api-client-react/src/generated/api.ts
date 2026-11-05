@@ -55,6 +55,7 @@ import type {
   DispatchPlanUpdate,
   DispatchStatusUpdate,
   GetOperationsDashboardParams,
+  GetOrderConfirmationVersionStatus200Item,
   GlassTrackingOrder,
   GlassTrackingOrderList,
   GlassTrackingQuantitiesInput,
@@ -12470,6 +12471,95 @@ export const useCreateConfirmationRecord = <TError = ErrorType<unknown>,
       return useMutation(getCreateConfirmationRecordMutationOptions(options));
     }
 
+export const getUpdateConfirmationRecordDecisionUrl = (recordId: string,) => {
+
+
+
+
+  return `/api/confirmation-records/${recordId}/client-decision`
+}
+
+/**
+ * @summary Set the client decision for a confirmation record
+ */
+export const updateConfirmationRecordDecision = async (recordId: string,
+    clientConfirmationDecisionInput: ClientConfirmationDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<ClientConfirmationDecision> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ClientConfirmationDecision>(getUpdateConfirmationRecordDecisionUrl(recordId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(clientConfirmationDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateConfirmationRecordDecisionMutationKey = () => ['updateConfirmationRecordDecision'] as const;
+
+export const getUpdateConfirmationRecordDecisionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConfirmationRecordDecision>>, TError,UpdateConfirmationRecordDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConfirmationRecordDecision>>, TError,UpdateConfirmationRecordDecisionMutationVariables, TContext> => {
+
+const mutationKey = getUpdateConfirmationRecordDecisionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConfirmationRecordDecision>>, UpdateConfirmationRecordDecisionMutationVariables> = (props) => {
+          const {recordId,data} = props ?? {};
+
+          return  updateConfirmationRecordDecision(recordId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateConfirmationRecordDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof updateConfirmationRecordDecision>>>
+    export type UpdateConfirmationRecordDecisionMutationBody = BodyType<ClientConfirmationDecisionInput>
+    export type UpdateConfirmationRecordDecisionMutationError = ErrorType<void>
+    export type UpdateConfirmationRecordDecisionMutationVariables = {recordId: string;data: BodyType<ClientConfirmationDecisionInput>}
+
+    /**
+ * @summary Set the client decision for a confirmation record
+ */
+export const useUpdateConfirmationRecordDecision = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConfirmationRecordDecision>>, TError,UpdateConfirmationRecordDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateConfirmationRecordDecision>>,
+        TError,
+        UpdateConfirmationRecordDecisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateConfirmationRecordDecisionMutationOptions(options));
+    }
+
 export const getUploadConfirmationRecordFileUrl = (recordId: string,
     kind: 'pdf' | 'excel',
     filename: string,) => {
@@ -12725,6 +12815,159 @@ export const useAttachConfirmationRecordToOrder = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getAttachConfirmationRecordToOrderMutationOptions(options));
     }
+
+export const getKeepCurrentConfirmationVersionForOrderUrl = (id: string,
+    recordId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/confirmation-records/${recordId}/keep-current`
+}
+
+/**
+ * @summary Keep the currently linked confirmation version
+ */
+export const keepCurrentConfirmationVersionForOrder = async (id: string,
+    recordId: string, options?: Parameters<typeof customFetch>[1]): Promise<AttachConfirmationRecordResponse> => {
+
+  return customFetch<AttachConfirmationRecordResponse>(getKeepCurrentConfirmationVersionForOrderUrl(id,recordId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getKeepCurrentConfirmationVersionForOrderMutationKey = () => ['keepCurrentConfirmationVersionForOrder'] as const;
+
+export const getKeepCurrentConfirmationVersionForOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof keepCurrentConfirmationVersionForOrder>>, TError,KeepCurrentConfirmationVersionForOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof keepCurrentConfirmationVersionForOrder>>, TError,KeepCurrentConfirmationVersionForOrderMutationVariables, TContext> => {
+
+const mutationKey = getKeepCurrentConfirmationVersionForOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof keepCurrentConfirmationVersionForOrder>>, KeepCurrentConfirmationVersionForOrderMutationVariables> = (props) => {
+          const {id,recordId} = props ?? {};
+
+          return  keepCurrentConfirmationVersionForOrder(id,recordId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type KeepCurrentConfirmationVersionForOrderMutationResult = NonNullable<Awaited<ReturnType<typeof keepCurrentConfirmationVersionForOrder>>>
+
+    export type KeepCurrentConfirmationVersionForOrderMutationError = ErrorType<unknown>
+    export type KeepCurrentConfirmationVersionForOrderMutationVariables = {id: string;recordId: string}
+
+    /**
+ * @summary Keep the currently linked confirmation version
+ */
+export const useKeepCurrentConfirmationVersionForOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof keepCurrentConfirmationVersionForOrder>>, TError,KeepCurrentConfirmationVersionForOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof keepCurrentConfirmationVersionForOrder>>,
+        TError,
+        KeepCurrentConfirmationVersionForOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getKeepCurrentConfirmationVersionForOrderMutationOptions(options));
+    }
+
+export const getGetOrderConfirmationVersionStatusUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/confirmation-version-status`
+}
+
+/**
+ * @summary Check whether newer confirmation versions need review
+ */
+export const getOrderConfirmationVersionStatus = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<GetOrderConfirmationVersionStatus200Item[]> => {
+
+  return customFetch<GetOrderConfirmationVersionStatus200Item[]>(getGetOrderConfirmationVersionStatusUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrderConfirmationVersionStatusQueryKey = (id: string,) => {
+    return [
+    `/api/orders/${id}/confirmation-version-status`
+    ] as const;
+    }
+
+
+export const getGetOrderConfirmationVersionStatusQueryOptions = <TData = Awaited<ReturnType<typeof getOrderConfirmationVersionStatus>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderConfirmationVersionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrderConfirmationVersionStatusQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderConfirmationVersionStatus>>> = ({ signal }) => getOrderConfirmationVersionStatus(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderConfirmationVersionStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOrderConfirmationVersionStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderConfirmationVersionStatus>>>
+export type GetOrderConfirmationVersionStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Check whether newer confirmation versions need review
+ */
+
+export function useGetOrderConfirmationVersionStatus<TData = Awaited<ReturnType<typeof getOrderConfirmationVersionStatus>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderConfirmationVersionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOrderConfirmationVersionStatusQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getUpdateClientConfirmationDecisionUrl = (orderRecordId: string,) => {
 

@@ -6121,15 +6121,38 @@ export const GetPurchaseOrderRegisterResponse = zod.array(GetPurchaseOrderRegist
 /**
  * @summary List reusable confirmation records
  */
+
+
+
+
+
 export const ListConfirmationRecordsResponseItem = zod.object({
   "_id": zod.string(),
   "confirmationId": zod.string(),
   "clientName": zod.string(),
   "location": zod.string(),
   "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
   "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "linkedVersionNumber": zod.number().int().nullable(),
+  "versionHistory": zod.array(zod.object({
+  "versionNumber": zod.number().int().min(1),
+  "reason": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "pdfFilename": zod.string().optional(),
+  "excelFilename": zod.string().optional()
+})),
+  "clientDecisionStatus": zod.union([zod.enum(['approved_by_client', 'rejected_by_client', 'revision_requested_by_client']),zod.null()]),
+  "clientDecisionNote": zod.string().nullable(),
+  "clientDecisionUpdatedAt": zod.coerce.date().nullable(),
+  "clientDecisionUpdatedBy": zod.string().nullable(),
   "pdfVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int().min(1),
+  "reason": zod.string(),
   "filename": zod.string(),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
@@ -6138,6 +6161,8 @@ export const ListConfirmationRecordsResponseItem = zod.object({
   "uploadedAt": zod.coerce.date()
 })),
   "excelVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int().min(1),
+  "reason": zod.string(),
   "filename": zod.string(),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
@@ -6211,15 +6236,38 @@ export const CreateConfirmationRecordBody = zod.object({
   "measurementSheetId": zod.string().optional()
 })
 
+
+
+
+
+
 export const CreateConfirmationRecordResponse = zod.object({
   "_id": zod.string(),
   "confirmationId": zod.string(),
   "clientName": zod.string(),
   "location": zod.string(),
   "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
   "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "linkedVersionNumber": zod.number().int().nullable(),
+  "versionHistory": zod.array(zod.object({
+  "versionNumber": zod.number().int().min(1),
+  "reason": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "pdfFilename": zod.string().optional(),
+  "excelFilename": zod.string().optional()
+})),
+  "clientDecisionStatus": zod.union([zod.enum(['approved_by_client', 'rejected_by_client', 'revision_requested_by_client']),zod.null()]),
+  "clientDecisionNote": zod.string().nullable(),
+  "clientDecisionUpdatedAt": zod.coerce.date().nullable(),
+  "clientDecisionUpdatedBy": zod.string().nullable(),
   "pdfVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int().min(1),
+  "reason": zod.string(),
   "filename": zod.string(),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
@@ -6228,6 +6276,8 @@ export const CreateConfirmationRecordResponse = zod.object({
   "uploadedAt": zod.coerce.date()
 })),
   "excelVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int().min(1),
+  "reason": zod.string(),
   "filename": zod.string(),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
@@ -6287,6 +6337,30 @@ export const CreateConfirmationRecordResponse = zod.object({
 
 
 /**
+ * @summary Set the client decision for a confirmation record
+ */
+export const UpdateConfirmationRecordDecisionParams = zod.object({
+  "recordId": zod.coerce.string()
+})
+
+export const updateConfirmationRecordDecisionBodyNoteMax = 2000;
+
+
+
+export const UpdateConfirmationRecordDecisionBody = zod.object({
+  "status": zod.enum(['approved_by_client', 'rejected_by_client', 'revision_requested_by_client']),
+  "note": zod.string().max(updateConfirmationRecordDecisionBodyNoteMax).nullable()
+})
+
+export const UpdateConfirmationRecordDecisionResponse = zod.object({
+  "status": zod.enum(['approved_by_client', 'rejected_by_client', 'revision_requested_by_client']),
+  "note": zod.string().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "updatedBy": zod.string()
+})
+
+
+/**
  * @summary Add a PDF or Excel version to a confirmation
  */
 export const UploadConfirmationRecordFileParams = zod.object({
@@ -6295,8 +6369,21 @@ export const UploadConfirmationRecordFileParams = zod.object({
   "filename": zod.coerce.string()
 })
 
+
+
+
+export const UploadConfirmationRecordFileHeader = zod.object({
+  "X-Confirmation-Version": zod.number().int().min(1),
+  "X-Confirmation-Version-Reason": zod.string()
+})
+
+
+
+
 export const UploadConfirmationRecordFileResponse = zod.object({
   "version": zod.object({
+  "versionNumber": zod.number().int().min(1),
+  "reason": zod.string(),
   "filename": zod.string(),
   "contentType": zod.string(),
   "sizeBytes": zod.number().int(),
@@ -6379,8 +6466,42 @@ export const AttachConfirmationRecordToOrderParams = zod.object({
 export const AttachConfirmationRecordToOrderResponse = zod.object({
   "confirmationId": zod.string(),
   "orderRecordId": zod.string(),
-  "filesAttached": zod.number().int()
+  "filesAttached": zod.number().int(),
+  "linkedVersionNumber": zod.number().int()
 })
+
+
+/**
+ * @summary Keep the currently linked confirmation version
+ */
+export const KeepCurrentConfirmationVersionForOrderParams = zod.object({
+  "id": zod.coerce.string(),
+  "recordId": zod.coerce.string()
+})
+
+export const KeepCurrentConfirmationVersionForOrderResponse = zod.object({
+  "confirmationId": zod.string(),
+  "orderRecordId": zod.string(),
+  "filesAttached": zod.number().int(),
+  "linkedVersionNumber": zod.number().int()
+})
+
+
+/**
+ * @summary Check whether newer confirmation versions need review
+ */
+export const GetOrderConfirmationVersionStatusParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetOrderConfirmationVersionStatusResponseItem = zod.object({
+  "recordId": zod.string(),
+  "confirmationId": zod.string(),
+  "linkedVersionNumber": zod.number().int(),
+  "latestVersionNumber": zod.number().int(),
+  "newerAvailable": zod.boolean()
+})
+export const GetOrderConfirmationVersionStatusResponse = zod.array(GetOrderConfirmationVersionStatusResponseItem)
 
 
 /**

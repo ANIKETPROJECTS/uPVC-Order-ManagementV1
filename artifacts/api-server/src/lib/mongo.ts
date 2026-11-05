@@ -412,11 +412,13 @@ export interface OrderDocumentCategoryDocument {
   updatedAt: Date;
 }
 export interface OrderDocumentMetadataDocument {
-  _id: string; orderRecordId: string; quotationRequestId?: string | null; confirmationRecordId?: string | null; confirmationFileKind?: "pdf" | "excel" | null; filename: string; category: DocumentCategory;
+  _id: string; orderRecordId: string; quotationRequestId?: string | null; confirmationRecordId?: string | null; confirmationFileKind?: "pdf" | "excel" | null; confirmationVersion?: number | null; filename: string; category: DocumentCategory;
   contentType: string; sizeBytes: number; gridFsId: string | null; storagePath?: string | null; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
   confirmationInfo?: import("./confirmation-extraction").ConfirmationInfo | null;
 }
 export interface ConfirmationRecordFileVersion {
+  versionNumber: number;
+  reason: string;
   filename: string;
   contentType: string;
   sizeBytes: number;
@@ -424,14 +426,31 @@ export interface ConfirmationRecordFileVersion {
   uploadedBy: string;
   uploadedAt: Date;
 }
+export interface ConfirmationRecordRevision {
+  versionNumber: number;
+  reason: string;
+  createdAt: Date;
+  uploadedBy: string;
+  pdfFilename?: string | null;
+  excelFilename?: string | null;
+}
 export interface ConfirmationRecordDocument {
   _id: string;
   confirmationId: string;
   clientName: string;
   location: string;
   quotationId: string | null;
+  quotationRecordId?: string | null;
   measurementSheetId: string | null;
+  measurementRecordId?: string | null;
   orderRecordId: string | null;
+  linkedVersionNumber?: number | null;
+  reviewedVersionNumber?: number | null;
+  versionHistory?: ConfirmationRecordRevision[];
+  clientDecisionStatus?: "approved_by_client" | "rejected_by_client" | "revision_requested_by_client" | null;
+  clientDecisionNote?: string | null;
+  clientDecisionUpdatedAt?: Date | null;
+  clientDecisionUpdatedBy?: string | null;
   pdfVersions: ConfirmationRecordFileVersion[];
   excelVersions: ConfirmationRecordFileVersion[];
   excelConfirmationInfo: import("./confirmation-extraction").ConfirmationInfo | null;
@@ -876,24 +895,18 @@ export function getMeasurementSheetsBucket(db: Db): any { return new GridFSBucke
 const measurementSheetSequenceId = "measurementSheetSequence";
 const measurementSheetMigrationId = "measurementSheetIdFormatV1";
 const measurementSheetFullYearMigrationId = "measurementSheetIdFormatV2";
+const measurementSheetCompactMigrationId = "measurementSheetIdFormatV3";
 
 function isValidDate(value: unknown): value is Date {
   return value instanceof Date && Number.isFinite(value.getTime());
 }
 
-function measurementDateCode(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  }).formatToParts(date);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
-  return `${part("day")}${part("month")}${part("year")}`;
-}
-
 function formatMeasurementSheetId(sequence: number, createdAt: Date): string {
-  return `MS-${String(sequence).padStart(3, "0")}-${measurementDateCode(createdAt)}`;
+  const year = new Intl.DateTimeFormat("en-GB", {
+    year: "2-digit",
+    timeZone: "Asia/Kolkata",
+  }).format(createdAt);
+  return `MS-${year}-${String(sequence).padStart(4, "0")}`;
 }
 
 export async function allocateMeasurementSheetId(db: Db, createdAt: Date): Promise<string> {
@@ -1090,7 +1103,10 @@ async function migrateMeasurementSheetIdsToFullYear(db: Db, now: Date): Promise<
             : now;
         return {
           updateOne: {
-            filter: { _id: record._id, sheetId: record.sheetId },
+            filter: {
+              _id: record._id,
+              ...(record.sheetId !== undefined ? { sheetId: record.sheetId } : { sheetId: { $exists: false } }),
+            },
             update: { $set: { sheetId: formatMeasurementSheetId(sequence, createdAt) } },
           },
         };
@@ -1125,6 +1141,133 @@ async function migrateMeasurementSheetIdsToFullYear(db: Db, now: Date): Promise<
     }
   }
   throw new Error("Timed out waiting for the full-year measurement ID migration to finish.");
+}
+
+async function migrateMeasurementSheetIdsToCompactFormat(db: Db, now: Date): Promise<void> {
+  const migrations = db.collection<MeasurementMigrationDocument>("system_migrations");
+  const records = getMeasurementRecords(db);
+  if (await records.countDocuments({}) === 0) return;
+  try {
+    await migrations.updateOne(
+      { _id: measurementSheetCompactMigrationId },
+      { $setOnInsert: { state: "pending", leaseUntil: new Date(0), updatedAt: now } },
+      { upsert: true },
+    );
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000)) throw error;
+  }
+
+  const owner = randomUUID();
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    const current = await migrations.findOne({ _id: measurementSheetCompactMigrationId });
+    if (current?.state === "complete") return;
+    const leaseNow = new Date();
+    const lease = await migrations.findOneAndUpdate(
+      {
+        _id: measurementSheetCompactMigrationId,
+        state: { $ne: "complete" },
+        $or: [{ leaseUntil: { $lte: leaseNow } }, { owner }],
+      },
+      { $set: { state: "running", owner, leaseUntil: new Date(leaseNow.getTime() + 60_000), updatedAt: leaseNow } },
+      { returnDocument: "after" },
+    );
+    if (lease?.owner !== owner) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      continue;
+    }
+
+    try {
+      const existingRecords = await records.find({}).toArray();
+      existingRecords.sort((left, right) => {
+        const leftDate = isValidDate(left.createdAt) ? left.createdAt : now;
+        const rightDate = isValidDate(right.createdAt) ? right.createdAt : now;
+        return leftDate.getTime() - rightDate.getTime() || left._id.localeCompare(right._id);
+      });
+      const counter = await getCounters(db).findOne({ _id: measurementSheetSequenceId });
+      const sequenceFromId = (id: string | undefined) => {
+        if (!id) return null;
+        const match = /^MS-(?:(\d{2})-(\d{4,})|(\d+)-\d{6,8})$/i.exec(id);
+        const sequence = match ? Number(match[2] ?? match[3]) : NaN;
+        return Number.isSafeInteger(sequence) && sequence > 0 ? sequence : null;
+      };
+      const parsedSequences = existingRecords.map((record) => sequenceFromId(record.sheetId));
+      let highWater = Math.max(counter?.value ?? 0, ...parsedSequences.filter((value): value is number => value !== null));
+      const usedSequences = new Set<number>();
+      const oldToNew = new Map<string, string>();
+      const updates = existingRecords.map((record, index) => {
+        const createdAt = isValidDate(record.createdAt)
+          ? record.createdAt
+          : isValidDate(record.updatedAt)
+            ? record.updatedAt
+            : now;
+        let sequence = parsedSequences[index];
+        if (sequence === null || usedSequences.has(sequence)) sequence = ++highWater;
+        usedSequences.add(sequence);
+        const sheetId = formatMeasurementSheetId(sequence, createdAt);
+        if (record.sheetId) oldToNew.set(record.sheetId, sheetId);
+        if (record.legacyId) oldToNew.set(record.legacyId, sheetId);
+        return {
+          updateOne: {
+            filter: {
+              _id: record._id,
+              ...(record.sheetId !== undefined ? { sheetId: record.sheetId } : { sheetId: { $exists: false } }),
+            },
+            update: {
+              $set: {
+                sheetId,
+                legacyId: record.sheetId && !/^MS-\d{2}-\d{4,}$/i.test(record.sheetId)
+                  ? record.sheetId
+                  : record.legacyId || `MS-${record._id.toUpperCase()}`,
+                ...(!isValidDate(record.createdAt) ? { createdAt } : {}),
+              },
+            },
+          },
+        };
+      });
+
+      for (let offset = 0; offset < updates.length; offset += 500) {
+        await records.bulkWrite(updates.slice(offset, offset + 500));
+        const heartbeat = new Date();
+        await migrations.updateOne(
+          { _id: measurementSheetCompactMigrationId, owner },
+          { $set: { leaseUntil: new Date(heartbeat.getTime() + 60_000), updatedAt: heartbeat } },
+        );
+      }
+      await getCounters(db).updateOne(
+        { _id: measurementSheetSequenceId },
+        { $max: { value: highWater }, $set: { updatedAt: new Date() } },
+        { upsert: true },
+      );
+
+      if (oldToNew.size) {
+        const confirmationRecords = db.collection<{ _id: string; measurementSheetId?: string | null }>("confirmation_records");
+        const linked = await confirmationRecords.find({ measurementSheetId: { $in: [...oldToNew.keys()] } }).toArray();
+        if (linked.length) {
+          await confirmationRecords.bulkWrite(linked.map((record) => ({
+            updateOne: {
+              filter: { _id: record._id, measurementSheetId: record.measurementSheetId },
+              update: { $set: { measurementSheetId: oldToNew.get(record.measurementSheetId!) } },
+            },
+          })));
+        }
+      }
+
+      await migrations.updateOne(
+        { _id: measurementSheetCompactMigrationId, owner },
+        { $set: { state: "complete", leaseUntil: new Date(0), updatedAt: new Date() }, $unset: { owner: "" } },
+      );
+      logger.info({ migratedMeasurementRecords: existingRecords.length, lastSequence: highWater }, "Migrated measurement sheet IDs to the compact year-sequence format");
+      return;
+    } catch (error) {
+      await migrations.updateOne(
+        { _id: measurementSheetCompactMigrationId, owner },
+        { $set: { state: "pending", leaseUntil: new Date(0), updatedAt: new Date() }, $unset: { owner: "" } },
+      );
+      throw error;
+    }
+  }
+  throw new Error("Timed out waiting for the compact measurement ID migration to finish.");
 }
 
 async function migrateOrderIds(db: Db, now: Date): Promise<void> {
@@ -1927,6 +2070,7 @@ export async function initializeMongo(): Promise<void> {
   await migrateRetailIdentifiers(db, now);
   await migrateMeasurementSheetIds(db, now);
   await migrateMeasurementSheetIdsToFullYear(db, now);
+  await migrateMeasurementSheetIdsToCompactFormat(db, now);
 
   logger.info({ database: db.databaseName }, "Connected to MongoDB");
 }

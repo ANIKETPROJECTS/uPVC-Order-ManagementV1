@@ -3317,6 +3317,26 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ConfirmationRecord" }
+  /confirmation-records/{recordId}/client-decision:
+    patch:
+      operationId: updateConfirmationRecordDecision
+      tags: [orders]
+      summary: Set the client decision for a confirmation record
+      parameters:
+        - { name: recordId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClientConfirmationDecisionInput" }
+      responses:
+        "200":
+          description: Saved confirmation decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientConfirmationDecision" }
+        "400": { description: Invalid decision or missing reason }
+        "404": { description: Confirmation record not found }
   /confirmation-records/{recordId}/files/{kind}/{filename}:
     post:
       operationId: uploadConfirmationRecordFile
@@ -3326,6 +3346,8 @@ paths:
         - { name: recordId, in: path, required: true, schema: { type: string } }
         - { name: kind, in: path, required: true, schema: { type: string, enum: [pdf, excel] } }
         - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: X-Confirmation-Version, in: header, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: X-Confirmation-Version-Reason, in: header, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
@@ -3366,6 +3388,43 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AttachConfirmationRecordResponse" }
+  /orders/{id}/confirmation-records/{recordId}/keep-current:
+    post:
+      operationId: keepCurrentConfirmationVersionForOrder
+      tags: [orders]
+      summary: Keep the currently linked confirmation version
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: recordId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Current order version acknowledged without changing its files
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttachConfirmationRecordResponse" }
+  /orders/{id}/confirmation-version-status:
+    get:
+      operationId: getOrderConfirmationVersionStatus
+      tags: [orders]
+      summary: Check whether newer confirmation versions need review
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Current confirmation versions linked to the order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    recordId: { type: string }
+                    confirmationId: { type: string }
+                    linkedVersionNumber: { type: integer }
+                    latestVersionNumber: { type: integer }
+                    newerAvailable: { type: boolean }
+                  required: [recordId, confirmationId, linkedVersionNumber, latestVersionNumber, newerAvailable]
   /confirmation/purchase-orders/{orderRecordId}/client-decision:
     patch:
       operationId: updateClientConfirmationDecision
@@ -5877,13 +5936,25 @@ components:
     ConfirmationRecordFileVersion:
       type: object
       properties:
+        versionNumber: { type: integer, minimum: 1 }
+        reason: { type: string }
         filename: { type: string }
         contentType: { type: string }
         sizeBytes: { type: integer }
         storagePath: { type: string }
         uploadedBy: { type: string }
         uploadedAt: { type: string, format: date-time }
-      required: [filename, contentType, sizeBytes, storagePath, uploadedBy, uploadedAt]
+      required: [versionNumber, reason, filename, contentType, sizeBytes, storagePath, uploadedBy, uploadedAt]
+    ConfirmationRecordRevision:
+      type: object
+      properties:
+        versionNumber: { type: integer, minimum: 1 }
+        reason: { type: string }
+        createdAt: { type: string, format: date-time }
+        uploadedBy: { type: string }
+        pdfFilename: { type: string }
+        excelFilename: { type: string }
+      required: [versionNumber, reason, createdAt, uploadedBy]
     ConfirmationRecord:
       type: object
       properties:
@@ -5892,8 +5963,22 @@ components:
         clientName: { type: string }
         location: { type: string }
         quotationId: { type: ["string", "null"] }
+        quotationRecordId: { type: ["string", "null"] }
         measurementSheetId: { type: ["string", "null"] }
+        measurementRecordId: { type: ["string", "null"] }
         orderRecordId: { type: ["string", "null"] }
+        orderId: { type: ["string", "null"] }
+        linkedVersionNumber: { type: ["integer", "null"] }
+        versionHistory:
+          type: array
+          items: { $ref: "#/components/schemas/ConfirmationRecordRevision" }
+        clientDecisionStatus:
+          anyOf:
+            - $ref: "#/components/schemas/ClientConfirmationStatus"
+            - type: "null"
+        clientDecisionNote: { type: ["string", "null"] }
+        clientDecisionUpdatedAt: { type: ["string", "null"], format: date-time }
+        clientDecisionUpdatedBy: { type: ["string", "null"] }
         pdfVersions:
           type: array
           items: { $ref: "#/components/schemas/ConfirmationRecordFileVersion" }
@@ -5906,7 +5991,7 @@ components:
             - type: "null"
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [_id, confirmationId, clientName, location, quotationId, measurementSheetId, orderRecordId, pdfVersions, excelVersions, excelConfirmationInfo, createdAt, updatedAt]
+      required: [_id, confirmationId, clientName, location, quotationId, quotationRecordId, measurementSheetId, measurementRecordId, orderRecordId, orderId, linkedVersionNumber, versionHistory, clientDecisionStatus, clientDecisionNote, clientDecisionUpdatedAt, clientDecisionUpdatedBy, pdfVersions, excelVersions, excelConfirmationInfo, createdAt, updatedAt]
     ConfirmationRecordList:
       type: array
       items: { $ref: "#/components/schemas/ConfirmationRecord" }
@@ -5933,7 +6018,8 @@ components:
         confirmationId: { type: string }
         orderRecordId: { type: string }
         filesAttached: { type: integer }
-      required: [confirmationId, orderRecordId, filesAttached]
+        linkedVersionNumber: { type: integer }
+      required: [confirmationId, orderRecordId, filesAttached, linkedVersionNumber]
     OrderDocument:
       type: object
       properties:

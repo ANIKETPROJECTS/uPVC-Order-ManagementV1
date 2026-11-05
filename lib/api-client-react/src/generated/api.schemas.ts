@@ -1845,6 +1845,9 @@ export interface ConfirmationReextractInput {
 }
 
 export interface ConfirmationRecordFileVersion {
+  /** @minimum 1 */
+  versionNumber: number;
+  reason: string;
   filename: string;
   contentType: string;
   sizeBytes: number;
@@ -1852,6 +1855,25 @@ export interface ConfirmationRecordFileVersion {
   uploadedBy: string;
   uploadedAt: string;
 }
+
+export interface ConfirmationRecordRevision {
+  /** @minimum 1 */
+  versionNumber: number;
+  reason: string;
+  createdAt: string;
+  uploadedBy: string;
+  pdfFilename?: string;
+  excelFilename?: string;
+}
+
+export type ClientConfirmationStatus = typeof ClientConfirmationStatus[keyof typeof ClientConfirmationStatus];
+
+
+export const ClientConfirmationStatus = {
+  approved_by_client: 'approved_by_client',
+  rejected_by_client: 'rejected_by_client',
+  revision_requested_by_client: 'revision_requested_by_client',
+} as const;
 
 export interface ConfirmationRecord {
   _id: string;
@@ -1861,9 +1883,25 @@ export interface ConfirmationRecord {
   /** @nullable */
   quotationId: string | null;
   /** @nullable */
+  quotationRecordId: string | null;
+  /** @nullable */
   measurementSheetId: string | null;
   /** @nullable */
+  measurementRecordId: string | null;
+  /** @nullable */
   orderRecordId: string | null;
+  /** @nullable */
+  orderId: string | null;
+  /** @nullable */
+  linkedVersionNumber: number | null;
+  versionHistory: ConfirmationRecordRevision[];
+  clientDecisionStatus: ClientConfirmationStatus | null;
+  /** @nullable */
+  clientDecisionNote: string | null;
+  /** @nullable */
+  clientDecisionUpdatedAt: string | null;
+  /** @nullable */
+  clientDecisionUpdatedBy: string | null;
   pdfVersions: ConfirmationRecordFileVersion[];
   excelVersions: ConfirmationRecordFileVersion[];
   excelConfirmationInfo: ConfirmationInfo | null;
@@ -1891,6 +1929,7 @@ export interface AttachConfirmationRecordResponse {
   confirmationId: string;
   orderRecordId: string;
   filesAttached: number;
+  linkedVersionNumber: number;
 }
 
 export interface OrderDocument {
@@ -1967,15 +2006,6 @@ export interface PurchaseOrderRegisterEntry {
   purchaseOrderDocuments: OrderDocumentList;
   confirmationDocuments: OrderDocumentList;
 }
-
-export type ClientConfirmationStatus = typeof ClientConfirmationStatus[keyof typeof ClientConfirmationStatus];
-
-
-export const ClientConfirmationStatus = {
-  approved_by_client: 'approved_by_client',
-  rejected_by_client: 'rejected_by_client',
-  revision_requested_by_client: 'revision_requested_by_client',
-} as const;
 
 export interface ClientConfirmationDecisionInput {
   status: ClientConfirmationStatus;
@@ -3342,6 +3372,14 @@ export const CancelQrPrintJob200State = {
 export type CancelQrPrintJob200 = {
   id: string;
   state: CancelQrPrintJob200State;
+};
+
+export type GetOrderConfirmationVersionStatus200Item = {
+  recordId: string;
+  confirmationId: string;
+  linkedVersionNumber: number;
+  latestVersionNumber: number;
+  newerAvailable: boolean;
 };
 
 export type PreviewOrderDocumentReextraction200 = {

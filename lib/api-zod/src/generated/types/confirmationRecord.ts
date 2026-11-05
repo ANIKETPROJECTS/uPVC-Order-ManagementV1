@@ -5,8 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ClientConfirmationStatus } from './clientConfirmationStatus';
 import type { ConfirmationInfo } from './confirmationInfo';
 import type { ConfirmationRecordFileVersion } from './confirmationRecordFileVersion';
+import type { ConfirmationRecordRevision } from './confirmationRecordRevision';
 
 export interface ConfirmationRecord {
   _id: string;
@@ -16,9 +18,25 @@ export interface ConfirmationRecord {
   /** @nullable */
   quotationId: string | null;
   /** @nullable */
+  quotationRecordId: string | null;
+  /** @nullable */
   measurementSheetId: string | null;
   /** @nullable */
+  measurementRecordId: string | null;
+  /** @nullable */
   orderRecordId: string | null;
+  /** @nullable */
+  orderId: string | null;
+  /** @nullable */
+  linkedVersionNumber: number | null;
+  versionHistory: ConfirmationRecordRevision[];
+  clientDecisionStatus: ClientConfirmationStatus | null;
+  /** @nullable */
+  clientDecisionNote: string | null;
+  /** @nullable */
+  clientDecisionUpdatedAt: Date | null;
+  /** @nullable */
+  clientDecisionUpdatedBy: string | null;
   pdfVersions: ConfirmationRecordFileVersion[];
   excelVersions: ConfirmationRecordFileVersion[];
   excelConfirmationInfo: ConfirmationInfo | null;

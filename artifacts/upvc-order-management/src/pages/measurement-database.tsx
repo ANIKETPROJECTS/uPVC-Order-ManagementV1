@@ -134,6 +134,8 @@ export default function MeasurementDatabasePage({ user }: { user: User }) {
     const query = recordSearch.trim().toLocaleLowerCase();
     const filtered = records.filter((record) => {
       const searchable = [
+        record.id,
+        `MS-${record.id.toUpperCase()}`,
         record.sheetId,
         record.legacyId || '',
         measurementSheetIdLabel(record.id, record.sheetId),
