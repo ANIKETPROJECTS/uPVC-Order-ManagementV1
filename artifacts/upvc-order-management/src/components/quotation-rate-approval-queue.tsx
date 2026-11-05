@@ -47,6 +47,7 @@ type RequestLayout = 'list' | 'grid';
 const statusLabels: Record<QuotationRateSubmission['status'], string> = {
   awaiting_pdf: 'Awaiting PDF',
   pending_review: 'Awaiting approval',
+  rate_assigned: 'Rate assigned',
   approved: 'Approved',
   rejected: 'Rejected',
 };
@@ -54,6 +55,7 @@ const statusLabels: Record<QuotationRateSubmission['status'], string> = {
 const statusStyles: Record<QuotationRateSubmission['status'], string> = {
   awaiting_pdf: 'border-border bg-muted text-muted-foreground',
   pending_review: 'border-amber-200 bg-amber-50 text-amber-800',
+  rate_assigned: 'border-emerald-200 bg-emerald-50 text-emerald-800',
   approved: 'border-emerald-200 bg-emerald-50 text-emerald-800',
   rejected: 'border-rose-200 bg-rose-50 text-rose-800',
 };
@@ -100,11 +102,11 @@ export function QuotationRateApprovalQueue({ user }: { user: User }) {
 
   const assignedRequests = useMemo(() => {
     const submissions = submissionsQuery.data ?? [];
-    return submissions.filter((submission) =>
-      user.roleId === 'master-admin' ||
-      submission.approverIds.includes(user.id) ||
-      (canReview && (submission.status === 'pending_review' || submission.status === 'awaiting_pdf')),
-    );
+    return submissions.filter((submission) => submission.workflowVersion !== 2 && (
+      user.roleId === 'master-admin'
+      || submission.approverIds.includes(user.id)
+      || (canReview && (submission.status === 'pending_review' || submission.status === 'awaiting_pdf'))
+    ));
   }, [canReview, submissionsQuery.data, user.id, user.roleId]);
 
   const locations = useMemo(

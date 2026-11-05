@@ -7,6 +7,7 @@
  */
 import type { QuotationRateSubmissionRevision } from './quotationRateSubmissionRevision';
 import type { QuotationRateSubmissionStatus } from './quotationRateSubmissionStatus';
+import type { QuotationRateSubmissionWorkflowVersion } from './quotationRateSubmissionWorkflowVersion';
 import type { RateRequestPriority } from './rateRequestPriority';
 
 export interface QuotationRateSubmission {
@@ -35,8 +36,17 @@ export interface QuotationRateSubmission {
   submittedBy: string;
   submittedByName: string;
   approverIds: string[];
+  workflowVersion: QuotationRateSubmissionWorkflowVersion;
   /** @nullable */
   decisionComment: string | null;
+  /** @nullable */
+  ratePerSqFt: number | null;
+  /** @nullable */
+  rateAssignedBy: string | null;
+  /** @nullable */
+  rateAssignedByName: string | null;
+  /** @nullable */
+  rateAssignedAt: Date | null;
   /** @nullable */
   decidedBy: string | null;
   /** @nullable */

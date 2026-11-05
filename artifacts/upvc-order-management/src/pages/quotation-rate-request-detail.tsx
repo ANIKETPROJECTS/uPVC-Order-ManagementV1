@@ -29,12 +29,13 @@ const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', {
 
 const statusName = (status: QuotationRateSubmission['status']) => ({
   awaiting_pdf: 'Awaiting PDF',
-  pending_review: 'Awaiting Approval',
+  pending_review: 'Awaiting Rate',
+  rate_assigned: 'Rate Assigned',
   approved: 'Approved',
   rejected: 'Rejected',
 })[status];
 
-const statusStyle = (status: QuotationRateSubmission['status']) => status === 'approved'
+const statusStyle = (status: QuotationRateSubmission['status']) => status === 'approved' || status === 'rate_assigned'
   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
   : status === 'rejected'
     ? 'border-rose-200 bg-rose-50 text-rose-800'
@@ -138,19 +139,19 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
     try {
       await upload.mutateAsync({ submissionId, filename: replacementPdf.name, data: replacementPdf });
       await refresh();
-      toast({ title: 'Request updated and resubmitted', description: 'The updated Eva PDF is in the approval queue.' });
+      toast({ title: 'Request updated and resubmitted', description: 'The updated Eva PDF is ready for rate assignment.' });
     } catch {
-      toast({ title: 'Request updated; PDF upload failed', description: 'The old PDF is still retained. Attach the updated PDF before approval.', variant: 'destructive' });
+      toast({ title: 'Request updated; PDF upload failed', description: 'The old PDF is still retained. Attach the updated PDF before rate assignment.', variant: 'destructive' });
     }
   };
 
   const deleteRequest = async () => {
     if (!submission || !canManage) return;
-    if (!window.confirm(`Delete ${submission.id} for ${submission.clientName}? This removes the request, its approval history, and its attached PDF.`)) return;
+    if (!window.confirm(`Delete ${submission.id} for ${submission.clientName}? This removes the request history and its attached PDF.`)) return;
     try {
       await remove.mutateAsync({ submissionId });
       await refresh();
-      toast({ title: 'Quotation request deleted', description: `${submission.id} and its approval record were removed.` });
+      toast({ title: 'Rate request deleted', description: `${submission.id} and its request history were removed.` });
       backToRequests();
     } catch {
       toast({ title: 'Could not delete the request', description: 'The request was not removed. Refresh and try again.', variant: 'destructive' });
@@ -203,7 +204,7 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
                       <label className="space-y-1.5 text-xs font-semibold">Average area per window<Input readOnly value={Number(values.windowQty) > 0 && Number(values.totalSqFt) > 0 ? (Number(values.totalSqFt) / Number(values.windowQty)).toFixed(2) : ''} data-testid="input-edit-rate-average-sqft" /></label>
                     </div>
                     <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
-                      <p className="text-xs font-semibold">Updated Eva Software PDF <span className="font-normal text-muted-foreground">· optional now; required before it can return to approval</span></p>
+                      <p className="text-xs font-semibold">Updated Eva Software PDF <span className="font-normal text-muted-foreground">· optional now; required before another rate can be assigned</span></p>
                       <Input className="mt-2" type="file" accept="application/pdf,.pdf" onChange={(event) => {
                         const file = event.target.files?.[0] || null;
                         if (!validatePdf(file)) setReplacementPdf(null);
@@ -227,7 +228,8 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Order ID</p><p className="mt-1 text-sm">{submission.orderId || 'No order linked'}</p></div>
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Measurement sheet</p><p className="mt-1 break-all font-mono text-xs">{submission.measurementRecordId ? submission.measurementSheetId || 'Linked sheet ID unavailable' : 'No sheet linked'}</p></div>
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Submitted by</p><p className="mt-1 text-sm">{submission.submittedByName}</p></div>
-                    <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Assigned approvers</p><p className="mt-1 break-all font-mono text-xs">{submission.approverIds.join(', ') || 'None'}</p></div>
+                      {submission.ratePerSqFt != null && <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Assigned rate</p><p className="mt-1 text-sm font-semibold">{submission.ratePerSqFt.toLocaleString('en-IN')} / sq. ft.</p></div>}
+                      {submission.rateAssignedByName && <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Rate set by</p><p className="mt-1 text-sm">{submission.rateAssignedByName}</p></div>}
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Created</p><p className="mt-1 text-sm">{dateLabel(submission.createdAt)}</p></div>
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Last updated</p><p className="mt-1 text-sm">{dateLabel(submission.updatedAt)}</p></div>
                     {(submission.status === 'approved' || submission.status === 'rejected') && <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Decision by</p><p className="mt-1 text-sm">{submission.decidedByName || 'Approver'}</p></div>}
@@ -241,7 +243,7 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
               <CardHeader className="border-b border-border/70">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Eva Software document</p>
                 <CardTitle className="mt-1 font-display text-lg">Attached quotation PDF</CardTitle>
-                <p className="text-xs text-muted-foreground">{submission.pdfNeedsRefresh ? 'This is the previous PDF. Attach an updated file before the request can return to approval.' : 'The PDF attached to this quotation request.'}</p>
+                <p className="text-xs text-muted-foreground">{submission.pdfNeedsRefresh ? 'This is the previous PDF. Attach an updated file before another rate can be assigned.' : 'The PDF attached to this quotation request.'}</p>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
                 {submission.pdfFilename ? (
@@ -259,7 +261,7 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
                       upload.mutate({ submissionId, filename: file.name, data: file }, {
                         onSuccess: async () => {
                           await refresh();
-                          toast({ title: 'Updated PDF attached', description: 'The request is back in the approval queue.' });
+                          toast({ title: 'Updated PDF attached', description: 'The request is ready for a new rate assignment.' });
                         },
                         onError: () => toast({ title: 'PDF upload failed', description: 'The previous PDF is still retained. Try the upload again.', variant: 'destructive' }),
                       });

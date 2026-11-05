@@ -15,6 +15,12 @@ export interface QuotationRateSubmissionRevision {
   windowQty: number;
   totalSqFt: number;
   glassType: string;
+  /** @nullable */
+  ratePerSqFt?: number | null;
+  /** @nullable */
+  rateAssignedByName?: string | null;
+  /** @nullable */
+  rateAssignedAt?: Date | null;
   averageSqFtPerQty: number;
   previousStatus: QuotationRateSubmissionStatus;
   revisedBy: string;

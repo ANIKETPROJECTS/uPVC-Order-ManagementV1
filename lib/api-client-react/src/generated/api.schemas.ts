@@ -1878,6 +1878,7 @@ export type QuotationRateSubmissionStatus = typeof QuotationRateSubmissionStatus
 export const QuotationRateSubmissionStatus = {
   awaiting_pdf: 'awaiting_pdf',
   pending_review: 'pending_review',
+  rate_assigned: 'rate_assigned',
   approved: 'approved',
   rejected: 'rejected',
 } as const;
@@ -2845,6 +2846,14 @@ export const RateRequestPriority = {
   urgent: 'urgent',
 } as const;
 
+export type QuotationRateSubmissionWorkflowVersion = typeof QuotationRateSubmissionWorkflowVersion[keyof typeof QuotationRateSubmissionWorkflowVersion];
+
+
+export const QuotationRateSubmissionWorkflowVersion = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
 export interface QuotationRateSubmissionRevision {
   revisionNumber: number;
   clientName: string;
@@ -2853,6 +2862,12 @@ export interface QuotationRateSubmissionRevision {
   windowQty: number;
   totalSqFt: number;
   glassType: string;
+  /** @nullable */
+  ratePerSqFt?: number | null;
+  /** @nullable */
+  rateAssignedByName?: string | null;
+  /** @nullable */
+  rateAssignedAt?: string | null;
   averageSqFtPerQty: number;
   previousStatus: QuotationRateSubmissionStatus;
   revisedBy: string;
@@ -2894,8 +2909,17 @@ export interface QuotationRateSubmission {
   submittedBy: string;
   submittedByName: string;
   approverIds: string[];
+  workflowVersion: QuotationRateSubmissionWorkflowVersion;
   /** @nullable */
   decisionComment: string | null;
+  /** @nullable */
+  ratePerSqFt: number | null;
+  /** @nullable */
+  rateAssignedBy: string | null;
+  /** @nullable */
+  rateAssignedByName: string | null;
+  /** @nullable */
+  rateAssignedAt: string | null;
   /** @nullable */
   decidedBy: string | null;
   /** @nullable */
@@ -2971,6 +2995,14 @@ export interface QuotationRateDecisionInput {
   decision: QuotationRateDecisionInputDecision;
   /** @maxLength 1000 */
   comment: string;
+}
+
+export interface QuotationRateAssignmentInput {
+  /**
+     * @minimum 0.01
+     * @maximum 10000000
+     */
+  ratePerSqFt: number;
 }
 
 /**

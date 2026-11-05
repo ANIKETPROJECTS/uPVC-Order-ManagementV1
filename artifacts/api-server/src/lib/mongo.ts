@@ -622,6 +622,7 @@ export interface QuotationApprovalSettingsDocument {
 export type QuotationRateSubmissionStatus =
   | "awaiting_pdf"
   | "pending_review"
+  | "rate_assigned"
   | "approved"
   | "rejected";
 export type RateRequestPriority = "normal" | "urgent";
@@ -633,6 +634,9 @@ export interface QuotationRateSubmissionRevisionDocument {
   totalSqFt: number;
   glassType: string;
   priority?: RateRequestPriority;
+  ratePerSqFt?: number | null;
+  rateAssignedByName?: string | null;
+  rateAssignedAt?: Date | null;
   averageSqFtPerQty: number;
   previousStatus: QuotationRateSubmissionStatus;
   revisedBy: string;
@@ -664,6 +668,11 @@ export interface QuotationRateSubmissionDocument {
   submittedBy: string;
   submittedByName: string;
   approverIds: string[];
+  workflowVersion?: 1 | 2;
+  ratePerSqFt?: number | null;
+  rateAssignedBy?: string | null;
+  rateAssignedByName?: string | null;
+  rateAssignedAt?: Date | null;
   decisionComment: string | null;
   decidedBy: string | null;
   decidedByName: string | null;

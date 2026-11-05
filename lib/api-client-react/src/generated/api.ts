@@ -147,6 +147,7 @@ import type {
   QuotationInput,
   QuotationList,
   QuotationOrderLinkInput,
+  QuotationRateAssignmentInput,
   QuotationRateDecisionInput,
   QuotationRateSubmission,
   QuotationRateSubmissionInput,
@@ -8949,7 +8950,9 @@ export const getDecideQuotationRateSubmissionUrl = (submissionId: string,) => {
 }
 
 /**
- * @summary Approve or reject a rate submission
+ * This endpoint remains for in-flight version 1 requests. New requests use the rate assignment endpoint.
+ * @deprecated
+ * @summary Decide a legacy rate submission
  */
 export const decideQuotationRateSubmission = async (submissionId: string,
     quotationRateDecisionInput: QuotationRateDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmission> => {
@@ -9016,7 +9019,8 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DecideQuotationRateSubmissionMutationVariables = {submissionId: string;data: BodyType<QuotationRateDecisionInput>}
 
     /**
- * @summary Approve or reject a rate submission
+ * @deprecated
+ * @summary Decide a legacy rate submission
  */
 export const useDecideQuotationRateSubmission = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideQuotationRateSubmission>>, TError,DecideQuotationRateSubmissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -9027,6 +9031,95 @@ export const useDecideQuotationRateSubmission = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDecideQuotationRateSubmissionMutationOptions(options));
+    }
+
+export const getAssignQuotationRateSubmissionRateUrl = (submissionId: string,) => {
+
+
+
+
+  return `/api/quotation-rate-submissions/${submissionId}/rate`
+}
+
+/**
+ * @summary Assign a rate per square foot to a rate request
+ */
+export const assignQuotationRateSubmissionRate = async (submissionId: string,
+    quotationRateAssignmentInput: QuotationRateAssignmentInput, options?: Parameters<typeof customFetch>[1]): Promise<QuotationRateSubmission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<QuotationRateSubmission>(getAssignQuotationRateSubmissionRateUrl(submissionId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(quotationRateAssignmentInput)
+  }
+);}
+
+
+
+
+
+export const getAssignQuotationRateSubmissionRateMutationKey = () => ['assignQuotationRateSubmissionRate'] as const;
+
+export const getAssignQuotationRateSubmissionRateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignQuotationRateSubmissionRate>>, TError,AssignQuotationRateSubmissionRateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof assignQuotationRateSubmissionRate>>, TError,AssignQuotationRateSubmissionRateMutationVariables, TContext> => {
+
+const mutationKey = getAssignQuotationRateSubmissionRateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignQuotationRateSubmissionRate>>, AssignQuotationRateSubmissionRateMutationVariables> = (props) => {
+          const {submissionId,data} = props ?? {};
+
+          return  assignQuotationRateSubmissionRate(submissionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignQuotationRateSubmissionRateMutationResult = NonNullable<Awaited<ReturnType<typeof assignQuotationRateSubmissionRate>>>
+    export type AssignQuotationRateSubmissionRateMutationBody = BodyType<QuotationRateAssignmentInput>
+    export type AssignQuotationRateSubmissionRateMutationError = ErrorType<void>
+    export type AssignQuotationRateSubmissionRateMutationVariables = {submissionId: string;data: BodyType<QuotationRateAssignmentInput>}
+
+    /**
+ * @summary Assign a rate per square foot to a rate request
+ */
+export const useAssignQuotationRateSubmissionRate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignQuotationRateSubmissionRate>>, TError,AssignQuotationRateSubmissionRateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof assignQuotationRateSubmissionRate>>,
+        TError,
+        AssignQuotationRateSubmissionRateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAssignQuotationRateSubmissionRateMutationOptions(options));
     }
 
 export const getListMeasurementRecordsUrl = () => {

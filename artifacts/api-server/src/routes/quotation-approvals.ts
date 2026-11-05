@@ -1,5 +1,8 @@
 import { ObjectId } from "mongodb";
 import {
+  AssignQuotationRateSubmissionRateBody,
+  AssignQuotationRateSubmissionRateParams,
+  AssignQuotationRateSubmissionRateResponse,
   CreateQuotationRateSubmissionBody,
   CreateQuotationRateSubmissionResponse,
   DeleteQuotationRateSubmissionParams,
@@ -114,6 +117,11 @@ function response(item: QuotationRateSubmissionDocument, measurementSheetId: str
     submittedBy: item.submittedBy,
     submittedByName: item.submittedByName,
     approverIds: item.approverIds,
+    workflowVersion: item.workflowVersion ?? 1,
+    ratePerSqFt: item.ratePerSqFt ?? null,
+    rateAssignedBy: item.rateAssignedBy ?? null,
+    rateAssignedByName: item.rateAssignedByName ?? null,
+    rateAssignedAt: item.rateAssignedAt?.toISOString() ?? null,
     decisionComment: item.decisionComment,
     decidedBy: item.decidedBy,
     decidedByName: item.decidedByName,
@@ -121,6 +129,7 @@ function response(item: QuotationRateSubmissionDocument, measurementSheetId: str
     revisionHistory: (item.revisionHistory ?? []).map((revision) => ({
       ...revision,
       revisedAt: revision.revisedAt.toISOString(),
+      rateAssignedAt: revision.rateAssignedAt?.toISOString() ?? null,
     })),
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
@@ -309,6 +318,11 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     submittedBy: actor.id,
     submittedByName: actor.name,
     approverIds: approvers.map((user) => user._id),
+    workflowVersion: 2,
+    ratePerSqFt: null,
+    rateAssignedBy: null,
+    rateAssignedByName: null,
+    rateAssignedAt: null,
     decisionComment: null,
     decidedBy: null,
     decidedByName: null,
@@ -382,6 +396,9 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
     totalSqFt: item.totalSqFt,
     glassType: item.glassType,
     priority: item.priority ?? "normal",
+    ratePerSqFt: item.ratePerSqFt ?? null,
+    rateAssignedByName: item.rateAssignedByName ?? null,
+    rateAssignedAt: item.rateAssignedAt ?? null,
     averageSqFtPerQty: item.averageSqFtPerQty,
     previousStatus: item.status,
     revisedBy: actor.id,
@@ -408,6 +425,11 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
           measurementRecordId,
           averageSqFtPerQty: Math.round((totalSqFt / windowQty + Number.EPSILON) * 10000) / 10000,
           status: "awaiting_pdf",
+          workflowVersion: 2,
+          ratePerSqFt: null,
+          rateAssignedBy: null,
+          rateAssignedByName: null,
+          rateAssignedAt: null,
           pdfNeedsRefresh: Boolean(item.pdfFilename || item.pdfStoragePath || item.pdfGridFsId),
           decisionComment: null,
           decidedBy: null,
@@ -734,6 +756,7 @@ router.post("/quotation-rate-submissions/:submissionId/decision", async (req, re
     {
       _id: parsedParams.data.submissionId,
       status: "pending_review",
+      workflowVersion: { $ne: 2 },
     },
     {
       $set: {
@@ -757,6 +780,47 @@ router.post("/quotation-rate-submissions/:submissionId/decision", async (req, re
     return;
   }
   res.json(DecideQuotationRateSubmissionResponse.parse(await responseOne(updated)));
+});
+
+router.post("/quotation-rate-submissions/:submissionId/rate", async (req, res): Promise<void> => {
+  const parsedParams = AssignQuotationRateSubmissionRateParams.safeParse(req.params);
+  const parsedBody = AssignQuotationRateSubmissionRateBody.safeParse(req.body);
+  if (!parsedParams.success || !parsedBody.success) {
+    res.status(400).json({ error: !parsedParams.success ? parsedParams.error.message : parsedBody.success ? "" : parsedBody.error.message });
+    return;
+  }
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  if (!canApprove(actor)) {
+    res.status(403).json({ error: "Rate manager editing access is required." });
+    return;
+  }
+  const db = await getMongoDb();
+  const updated = await getQuotationRateSubmissions(db).findOneAndUpdate(
+    { _id: parsedParams.data.submissionId, workflowVersion: 2, status: "pending_review" },
+    {
+      $set: {
+        status: "rate_assigned",
+        ratePerSqFt: Math.round((parsedBody.data.ratePerSqFt + Number.EPSILON) * 100) / 100,
+        rateAssignedBy: actor.id,
+        rateAssignedByName: actor.name,
+        rateAssignedAt: new Date(),
+        updatedAt: new Date(),
+      },
+      $addToSet: { approverIds: actor.id },
+    },
+    { returnDocument: "after" },
+  );
+  if (!updated) {
+    const existing = await getQuotationRateSubmissions(db).findOne({ _id: parsedParams.data.submissionId });
+    if (!existing) {
+      res.status(404).json({ error: "Quotation rate submission not found." });
+      return;
+    }
+    res.status(409).json({ error: "This request is not waiting for a rate assignment." });
+    return;
+  }
+  res.json(AssignQuotationRateSubmissionRateResponse.parse(await responseOne(updated)));
 });
 
 function readRawFile(

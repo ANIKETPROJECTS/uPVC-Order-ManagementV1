@@ -13,4 +13,4 @@ For new rate requests, higher-ups provide a rate; they do not approve or reject 
 
 **Why:** The project owner clarified that managers give a rate rather than approve anything.
 
-**How to apply:** Build a rate-assignment action for new requests and preserve historical approval data until its migration is explicitly defined. Ask for the rate's value/unit if it is not specified.
+**How to apply:** Managers assign a rate per square foot to new requests. Preserve historical approval data and its separate decision route for pre-migration records.

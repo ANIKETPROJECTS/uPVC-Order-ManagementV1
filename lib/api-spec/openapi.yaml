@@ -2372,7 +2372,9 @@ paths:
     post:
       operationId: decideQuotationRateSubmission
       tags: [quotations]
-      summary: Approve or reject a rate submission
+      summary: Decide a legacy rate submission
+      description: This endpoint remains for in-flight version 1 requests. New requests use the rate assignment endpoint.
+      deprecated: true
       parameters:
         - name: submissionId
           in: path
@@ -2398,6 +2400,36 @@ paths:
           description: Submission not found
         "409":
           description: Submission already decided
+  /quotation-rate-submissions/{submissionId}/rate:
+    post:
+      operationId: assignQuotationRateSubmissionRate
+      tags: [quotations]
+      summary: Assign a rate per square foot to a rate request
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotationRateAssignmentInput"
+      responses:
+        "200":
+          description: Rate assigned to the request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationRateSubmission"
+        "403":
+          description: Rate manager access required
+        "404":
+          description: Request not found
+        "409":
+          description: Request is not awaiting a rate
   /measurement-records:
     get:
       operationId: listMeasurementRecords
@@ -7177,7 +7209,7 @@ components:
       required: [items, unreadCount]
     QuotationRateSubmissionStatus:
       type: string
-      enum: [awaiting_pdf, pending_review, approved, rejected]
+      enum: [awaiting_pdf, pending_review, rate_assigned, approved, rejected]
     RateRequestPriority:
       type: string
       enum: [normal, urgent]
@@ -7222,8 +7254,20 @@ components:
           type: array
           items:
             type: string
+        workflowVersion:
+          type: integer
+          enum: [1, 2]
         decisionComment:
           type: ["string", "null"]
+        ratePerSqFt:
+          type: ["number", "null"]
+        rateAssignedBy:
+          type: ["string", "null"]
+        rateAssignedByName:
+          type: ["string", "null"]
+        rateAssignedAt:
+          type: ["string", "null"]
+          format: date-time
         decidedBy:
           type: ["string", "null"]
         decidedByName:
@@ -7240,7 +7284,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, clientName, location, windowQty, totalSqFt, glassType, priority, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
+      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, clientName, location, windowQty, totalSqFt, glassType, priority, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, workflowVersion, ratePerSqFt, rateAssignedBy, rateAssignedByName, rateAssignedAt, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
     QuotationRateSubmissionRevision:
       type: object
       properties:
@@ -7256,6 +7300,13 @@ components:
           type: number
         glassType:
           type: string
+        ratePerSqFt:
+          type: ["number", "null"]
+        rateAssignedByName:
+          type: ["string", "null"]
+        rateAssignedAt:
+          type: ["string", "null"]
+          format: date-time
         averageSqFtPerQty:
           type: number
         previousStatus:
@@ -7345,6 +7396,14 @@ components:
           type: string
           maxLength: 1000
       required: [decision, comment]
+    QuotationRateAssignmentInput:
+      type: object
+      properties:
+        ratePerSqFt:
+          type: number
+          minimum: 0.01
+          maximum: 10000000
+      required: [ratePerSqFt]
     MeasurementVersion:
       type: object
       properties:

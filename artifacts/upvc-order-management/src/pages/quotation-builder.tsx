@@ -40,9 +40,9 @@ import {
   useArchiveWindowProfile,
   useCreateQuotation,
   useCreateQuotationRateSubmission,
+  useAssignQuotationRateSubmissionRate,
   useCreateWindowProfile,
   useDeleteQuotationRateSubmission,
-  useDecideQuotationRateSubmission,
   useGetQuotation,
   useListClients,
   useListOrders,
@@ -613,7 +613,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
   const ordersQuery = useListOrders({}, { query: { queryKey: getListOrdersQueryKey({}) } });
   const create = useCreateQuotationRateSubmission();
   const upload = useUploadQuotationRateSubmissionPdf();
-  const decide = useDecideQuotationRateSubmission();
+  const assignRateMutation = useAssignQuotationRateSubmissionRate();
   const deleteSubmission = useDeleteQuotationRateSubmission();
   const linkOrder = useLinkQuotationRateSubmissionOrder();
   const [clientName, setClientName] = useState('');
@@ -625,7 +625,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
   const [measurementId, setMeasurementId] = useState<string | null>(null);
   const [measurementLabel, setMeasurementLabel] = useState('');
   const [pdf, setPdf] = useState<File | null>(null);
-  const [comments, setComments] = useState<Record<string, string>>({});
+  const [rateValues, setRateValues] = useState<Record<string, string>>({});
   const [historySearch, setHistorySearch] = useState('');
   const [linkingSubmission, setLinkingSubmission] = useState<QuotationRateSubmission | null>(null);
   const [linkOrderRecordId, setLinkOrderRecordId] = useState('');
@@ -664,7 +664,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
     upload.mutate({ submissionId, filename: file.name, data: file }, {
       onSuccess: () => {
         refreshSubmissions();
-        toast({ title: 'PDF attached', description: 'The rate request is now in the approval queue.' });
+        toast({ title: 'PDF attached', description: 'The rate request is ready for rate assignment.' });
       },
       onError: () => toast({ title: 'PDF upload failed', description: 'The request remains available for another upload attempt.', variant: 'destructive' }),
     });
@@ -708,13 +708,19 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
       onError: () => toast({ title: 'Could not create rate request', description: 'Check the fields and try again.', variant: 'destructive' }),
     });
   };
-  const makeDecision = (submission: QuotationRateSubmission, decision: 'approved' | 'rejected') => {
-    decide.mutate({ submissionId: submission.id, data: { decision, comment: comments[submission.id] || '' } }, {
+  const assignRate = (submission: QuotationRateSubmission) => {
+    const ratePerSqFt = Number(rateValues[submission.id]);
+    if (!Number.isFinite(ratePerSqFt) || ratePerSqFt <= 0) {
+      toast({ title: 'Enter a valid rate', description: 'The rate per square foot must be greater than zero.', variant: 'destructive' });
+      return;
+    }
+    assignRateMutation.mutate({ submissionId: submission.id, data: { ratePerSqFt } }, {
       onSuccess: () => {
         refreshSubmissions();
-        toast({ title: decision === 'approved' ? 'Rate request approved' : 'Rate request rejected', description: submission.clientName });
+        setRateValues((current) => ({ ...current, [submission.id]: '' }));
+        toast({ title: 'Rate assigned', description: `${submission.clientName} · ${money(ratePerSqFt)} per sq. ft.` });
       },
-      onError: () => toast({ title: 'Decision was not saved', description: 'The request is unchanged. Try again.', variant: 'destructive' }),
+      onError: () => toast({ title: 'Rate was not assigned', description: 'The request is unchanged. Refresh and try again.', variant: 'destructive' }),
     });
   };
   const openOrderLink = (submission: QuotationRateSubmission) => {
@@ -755,18 +761,18 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
     || (canSubmit && submission.submittedBy === user.id);
   const removeSubmission = (submission: QuotationRateSubmission) => {
     if (!canManageSubmission(submission)) return;
-    if (!window.confirm(`Delete ${submission.id} for ${submission.clientName}? This removes the request, its approval history, and its attached PDF.`)) return;
+    if (!window.confirm(`Delete ${submission.id} for ${submission.clientName}? This removes the request history and its attached PDF.`)) return;
     deleteSubmission.mutate({ submissionId: submission.id }, {
       onSuccess: () => {
         refreshSubmissions();
         void queryClient.invalidateQueries({ queryKey: getListMeasurementRecordsQueryKey() });
-        toast({ title: 'Quotation request deleted', description: `${submission.id} and its approval record were removed.` });
+        toast({ title: 'Rate request deleted', description: `${submission.id} and its request history were removed.` });
       },
       onError: () => toast({ title: 'Could not delete the request', description: 'The request was not removed. Refresh and try again.', variant: 'destructive' }),
     });
   };
-  const statusStyle = (status: string) => status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : status === 'pending_review' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-border bg-muted text-muted-foreground';
-  const statusName = (status: string) => status === 'pending_review' ? 'Awaiting Approval' : status === 'awaiting_pdf' ? 'Awaiting PDF' : status === 'approved' ? 'Approved' : 'Rejected';
+  const statusStyle = (status: string) => status === 'rate_assigned' || status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : status === 'pending_review' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-border bg-muted text-muted-foreground';
+  const statusName = (status: string) => status === 'pending_review' ? 'Awaiting Rate' : status === 'awaiting_pdf' ? 'Awaiting PDF' : status === 'rate_assigned' ? 'Rate Assigned' : status === 'approved' ? 'Approved' : 'Rejected';
   const pdfInput = (submission: QuotationRateSubmission) => (
     <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold transition-colors hover:bg-muted" data-testid={`label-upload-rate-pdf-${submission.id}`}>
       <FilePlus2 size={14} /> Attach Eva PDF
@@ -829,7 +835,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
               <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Rate request history</p><CardTitle className="mt-1 font-display text-lg">All requests</CardTitle><p className="mt-1 text-xs text-muted-foreground">Request details, status, measurement sheet, and Eva PDFs stay together.</p></div>
               <div className="flex flex-wrap items-center gap-2">
                 {canSubmit && <Button size="sm" variant="outline" onClick={onCreate} data-testid="button-new-rate-request"><FilePlus2 size={13} /> New request</Button>}
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">{pending.length} to review</span>
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">{pending.length} to assign</span>
                 <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">{awaiting.length} awaiting PDF</span>
               </div>
             </div>
@@ -862,7 +868,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
                             <p className="mt-1 text-[10px] text-muted-foreground">Submitted by {submission.submittedByName}</p>
                             {submission.pdfFilename && <div className="mt-2">
                               <a href={getDownloadQuotationRateSubmissionPdfUrl(submission.id)} download={submission.pdfFilename} className="inline-flex max-w-full items-center gap-1.5 truncate text-[10px] font-semibold text-primary hover:underline" data-testid={`link-download-rate-pdf-${submission.id}`}><Download size={12} /> {submission.pdfNeedsRefresh ? `Previous PDF · ${submission.pdfFilename}` : submission.pdfFilename}</a>
-                              {submission.pdfNeedsRefresh && <p className="mt-1 text-[10px] text-amber-700">Updated PDF required before approval</p>}
+                              {submission.pdfNeedsRefresh && <p className="mt-1 text-[10px] text-amber-700">Updated PDF required before a new rate can be assigned</p>}
                             </div>}
                             {submission.status === 'awaiting_pdf' && canManageSubmission(submission) ? pdfInput(submission) : null}
                           </td>
@@ -874,6 +880,8 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
                           <td className="px-3 py-3">
                             <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.12em] ${statusStyle(submission.status)}`} data-testid={`status-rate-submission-${submission.id}`}>{statusName(submission.status)}</span>
                             {(submission.status === 'approved' || submission.status === 'rejected') && <p className="mt-1 max-w-[130px] text-[10px] leading-4 text-muted-foreground">by {submission.decidedByName || 'approver'}</p>}
+                            {submission.ratePerSqFt != null && <p className="mt-1 text-[10px] font-semibold text-emerald-800">{money(submission.ratePerSqFt)} / sq. ft.</p>}
+                            {submission.rateAssignedByName && <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-muted-foreground">Set by {submission.rateAssignedByName}</p>}
                             {submission.decisionComment && <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-muted-foreground">{submission.decisionComment}</p>}
                           </td>
                           <td className="min-w-[260px] px-4 py-3">
@@ -882,9 +890,10 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
                               {canManageSubmission(submission) && <Button size="sm" variant="outline" onClick={() => navigate(`/quotations-rates/requests/${submission.id}?edit=1`)} data-testid={`button-edit-rate-request-${submission.id}`}><Pencil size={13} /> Edit</Button>}
                               {canManageSubmission(submission) && <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={deleteSubmission.isPending} onClick={() => removeSubmission(submission)} data-testid={`button-delete-rate-request-${submission.id}`}><Trash2 size={13} /> Delete</Button>}
                               {canLinkSubmission(submission) && <Button size="sm" variant="outline" onClick={() => openOrderLink(submission)} data-testid={`button-link-rate-order-${submission.id}`}><Link2 size={13} /> {submission.orderId ? 'Update links' : 'Link to order'}</Button>}
-                              {submission.status === 'pending_review' && rateDesk ? <><Button size="sm" onClick={() => makeDecision(submission, 'approved')} disabled={decide.isPending} data-testid={`button-approve-rate-${submission.id}`}><Check size={13} /> Approve</Button><Button size="sm" variant="outline" className="text-destructive" onClick={() => makeDecision(submission, 'rejected')} disabled={decide.isPending} data-testid={`button-reject-rate-${submission.id}`}><X size={13} /> Reject</Button></> : submission.status === 'approved' || submission.status === 'rejected' ? <span className="px-2 text-muted-foreground" data-testid={`text-rate-action-complete-${submission.id}`}>—</span> : null}
+                              {submission.status === 'pending_review' && rateDesk && <div className="flex min-w-[210px] items-center gap-1.5" data-testid={`rate-assignment-controls-${submission.id}`}><Input type="number" min="0.01" step="0.01" value={rateValues[submission.id] || ''} onChange={(event) => setRateValues((current) => ({ ...current, [submission.id]: event.target.value }))} placeholder="Rate / sq. ft." aria-label={`Rate per square foot for ${submission.clientName}`} data-testid={`input-rate-per-sqft-${submission.id}`} /><Button size="sm" onClick={() => assignRate(submission)} disabled={assignRateMutation.isPending} data-testid={`button-assign-rate-${submission.id}`}>Assign</Button></div>}
+                              {submission.status === 'rate_assigned' && <span className="px-2 text-muted-foreground" data-testid={`text-rate-assigned-${submission.id}`}>Assigned</span>}
+                              {(submission.status === 'approved' || submission.status === 'rejected') && <span className="px-2 text-muted-foreground" data-testid={`text-rate-action-complete-${submission.id}`}>Historical</span>}
                             </div>
-                            {submission.status === 'pending_review' && rateDesk && <label className="mt-2 block space-y-1 text-[10px] font-semibold text-muted-foreground">Optional decision note<Textarea rows={2} maxLength={1000} value={comments[submission.id] || ''} onChange={(event) => setComments((current) => ({ ...current, [submission.id]: event.target.value }))} placeholder="Context for the submitter" data-testid={`input-rate-decision-comment-${submission.id}`} /></label>}
                           </td>
                         </tr>)}
                       </tbody>
