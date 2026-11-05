@@ -1844,6 +1844,55 @@ export interface ConfirmationReextractInput {
   expectedExtractedAt: string;
 }
 
+export interface ConfirmationRecordFileVersion {
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  storagePath: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface ConfirmationRecord {
+  _id: string;
+  confirmationId: string;
+  clientName: string;
+  location: string;
+  /** @nullable */
+  quotationId: string | null;
+  /** @nullable */
+  measurementSheetId: string | null;
+  /** @nullable */
+  orderRecordId: string | null;
+  pdfVersions: ConfirmationRecordFileVersion[];
+  excelVersions: ConfirmationRecordFileVersion[];
+  excelConfirmationInfo: ConfirmationInfo | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ConfirmationRecordList = ConfirmationRecord[];
+
+export interface ConfirmationRecordInput {
+  /** @minLength 1 */
+  clientName: string;
+  /** @minLength 1 */
+  location: string;
+  quotationId?: string;
+  measurementSheetId?: string;
+}
+
+export interface ConfirmationRecordFileUpload {
+  version: ConfirmationRecordFileVersion;
+  confirmationInfo: ConfirmationInfo | null;
+}
+
+export interface AttachConfirmationRecordResponse {
+  confirmationId: string;
+  orderRecordId: string;
+  filesAttached: number;
+}
+
 export interface OrderDocument {
   id: string;
   orderRecordId: string;

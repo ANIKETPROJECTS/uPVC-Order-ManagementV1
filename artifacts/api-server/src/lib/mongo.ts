@@ -412,9 +412,31 @@ export interface OrderDocumentCategoryDocument {
   updatedAt: Date;
 }
 export interface OrderDocumentMetadataDocument {
-  _id: string; orderRecordId: string; quotationRequestId?: string | null; filename: string; category: DocumentCategory;
+  _id: string; orderRecordId: string; quotationRequestId?: string | null; confirmationRecordId?: string | null; confirmationFileKind?: "pdf" | "excel" | null; filename: string; category: DocumentCategory;
   contentType: string; sizeBytes: number; gridFsId: string | null; storagePath?: string | null; uploadedBy: string; uploadedAt: Date; archivedAt?: Date | null;
   confirmationInfo?: import("./confirmation-extraction").ConfirmationInfo | null;
+}
+export interface ConfirmationRecordFileVersion {
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  storagePath: string;
+  uploadedBy: string;
+  uploadedAt: Date;
+}
+export interface ConfirmationRecordDocument {
+  _id: string;
+  confirmationId: string;
+  clientName: string;
+  location: string;
+  quotationId: string | null;
+  measurementSheetId: string | null;
+  orderRecordId: string | null;
+  pdfVersions: ConfirmationRecordFileVersion[];
+  excelVersions: ConfirmationRecordFileVersion[];
+  excelConfirmationInfo: import("./confirmation-extraction").ConfirmationInfo | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 export interface OrderActivityDocument {
   _id: string; orderRecordId: string; actorId: string; actorName: string; action: string; summary: string; createdAt: Date;
@@ -651,6 +673,7 @@ export interface QuotationRateSubmissionRevisionDocument {
 export interface QuotationRateSubmissionDocument {
   _id: string;
   legacyId?: string | null;
+  migrationMeasurementRecordId?: string | null;
   orderRecordId: string | null;
   orderId: string | null;
   measurementRecordId?: string | null;
@@ -832,6 +855,7 @@ export function getOrderRefunds(db: Db) { return db.collection<OrderRefundDocume
 export function getOrderPaymentFlags(db: Db) { return db.collection<OrderPaymentFlagDocument>("order_payment_flags"); }
 export function getOrderDocumentCategories(db: Db) { return db.collection<OrderDocumentCategoryDocument>("order_document_categories"); }
 export function getOrderDocumentMetadata(db: Db) { return db.collection<OrderDocumentMetadataDocument>("order_document_metadata"); }
+export function getConfirmationRecords(db: Db) { return db.collection<ConfirmationRecordDocument>("confirmation_records"); }
 export function getOrderActivity(db: Db) { return db.collection<OrderActivityDocument>("order_activity"); }
 export function getInstallations(db: Db) { return db.collection<InstallationDocument>("installations"); }
 export function getInstallationTeams(db: Db) { return db.collection<InstallationTeamDocument>("installation_teams"); }
@@ -1266,6 +1290,15 @@ async function migrateQuotationRateRequestIds(db: Db, now: Date): Promise<void> 
   for (const item of legacyRequests) {
     let migrated = await submissions.findOne({ legacyId: item._id });
     if (!migrated) {
+      if (item.measurementRecordId) {
+        await submissions.updateOne(
+          { _id: item._id },
+          {
+            $set: { migrationMeasurementRecordId: item.measurementRecordId },
+            $unset: { measurementRecordId: "" },
+          },
+        );
+      }
       const year = quotationYearCode(item.createdAt);
       const counter = await counters.findOneAndUpdate(
         { _id: quotationYearSequenceCounterId(year) },
@@ -1276,7 +1309,16 @@ async function migrateQuotationRateRequestIds(db: Db, now: Date): Promise<void> 
         throw new Error("The quotation rate-request ID sequence could not be allocated.");
       }
       const nextId = `QT-${year}-${String(counter.value).padStart(4, "0")}`;
-      const replacement = { ...item, _id: nextId, legacyId: item.legacyId ?? item._id };
+      const {
+        migrationMeasurementRecordId,
+        ...originalFields
+      } = item;
+      const replacement = {
+        ...originalFields,
+        _id: nextId,
+        legacyId: item.legacyId ?? item._id,
+        measurementRecordId: item.measurementRecordId ?? migrationMeasurementRecordId ?? null,
+      };
       await submissions.insertOne(replacement);
       migrated = replacement;
     }
@@ -1764,6 +1806,8 @@ export async function initializeMongo(): Promise<void> {
     paymentFlags.createIndex({ createdAt: -1, _id: 1 }, { name: "payment_flags_by_created_date" }),
     paymentFlags.createIndex({ orderRecordId: 1, createdAt: -1, _id: 1 }, { name: "payment_flags_by_order_created_date" }),
     orderDocumentMetadata.createIndex({ orderRecordId: 1, uploadedAt: -1 }, { name: "documents_by_order" }),
+    getConfirmationRecords(db).createIndex({ confirmationId: 1 }, { unique: true, name: "confirmation_record_id_unique" }),
+    getConfirmationRecords(db).createIndex({ orderRecordId: 1, updatedAt: -1 }, { name: "confirmation_records_by_order" }),
     orderActivity.createIndex({ orderRecordId: 1, createdAt: -1 }, { name: "activity_by_order" }),
     windowProfiles.createIndex(
       { codeUpper: 1 },

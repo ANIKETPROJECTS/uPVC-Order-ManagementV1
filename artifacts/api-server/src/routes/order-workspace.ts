@@ -38,7 +38,7 @@ import {
   UploadQuotationConfirmationDocumentResponse,
 } from "@workspace/api-zod";
 import {
-  getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getOrderDocumentsBucket, getOrderPaymentFlags, getOrderPayments,
+  getMongoDb, getOrderActivity, getOrderDocumentCategories, getOrderDocumentMetadata, getConfirmationRecords, getCounters, getQuotations, getMeasurementRecords, getOrderDocumentsBucket, getOrderPaymentFlags, getOrderPayments,
   getOrderRefunds, getOrders, getOrderWindows, getGlassTrackingOrders, getGlassTrackingWorkbookImports, getQuotationRateSubmissions, getPublicUser, getUsers, type DocumentCategory, type OrderDocument, type OrderWindowDocument, type OrderWindowPieceDocument,
   getQrPrintJobs, getQrStickerSettings, getQrStickerSettingsAudit, type QrPrintJobDocument, type QrPrintJobPieceDocument,
   type GlassTrackingItemDocument, type GlassTrackingOrderDocument,
@@ -760,6 +760,154 @@ router.get("/confirmation/purchase-orders", async (req, res): Promise<void> => {
   });
 
   res.json(GetPurchaseOrderRegisterResponse.parse(register));
+});
+
+router.get("/confirmation-records", async (req, res): Promise<void> => {
+  if (!(await context(req, res, "confirmation"))) return;
+  const rows = await getConfirmationRecords(await getMongoDb()).find({}).sort({ updatedAt: -1 }).toArray();
+  res.json(rows);
+});
+
+router.post("/confirmation-records", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "confirmation", true);
+  if (!actor) return;
+  const clientName = typeof req.body?.clientName === "string" ? req.body.clientName.trim() : "";
+  const location = typeof req.body?.location === "string" ? req.body.location.trim() : "";
+  if (!clientName || !location) {
+    res.status(400).json({ error: "Client name and location are required." });
+    return;
+  }
+  const db = await getMongoDb();
+  const quotationInput = typeof req.body.quotationId === "string" ? req.body.quotationId.trim() : "";
+  const measurementInput = typeof req.body.measurementSheetId === "string" ? req.body.measurementSheetId.trim() : "";
+  const quotation = quotationInput
+    ? await getQuotations(db).findOne({ $or: [{ quoteNo: quotationInput }, { legacyQuoteNo: quotationInput }] })
+    : null;
+  if (quotationInput && (!quotation || quotation.archivedAt)) {
+    res.status(400).json({ error: "Quotation ID was not found." });
+    return;
+  }
+  const measurement = measurementInput
+    ? await getMeasurementRecords(db).findOne({ $or: [{ sheetId: measurementInput }, { legacyId: measurementInput }, { _id: measurementInput }] })
+    : null;
+  if (measurementInput && !measurement) {
+    res.status(400).json({ error: "Measurement sheet ID was not found." });
+    return;
+  }
+  const now = new Date();
+  const year = new Intl.DateTimeFormat("en-GB", { year: "2-digit", timeZone: "Asia/Kolkata" }).format(now);
+  const counter = await getCounters(db).findOneAndUpdate(
+    { _id: `confirmation-year-sequence:${year}` },
+    { $inc: { value: 1 }, $set: { updatedAt: now } },
+    { upsert: true, returnDocument: "after" },
+  );
+  if (!counter) { res.status(503).json({ error: "Confirmation ID could not be allocated." }); return; }
+  const record = {
+    _id: randomUUID(),
+    confirmationId: `CF-${year}-${String(counter.value).padStart(4, "0")}`,
+    clientName,
+    location,
+    quotationId: quotation?.quoteNo ?? null,
+    measurementSheetId: measurement?.sheetId ?? measurement?.legacyId ?? measurement?._id ?? null,
+    orderRecordId: null,
+    pdfVersions: [],
+    excelVersions: [],
+    excelConfirmationInfo: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await getConfirmationRecords(db).insertOne(record);
+  res.status(201).json(record);
+});
+
+router.post("/confirmation-records/:recordId/files/:kind/:filename", async (req, res, next): Promise<void> => {
+  const actor = await context(req, res, "confirmation", true);
+  if (!actor) return;
+  const { recordId, kind, filename } = req.params;
+  if (kind !== "pdf" && kind !== "excel") { res.status(400).json({ error: "Choose PDF or Excel." }); return; }
+  const extension = filename.toLowerCase().split(".").pop();
+  if ((kind === "pdf" && extension !== "pdf") || (kind === "excel" && !["xlsx", "xls"].includes(extension ?? ""))) {
+    res.status(400).json({ error: kind === "pdf" ? "Upload a PDF file." : "Upload an Excel workbook." });
+    return;
+  }
+  const db = await getMongoDb();
+  const record = await getConfirmationRecords(db).findOne({ _id: recordId });
+  if (!record) { res.status(404).json({ error: "Confirmation record not found." }); return; }
+  expressRaw(req, res, next, async () => {
+    const body = req.body as Buffer;
+    if (!body?.length || body.length > 10 * 1024 * 1024) { res.status(400).json({ error: "File must be under 10 MiB." }); return; }
+    const storagePath = await storeProjectUpload("order-documents", filename, body);
+    const version = { filename, contentType: kind === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sizeBytes: body.length, storagePath, uploadedBy: actor.id, uploadedAt: new Date() };
+    const fields: "pdfVersions" | "excelVersions" = kind === "pdf" ? "pdfVersions" : "excelVersions";
+    const info = kind === "excel" ? await extractConfirmationInfo(body, filename) : null;
+    await getConfirmationRecords(db).updateOne(
+      { _id: recordId },
+      { $push: { [fields]: version } as any, $set: { ...(info ? { excelConfirmationInfo: info } : {}), updatedAt: new Date() } },
+    );
+    if (record.orderRecordId) {
+      const documents = getOrderDocumentMetadata(db);
+      const linked = await documents.findOne({
+        orderRecordId: record.orderRecordId,
+        confirmationRecordId: record._id,
+        confirmationFileKind: kind,
+        archivedAt: { $exists: false },
+      } as any);
+      const values = {
+        filename, category: "confirmation", confirmationFileKind: kind,
+        contentType: version.contentType, sizeBytes: body.length, storagePath,
+        uploadedBy: actor.id, uploadedAt: version.uploadedAt,
+        ...(kind === "excel" ? { confirmationInfo: info } : {}),
+      };
+      if (linked) await documents.updateOne({ _id: linked._id }, { $set: values } as any);
+      else await documents.insertOne({
+        _id: randomUUID(), orderRecordId: record.orderRecordId, quotationRequestId: null,
+        confirmationRecordId: record._id, ...values, gridFsId: null,
+      } as any);
+    }
+    res.status(201).json({ version, confirmationInfo: info });
+  });
+});
+
+router.get("/confirmation-records/:recordId/file-versions/:kind/:version", async (req, res): Promise<void> => {
+  if (!(await context(req, res, "confirmation"))) return;
+  const kind = req.params.kind === "pdf" ? "pdfVersions" : req.params.kind === "excel" ? "excelVersions" : null;
+  const versionNumber = Number(req.params.version);
+  if (!kind || !Number.isInteger(versionNumber) || versionNumber < 1) { res.status(400).json({ error: "Invalid file version." }); return; }
+  const record = await getConfirmationRecords(await getMongoDb()).findOne({ _id: req.params.recordId });
+  const version = record?.[kind][versionNumber - 1];
+  const filePath = version ? resolveProjectUploadPath(version.storagePath) : null;
+  if (!version || !filePath) { res.status(404).json({ error: "Confirmation file not found." }); return; }
+  res.download(filePath, version.filename);
+});
+
+router.post("/orders/:id/confirmation-records/:recordId/attach", async (req, res): Promise<void> => {
+  const actor = await context(req, res, "confirmation", true);
+  if (!actor || !(await orderExists(String(req.params.id), res))) return;
+  const db = await getMongoDb();
+  const records = getConfirmationRecords(db);
+  const record = await records.findOne({ _id: String(req.params.recordId) });
+  if (!record) { res.status(404).json({ error: "Confirmation record not found." }); return; }
+  if (record.orderRecordId && record.orderRecordId !== String(req.params.id)) { res.status(409).json({ error: "This confirmation is already attached to another order." }); return; }
+  const orderRecordId = String(req.params.id);
+  const orderDocuments = getOrderDocumentMetadata(db);
+  const existing = await orderDocuments.findOne({ orderRecordId, confirmationRecordId: record._id, archivedAt: { $exists: false } } as any);
+  if (existing) { res.status(409).json({ error: "This confirmation is already attached." }); return; }
+  const now = new Date();
+  const files = [
+    ...record.pdfVersions.slice(-1).map((file) => ({ file, kind: "pdf" })),
+    ...record.excelVersions.slice(-1).map((file) => ({ file, kind: "excel" })),
+  ];
+  for (const { file, kind } of files) {
+    const confirmationInfo = file === record.excelVersions.at(-1) ? record.excelConfirmationInfo : null;
+    await orderDocuments.insertOne({
+      _id: randomUUID(), orderRecordId, quotationRequestId: null, confirmationRecordId: record._id, confirmationFileKind: kind,
+      filename: file.filename, category: "confirmation", contentType: file.contentType, sizeBytes: file.sizeBytes,
+      gridFsId: null, storagePath: file.storagePath, uploadedBy: actor.id, uploadedAt: now, confirmationInfo,
+    } as any);
+  }
+  await records.updateOne({ _id: record._id }, { $set: { orderRecordId, updatedAt: now } });
+  await event(orderRecordId, actor, "confirmation.attached", `Attached ${record.confirmationId} confirmation.`);
+  res.json({ confirmationId: record.confirmationId, orderRecordId, filesAttached: files.length });
 });
 
 router.patch("/confirmation/purchase-orders/:orderRecordId/client-decision", async (req, res): Promise<void> => {
@@ -1972,7 +2120,7 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
       return;
     }
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
-    const confirmationInfo = p.data.category === "confirmation" ? await extractConfirmationInfo(body, p.data.filename) : null;
+    const confirmationInfo = p.data.category === "confirmation" && /\.(xlsx|xls)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
     const meta = { _id: randomUUID(), orderRecordId: p.data.id, quotationRequestId: null, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: null, storagePath, uploadedBy: actor.id, uploadedAt: new Date(), confirmationInfo };
     try {
       await getOrderDocumentMetadata(db).insertOne(meta);
@@ -2013,7 +2161,7 @@ router.post("/orders/:id/quotation-requests/:quotationRequestId/confirmation-doc
       return;
     }
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
-    const confirmationInfo = await extractConfirmationInfo(body, p.data.filename);
+    const confirmationInfo = /\.(xlsx|xls)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
     const meta = {
       _id: randomUUID(),
       orderRecordId: p.data.id,
@@ -2107,6 +2255,7 @@ router.post("/orders/:id/documents/:documentId/re-extract-preview", async (req, 
   const meta = await getOrderDocumentMetadata(db).findOne({ _id: String(req.params.documentId), orderRecordId: String(req.params.id), archivedAt: { $exists: false } });
   if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
   if (meta.category !== "confirmation") { res.status(400).json({ error: "Only confirmation documents can be re-extracted." }); return; }
+  if (!/\.(xlsx|xlsm|xls|csv)$/i.test(meta.filename)) { res.status(400).json({ error: "Only an Excel workbook can be used for confirmation extraction." }); return; }
   const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
   if (!category || !requireModuleEdit(actor, res, category.requiredModule)) return;
   try {
@@ -2126,6 +2275,7 @@ router.post("/orders/:id/documents/:documentId/re-extract", async (req, res): Pr
   const meta = await documents.findOne({ _id: String(req.params.documentId), orderRecordId: String(req.params.id), archivedAt: { $exists: false } });
   if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
   if (meta.category !== "confirmation") { res.status(400).json({ error: "Only confirmation documents can be re-extracted." }); return; }
+  if (!/\.(xlsx|xlsm|xls|csv)$/i.test(meta.filename)) { res.status(400).json({ error: "Only an Excel workbook can be used for confirmation extraction." }); return; }
   const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
   if (!category || !requireModuleEdit(actor, res, category.requiredModule)) return;
   if (meta.confirmationInfo?.extractedAt !== expectedExtractedAt) { res.status(409).json({ error: "The saved extraction changed. Refresh and review the new preview." }); return; }
@@ -2172,7 +2322,7 @@ router.put("/orders/:id/documents/:documentId/content/:filename", async (req, re
 
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
     const uploadedAt = new Date();
-    const confirmationInfo = meta.category === "confirmation" ? await extractConfirmationInfo(body, p.data.filename) : null;
+    const confirmationInfo = meta.category === "confirmation" && /\.(xlsx|xls)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
     let replaced;
     try {
       replaced = await documents.updateOne(

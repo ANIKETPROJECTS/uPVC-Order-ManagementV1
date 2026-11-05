@@ -21,6 +21,7 @@ import type {
 
 import type {
   AdminSummary,
+  AttachConfirmationRecordResponse,
   AuthSession,
   BalancePaymentRegisterList,
   BalancePaymentTransactions,
@@ -40,6 +41,10 @@ import type {
   ClientList,
   ClientUpdate,
   ConfirmQrPrintJobInput,
+  ConfirmationRecord,
+  ConfirmationRecordFileUpload,
+  ConfirmationRecordInput,
+  ConfirmationRecordList,
   ConfirmationReextractInput,
   CreateOrderGrievance,
   Dashboard,
@@ -12299,6 +12304,427 @@ export function useGetPurchaseOrderRegister<TData = Awaited<ReturnType<typeof ge
 
 
 
+
+export const getListConfirmationRecordsUrl = () => {
+
+
+
+
+  return `/api/confirmation-records`
+}
+
+/**
+ * @summary List reusable confirmation records
+ */
+export const listConfirmationRecords = async ( options?: Parameters<typeof customFetch>[1]): Promise<ConfirmationRecordList> => {
+
+  return customFetch<ConfirmationRecordList>(getListConfirmationRecordsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListConfirmationRecordsQueryKey = () => {
+    return [
+    `/api/confirmation-records`
+    ] as const;
+    }
+
+
+export const getListConfirmationRecordsQueryOptions = <TData = Awaited<ReturnType<typeof listConfirmationRecords>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listConfirmationRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListConfirmationRecordsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listConfirmationRecords>>> = ({ signal }) => listConfirmationRecords({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listConfirmationRecords>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListConfirmationRecordsQueryResult = NonNullable<Awaited<ReturnType<typeof listConfirmationRecords>>>
+export type ListConfirmationRecordsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List reusable confirmation records
+ */
+
+export function useListConfirmationRecords<TData = Awaited<ReturnType<typeof listConfirmationRecords>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listConfirmationRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListConfirmationRecordsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateConfirmationRecordUrl = () => {
+
+
+
+
+  return `/api/confirmation-records`
+}
+
+/**
+ * @summary Create a reusable confirmation record
+ */
+export const createConfirmationRecord = async (confirmationRecordInput: ConfirmationRecordInput, options?: Parameters<typeof customFetch>[1]): Promise<ConfirmationRecord> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ConfirmationRecord>(getCreateConfirmationRecordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(confirmationRecordInput)
+  }
+);}
+
+
+
+
+
+export const getCreateConfirmationRecordMutationKey = () => ['createConfirmationRecord'] as const;
+
+export const getCreateConfirmationRecordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConfirmationRecord>>, TError,CreateConfirmationRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createConfirmationRecord>>, TError,CreateConfirmationRecordMutationVariables, TContext> => {
+
+const mutationKey = getCreateConfirmationRecordMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createConfirmationRecord>>, CreateConfirmationRecordMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createConfirmationRecord(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateConfirmationRecordMutationResult = NonNullable<Awaited<ReturnType<typeof createConfirmationRecord>>>
+    export type CreateConfirmationRecordMutationBody = BodyType<ConfirmationRecordInput>
+    export type CreateConfirmationRecordMutationError = ErrorType<unknown>
+    export type CreateConfirmationRecordMutationVariables = {data: BodyType<ConfirmationRecordInput>}
+
+    /**
+ * @summary Create a reusable confirmation record
+ */
+export const useCreateConfirmationRecord = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConfirmationRecord>>, TError,CreateConfirmationRecordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createConfirmationRecord>>,
+        TError,
+        CreateConfirmationRecordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateConfirmationRecordMutationOptions(options));
+    }
+
+export const getUploadConfirmationRecordFileUrl = (recordId: string,
+    kind: 'pdf' | 'excel',
+    filename: string,) => {
+
+
+
+
+  return `/api/confirmation-records/${recordId}/files/${kind}/${filename}`
+}
+
+/**
+ * @summary Add a PDF or Excel version to a confirmation
+ */
+export const uploadConfirmationRecordFile = async (recordId: string,
+    kind: 'pdf' | 'excel',
+    filename: string,
+    uploadConfirmationRecordFileBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<ConfirmationRecordFileUpload> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ConfirmationRecordFileUpload>(getUploadConfirmationRecordFileUrl(recordId,kind,filename),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadConfirmationRecordFileBody
+  }
+);}
+
+
+
+
+
+export const getUploadConfirmationRecordFileMutationKey = () => ['uploadConfirmationRecordFile'] as const;
+
+export const getUploadConfirmationRecordFileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadConfirmationRecordFile>>, TError,UploadConfirmationRecordFileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadConfirmationRecordFile>>, TError,UploadConfirmationRecordFileMutationVariables, TContext> => {
+
+const mutationKey = getUploadConfirmationRecordFileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadConfirmationRecordFile>>, UploadConfirmationRecordFileMutationVariables> = (props) => {
+          const {recordId,kind,filename,data} = props ?? {};
+
+          return  uploadConfirmationRecordFile(recordId,kind,filename,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadConfirmationRecordFileMutationResult = NonNullable<Awaited<ReturnType<typeof uploadConfirmationRecordFile>>>
+    export type UploadConfirmationRecordFileMutationBody = BodyType<Blob>
+    export type UploadConfirmationRecordFileMutationError = ErrorType<unknown>
+    export type UploadConfirmationRecordFileMutationVariables = {recordId: string;kind: 'pdf' | 'excel';filename: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Add a PDF or Excel version to a confirmation
+ */
+export const useUploadConfirmationRecordFile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadConfirmationRecordFile>>, TError,UploadConfirmationRecordFileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadConfirmationRecordFile>>,
+        TError,
+        UploadConfirmationRecordFileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadConfirmationRecordFileMutationOptions(options));
+    }
+
+export const getDownloadConfirmationRecordFileUrl = (recordId: string,
+    kind: 'pdf' | 'excel',
+    version: number,) => {
+
+
+
+
+  return `/api/confirmation-records/${recordId}/file-versions/${kind}/${version}`
+}
+
+/**
+ * @summary Download a confirmation file version
+ */
+export const downloadConfirmationRecordFile = async (recordId: string,
+    kind: 'pdf' | 'excel',
+    version: number, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadConfirmationRecordFileUrl(recordId,kind,version),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadConfirmationRecordFileQueryKey = (recordId: string,
+    kind: 'pdf' | 'excel',
+    version: number,) => {
+    return [
+    `/api/confirmation-records/${recordId}/file-versions/${kind}/${version}`
+    ] as const;
+    }
+
+
+export const getDownloadConfirmationRecordFileQueryOptions = <TData = Awaited<ReturnType<typeof downloadConfirmationRecordFile>>, TError = ErrorType<unknown>>(recordId: string,
+    kind: 'pdf' | 'excel',
+    version: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadConfirmationRecordFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadConfirmationRecordFileQueryKey(recordId,kind,version);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadConfirmationRecordFile>>> = ({ signal }) => downloadConfirmationRecordFile(recordId,kind,version, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: recordId !== null && recordId !== undefined && kind !== null && kind !== undefined && version !== null && version !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadConfirmationRecordFile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadConfirmationRecordFileQueryResult = NonNullable<Awaited<ReturnType<typeof downloadConfirmationRecordFile>>>
+export type DownloadConfirmationRecordFileQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Download a confirmation file version
+ */
+
+export function useDownloadConfirmationRecordFile<TData = Awaited<ReturnType<typeof downloadConfirmationRecordFile>>, TError = ErrorType<unknown>>(
+ recordId: string,
+    kind: 'pdf' | 'excel',
+    version: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadConfirmationRecordFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadConfirmationRecordFileQueryOptions(recordId,kind,version,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAttachConfirmationRecordToOrderUrl = (id: string,
+    recordId: string,) => {
+
+
+
+
+  return `/api/orders/${id}/confirmation-records/${recordId}/attach`
+}
+
+/**
+ * @summary Attach saved confirmation files to an order
+ */
+export const attachConfirmationRecordToOrder = async (id: string,
+    recordId: string, options?: Parameters<typeof customFetch>[1]): Promise<AttachConfirmationRecordResponse> => {
+
+  return customFetch<AttachConfirmationRecordResponse>(getAttachConfirmationRecordToOrderUrl(id,recordId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAttachConfirmationRecordToOrderMutationKey = () => ['attachConfirmationRecordToOrder'] as const;
+
+export const getAttachConfirmationRecordToOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachConfirmationRecordToOrder>>, TError,AttachConfirmationRecordToOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof attachConfirmationRecordToOrder>>, TError,AttachConfirmationRecordToOrderMutationVariables, TContext> => {
+
+const mutationKey = getAttachConfirmationRecordToOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof attachConfirmationRecordToOrder>>, AttachConfirmationRecordToOrderMutationVariables> = (props) => {
+          const {id,recordId} = props ?? {};
+
+          return  attachConfirmationRecordToOrder(id,recordId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AttachConfirmationRecordToOrderMutationResult = NonNullable<Awaited<ReturnType<typeof attachConfirmationRecordToOrder>>>
+
+    export type AttachConfirmationRecordToOrderMutationError = ErrorType<unknown>
+    export type AttachConfirmationRecordToOrderMutationVariables = {id: string;recordId: string}
+
+    /**
+ * @summary Attach saved confirmation files to an order
+ */
+export const useAttachConfirmationRecordToOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachConfirmationRecordToOrder>>, TError,AttachConfirmationRecordToOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof attachConfirmationRecordToOrder>>,
+        TError,
+        AttachConfirmationRecordToOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAttachConfirmationRecordToOrderMutationOptions(options));
+    }
 
 export const getUpdateClientConfirmationDecisionUrl = (orderRecordId: string,) => {
 

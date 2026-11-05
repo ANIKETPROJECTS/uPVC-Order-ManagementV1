@@ -6119,6 +6119,271 @@ export const GetPurchaseOrderRegisterResponse = zod.array(GetPurchaseOrderRegist
 
 
 /**
+ * @summary List reusable confirmation records
+ */
+export const ListConfirmationRecordsResponseItem = zod.object({
+  "_id": zod.string(),
+  "confirmationId": zod.string(),
+  "clientName": zod.string(),
+  "location": zod.string(),
+  "quotationId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
+  "orderRecordId": zod.string().nullable(),
+  "pdfVersions": zod.array(zod.object({
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "storagePath": zod.string(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})),
+  "excelVersions": zod.array(zod.object({
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "storagePath": zod.string(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})),
+  "excelConfirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
+})),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()]),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListConfirmationRecordsResponse = zod.array(ListConfirmationRecordsResponseItem)
+
+
+/**
+ * @summary Create a reusable confirmation record
+ */
+
+
+
+
+export const CreateConfirmationRecordBody = zod.object({
+  "clientName": zod.string().min(1),
+  "location": zod.string().min(1),
+  "quotationId": zod.string().optional(),
+  "measurementSheetId": zod.string().optional()
+})
+
+export const CreateConfirmationRecordResponse = zod.object({
+  "_id": zod.string(),
+  "confirmationId": zod.string(),
+  "clientName": zod.string(),
+  "location": zod.string(),
+  "quotationId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
+  "orderRecordId": zod.string().nullable(),
+  "pdfVersions": zod.array(zod.object({
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "storagePath": zod.string(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})),
+  "excelVersions": zod.array(zod.object({
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "storagePath": zod.string(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})),
+  "excelConfirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
+})),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()]),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Add a PDF or Excel version to a confirmation
+ */
+export const UploadConfirmationRecordFileParams = zod.object({
+  "recordId": zod.coerce.string(),
+  "kind": zod.enum(['pdf', 'excel']),
+  "filename": zod.coerce.string()
+})
+
+export const UploadConfirmationRecordFileResponse = zod.object({
+  "version": zod.object({
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "storagePath": zod.string(),
+  "uploadedBy": zod.string(),
+  "uploadedAt": zod.coerce.date()
+}),
+  "confirmationInfo": zod.union([zod.object({
+  "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
+  "method": zod.enum(['pdf_text', 'ocr', 'none']),
+  "extractedAt": zod.coerce.date(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+}))
+})),
+  "windows": zod.array(zod.object({
+  "windowNo": zod.string(),
+  "location": zod.string(),
+  "width": zod.string(),
+  "height": zod.string(),
+  "area": zod.string(),
+  "quantity": zod.string(),
+  "windowType": zod.string(),
+  "glass": zod.string(),
+  "lockType": zod.string(),
+  "profile": zod.string(),
+  "mesh": zod.string(),
+  "originalCells": zod.array(zod.object({
+  "columnLabel": zod.string(),
+  "text": zod.string(),
+  "page": zod.number().int().nullable(),
+  "rowPosition": zod.number()
+})).optional(),
+  "page": zod.number().int().nullish(),
+  "rowPosition": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional(),
+  "confidence": zod.number().optional()
+})),
+  "columns": zod.array(zod.string()).optional(),
+  "checksum": zod.object({
+  "rowsFound": zod.number().int(),
+  "quantity": zod.number(),
+  "calculatedAreaSqFt": zod.number(),
+  "documentAreaSqFt": zod.number().nullable(),
+  "matches": zod.boolean().nullable()
+}).optional(),
+  "terms": zod.array(zod.string()),
+  "rawText": zod.string(),
+  "error": zod.string().nullable()
+}),zod.null()])
+})
+
+
+/**
+ * @summary Download a confirmation file version
+ */
+
+
+
+export const DownloadConfirmationRecordFileParams = zod.object({
+  "recordId": zod.coerce.string(),
+  "kind": zod.enum(['pdf', 'excel']),
+  "version": zod.coerce.number().int().min(1)
+})
+
+export const DownloadConfirmationRecordFileResponse = zod.unknown()
+
+
+/**
+ * @summary Attach saved confirmation files to an order
+ */
+export const AttachConfirmationRecordToOrderParams = zod.object({
+  "id": zod.coerce.string(),
+  "recordId": zod.coerce.string()
+})
+
+export const AttachConfirmationRecordToOrderResponse = zod.object({
+  "confirmationId": zod.string(),
+  "orderRecordId": zod.string(),
+  "filesAttached": zod.number().int()
+})
+
+
+/**
  * @summary Record the client decision for an order confirmation
  */
 export const UpdateClientConfirmationDecisionParams = zod.object({

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { Link } from 'wouter';
 import {
   ArrowDownToLine,
@@ -88,6 +88,12 @@ const formatBytes = (bytes: number) => {
 
 type DownloadTarget = { orderRecordId: string; document: OrderDocument } | null;
 type RegisterSort = 'updated-desc' | 'updated-asc' | 'order-id' | 'client';
+type ConfirmationRecord = {
+  _id: string; confirmationId: string; clientName: string; location: string;
+  quotationId: string | null; measurementSheetId: string | null; orderRecordId: string | null;
+  pdfVersions: { filename: string; sizeBytes: number; uploadedAt: string }[];
+  excelVersions: { filename: string; sizeBytes: number; uploadedAt: string }[];
+};
 const registerSortDescriptions: Record<RegisterSort, string> = {
   'updated-desc': 'recent order update',
   'updated-asc': 'oldest order update',
@@ -100,6 +106,7 @@ type PreviewTarget =
 
 const acceptedDocuments = '.pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx';
 const isSupportedDocument = (file: File) => /\.(pdf|png|jpe?g|webp|docx|xlsx)$/i.test(file.name);
+const confirmationApiUrl = (path: string) => `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api${path}`;
 
 function RegisterLoading() {
   return <div className="space-y-3" data-testid="state-confirmation-loading" aria-label="Loading purchase order register">
@@ -200,12 +207,87 @@ export default function ConfirmationPage({ user }: { user: User }) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [downloadTarget, setDownloadTarget] = useState<DownloadTarget>(null);
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
+  const [records, setRecords] = useState<ConfirmationRecord[]>([]);
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [recordBusy, setRecordBusy] = useState(false);
+  const [attachTargets, setAttachTargets] = useState<Record<string, string>>({});
+  const [recordFields, setRecordFields] = useState({ clientName: '', location: '', quotationId: '', measurementSheetId: '' });
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [excelFile, setExcelFile] = useState<File | null>(null);
   const query = useGetPurchaseOrderRegister({
     query: {
       enabled: canViewRegister,
       queryKey: getGetPurchaseOrderRegisterQueryKey(),
     },
   });
+  const refreshRecords = () => fetch(confirmationApiUrl('/confirmation-records')).then(async (response) => {
+    if (!response.ok) throw new Error('Confirmation records could not be loaded.');
+    setRecords(await response.json() as ConfirmationRecord[]);
+  }).catch(() => toast({ title: 'Confirmation records unavailable', variant: 'destructive' }));
+  useEffect(() => { if (canViewConfirmation) void refreshRecords(); }, [canViewConfirmation]);
+  const uploadRecordFile = async (recordId: string, kind: 'pdf' | 'excel', file: File) => {
+    const response = await fetch(confirmationApiUrl(`/confirmation-records/${recordId}/files/${kind}/${encodeURIComponent(file.name)}`), {
+      method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || `${kind.toUpperCase()} upload failed.`);
+    }
+  };
+  const createConfirmationRecord = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!pdfFile) {
+      toast({ title: 'Choose the official PDF copy', variant: 'destructive' });
+      return;
+    }
+    setRecordBusy(true);
+    try {
+      const response = await fetch(confirmationApiUrl('/confirmation-records'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recordFields),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || 'Could not create confirmation.');
+      const record = await response.json() as ConfirmationRecord;
+      if (pdfFile) await uploadRecordFile(record._id, 'pdf', pdfFile);
+      if (excelFile) await uploadRecordFile(record._id, 'excel', excelFile);
+      toast({ title: 'Confirmation saved', description: `${record.confirmationId} created.` });
+      setShowUploadForm(false);
+      setRecordFields({ clientName: '', location: '', quotationId: '', measurementSheetId: '' });
+      setPdfFile(null); setExcelFile(null);
+      await refreshRecords();
+    } catch (error) {
+      toast({ title: 'Confirmation upload incomplete', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
+      await refreshRecords();
+    } finally { setRecordBusy(false); }
+  };
+  const addVersionToRecord = async (record: ConfirmationRecord, kind: 'pdf' | 'excel', file?: File) => {
+    if (!file) return;
+    setRecordBusy(true);
+    try {
+      await uploadRecordFile(record._id, kind, file);
+      await refreshRecords();
+      if (record.orderRecordId) {
+        void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(record.orderRecordId) });
+        void queryClient.invalidateQueries({ queryKey: getGetPurchaseOrderRegisterQueryKey() });
+      }
+      toast({ title: `${kind === 'pdf' ? 'PDF' : 'Excel'} version added`, description: `${record.confirmationId} is updated.` });
+    }
+    catch (error) { toast({ title: 'Confirmation file upload failed', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' }); }
+    finally { setRecordBusy(false); }
+  };
+  const attachRecordToOrder = async (record: ConfirmationRecord) => {
+    const orderRecordId = attachTargets[record._id];
+    if (!orderRecordId) return;
+    setRecordBusy(true);
+    try {
+      const response = await fetch(confirmationApiUrl(`/orders/${orderRecordId}/confirmation-records/${record._id}/attach`), { method: 'POST' });
+      if (!response.ok) throw new Error((await response.json()).error || 'Could not attach confirmation.');
+      toast({ title: 'Confirmation attached', description: `${record.confirmationId} files are now on the order.` });
+      await refreshRecords(); void queryClient.invalidateQueries({ queryKey: getGetPurchaseOrderRegisterQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderRecordId) });
+    } catch (error) { toast({ title: 'Could not attach confirmation', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' }); }
+    finally { setRecordBusy(false); }
+  };
   const downloadQuery = useDownloadOrderDocument(
     downloadTarget?.orderRecordId || '',
     downloadTarget?.document.id || '',
@@ -393,7 +475,10 @@ export default function ConfirmationPage({ user }: { user: User }) {
         <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
             <p className="confirmation-kicker flex items-center gap-2 text-[10px] font-bold uppercase text-primary"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> Commercial control desk</p>
-            <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.045em] sm:text-[2.5rem]">Confirmation <span className="text-primary">/ PO</span></h1>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.045em] sm:text-[2.5rem]">Confirmation <span className="text-primary">/ PO</span></h1>
+              {canEditConfirmation && <Button type="button" size="sm" onClick={() => setShowUploadForm((value) => !value)} data-testid="button-new-confirmation-record"><Upload size={14} /> Upload confirmation</Button>}
+            </div>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">See each order’s purchase order, linked quotation request files, and matching confirmations. Upload or manage confirmations against the correct request.</p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:min-w-[350px]">
@@ -413,6 +498,29 @@ export default function ConfirmationPage({ user }: { user: User }) {
           <span className="inline-flex items-center gap-1.5"><ShieldCheck size={13} /> Existing records only</span>
         </div>
       </section>
+      {canViewConfirmation && <section className="space-y-3 rounded-xl border border-border/70 bg-card/70 p-4" data-testid="section-confirmation-record-library">
+        {showUploadForm && <form onSubmit={(event) => void createConfirmationRecord(event)} className="grid gap-3 rounded-lg border border-primary/20 bg-background/70 p-4 sm:grid-cols-2" data-testid="form-create-confirmation-record">
+          <label className="grid gap-1 text-xs font-medium">Client name<Input required value={recordFields.clientName} onChange={(event) => setRecordFields({ ...recordFields, clientName: event.target.value })} /></label>
+          <label className="grid gap-1 text-xs font-medium">Location<Input required value={recordFields.location} onChange={(event) => setRecordFields({ ...recordFields, location: event.target.value })} /></label>
+          <label className="grid gap-1 text-xs font-medium">Quotation ID (optional)<Input value={recordFields.quotationId} onChange={(event) => setRecordFields({ ...recordFields, quotationId: event.target.value })} placeholder="QT-26-0001" /></label>
+          <label className="grid gap-1 text-xs font-medium">Measurement sheet ID (optional)<Input value={recordFields.measurementSheetId} onChange={(event) => setRecordFields({ ...recordFields, measurementSheetId: event.target.value })} placeholder="MS-26-0001" /></label>
+          <label className="grid gap-1 text-xs font-medium">PDF · official copy<input type="file" accept=".pdf,application/pdf" onChange={(event) => setPdfFile(event.target.files?.[0] ?? null)} /></label>
+          <label className="grid gap-1 text-xs font-medium">Excel · working data<input type="file" accept=".xlsx,.xls" onChange={(event) => setExcelFile(event.target.files?.[0] ?? null)} /></label>
+          <div className="flex gap-2 sm:col-span-2"><Button type="submit" size="sm" disabled={recordBusy}>{recordBusy ? 'Saving…' : 'Save confirmation'}</Button><Button type="button" size="sm" variant="outline" onClick={() => setShowUploadForm(false)}>Cancel</Button></div>
+        </form>}
+        <div className="flex items-center justify-between"><div><h2 className="text-sm font-bold">Confirmation documents</h2><p className="text-xs text-muted-foreground">PDF is proof; only the Excel workbook is extracted.</p></div><span className="text-xs text-muted-foreground">{records.length} records</span></div>
+        {records.length === 0 ? <p className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">No confirmation records yet.</p> : <div className="grid gap-2 md:grid-cols-2">
+          {records.map((record) => <article key={record._id} className="rounded-lg border bg-background/70 p-3" data-testid={`confirmation-record-${record.confirmationId}`}>
+            <div className="flex flex-wrap items-start justify-between gap-2"><div><code className="font-mono text-xs font-bold text-primary">{record.confirmationId}</code><p className="text-xs font-medium">{record.clientName}, {record.location}</p><p className="text-[10px] text-muted-foreground">{record.quotationId || 'No quotation'} · {record.measurementSheetId || 'No measurement sheet'}</p></div><div className="flex gap-1"><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-800">PDF {record.pdfVersions.length ? `v${record.pdfVersions.length}` : 'missing'}</span><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${record.excelVersions.length ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>{record.excelVersions.length ? `Excel v${record.excelVersions.length}` : 'Excel missing'}</span></div></div>
+            <div className="mt-2 flex flex-wrap gap-2 text-[10px]">{record.pdfVersions.map((version, index) => <a key={`pdf-${index}`} className="underline text-primary" href={confirmationApiUrl(`/confirmation-records/${record._id}/file-versions/pdf/${index + 1}`)}>PDF v{index + 1} · {version.filename}</a>)}{record.excelVersions.map((version, index) => <a key={`excel-${index}`} className="underline text-primary" href={confirmationApiUrl(`/confirmation-records/${record._id}/file-versions/excel/${index + 1}`)}>Excel v{index + 1} · {version.filename}</a>)}</div>
+            {canEditConfirmation && <div className="mt-2 flex gap-3 text-xs font-semibold text-primary">
+              <label className="cursor-pointer">{record.pdfVersions.length ? 'Add PDF version' : 'Add PDF'}<input type="file" accept=".pdf,application/pdf" className="sr-only" disabled={recordBusy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void addVersionToRecord(record, 'pdf', file); }} /></label>
+              <label className="cursor-pointer">{record.excelVersions.length ? 'Add Excel version' : 'Add Excel'}<input type="file" accept=".xlsx,.xls" className="sr-only" disabled={recordBusy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void addVersionToRecord(record, 'excel', file); }} /></label>
+            </div>}
+            <div className="mt-2 flex gap-2">{!record.orderRecordId && rows.length > 0 && <><select className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-xs" value={attachTargets[record._id] || ''} onChange={(event) => setAttachTargets({ ...attachTargets, [record._id]: event.target.value })}><option value="">Attach to order…</option>{rows.map((row) => <option key={row.orderRecordId} value={row.orderRecordId}>{row.orderId} · {row.clientName}</option>)}</select><Button type="button" size="sm" variant="outline" disabled={!attachTargets[record._id] || recordBusy} onClick={() => void attachRecordToOrder(record)}>Attach</Button></>}{record.orderRecordId && <span className="text-xs text-muted-foreground">Attached to an order</span>}</div>
+          </article>)}
+        </div>}
+      </section>}
 
       {!canViewRegister ? <section className="rounded-2xl border border-amber-500/25 bg-amber-500/[.06] p-8 text-center" data-testid="state-confirmation-access-restricted">
         <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-amber-500/10 text-amber-700"><LockKeyhole size={21} /></span>

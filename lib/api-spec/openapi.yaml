@@ -3291,6 +3291,81 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PurchaseOrderRegisterList"
+  /confirmation-records:
+    get:
+      operationId: listConfirmationRecords
+      tags: [orders]
+      summary: List reusable confirmation records
+      responses:
+        "200":
+          description: Confirmation records
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfirmationRecordList" }
+    post:
+      operationId: createConfirmationRecord
+      tags: [orders]
+      summary: Create a reusable confirmation record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfirmationRecordInput" }
+      responses:
+        "201":
+          description: Created record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfirmationRecord" }
+  /confirmation-records/{recordId}/files/{kind}/{filename}:
+    post:
+      operationId: uploadConfirmationRecordFile
+      tags: [orders]
+      summary: Add a PDF or Excel version to a confirmation
+      parameters:
+        - { name: recordId, in: path, required: true, schema: { type: string } }
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [pdf, excel] } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          description: File version saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfirmationRecordFileUpload" }
+  /confirmation-records/{recordId}/file-versions/{kind}/{version}:
+    get:
+      operationId: downloadConfirmationRecordFile
+      tags: [orders]
+      summary: Download a confirmation file version
+      parameters:
+        - { name: recordId, in: path, required: true, schema: { type: string } }
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [pdf, excel] } }
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Confirmation file
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+  /orders/{id}/confirmation-records/{recordId}/attach:
+    post:
+      operationId: attachConfirmationRecordToOrder
+      tags: [orders]
+      summary: Attach saved confirmation files to an order
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: recordId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Confirmation files attached
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttachConfirmationRecordResponse" }
   /confirmation/purchase-orders/{orderRecordId}/client-decision:
     patch:
       operationId: updateClientConfirmationDecision
@@ -5799,6 +5874,66 @@ components:
       properties:
         expectedExtractedAt: { type: string }
       required: [expectedExtractedAt]
+    ConfirmationRecordFileVersion:
+      type: object
+      properties:
+        filename: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer }
+        storagePath: { type: string }
+        uploadedBy: { type: string }
+        uploadedAt: { type: string, format: date-time }
+      required: [filename, contentType, sizeBytes, storagePath, uploadedBy, uploadedAt]
+    ConfirmationRecord:
+      type: object
+      properties:
+        _id: { type: string }
+        confirmationId: { type: string }
+        clientName: { type: string }
+        location: { type: string }
+        quotationId: { type: ["string", "null"] }
+        measurementSheetId: { type: ["string", "null"] }
+        orderRecordId: { type: ["string", "null"] }
+        pdfVersions:
+          type: array
+          items: { $ref: "#/components/schemas/ConfirmationRecordFileVersion" }
+        excelVersions:
+          type: array
+          items: { $ref: "#/components/schemas/ConfirmationRecordFileVersion" }
+        excelConfirmationInfo:
+          anyOf:
+            - $ref: "#/components/schemas/ConfirmationInfo"
+            - type: "null"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [_id, confirmationId, clientName, location, quotationId, measurementSheetId, orderRecordId, pdfVersions, excelVersions, excelConfirmationInfo, createdAt, updatedAt]
+    ConfirmationRecordList:
+      type: array
+      items: { $ref: "#/components/schemas/ConfirmationRecord" }
+    ConfirmationRecordInput:
+      type: object
+      properties:
+        clientName: { type: string, minLength: 1 }
+        location: { type: string, minLength: 1 }
+        quotationId: { type: string }
+        measurementSheetId: { type: string }
+      required: [clientName, location]
+    ConfirmationRecordFileUpload:
+      type: object
+      properties:
+        version: { $ref: "#/components/schemas/ConfirmationRecordFileVersion" }
+        confirmationInfo:
+          anyOf:
+            - $ref: "#/components/schemas/ConfirmationInfo"
+            - type: "null"
+      required: [version, confirmationInfo]
+    AttachConfirmationRecordResponse:
+      type: object
+      properties:
+        confirmationId: { type: string }
+        orderRecordId: { type: string }
+        filesAttached: { type: integer }
+      required: [confirmationId, orderRecordId, filesAttached]
     OrderDocument:
       type: object
       properties:
