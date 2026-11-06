@@ -166,6 +166,10 @@ export function quotationResponse(quotation: QuotationDocument) {
     notes: quotation.notes,
     totals: quotation.totals,
     status: quotation.status,
+    outcomeStatus: quotation.outcomeStatus ?? null,
+    lostReason: quotation.lostReason ?? null,
+    outcomeSource: quotation.outcomeSource ?? null,
+    confirmationRecordIds: quotation.confirmationRecordIds ?? [],
     sampleOnly: quotation.sampleOnly ?? false,
     requiresRateApproval:
       quotation.requiresRateApproval ?? items.some((item) => item.rateOverridden),

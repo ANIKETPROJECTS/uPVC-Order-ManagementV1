@@ -614,6 +614,10 @@ export interface QuotationDocument {
   notes: string | null;
   totals: QuotationTotalsDocument;
   status: "draft" | "pending_approval" | "approved" | "rejected";
+  outcomeStatus?: QuotationOutcomeStatus | null;
+  lostReason?: QuotationLostReason | null;
+  outcomeSource?: "manual" | "confirmation" | null;
+  confirmationRecordIds?: string[];
   requiresRateApproval?: boolean;
   approvalApproverId?: string | null;
   approvalSubmittedAt?: Date | null;
@@ -631,6 +635,10 @@ export type AppNotificationType =
   | "approval_request"
   | "approval_decision"
   | "approval_reminder"
+  | "rate_request"
+  | "rate_request_urgent"
+  | "rate_overdue"
+  | "rate_assigned"
   | "test";
 
 export interface AppNotificationDocument {
@@ -662,11 +670,27 @@ export interface QuotationApprovalSettingsDocument {
 }
 
 export type QuotationRateSubmissionStatus =
+  | "awaiting_rate"
+  | "query_raised"
+  | "rated"
+  | "sent_to_client"
+  | "rejected"
   | "awaiting_pdf"
   | "pending_review"
   | "rate_assigned"
-  | "approved"
-  | "rejected";
+  | "approved";
+export type QuotationOutcomeStatus = "negotiating" | "won" | "lost";
+export type QuotationLostReason = "price" | "competitor" | "delayed" | "project_cancelled";
+export interface QuotationRateQueryEntry {
+  question: string;
+  raisedBy: string;
+  raisedByName: string;
+  raisedAt: Date;
+  response: string | null;
+  respondedBy: string | null;
+  respondedByName: string | null;
+  respondedAt: Date | null;
+}
 export type RateRequestPriority = "normal" | "urgent";
 export interface QuotationRateSubmissionRevisionDocument {
   revisionNumber: number;
@@ -677,6 +701,7 @@ export interface QuotationRateSubmissionRevisionDocument {
   glassType: string;
   priority?: RateRequestPriority;
   ratePerSqFt?: number | null;
+  rateNote?: string | null;
   rateAssignedByName?: string | null;
   rateAssignedAt?: Date | null;
   averageSqFtPerQty: number;
@@ -712,8 +737,19 @@ export interface QuotationRateSubmissionDocument {
   submittedBy: string;
   submittedByName: string;
   approverIds: string[];
-  workflowVersion?: 1 | 2;
+  workflowVersion?: 1 | 2 | 3;
+  awaitingRateSince?: Date | null;
+  queryRaisedAt?: Date | null;
+  pausedWaitMilliseconds?: number;
+  attentionLastReminderAt?: Date | null;
+  queryHistory?: QuotationRateQueryEntry[];
+  sentToClientAt?: Date | null;
+  outcomeStatus?: QuotationOutcomeStatus | null;
+  lostReason?: QuotationLostReason | null;
+  outcomeSource?: "manual" | "confirmation" | null;
+  confirmationRecordIds?: string[];
   ratePerSqFt?: number | null;
+  rateNote?: string | null;
   rateAssignedBy?: string | null;
   rateAssignedByName?: string | null;
   rateAssignedAt?: Date | null;

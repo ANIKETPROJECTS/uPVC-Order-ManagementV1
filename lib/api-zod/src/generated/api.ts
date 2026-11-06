@@ -3104,6 +3104,10 @@ export const ListQuotationsResponseItem = zod.object({
   "averagePricePerSqFt": zod.number()
 }),
   "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "requiresRateApproval": zod.boolean(),
   "sampleOnly": zod.boolean(),
   "approvalHistory": zod.array(zod.object({
@@ -3262,6 +3266,10 @@ export const CreateQuotationResponse = zod.object({
   "averagePricePerSqFt": zod.number()
 }),
   "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "requiresRateApproval": zod.boolean(),
   "sampleOnly": zod.boolean(),
   "approvalHistory": zod.array(zod.object({
@@ -3348,6 +3356,10 @@ export const GetQuotationResponse = zod.object({
   "averagePricePerSqFt": zod.number()
 }),
   "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "requiresRateApproval": zod.boolean(),
   "sampleOnly": zod.boolean(),
   "approvalHistory": zod.array(zod.object({
@@ -3509,6 +3521,10 @@ export const UpdateQuotationResponse = zod.object({
   "averagePricePerSqFt": zod.number()
 }),
   "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "requiresRateApproval": zod.boolean(),
   "sampleOnly": zod.boolean(),
   "approvalHistory": zod.array(zod.object({
@@ -3605,6 +3621,10 @@ export const SubmitQuotationForApprovalResponse = zod.object({
   "averagePricePerSqFt": zod.number()
 }),
   "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "requiresRateApproval": zod.boolean(),
   "sampleOnly": zod.boolean(),
   "approvalHistory": zod.array(zod.object({
@@ -3688,6 +3708,10 @@ export const ListQuotationApprovalsResponseItem = zod.object({
   "averagePricePerSqFt": zod.number()
 }),
   "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "requiresRateApproval": zod.boolean(),
   "sampleOnly": zod.boolean(),
   "approvalHistory": zod.array(zod.object({
@@ -3788,6 +3812,10 @@ export const DecideQuotationApprovalResponse = zod.object({
   "averagePricePerSqFt": zod.number()
 }),
   "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "requiresRateApproval": zod.boolean(),
   "sampleOnly": zod.boolean(),
   "approvalHistory": zod.array(zod.object({
@@ -3891,7 +3919,7 @@ export const listNotificationsResponseUnreadCountMin = 0;
 export const ListNotificationsResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.string(),
-  "type": zod.enum(['approval_request', 'approval_decision', 'approval_reminder', 'test']),
+  "type": zod.enum(['approval_request', 'approval_decision', 'approval_reminder', 'rate_request', 'rate_request_urgent', 'rate_overdue', 'rate_assigned', 'test']),
   "title": zod.string(),
   "message": zod.string(),
   "url": zod.string(),
@@ -3930,6 +3958,10 @@ export const SendTestNotificationResponse = zod.object({
 /**
  * @summary List rate request history and assigned requests
  */
+export const listQuotationRateSubmissionsResponsePausedWaitMillisecondsMin = 0;
+
+
+
 export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
@@ -3943,15 +3975,34 @@ export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "glassType": zod.string(),
   "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
   "pdfSizeBytes": zod.number().int().nullable(),
   "submittedBy": zod.string(),
   "submittedByName": zod.string(),
   "approverIds": zod.array(zod.string()),
-  "workflowVersion": zod.union([zod.literal(1),zod.literal(2)]),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(listQuotationRateSubmissionsResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "decisionComment": zod.string().nullable(),
   "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
   "rateAssignedBy": zod.string().nullable(),
   "rateAssignedByName": zod.string().nullable(),
   "rateAssignedAt": zod.coerce.date().nullable(),
@@ -3969,7 +4020,7 @@ export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "rateAssignedByName": zod.string().nullish(),
   "rateAssignedAt": zod.coerce.date().nullish(),
   "averageSqFtPerQty": zod.number(),
-  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "revisedBy": zod.string(),
   "revisedByName": zod.string(),
   "revisedAt": zod.coerce.date(),
@@ -4010,6 +4061,10 @@ export const CreateQuotationRateSubmissionBody = zod.object({
   "measurementRecordId": zod.string().nullish()
 })
 
+export const createQuotationRateSubmissionResponsePausedWaitMillisecondsMin = 0;
+
+
+
 export const CreateQuotationRateSubmissionResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
@@ -4023,15 +4078,34 @@ export const CreateQuotationRateSubmissionResponse = zod.object({
   "glassType": zod.string(),
   "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
   "pdfSizeBytes": zod.number().int().nullable(),
   "submittedBy": zod.string(),
   "submittedByName": zod.string(),
   "approverIds": zod.array(zod.string()),
-  "workflowVersion": zod.union([zod.literal(1),zod.literal(2)]),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(createQuotationRateSubmissionResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "decisionComment": zod.string().nullable(),
   "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
   "rateAssignedBy": zod.string().nullable(),
   "rateAssignedByName": zod.string().nullable(),
   "rateAssignedAt": zod.coerce.date().nullable(),
@@ -4049,7 +4123,7 @@ export const CreateQuotationRateSubmissionResponse = zod.object({
   "rateAssignedByName": zod.string().nullish(),
   "rateAssignedAt": zod.coerce.date().nullish(),
   "averageSqFtPerQty": zod.number(),
-  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "revisedBy": zod.string(),
   "revisedByName": zod.string(),
   "revisedAt": zod.coerce.date(),
@@ -4097,6 +4171,10 @@ export const UpdateQuotationRateSubmissionBody = zod.object({
   "measurementRecordId": zod.string().nullish()
 })
 
+export const updateQuotationRateSubmissionResponsePausedWaitMillisecondsMin = 0;
+
+
+
 export const UpdateQuotationRateSubmissionResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
@@ -4110,15 +4188,34 @@ export const UpdateQuotationRateSubmissionResponse = zod.object({
   "glassType": zod.string(),
   "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
   "pdfSizeBytes": zod.number().int().nullable(),
   "submittedBy": zod.string(),
   "submittedByName": zod.string(),
   "approverIds": zod.array(zod.string()),
-  "workflowVersion": zod.union([zod.literal(1),zod.literal(2)]),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(updateQuotationRateSubmissionResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "decisionComment": zod.string().nullable(),
   "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
   "rateAssignedBy": zod.string().nullable(),
   "rateAssignedByName": zod.string().nullable(),
   "rateAssignedAt": zod.coerce.date().nullable(),
@@ -4136,7 +4233,7 @@ export const UpdateQuotationRateSubmissionResponse = zod.object({
   "rateAssignedByName": zod.string().nullish(),
   "rateAssignedAt": zod.coerce.date().nullish(),
   "averageSqFtPerQty": zod.number(),
-  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "revisedBy": zod.string(),
   "revisedByName": zod.string(),
   "revisedAt": zod.coerce.date(),
@@ -4179,7 +4276,7 @@ export const SearchQuotationRateSubmissionsQueryParams = zod.object({
 export const SearchQuotationRateSubmissionsResponseItem = zod.object({
   "id": zod.string(),
   "clientName": zod.string(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable()
@@ -4199,6 +4296,10 @@ export const LinkQuotationRateSubmissionOrderBody = zod.object({
   "measurementRecordId": zod.string().nullable()
 })
 
+export const linkQuotationRateSubmissionOrderResponsePausedWaitMillisecondsMin = 0;
+
+
+
 export const LinkQuotationRateSubmissionOrderResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
@@ -4212,15 +4313,34 @@ export const LinkQuotationRateSubmissionOrderResponse = zod.object({
   "glassType": zod.string(),
   "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
   "pdfSizeBytes": zod.number().int().nullable(),
   "submittedBy": zod.string(),
   "submittedByName": zod.string(),
   "approverIds": zod.array(zod.string()),
-  "workflowVersion": zod.union([zod.literal(1),zod.literal(2)]),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(linkQuotationRateSubmissionOrderResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "decisionComment": zod.string().nullable(),
   "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
   "rateAssignedBy": zod.string().nullable(),
   "rateAssignedByName": zod.string().nullable(),
   "rateAssignedAt": zod.coerce.date().nullable(),
@@ -4238,7 +4358,7 @@ export const LinkQuotationRateSubmissionOrderResponse = zod.object({
   "rateAssignedByName": zod.string().nullish(),
   "rateAssignedAt": zod.coerce.date().nullish(),
   "averageSqFtPerQty": zod.number(),
-  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "revisedBy": zod.string(),
   "revisedByName": zod.string(),
   "revisedAt": zod.coerce.date(),
@@ -4264,6 +4384,10 @@ export const UploadQuotationRateSubmissionPdfParams = zod.object({
   "filename": zod.coerce.string().min(1).max(uploadQuotationRateSubmissionPdfPathFilenameMax)
 })
 
+export const uploadQuotationRateSubmissionPdfResponsePausedWaitMillisecondsMin = 0;
+
+
+
 export const UploadQuotationRateSubmissionPdfResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
@@ -4277,15 +4401,34 @@ export const UploadQuotationRateSubmissionPdfResponse = zod.object({
   "glassType": zod.string(),
   "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
   "pdfSizeBytes": zod.number().int().nullable(),
   "submittedBy": zod.string(),
   "submittedByName": zod.string(),
   "approverIds": zod.array(zod.string()),
-  "workflowVersion": zod.union([zod.literal(1),zod.literal(2)]),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(uploadQuotationRateSubmissionPdfResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "decisionComment": zod.string().nullable(),
   "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
   "rateAssignedBy": zod.string().nullable(),
   "rateAssignedByName": zod.string().nullable(),
   "rateAssignedAt": zod.coerce.date().nullable(),
@@ -4303,7 +4446,7 @@ export const UploadQuotationRateSubmissionPdfResponse = zod.object({
   "rateAssignedByName": zod.string().nullish(),
   "rateAssignedAt": zod.coerce.date().nullish(),
   "averageSqFtPerQty": zod.number(),
-  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "revisedBy": zod.string(),
   "revisedByName": zod.string(),
   "revisedAt": zod.coerce.date(),
@@ -4345,6 +4488,10 @@ export const DecideQuotationRateSubmissionBody = zod.object({
   "comment": zod.string().max(decideQuotationRateSubmissionBodyCommentMax)
 })
 
+export const decideQuotationRateSubmissionResponsePausedWaitMillisecondsMin = 0;
+
+
+
 export const DecideQuotationRateSubmissionResponse = zod.object({
   "id": zod.string(),
   "orderRecordId": zod.string().nullable(),
@@ -4358,15 +4505,34 @@ export const DecideQuotationRateSubmissionResponse = zod.object({
   "glassType": zod.string(),
   "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
   "pdfSizeBytes": zod.number().int().nullable(),
   "submittedBy": zod.string(),
   "submittedByName": zod.string(),
   "approverIds": zod.array(zod.string()),
-  "workflowVersion": zod.union([zod.literal(1),zod.literal(2)]),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(decideQuotationRateSubmissionResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "decisionComment": zod.string().nullable(),
   "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
   "rateAssignedBy": zod.string().nullable(),
   "rateAssignedByName": zod.string().nullable(),
   "rateAssignedAt": zod.coerce.date().nullable(),
@@ -4384,7 +4550,7 @@ export const DecideQuotationRateSubmissionResponse = zod.object({
   "rateAssignedByName": zod.string().nullish(),
   "rateAssignedAt": zod.coerce.date().nullish(),
   "averageSqFtPerQty": zod.number(),
-  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "revisedBy": zod.string(),
   "revisedByName": zod.string(),
   "revisedAt": zod.coerce.date(),
@@ -4408,11 +4574,19 @@ export const AssignQuotationRateSubmissionRateParams = zod.object({
 export const assignQuotationRateSubmissionRateBodyRatePerSqFtMin = 0.01;
 export const assignQuotationRateSubmissionRateBodyRatePerSqFtMax = 10000000;
 
+export const assignQuotationRateSubmissionRateBodyRateNoteMax = 1000;
+
 
 
 export const AssignQuotationRateSubmissionRateBody = zod.object({
-  "ratePerSqFt": zod.number().min(assignQuotationRateSubmissionRateBodyRatePerSqFtMin).max(assignQuotationRateSubmissionRateBodyRatePerSqFtMax)
+  "ratePerSqFt": zod.number().min(assignQuotationRateSubmissionRateBodyRatePerSqFtMin).max(assignQuotationRateSubmissionRateBodyRatePerSqFtMax),
+  "rateNote": zod.string().max(assignQuotationRateSubmissionRateBodyRateNoteMax).nullish(),
+  "expectedUpdatedAt": zod.coerce.date()
 })
+
+export const assignQuotationRateSubmissionRateResponsePausedWaitMillisecondsMin = 0;
+
+
 
 export const AssignQuotationRateSubmissionRateResponse = zod.object({
   "id": zod.string(),
@@ -4427,15 +4601,34 @@ export const AssignQuotationRateSubmissionRateResponse = zod.object({
   "glassType": zod.string(),
   "priority": zod.enum(['normal', 'urgent']),
   "averageSqFtPerQty": zod.number(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
   "pdfSizeBytes": zod.number().int().nullable(),
   "submittedBy": zod.string(),
   "submittedByName": zod.string(),
   "approverIds": zod.array(zod.string()),
-  "workflowVersion": zod.union([zod.literal(1),zod.literal(2)]),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(assignQuotationRateSubmissionRateResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
   "decisionComment": zod.string().nullable(),
   "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
   "rateAssignedBy": zod.string().nullable(),
   "rateAssignedByName": zod.string().nullable(),
   "rateAssignedAt": zod.coerce.date().nullable(),
@@ -4453,7 +4646,299 @@ export const AssignQuotationRateSubmissionRateResponse = zod.object({
   "rateAssignedByName": zod.string().nullish(),
   "rateAssignedAt": zod.coerce.date().nullish(),
   "averageSqFtPerQty": zod.number(),
-  "previousStatus": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Find recent rates for similar work
+ */
+export const GetQuotationRateSubmissionPastRatesParams = zod.object({
+  "submissionId": zod.coerce.string()
+})
+
+export const GetQuotationRateSubmissionPastRatesResponse = zod.object({
+  "rates": zod.array(zod.object({
+  "id": zod.string(),
+  "clientName": zod.string(),
+  "glassType": zod.string(),
+  "averageSqFtPerQty": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "rateAssignedAt": zod.coerce.date()
+})),
+  "count": zod.number().int(),
+  "tolerancePercent": zod.number(),
+  "maxAgeDays": zod.number().int()
+})
+
+
+/**
+ * @summary Raise a rate request query and pause its wait timer
+ */
+export const RaiseQuotationRateQueryParams = zod.object({
+  "submissionId": zod.coerce.string()
+})
+
+export const raiseQuotationRateQueryBodyCommentMax = 2000;
+
+
+
+export const RaiseQuotationRateQueryBody = zod.object({
+  "comment": zod.string().min(1).max(raiseQuotationRateQueryBodyCommentMax)
+})
+
+export const raiseQuotationRateQueryResponsePausedWaitMillisecondsMin = 0;
+
+
+
+export const RaiseQuotationRateQueryResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(raiseQuotationRateQueryResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
+  "rateAssignedBy": zod.string().nullable(),
+  "rateAssignedByName": zod.string().nullable(),
+  "rateAssignedAt": zod.coerce.date().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "ratePerSqFt": zod.number().nullish(),
+  "rateAssignedByName": zod.string().nullish(),
+  "rateAssignedAt": zod.coerce.date().nullish(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Answer a rate team query and resume the wait timer
+ */
+export const RespondToQuotationRateQueryParams = zod.object({
+  "submissionId": zod.coerce.string()
+})
+
+export const respondToQuotationRateQueryBodyCommentMax = 2000;
+
+
+
+export const RespondToQuotationRateQueryBody = zod.object({
+  "comment": zod.string().min(1).max(respondToQuotationRateQueryBodyCommentMax)
+})
+
+export const respondToQuotationRateQueryResponsePausedWaitMillisecondsMin = 0;
+
+
+
+export const RespondToQuotationRateQueryResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(respondToQuotationRateQueryResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
+  "rateAssignedBy": zod.string().nullable(),
+  "rateAssignedByName": zod.string().nullable(),
+  "rateAssignedAt": zod.coerce.date().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "ratePerSqFt": zod.number().nullish(),
+  "rateAssignedByName": zod.string().nullish(),
+  "rateAssignedAt": zod.coerce.date().nullish(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "revisedBy": zod.string(),
+  "revisedByName": zod.string(),
+  "revisedAt": zod.coerce.date(),
+  "pdfFilename": zod.string().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "decisionComment": zod.string().nullable()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Record a sent quotation's client outcome
+ */
+export const SetQuotationRateOutcomeParams = zod.object({
+  "submissionId": zod.coerce.string()
+})
+
+export const SetQuotationRateOutcomeBody = zod.object({
+  "status": zod.enum(['negotiating', 'won', 'lost']),
+  "lostReason": zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']).optional()
+})
+
+export const setQuotationRateOutcomeResponsePausedWaitMillisecondsMin = 0;
+
+
+
+export const SetQuotationRateOutcomeResponse = zod.object({
+  "id": zod.string(),
+  "orderRecordId": zod.string().nullable(),
+  "orderId": zod.string().nullable(),
+  "measurementRecordId": zod.string().nullable(),
+  "measurementSheetId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "priority": zod.enum(['normal', 'urgent']),
+  "averageSqFtPerQty": zod.number(),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "pdfFilename": zod.string().nullable(),
+  "pdfSizeBytes": zod.number().int().nullable(),
+  "submittedBy": zod.string(),
+  "submittedByName": zod.string(),
+  "approverIds": zod.array(zod.string()),
+  "workflowVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "awaitingRateSince": zod.coerce.date(),
+  "queryRaisedAt": zod.coerce.date().nullable(),
+  "pausedWaitMilliseconds": zod.number().int().min(setQuotationRateOutcomeResponsePausedWaitMillisecondsMin),
+  "queryHistory": zod.array(zod.object({
+  "question": zod.string(),
+  "raisedBy": zod.string(),
+  "raisedByName": zod.string(),
+  "raisedAt": zod.coerce.date(),
+  "response": zod.string().nullable(),
+  "respondedBy": zod.string().nullable(),
+  "respondedByName": zod.string().nullable(),
+  "respondedAt": zod.coerce.date().nullable()
+})),
+  "sentToClientAt": zod.coerce.date().nullable(),
+  "outcomeStatus": zod.union([zod.literal('negotiating'),zod.literal('won'),zod.literal('lost'),zod.literal(null)]).nullable(),
+  "lostReason": zod.union([zod.literal('price'),zod.literal('competitor'),zod.literal('delayed'),zod.literal('project_cancelled'),zod.literal(null)]).nullable(),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
+  "decisionComment": zod.string().nullable(),
+  "ratePerSqFt": zod.number().nullable(),
+  "rateNote": zod.string().nullable(),
+  "rateAssignedBy": zod.string().nullable(),
+  "rateAssignedByName": zod.string().nullable(),
+  "rateAssignedAt": zod.coerce.date().nullable(),
+  "decidedBy": zod.string().nullable(),
+  "decidedByName": zod.string().nullable(),
+  "pdfNeedsRefresh": zod.boolean(),
+  "revisionHistory": zod.array(zod.object({
+  "revisionNumber": zod.number().int(),
+  "clientName": zod.string(),
+  "location": zod.string().nullable(),
+  "windowQty": zod.number().int(),
+  "totalSqFt": zod.number(),
+  "glassType": zod.string(),
+  "ratePerSqFt": zod.number().nullish(),
+  "rateAssignedByName": zod.string().nullish(),
+  "rateAssignedAt": zod.coerce.date().nullish(),
+  "averageSqFtPerQty": zod.number(),
+  "previousStatus": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "revisedBy": zod.string(),
   "revisedByName": zod.string(),
   "revisedAt": zod.coerce.date(),
@@ -5995,7 +6480,7 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "id": zod.string(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
-  "status": zod.enum(['awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
+  "status": zod.enum(['awaiting_rate', 'query_raised', 'rated', 'sent_to_client', 'awaiting_pdf', 'pending_review', 'rate_assigned', 'approved', 'rejected']),
   "pdfFilename": zod.string().nullable(),
   "pdfSizeBytes": zod.number().int().nullable(),
   "updatedAt": zod.coerce.date()

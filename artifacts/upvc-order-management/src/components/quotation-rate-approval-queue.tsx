@@ -45,6 +45,10 @@ type RequestSort = 'priority' | 'newest' | 'oldest' | 'updated' | 'client' | 're
 type RequestLayout = 'list' | 'grid';
 
 const statusLabels: Record<QuotationRateSubmission['status'], string> = {
+  awaiting_rate: 'Awaiting rate',
+  query_raised: 'Query raised',
+  rated: 'Rated',
+  sent_to_client: 'Sent to client',
   awaiting_pdf: 'Awaiting PDF',
   pending_review: 'Awaiting approval',
   rate_assigned: 'Rate assigned',
@@ -53,6 +57,10 @@ const statusLabels: Record<QuotationRateSubmission['status'], string> = {
 };
 
 const statusStyles: Record<QuotationRateSubmission['status'], string> = {
+  awaiting_rate: 'border-amber-200 bg-amber-50 text-amber-800',
+  query_raised: 'border-violet-200 bg-violet-50 text-violet-800',
+  rated: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  sent_to_client: 'border-emerald-200 bg-emerald-50 text-emerald-800',
   awaiting_pdf: 'border-border bg-muted text-muted-foreground',
   pending_review: 'border-amber-200 bg-amber-50 text-amber-800',
   rate_assigned: 'border-emerald-200 bg-emerald-50 text-emerald-800',

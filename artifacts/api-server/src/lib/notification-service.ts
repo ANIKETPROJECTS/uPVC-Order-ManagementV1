@@ -119,15 +119,37 @@ export async function createAppNotification(
   db: Parameters<typeof getAppNotifications>[0],
   userId: string,
   input: AppNotificationInput,
+  dedupeKey?: string,
 ): Promise<{ notification: AppNotificationDocument; push: PushDeliveryResult }> {
   const notification: AppNotificationDocument = {
-    _id: randomUUID(),
+    _id: dedupeKey
+      ? createHash("sha256").update(`${userId}:${dedupeKey}`).digest("hex")
+      : randomUUID(),
     userId,
     ...input,
     readAt: null,
     createdAt: new Date(),
   };
-  await getAppNotifications(db).insertOne(notification);
+  try {
+    await getAppNotifications(db).insertOne(notification);
+  } catch (error) {
+    if (
+      dedupeKey &&
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === 11000
+    ) {
+      const existing = await getAppNotifications(db).findOne({ _id: notification._id });
+      if (existing) {
+        return {
+          notification: existing,
+          push: { configured: pushConfigurationReady(), attempted: 0, sent: 0, expired: 0 },
+        };
+      }
+    }
+    throw error;
+  }
   const push = await sendPushToUser(db, userId, input);
   return { notification, push };
 }

@@ -5,6 +5,7 @@ import {
   getDownloadQuotationRateSubmissionPdfUrl,
   getListMeasurementRecordsQueryKey,
   getListQuotationRateSubmissionsQueryKey,
+  useAssignQuotationRateSubmissionRate,
   useDeleteQuotationRateSubmission,
   useListQuotationRateSubmissions,
   useUpdateQuotationRateSubmission,
@@ -15,6 +16,7 @@ import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useParams } from 'wouter';
 
@@ -28,6 +30,10 @@ const dateLabel = (value: string) => new Intl.DateTimeFormat('en-IN', {
 }).format(new Date(value));
 
 const statusName = (status: QuotationRateSubmission['status']) => ({
+  awaiting_rate: 'Awaiting rate',
+  query_raised: 'Query raised',
+  rated: 'Rated',
+  sent_to_client: 'Sent to client',
   awaiting_pdf: 'Awaiting PDF',
   pending_review: 'Awaiting Rate',
   rate_assigned: 'Rate Assigned',
@@ -35,13 +41,15 @@ const statusName = (status: QuotationRateSubmission['status']) => ({
   rejected: 'Rejected',
 })[status];
 
-const statusStyle = (status: QuotationRateSubmission['status']) => status === 'approved' || status === 'rate_assigned'
+const statusStyle = (status: QuotationRateSubmission['status']) => ['approved', 'rate_assigned', 'rated', 'sent_to_client'].includes(status)
   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
   : status === 'rejected'
     ? 'border-rose-200 bg-rose-50 text-rose-800'
-    : status === 'pending_review'
-      ? 'border-amber-200 bg-amber-50 text-amber-800'
-      : 'border-border bg-muted text-muted-foreground';
+    : status === 'query_raised'
+      ? 'border-violet-200 bg-violet-50 text-violet-800'
+      : status === 'pending_review' || status === 'awaiting_rate'
+        ? 'border-amber-200 bg-amber-50 text-amber-800'
+        : 'border-border bg-muted text-muted-foreground';
 
 type EditValues = {
   clientName: string;
@@ -59,6 +67,101 @@ const editValues = (submission: QuotationRateSubmission): EditValues => ({
   glassType: submission.glassType,
 });
 
+type PastRate = { id: string; clientName: string; glassType: string; averageSqFtPerQty: number; ratePerSqFt: number; rateAssignedAt: string };
+const rupees = (value: number) => `Rs ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(value)}`;
+
+function RateEntryScreen({ submission, user, refresh }: { submission: QuotationRateSubmission; user: User; refresh: () => Promise<void> }) {
+  const { toast } = useToast();
+  const assign = useAssignQuotationRateSubmissionRate();
+  const canAssign = user.roleId === 'master-admin' || user.permissions?.['rate-approval'] === 'edit';
+  const [rate, setRate] = useState('');
+  const [note, setNote] = useState('');
+  const [queryText, setQueryText] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [pastRates, setPastRates] = useState<PastRate[]>([]);
+  const [pastRatesError, setPastRatesError] = useState(false);
+  useEffect(() => {
+    setRate(submission.ratePerSqFt == null ? '' : String(submission.ratePerSqFt));
+    setNote(submission.rateNote || '');
+    setEditing(submission.status === 'awaiting_rate');
+  }, [submission.id, submission.updatedAt]);
+  useEffect(() => {
+    if (!canAssign) return;
+    const controller = new AbortController();
+    fetch(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotation-rate-submissions/${encodeURIComponent(submission.id)}/past-rates`, { signal: controller.signal })
+      .then(async (response) => { if (!response.ok) throw new Error(); return response.json(); })
+      .then((data) => setPastRates(Array.isArray(data.rates) ? data.rates : []))
+      .catch(() => { if (!controller.signal.aborted) setPastRatesError(true); });
+    return () => controller.abort();
+  }, [canAssign, submission.id, submission.averageSqFtPerQty, submission.glassType]);
+
+  const submitRate = async (event: FormEvent) => {
+    event.preventDefault();
+    const parsedRate = Number(rate);
+    if (!Number.isFinite(parsedRate) || parsedRate <= 0) {
+      toast({ title: 'Enter a valid rate', description: 'Rate per sq. ft. must be greater than zero.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await assign.mutateAsync({ submissionId: submission.id, data: { ratePerSqFt: parsedRate, rateNote: note.trim() || null, expectedUpdatedAt: submission.updatedAt } });
+      await refresh();
+      setEditing(false);
+      toast({ title: 'Rate submitted', description: `${submission.id} is now Rated.` });
+    } catch (error) {
+      toast({ title: 'Rate was not saved', description: error instanceof Error ? error.message : 'Refresh the request and try again.', variant: 'destructive' });
+    }
+  };
+  const raiseQuery = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!queryText.trim()) return;
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotation-rate-submissions/${encodeURIComponent(submission.id)}/query`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: queryText.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Could not raise the query.');
+      await refresh();
+      setQueryText('');
+      toast({ title: 'Query raised', description: 'The waiting timer is paused until the quotation member responds.' });
+    } catch (error) {
+      toast({ title: 'Query was not saved', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
+    }
+  };
+  if (!canAssign && !submission.ratePerSqFt) return null;
+  const canEnter = canAssign && (submission.status === 'awaiting_rate' || (submission.status === 'rated' && editing));
+  return <Card className="overflow-hidden border-border/80" data-testid="card-rate-entry-screen">
+    <CardHeader className="border-b border-border/70"><CardTitle className="font-display text-lg">Rate entry</CardTitle><p className="text-xs text-muted-foreground">Rate per square foot for this request</p></CardHeader>
+    <CardContent className="space-y-4 p-4">
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border p-4" data-testid="rate-entry-request-details">
+          <div className="flex items-start justify-between gap-2"><p className="font-mono text-xs font-bold text-primary">{submission.id} · {submission.clientName}</p><span className="rounded-full bg-muted px-2 py-1 text-[9px] font-bold">{submission.priority === 'urgent' ? 'Urgent' : 'Normal'}</span></div>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]"><dt className="text-muted-foreground">Location</dt><dd className="text-right font-semibold">{submission.location || '—'}</dd><dt className="text-muted-foreground">Window qty</dt><dd className="text-right font-semibold">{submission.windowQty}</dd><dt className="text-muted-foreground">Total sq. ft.</dt><dd className="text-right font-semibold">{submission.totalSqFt.toLocaleString('en-IN')}</dd><dt className="text-muted-foreground">Avg. sq. ft. / window</dt><dd className="text-right font-semibold">{Number(submission.averageSqFtPerQty).toFixed(2)}</dd><dt className="text-muted-foreground">Glass</dt><dd className="text-right font-semibold">{submission.glassType}</dd><dt className="text-muted-foreground">Eva PDF</dt><dd className="text-right font-semibold">{submission.pdfFilename ? 'Attached' : 'Not attached'}</dd></dl>
+        </div>
+        {canAssign && <div className="rounded-xl border border-sky-300 bg-sky-50/50 p-4" data-testid="panel-past-rates">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-sky-900">Past rates · similar work</p>
+          {pastRatesError ? <p className="mt-3 text-xs text-destructive">Similar rates could not be loaded.</p> : pastRates.length ? <div className="mt-2 space-y-1.5">{pastRates.map((past) => <div key={past.id} className="rounded-lg bg-white p-2.5"><p className="text-xs font-bold">{rupees(past.ratePerSqFt)} / sq. ft.</p><p className="mt-1 text-[10px] text-muted-foreground">{past.glassType} · avg {Number(past.averageSqFtPerQty).toFixed(1)} sq. ft. · {dateLabel(past.rateAssignedAt)}</p></div>)}</div> : <p className="mt-3 text-xs text-muted-foreground">No similar recent rates yet. The match uses the same glass type or average area within the configured tolerance.</p>}
+        </div>}
+      </div>
+      {submission.ratePerSqFt != null && !editing && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs" data-testid="read-only-assigned-rate"><p className="font-bold text-emerald-900">{rupees(submission.ratePerSqFt)} / sq. ft.</p><p className="mt-1 text-emerald-800">{submission.rateNote || 'No note'}</p><p className="mt-1 text-[10px] text-emerald-800">Entered by {submission.rateAssignedByName || 'Rate manager'} · {submission.rateAssignedAt ? dateLabel(submission.rateAssignedAt) : 'date unavailable'}</p>{canAssign && submission.status === 'rated' && <Button className="mt-2" size="sm" variant="outline" type="button" onClick={() => setEditing(true)}>Correct rate</Button>}</div>}
+      {canEnter && <div className="space-y-3 rounded-xl border bg-muted/20 p-3" data-testid="form-rate-entry">
+        <form className="grid gap-3 md:grid-cols-[1fr_1.3fr_auto]" onSubmit={(event) => void submitRate(event)}>
+          <label className="space-y-1 text-[10px] font-semibold text-muted-foreground">Rate per sq. ft. (Rs)<Input type="number" min="0.01" step="0.01" value={rate} onChange={(event) => setRate(event.target.value)} required data-testid="input-detail-rate-per-sqft" /></label>
+          <label className="space-y-1 text-[10px] font-semibold text-muted-foreground">Note (optional)<Input value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} data-testid="input-detail-rate-note" /></label>
+          <Button type="submit" disabled={assign.isPending} className="self-end" data-testid="button-submit-rate">{assign.isPending ? 'Submitting…' : 'Submit rate'}</Button>
+        </form>
+      </div>}
+      {canAssign && ['awaiting_rate', 'rated'].includes(submission.status) && <details>
+        <summary className="cursor-pointer text-xs font-semibold text-amber-800">Raise query</summary>
+        <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={(event) => void raiseQuery(event)}>
+          <Textarea value={queryText} onChange={(event) => setQueryText(event.target.value)} maxLength={2000} placeholder="Question for the quotation member" aria-label="Query comment" className="min-w-[240px] flex-1" />
+          <Button type="submit" variant="outline" disabled={!queryText.trim()}>Send query</Button>
+        </form>
+      </details>}
+      <div className="rounded-lg border bg-muted/40 p-3 text-[10px] leading-5 text-muted-foreground"><p className="font-bold text-foreground">Assumptions</p><p>Final quote PDF is created in Eva and uploaded after the rate is given.</p><p>Any higher-up with rate access can enter the rate; notification recipients are configured separately.</p><p>The request keeps its QT ID when it moves to a sent quotation.</p></div>
+    </CardContent>
+  </Card>;
+}
+
 export default function QuotationRateRequestDetailPage({ user }: { user: User }) {
   const { submissionId = '' } = useParams<{ submissionId: string }>();
   const [location, setLocation] = useLocation();
@@ -73,7 +176,6 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
   const requestedEdit = new URLSearchParams(location.split('?')[1] || '').get('edit') === '1';
   const [isEditing, setIsEditing] = useState(requestedEdit);
   const [values, setValues] = useState<EditValues>({ clientName: '', location: '', windowQty: '', totalSqFt: '', glassType: '' });
-  const [replacementPdf, setReplacementPdf] = useState<File | null>(null);
   const update = useUpdateQuotationRateSubmission();
   const upload = useUploadQuotationRateSubmissionPdf();
   const remove = useDeleteQuotationRateSubmission();
@@ -112,7 +214,6 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
       toast({ title: 'Check the request details', description: 'Enter a client, glass type, positive window quantity, and total area.', variant: 'destructive' });
       return;
     }
-    if (!validatePdf(replacementPdf)) return;
     try {
       await update.mutateAsync({
         submissionId,
@@ -130,19 +231,8 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
     }
     await refresh();
     setIsEditing(false);
-    setReplacementPdf(null);
     setLocation(`/quotations-rates/requests/${submissionId}`);
-    if (!replacementPdf) {
-      toast({ title: 'Request updated', description: 'It is back in Awaiting PDF until an updated Eva PDF is attached.' });
-      return;
-    }
-    try {
-      await upload.mutateAsync({ submissionId, filename: replacementPdf.name, data: replacementPdf });
-      await refresh();
-      toast({ title: 'Request updated and resubmitted', description: 'The updated Eva PDF is ready for rate assignment.' });
-    } catch {
-      toast({ title: 'Request updated; PDF upload failed', description: 'The old PDF is still retained. Attach the updated PDF before rate assignment.', variant: 'destructive' });
-    }
+    toast({ title: 'Request updated', description: 'It is back in Awaiting rate. Assign the rate before uploading the final PDF.' });
   };
 
   const deleteRequest = async () => {
@@ -203,19 +293,9 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
                       <label className="space-y-1.5 text-xs font-semibold">Glass type<Input value={values.glassType} onChange={(event) => setValues((current) => ({ ...current, glassType: event.target.value }))} maxLength={120} required data-testid="input-edit-rate-glass-type" /></label>
                       <label className="space-y-1.5 text-xs font-semibold">Average area per window<Input readOnly value={Number(values.windowQty) > 0 && Number(values.totalSqFt) > 0 ? (Number(values.totalSqFt) / Number(values.windowQty)).toFixed(2) : ''} data-testid="input-edit-rate-average-sqft" /></label>
                     </div>
-                    <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
-                      <p className="text-xs font-semibold">Updated Eva Software PDF <span className="font-normal text-muted-foreground">· optional now; required before another rate can be assigned</span></p>
-                      <Input className="mt-2" type="file" accept="application/pdf,.pdf" onChange={(event) => {
-                        const file = event.target.files?.[0] || null;
-                        if (!validatePdf(file)) setReplacementPdf(null);
-                        else setReplacementPdf(file);
-                        event.currentTarget.value = '';
-                      }} data-testid="input-edit-rate-pdf" />
-                      {replacementPdf && <p className="mt-2 truncate text-[11px] text-primary">{replacementPdf.name} · {(replacementPdf.size / 1024 / 1024).toFixed(2)} MiB</p>}
-                    </div>
                     <div className="flex flex-wrap justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => { setIsEditing(false); setReplacementPdf(null); setLocation(`/quotations-rates/requests/${submissionId}`); }} data-testid="button-cancel-edit-quotation-request">Cancel</Button>
-                      <Button type="submit" disabled={update.isPending || upload.isPending} data-testid="button-save-quotation-request">{update.isPending || upload.isPending ? 'Saving…' : 'Save changes'} <FileText size={14} /></Button>
+                      <Button type="button" variant="outline" onClick={() => { setIsEditing(false); setLocation(`/quotations-rates/requests/${submissionId}`); }} data-testid="button-cancel-edit-quotation-request">Cancel</Button>
+                      <Button type="submit" disabled={update.isPending} data-testid="button-save-quotation-request">{update.isPending ? 'Saving…' : 'Save changes'} <FileText size={14} /></Button>
                     </div>
                   </form>
                 ) : (
@@ -239,11 +319,13 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
               </CardContent>
             </Card>
 
+            {!isEditing && submission.workflowVersion === 3 && <RateEntryScreen submission={submission} user={user} refresh={refresh} />}
+
             {!isEditing && <Card className="overflow-hidden border-border/80" data-testid="card-quotation-request-pdf">
               <CardHeader className="border-b border-border/70">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Eva Software document</p>
                 <CardTitle className="mt-1 font-display text-lg">Attached quotation PDF</CardTitle>
-                <p className="text-xs text-muted-foreground">{submission.pdfNeedsRefresh ? 'This is the previous PDF. Attach an updated file before another rate can be assigned.' : 'The PDF attached to this quotation request.'}</p>
+                <p className="text-xs text-muted-foreground">{submission.pdfNeedsRefresh ? 'This is the previous PDF. It remains in history while the request is re-rated.' : 'The final quote PDF sent to the client.'}</p>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
                 {submission.pdfFilename ? (
@@ -251,9 +333,9 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
                     <Download size={15} /> {submission.pdfFilename}
                   </a>
                 ) : <p className="text-sm text-muted-foreground">No PDF has been attached.</p>}
-                {canManage && submission.status === 'awaiting_pdf' && (
+                {canManage && submission.status === 'rated' && (
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold transition-colors hover:bg-muted" data-testid="label-upload-detail-rate-pdf">
-                    <Upload size={14} /> {submission.pdfFilename ? 'Attach updated PDF' : 'Attach Eva PDF'}
+                    <Upload size={14} /> Attach final quote PDF
                     <input type="file" accept="application/pdf,.pdf" className="sr-only" data-testid="input-upload-detail-rate-pdf" onChange={(event) => {
                       const file = event.currentTarget.files?.[0] || null;
                       event.currentTarget.value = '';
@@ -261,7 +343,7 @@ export default function QuotationRateRequestDetailPage({ user }: { user: User })
                       upload.mutate({ submissionId, filename: file.name, data: file }, {
                         onSuccess: async () => {
                           await refresh();
-                          toast({ title: 'Updated PDF attached', description: 'The request is ready for a new rate assignment.' });
+                          toast({ title: 'Quote sent to client', description: 'The final PDF is attached and the quote is now in Quotations.' });
                         },
                         onError: () => toast({ title: 'PDF upload failed', description: 'The previous PDF is still retained. Try the upload again.', variant: 'destructive' }),
                       });

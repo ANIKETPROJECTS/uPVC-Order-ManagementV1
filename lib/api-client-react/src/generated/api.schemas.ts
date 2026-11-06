@@ -1964,6 +1964,10 @@ export type QuotationRateSubmissionStatus = typeof QuotationRateSubmissionStatus
 
 
 export const QuotationRateSubmissionStatus = {
+  awaiting_rate: 'awaiting_rate',
+  query_raised: 'query_raised',
+  rated: 'rated',
+  sent_to_client: 'sent_to_client',
   awaiting_pdf: 'awaiting_pdf',
   pending_review: 'pending_review',
   rate_assigned: 'rate_assigned',
@@ -2699,6 +2703,36 @@ export interface QuotationTotals {
   averagePricePerSqFt: number;
 }
 
+/**
+ * @nullable
+ */
+export type QuotationOutcomeSource = typeof QuotationOutcomeSource[keyof typeof QuotationOutcomeSource] | null;
+
+
+export const QuotationOutcomeSource = {
+  manual: 'manual',
+  confirmation: 'confirmation',
+} as const;
+
+export type QuotationOutcomeStatus = typeof QuotationOutcomeStatus[keyof typeof QuotationOutcomeStatus];
+
+
+export const QuotationOutcomeStatus = {
+  negotiating: 'negotiating',
+  won: 'won',
+  lost: 'lost',
+} as const;
+
+export type QuotationLostReason = typeof QuotationLostReason[keyof typeof QuotationLostReason];
+
+
+export const QuotationLostReason = {
+  price: 'price',
+  competitor: 'competitor',
+  delayed: 'delayed',
+  project_cancelled: 'project_cancelled',
+} as const;
+
 export type QuotationApprovalHistoryAction = typeof QuotationApprovalHistoryAction[keyof typeof QuotationApprovalHistoryAction];
 
 
@@ -2740,6 +2774,11 @@ export interface Quotation {
   notes: string | null;
   totals: QuotationTotals;
   status: QuotationStatus;
+  outcomeStatus: QuotationOutcomeStatus | null;
+  lostReason: QuotationLostReason | null;
+  /** @nullable */
+  outcomeSource: QuotationOutcomeSource;
+  confirmationRecordIds: string[];
   requiresRateApproval: boolean;
   sampleOnly: boolean;
   approvalHistory: QuotationApprovalHistory[];
@@ -2895,6 +2934,10 @@ export const NotificationType = {
   approval_request: 'approval_request',
   approval_decision: 'approval_decision',
   approval_reminder: 'approval_reminder',
+  rate_request: 'rate_request',
+  rate_request_urgent: 'rate_request_urgent',
+  rate_overdue: 'rate_overdue',
+  rate_assigned: 'rate_assigned',
   test: 'test',
 } as const;
 
@@ -2917,6 +2960,21 @@ export interface NotificationCenter {
   unreadCount: number;
 }
 
+export interface QuotationRateQueryEntry {
+  question: string;
+  raisedBy: string;
+  raisedByName: string;
+  raisedAt: string;
+  /** @nullable */
+  response: string | null;
+  /** @nullable */
+  respondedBy: string | null;
+  /** @nullable */
+  respondedByName: string | null;
+  /** @nullable */
+  respondedAt: string | null;
+}
+
 export type RateRequestPriority = typeof RateRequestPriority[keyof typeof RateRequestPriority];
 
 
@@ -2931,6 +2989,43 @@ export type QuotationRateSubmissionWorkflowVersion = typeof QuotationRateSubmiss
 export const QuotationRateSubmissionWorkflowVersion = {
   NUMBER_1: 1,
   NUMBER_2: 2,
+  NUMBER_3: 3,
+} as const;
+
+/**
+ * @nullable
+ */
+export type QuotationRateSubmissionOutcomeStatus = typeof QuotationRateSubmissionOutcomeStatus[keyof typeof QuotationRateSubmissionOutcomeStatus] | null;
+
+
+export const QuotationRateSubmissionOutcomeStatus = {
+  negotiating: 'negotiating',
+  won: 'won',
+  lost: 'lost',
+} as const;
+
+/**
+ * @nullable
+ */
+export type QuotationRateSubmissionLostReason = typeof QuotationRateSubmissionLostReason[keyof typeof QuotationRateSubmissionLostReason] | null;
+
+
+export const QuotationRateSubmissionLostReason = {
+  price: 'price',
+  competitor: 'competitor',
+  delayed: 'delayed',
+  project_cancelled: 'project_cancelled',
+} as const;
+
+/**
+ * @nullable
+ */
+export type QuotationRateSubmissionOutcomeSource = typeof QuotationRateSubmissionOutcomeSource[keyof typeof QuotationRateSubmissionOutcomeSource] | null;
+
+
+export const QuotationRateSubmissionOutcomeSource = {
+  manual: 'manual',
+  confirmation: 'confirmation',
 } as const;
 
 export interface QuotationRateSubmissionRevision {
@@ -2989,10 +3084,27 @@ export interface QuotationRateSubmission {
   submittedByName: string;
   approverIds: string[];
   workflowVersion: QuotationRateSubmissionWorkflowVersion;
+  awaitingRateSince: string;
+  /** @nullable */
+  queryRaisedAt: string | null;
+  /** @minimum 0 */
+  pausedWaitMilliseconds: number;
+  queryHistory: QuotationRateQueryEntry[];
+  /** @nullable */
+  sentToClientAt: string | null;
+  /** @nullable */
+  outcomeStatus: QuotationRateSubmissionOutcomeStatus;
+  /** @nullable */
+  lostReason: QuotationRateSubmissionLostReason;
+  /** @nullable */
+  outcomeSource: QuotationRateSubmissionOutcomeSource;
+  confirmationRecordIds: string[];
   /** @nullable */
   decisionComment: string | null;
   /** @nullable */
   ratePerSqFt: number | null;
+  /** @nullable */
+  rateNote: string | null;
   /** @nullable */
   rateAssignedBy: string | null;
   /** @nullable */
@@ -3029,6 +3141,19 @@ export interface QuotationOrderLinkInput {
   orderRecordId: string;
   /** @nullable */
   measurementRecordId: string | null;
+}
+
+export interface QuotationRateQueryInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  comment: string;
+}
+
+export interface QuotationRateOutcomeInput {
+  status: QuotationOutcomeStatus;
+  lostReason?: QuotationLostReason;
 }
 
 export interface QuotationRateSubmissionInput {
@@ -3082,6 +3207,28 @@ export interface QuotationRateAssignmentInput {
      * @maximum 10000000
      */
   ratePerSqFt: number;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  rateNote?: string | null;
+  expectedUpdatedAt: string;
+}
+
+export interface QuotationRatePastRate {
+  id: string;
+  clientName: string;
+  glassType: string;
+  averageSqFtPerQty: number;
+  ratePerSqFt: number;
+  rateAssignedAt: string;
+}
+
+export interface QuotationRatePastRateList {
+  rates: QuotationRatePastRate[];
+  count: number;
+  tolerancePercent: number;
+  maxAgeDays: number;
 }
 
 /**

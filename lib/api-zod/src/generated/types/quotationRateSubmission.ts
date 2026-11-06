@@ -5,6 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QuotationRateQueryEntry } from './quotationRateQueryEntry';
+import type { QuotationRateSubmissionLostReason } from './quotationRateSubmissionLostReason';
+import type { QuotationRateSubmissionOutcomeSource } from './quotationRateSubmissionOutcomeSource';
+import type { QuotationRateSubmissionOutcomeStatus } from './quotationRateSubmissionOutcomeStatus';
 import type { QuotationRateSubmissionRevision } from './quotationRateSubmissionRevision';
 import type { QuotationRateSubmissionStatus } from './quotationRateSubmissionStatus';
 import type { QuotationRateSubmissionWorkflowVersion } from './quotationRateSubmissionWorkflowVersion';
@@ -37,10 +41,27 @@ export interface QuotationRateSubmission {
   submittedByName: string;
   approverIds: string[];
   workflowVersion: QuotationRateSubmissionWorkflowVersion;
+  awaitingRateSince: Date;
+  /** @nullable */
+  queryRaisedAt: Date | null;
+  /** @minimum 0 */
+  pausedWaitMilliseconds: number;
+  queryHistory: QuotationRateQueryEntry[];
+  /** @nullable */
+  sentToClientAt: Date | null;
+  /** @nullable */
+  outcomeStatus: QuotationRateSubmissionOutcomeStatus;
+  /** @nullable */
+  lostReason: QuotationRateSubmissionLostReason;
+  /** @nullable */
+  outcomeSource: QuotationRateSubmissionOutcomeSource;
+  confirmationRecordIds: string[];
   /** @nullable */
   decisionComment: string | null;
   /** @nullable */
   ratePerSqFt: number | null;
+  /** @nullable */
+  rateNote: string | null;
   /** @nullable */
   rateAssignedBy: string | null;
   /** @nullable */

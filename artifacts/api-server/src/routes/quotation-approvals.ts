@@ -41,6 +41,13 @@ import {
   resolveProjectUploadPath,
   storeProjectUpload,
 } from "../lib/project-upload-storage";
+import { logger } from "../lib/logger";
+import {
+  getQuotationRateAttentionConfig,
+  notifyNewRateRequest,
+  notifyRateAssigned,
+  sendQuotationRateOverdueReminders,
+} from "../lib/quotation-rate-attention";
 
 const router = Router();
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -114,7 +121,21 @@ function response(item: QuotationRateSubmissionDocument, measurementSheetId: str
     submittedByName: item.submittedByName,
     approverIds: item.approverIds,
     workflowVersion: item.workflowVersion ?? 1,
+    awaitingRateSince: item.awaitingRateSince?.toISOString() ?? item.createdAt.toISOString(),
+    queryRaisedAt: item.queryRaisedAt?.toISOString() ?? null,
+    pausedWaitMilliseconds: item.pausedWaitMilliseconds ?? 0,
+    queryHistory: (item.queryHistory ?? []).map((entry) => ({
+      ...entry,
+      raisedAt: entry.raisedAt.toISOString(),
+      respondedAt: entry.respondedAt?.toISOString() ?? null,
+    })),
+    sentToClientAt: item.sentToClientAt?.toISOString() ?? null,
+    outcomeStatus: item.outcomeStatus ?? null,
+    lostReason: item.lostReason ?? null,
+    outcomeSource: item.outcomeSource ?? null,
+    confirmationRecordIds: item.confirmationRecordIds ?? [],
     ratePerSqFt: item.ratePerSqFt ?? null,
+    rateNote: item.rateNote ?? null,
     rateAssignedBy: item.rateAssignedBy ?? null,
     rateAssignedByName: item.rateAssignedByName ?? null,
     rateAssignedAt: item.rateAssignedAt?.toISOString() ?? null,
@@ -192,15 +213,41 @@ router.get("/quotation-rate-submissions", async (req, res): Promise<void> => {
         $or: [
           { submittedBy: actor.id },
           { approverIds: actor.id },
-          { status: { $in: ["awaiting_pdf", "pending_review"] as const } },
+          { status: { $in: ["awaiting_rate", "query_raised", "rated", "sent_to_client", "awaiting_pdf", "pending_review"] as const } },
         ],
       }
     : { submittedBy: actor.id };
-  const items = await getQuotationRateSubmissions(db)
+  const submissions = getQuotationRateSubmissions(db);
+  const legacyItems = await submissions.find({ workflowVersion: 2 }).toArray();
+  for (const item of legacyItems) {
+    const now = new Date();
+    const status = item.status === "rate_assigned" ? "rated"
+      : item.status === "approved" ? "sent_to_client"
+      : item.status === "awaiting_pdf" || item.status === "pending_review" ? "awaiting_rate"
+      : item.status;
+    await submissions.updateOne({ _id: item._id, workflowVersion: 2 }, { $set: {
+      workflowVersion: 3,
+      status,
+      awaitingRateSince: item.createdAt,
+      pausedWaitMilliseconds: 0,
+      queryHistory: [],
+      sentToClientAt: status === "sent_to_client" ? item.updatedAt : null,
+      outcomeStatus: null,
+      outcomeSource: null,
+      confirmationRecordIds: [],
+    } });
+  }
+  const items = await submissions
     .find(filter)
     .sort({ createdAt: -1 })
     .toArray();
   res.json(ListQuotationRateSubmissionsResponse.parse(await responseList(items)));
+});
+
+router.get("/quotation-rate-attention-config", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  res.json(getQuotationRateAttentionConfig());
 });
 
 router.get("/quotation-rate-submissions/lookup", async (req, res): Promise<void> => {
@@ -308,15 +355,16 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     glassType: glassType.trim(),
     priority: parsed.data.priority ?? "normal",
     averageSqFtPerQty: Math.round((totalSqFt / windowQty + Number.EPSILON) * 10000) / 10000,
-    status: "awaiting_pdf",
     pdfFilename: null,
     pdfSizeBytes: null,
     pdfGridFsId: null,
     submittedBy: actor.id,
     submittedByName: actor.name,
     approverIds: approvers.map((user) => user._id),
-    workflowVersion: 2,
+    workflowVersion: 3,
+    status: "awaiting_rate",
     ratePerSqFt: null,
+    rateNote: null,
     rateAssignedBy: null,
     rateAssignedByName: null,
     rateAssignedAt: null,
@@ -325,6 +373,15 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     decidedByName: null,
     pdfNeedsRefresh: false,
     revisionHistory: [],
+    awaitingRateSince: now,
+    queryRaisedAt: null,
+    pausedWaitMilliseconds: 0,
+    queryHistory: [],
+    sentToClientAt: null,
+    outcomeStatus: null,
+    lostReason: null,
+    outcomeSource: null,
+    confirmationRecordIds: [],
     createdAt: now,
     updatedAt: now,
   };
@@ -337,6 +394,9 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     }
     throw error;
   }
+  void notifyNewRateRequest(item, item.priority === "urgent").catch((error: unknown) => {
+    logger.error({ err: error, submissionId: item._id }, "Could not notify quotation rate recipients");
+  });
   res.status(201).json(CreateQuotationRateSubmissionResponse.parse(await responseOne(item)));
 });
 
@@ -394,6 +454,7 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
     glassType: item.glassType,
     priority: item.priority ?? "normal",
     ratePerSqFt: item.ratePerSqFt ?? null,
+    rateNote: item.rateNote ?? null,
     rateAssignedByName: item.rateAssignedByName ?? null,
     rateAssignedAt: item.rateAssignedAt ?? null,
     averageSqFtPerQty: item.averageSqFtPerQty,
@@ -421,13 +482,22 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
           priority: parsedBody.data.priority ?? item.priority ?? "normal",
           measurementRecordId,
           averageSqFtPerQty: Math.round((totalSqFt / windowQty + Number.EPSILON) * 10000) / 10000,
-          status: "awaiting_pdf",
-          workflowVersion: 2,
+          status: "awaiting_rate",
+          workflowVersion: 3,
           ratePerSqFt: null,
+          rateNote: null,
           rateAssignedBy: null,
           rateAssignedByName: null,
           rateAssignedAt: null,
           pdfNeedsRefresh: Boolean(item.pdfFilename || item.pdfStoragePath || item.pdfGridFsId),
+          awaitingRateSince: now,
+          queryRaisedAt: null,
+          pausedWaitMilliseconds: 0,
+          queryHistory: [],
+          sentToClientAt: null,
+          outcomeStatus: null,
+          lostReason: null,
+          outcomeSource: null,
           decisionComment: null,
           decidedBy: null,
           decidedByName: null,
@@ -447,6 +517,11 @@ router.patch("/quotation-rate-submissions/:submissionId", async (req, res): Prom
   if (!updated) {
     res.status(409).json({ error: "This request changed while you were editing it. Refresh and try again." });
     return;
+  }
+  if (updated.priority === "urgent" && item.priority !== "urgent") {
+    void notifyNewRateRequest(updated, true).catch((error: unknown) => {
+      logger.error({ err: error, submissionId: item._id }, "Could not notify urgent quotation rate recipients");
+    });
   }
   res.json(UpdateQuotationRateSubmissionResponse.parse(await responseOne(updated)));
 });
@@ -621,8 +696,8 @@ router.post(
       res.status(403).json({ error: "Only the submitting quotation member or a master admin can attach the PDF." });
       return;
     }
-    if (item.status !== "awaiting_pdf") {
-      res.status(409).json({ error: "A PDF can only be attached before the submission enters review." });
+    if (item.status !== "rated") {
+      res.status(409).json({ error: "Upload the final PDF after a rate has been assigned." });
       return;
     }
 
@@ -643,10 +718,13 @@ router.post(
       let updated: QuotationRateSubmissionDocument | null;
       try {
         updated = await submissions.findOneAndUpdate(
-          { _id: item._id, status: "awaiting_pdf", updatedAt: item.updatedAt },
+          { _id: item._id, status: "rated", updatedAt: item.updatedAt },
           {
             $set: {
-              status: "pending_review",
+              status: "sent_to_client",
+              sentToClientAt: new Date(),
+              outcomeStatus: null,
+              outcomeSource: null,
               pdfFilename: filename,
               pdfSizeBytes: body.length,
               pdfGridFsId: null,
@@ -793,16 +871,32 @@ router.post("/quotation-rate-submissions/:submissionId/rate", async (req, res): 
     return;
   }
   const db = await getMongoDb();
-  const updated = await getQuotationRateSubmissions(db).findOneAndUpdate(
-    { _id: parsedParams.data.submissionId, workflowVersion: 2, status: "pending_review" },
+  const submissions = getQuotationRateSubmissions(db);
+  const current = await submissions.findOne({
+    _id: parsedParams.data.submissionId,
+    workflowVersion: 3,
+    status: { $in: ["awaiting_rate", "rated"] },
+  });
+  if (!current) {
+    res.status(404).json({ error: "Rate request is not available for rate entry." });
+    return;
+  }
+  if (current.updatedAt.getTime() !== parsedBody.data.expectedUpdatedAt.getTime()) {
+    res.status(409).json({ error: "This request changed while you were entering the rate. Refresh and review the latest details." });
+    return;
+  }
+  const now = new Date();
+  const updated = await submissions.findOneAndUpdate(
+    { _id: current._id, workflowVersion: 3, status: current.status, updatedAt: current.updatedAt },
     {
       $set: {
-        status: "rate_assigned",
+        status: "rated",
         ratePerSqFt: Math.round((parsedBody.data.ratePerSqFt + Number.EPSILON) * 100) / 100,
+        rateNote: parsedBody.data.rateNote?.trim() || null,
         rateAssignedBy: actor.id,
         rateAssignedByName: actor.name,
-        rateAssignedAt: new Date(),
-        updatedAt: new Date(),
+        rateAssignedAt: now,
+        updatedAt: now,
       },
       $addToSet: { approverIds: actor.id },
     },
@@ -817,7 +911,125 @@ router.post("/quotation-rate-submissions/:submissionId/rate", async (req, res): 
     res.status(409).json({ error: "This request is not waiting for a rate assignment." });
     return;
   }
+  void notifyRateAssigned(updated).catch((error: unknown) => {
+    logger.error({ err: error, submissionId: updated._id }, "Could not notify recipients of the assigned rate");
+  });
   res.json(AssignQuotationRateSubmissionRateResponse.parse(await responseOne(updated)));
+});
+
+router.get("/quotation-rate-submissions/:submissionId/past-rates", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  if (!canApprove(actor)) {
+    res.status(403).json({ error: "Rate manager editing access is required." });
+    return;
+  }
+  const db = await getMongoDb();
+  const current = await getQuotationRateSubmissions(db).findOne({ _id: String(req.params.submissionId) });
+  if (!current) {
+    res.status(404).json({ error: "Rate request not found." });
+    return;
+  }
+  const count = Math.min(10, Math.max(1, Number(process.env.QUOTATION_RATE_PAST_RATE_COUNT) || 3));
+  const tolerancePercent = Math.min(100, Math.max(1, Number(process.env.QUOTATION_RATE_PAST_RATE_TOLERANCE_PCT) || 20));
+  const maxAgeDays = Math.min(3650, Math.max(1, Number(process.env.QUOTATION_RATE_PAST_RATE_MAX_AGE_DAYS) || 365));
+  const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000);
+  const candidates = await getQuotationRateSubmissions(db).find({
+    _id: { $ne: current._id },
+    ratePerSqFt: { $gt: 0 },
+    $or: [
+      { workflowVersion: 3, status: { $in: ["rated", "sent_to_client"] } },
+      { workflowVersion: { $ne: 3 }, status: { $in: ["rate_assigned", "approved"] } },
+    ],
+  }).sort({ rateAssignedAt: -1, updatedAt: -1 }).limit(500).toArray();
+  const normalize = (value: string) => value.toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+  const rates = candidates.filter((item) => {
+    const date = item.rateAssignedAt ?? item.updatedAt;
+    if (date < cutoff || !item.averageSqFtPerQty) return false;
+    const sameGlass = normalize(item.glassType) === normalize(current.glassType);
+    const similarArea = current.averageSqFtPerQty > 0
+      && Math.abs(item.averageSqFtPerQty - current.averageSqFtPerQty) / current.averageSqFtPerQty * 100 <= tolerancePercent;
+    return sameGlass || similarArea;
+  }).slice(0, count).map((item) => ({
+    id: item._id,
+    clientName: item.clientName,
+    glassType: item.glassType,
+    averageSqFtPerQty: item.averageSqFtPerQty,
+    ratePerSqFt: item.ratePerSqFt!,
+    rateAssignedAt: (item.rateAssignedAt ?? item.updatedAt).toISOString(),
+  }));
+  res.json({ rates, count, tolerancePercent, maxAgeDays });
+});
+
+router.post("/quotation-rate-submissions/:submissionId/query", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  if (!canApprove(actor)) { res.status(403).json({ error: "Rate manager access is required to raise a query." }); return; }
+  const question = typeof req.body?.comment === "string" ? req.body.comment.trim() : "";
+  if (!question || question.length > 2000) { res.status(400).json({ error: "Enter a query up to 2000 characters." }); return; }
+  const submissions = getQuotationRateSubmissions(await getMongoDb());
+  const item = await submissions.findOne({ _id: String(req.params.submissionId), workflowVersion: 3, status: { $in: ["awaiting_rate", "rated"] } });
+  if (!item) { res.status(409).json({ error: "This request cannot receive a query in its current status." }); return; }
+  const now = new Date();
+  const queryHistory = [...(item.queryHistory ?? []), {
+    question, raisedBy: actor.id, raisedByName: actor.name, raisedAt: now,
+    response: null, respondedBy: null, respondedByName: null, respondedAt: null,
+  }];
+  await submissions.updateOne({ _id: item._id, updatedAt: item.updatedAt }, { $set: {
+    status: "query_raised", queryRaisedAt: now, queryHistory, updatedAt: now,
+  } });
+  res.json(await responseOne({ ...item, status: "query_raised", queryRaisedAt: now, queryHistory, updatedAt: now }));
+});
+
+router.post("/quotation-rate-submissions/:submissionId/query-response", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  const submissions = getQuotationRateSubmissions(await getMongoDb());
+  const item = await submissions.findOne({ _id: String(req.params.submissionId), workflowVersion: 3, status: "query_raised" });
+  if (!item) { res.status(409).json({ error: "There is no open query on this request." }); return; }
+  if (!actor.masterAdmin && (!canSubmit(actor) || item.submittedBy !== actor.id)) {
+    res.status(403).json({ error: "Only the requesting quotation member can answer this query." }); return;
+  }
+  const answer = typeof req.body?.comment === "string" ? req.body.comment.trim() : "";
+  if (!answer || answer.length > 2000) { res.status(400).json({ error: "Enter a response up to 2000 characters." }); return; }
+  const now = new Date();
+  const queryHistory = [...(item.queryHistory ?? [])];
+  const openQuery = [...queryHistory].reverse().find((query) => !query.respondedAt);
+  if (!openQuery || !item.queryRaisedAt) { res.status(409).json({ error: "The open query could not be found." }); return; }
+  openQuery.response = answer;
+  openQuery.respondedBy = actor.id;
+  openQuery.respondedByName = actor.name;
+  openQuery.respondedAt = now;
+  const updated = { ...item, status: "awaiting_rate" as const, queryRaisedAt: null, pausedWaitMilliseconds: (item.pausedWaitMilliseconds ?? 0) + (now.getTime() - item.queryRaisedAt.getTime()), queryHistory, updatedAt: now };
+  await submissions.updateOne({ _id: item._id, updatedAt: item.updatedAt }, { $set: {
+    status: updated.status, queryRaisedAt: null, pausedWaitMilliseconds: updated.pausedWaitMilliseconds, queryHistory, updatedAt: now,
+  } });
+  res.json(await responseOne(updated));
+});
+
+router.patch("/quotation-rate-submissions/:submissionId/outcome", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res);
+  if (!actor) return;
+  const status = req.body?.status;
+  const lostReason = req.body?.lostReason;
+  const allowedReasons = ["price", "competitor", "delayed", "project_cancelled"];
+  if (!["negotiating", "won", "lost"].includes(status) || (status === "lost" && !allowedReasons.includes(lostReason))) {
+    res.status(400).json({ error: "Choose an outcome; Lost also requires a valid reason." }); return;
+  }
+  const submissions = getQuotationRateSubmissions(await getMongoDb());
+  const item = await submissions.findOne({ _id: String(req.params.submissionId), workflowVersion: 3, status: "sent_to_client" });
+  if (!item) { res.status(409).json({ error: "Only sent quotations can have an outcome." }); return; }
+  if (!actor.masterAdmin && (!canSubmit(actor) || item.submittedBy !== actor.id)) {
+    res.status(403).json({ error: "Only the quotation owner can set its client outcome." }); return;
+  }
+  if (item.outcomeSource === "confirmation" && item.outcomeStatus === "won") {
+    res.status(409).json({ error: "This quotation is already Won from a linked confirmation." }); return;
+  }
+  const updated = await submissions.findOneAndUpdate({ _id: item._id, updatedAt: item.updatedAt }, { $set: {
+    outcomeStatus: status, lostReason: status === "lost" ? lostReason : null, outcomeSource: "manual", updatedAt: new Date(),
+  } }, { returnDocument: "after" });
+  if (!updated) { res.status(409).json({ error: "This quotation changed. Refresh and try again." }); return; }
+  res.json(await responseOne(updated));
 });
 
 function readRawFile(
@@ -861,5 +1073,15 @@ function readRawFile(
   req.on("aborted", () => next(new Error("Quotation PDF upload was interrupted.")));
   req.on("error", next);
 }
+
+const rateAttentionReminderTimer = setInterval(() => {
+  void sendQuotationRateOverdueReminders().catch((error: unknown) => {
+    logger.error({ err: error }, "Hourly quotation rate reminder check failed");
+  });
+}, 60 * 60 * 1000);
+rateAttentionReminderTimer.unref();
+void sendQuotationRateOverdueReminders().catch((error: unknown) => {
+  logger.error({ err: error }, "Initial quotation rate reminder check failed");
+});
 
 export default router;

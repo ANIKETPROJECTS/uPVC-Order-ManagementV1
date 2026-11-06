@@ -7,6 +7,9 @@
  */
 import type { QuotationApprovalHistory } from './quotationApprovalHistory';
 import type { QuotationItem } from './quotationItem';
+import type { QuotationLostReason } from './quotationLostReason';
+import type { QuotationOutcomeSource } from './quotationOutcomeSource';
+import type { QuotationOutcomeStatus } from './quotationOutcomeStatus';
 import type { QuotationStatus } from './quotationStatus';
 import type { QuotationTotals } from './quotationTotals';
 
@@ -33,6 +36,11 @@ export interface Quotation {
   notes: string | null;
   totals: QuotationTotals;
   status: QuotationStatus;
+  outcomeStatus: QuotationOutcomeStatus | null;
+  lostReason: QuotationLostReason | null;
+  /** @nullable */
+  outcomeSource: QuotationOutcomeSource;
+  confirmationRecordIds: string[];
   requiresRateApproval: boolean;
   sampleOnly: boolean;
   approvalHistory: QuotationApprovalHistory[];

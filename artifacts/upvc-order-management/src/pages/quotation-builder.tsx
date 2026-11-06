@@ -40,7 +40,6 @@ import {
   useArchiveWindowProfile,
   useCreateQuotation,
   useCreateQuotationRateSubmission,
-  useAssignQuotationRateSubmissionRate,
   useCreateWindowProfile,
   useDeleteQuotationRateSubmission,
   useGetQuotation,
@@ -609,11 +608,10 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
   const { toast } = useToast();
   const rateDesk = user.roleId === 'master-admin' || user.permissions?.['rate-approval'] === 'edit';
   const canSubmit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
-  const submissionsQuery = useListQuotationRateSubmissions({ query: { queryKey: getListQuotationRateSubmissionsQueryKey() } });
+  const submissionsQuery = useListQuotationRateSubmissions({ query: { queryKey: getListQuotationRateSubmissionsQueryKey(), refetchInterval: 60_000 } });
   const ordersQuery = useListOrders({}, { query: { queryKey: getListOrdersQueryKey({}) } });
   const create = useCreateQuotationRateSubmission();
   const upload = useUploadQuotationRateSubmissionPdf();
-  const assignRateMutation = useAssignQuotationRateSubmissionRate();
   const deleteSubmission = useDeleteQuotationRateSubmission();
   const linkOrder = useLinkQuotationRateSubmissionOrder();
   const [clientName, setClientName] = useState('');
@@ -624,8 +622,13 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
   const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
   const [measurementId, setMeasurementId] = useState<string | null>(null);
   const [measurementLabel, setMeasurementLabel] = useState('');
-  const [pdf, setPdf] = useState<File | null>(null);
-  const [rateValues, setRateValues] = useState<Record<string, string>>({});
+  const [queryValues, setQueryValues] = useState<Record<string, string>>({});
+  const [queryAnswers, setQueryAnswers] = useState<Record<string, string>>({});
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [historySearch, setHistorySearch] = useState('');
   const [linkingSubmission, setLinkingSubmission] = useState<QuotationRateSubmission | null>(null);
   const [linkOrderRecordId, setLinkOrderRecordId] = useState('');
@@ -633,8 +636,8 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
   const [linkMeasurementId, setLinkMeasurementId] = useState<string | null>(null);
   const [linkMeasurementLabel, setLinkMeasurementLabel] = useState('');
   const submissions = submissionsQuery.data || [];
-  const pending = submissions.filter((item) => item.status === 'pending_review');
-  const awaiting = submissions.filter((item) => item.status === 'awaiting_pdf');
+  const pending = submissions.filter((item) => item.status === 'awaiting_rate');
+  const awaiting = submissions.filter((item) => item.status === 'query_raised');
   const visibleSubmissions = useMemo(() => {
     const normalized = historySearch.trim().toLowerCase();
     if (!normalized) return submissions;
@@ -664,7 +667,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
     upload.mutate({ submissionId, filename: file.name, data: file }, {
       onSuccess: () => {
         refreshSubmissions();
-        toast({ title: 'PDF attached', description: 'The rate request is ready for rate assignment.' });
+        toast({ title: 'Quote sent to client', description: 'The final PDF is attached and the request is now in Quotations.' });
       },
       onError: () => toast({ title: 'PDF upload failed', description: 'The request remains available for another upload attempt.', variant: 'destructive' }),
     });
@@ -675,11 +678,6 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
       toast({ title: 'Complete the rate request', description: 'Add a client, glass type, positive window quantity, and total area.', variant: 'destructive' });
       return;
     }
-    if (!pdf) {
-      toast({ title: 'Eva Software PDF required', description: 'Attach the quotation PDF before submitting this rate request.', variant: 'destructive' });
-      return;
-    }
-    if (!validatePdf(pdf)) return;
     create.mutate({
       data: {
         clientName: clientName.trim(),
@@ -701,27 +699,27 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
         setPriority('normal');
         setMeasurementId(null);
         setMeasurementLabel('');
-        const attached = pdf;
-        setPdf(null);
-        if (attached) uploadPdf(submission.id, attached);
+        toast({ title: 'Rate request created', description: `${submission.id} is waiting for a rate.` });
       },
       onError: () => toast({ title: 'Could not create rate request', description: 'Check the fields and try again.', variant: 'destructive' }),
     });
   };
-  const assignRate = (submission: QuotationRateSubmission) => {
-    const ratePerSqFt = Number(rateValues[submission.id]);
-    if (!Number.isFinite(ratePerSqFt) || ratePerSqFt <= 0) {
-      toast({ title: 'Enter a valid rate', description: 'The rate per square foot must be greater than zero.', variant: 'destructive' });
-      return;
+  const postQuery = async (submission: QuotationRateSubmission, answer = false) => {
+    const text = (answer ? queryAnswers[submission.id] : queryValues[submission.id])?.trim();
+    if (!text) return;
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotation-rate-submissions/${encodeURIComponent(submission.id)}/${answer ? 'query-response' : 'query'}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: text }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'The query could not be saved.');
+      refreshSubmissions();
+      if (answer) setQueryAnswers((current) => ({ ...current, [submission.id]: '' }));
+      else setQueryValues((current) => ({ ...current, [submission.id]: '' }));
+      toast({ title: answer ? 'Response sent' : 'Query raised', description: answer ? 'The request returned to Awaiting rate.' : 'The waiting timer is paused until a response.' });
+    } catch (error) {
+      toast({ title: 'Could not save query', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
     }
-    assignRateMutation.mutate({ submissionId: submission.id, data: { ratePerSqFt } }, {
-      onSuccess: () => {
-        refreshSubmissions();
-        setRateValues((current) => ({ ...current, [submission.id]: '' }));
-        toast({ title: 'Rate assigned', description: `${submission.clientName} · ${money(ratePerSqFt)} per sq. ft.` });
-      },
-      onError: () => toast({ title: 'Rate was not assigned', description: 'The request is unchanged. Refresh and try again.', variant: 'destructive' }),
-    });
   };
   const openOrderLink = (submission: QuotationRateSubmission) => {
     setLinkingSubmission(submission);
@@ -771,11 +769,21 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
       onError: () => toast({ title: 'Could not delete the request', description: 'The request was not removed. Refresh and try again.', variant: 'destructive' }),
     });
   };
-  const statusStyle = (status: string) => status === 'rate_assigned' || status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : status === 'pending_review' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-border bg-muted text-muted-foreground';
-  const statusName = (status: string) => status === 'pending_review' ? 'Awaiting Rate' : status === 'awaiting_pdf' ? 'Awaiting PDF' : status === 'rate_assigned' ? 'Rate Assigned' : status === 'approved' ? 'Approved' : 'Rejected';
+  const statusStyle = (status: string) => status === 'rated' || status === 'sent_to_client' || status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : status === 'query_raised' ? 'border-violet-200 bg-violet-50 text-violet-800' : status === 'awaiting_rate' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-border bg-muted text-muted-foreground';
+  const statusName = (status: string) => ({ awaiting_rate: 'Awaiting rate', query_raised: 'Query raised', rated: 'Rated', sent_to_client: 'Sent to client', pending_review: 'Awaiting rate', rate_assigned: 'Rated', approved: 'Sent to client', awaiting_pdf: 'Awaiting rate' } as Record<string, string>)[status] || 'Historical';
+  const waitingLabel = (submission: QuotationRateSubmission) => {
+    if (!['awaiting_rate', 'query_raised'].includes(submission.status)) return null;
+    const start = Date.parse(submission.createdAt);
+    const paused = Number(submission.pausedWaitMilliseconds || 0);
+    const currentPause = submission.status === 'query_raised' && submission.queryRaisedAt ? now - Date.parse(submission.queryRaisedAt) : 0;
+    const elapsed = Math.max(0, now - start - paused - currentPause);
+    const days = Math.floor(elapsed / 86_400_000);
+    const hours = Math.floor((elapsed % 86_400_000) / 3_600_000);
+    return `Waiting ${days ? `${days}d ` : ''}${hours}h${submission.status === 'query_raised' ? ' · paused' : ''}`;
+  };
   const pdfInput = (submission: QuotationRateSubmission) => (
     <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold transition-colors hover:bg-muted" data-testid={`label-upload-rate-pdf-${submission.id}`}>
-      <FilePlus2 size={14} /> Attach Eva PDF
+      <FilePlus2 size={14} /> Attach final quote PDF
       <input
         type="file"
         accept="application/pdf,.pdf"
@@ -812,17 +820,8 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
                  <label className="space-y-1.5 text-xs font-semibold">Priority<Select value={priority} onValueChange={(value) => setPriority(value as 'normal' | 'urgent')}><SelectTrigger data-testid="select-rate-request-priority"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="normal">Normal</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select></label>
                  <div className="space-y-1.5 text-xs font-semibold sm:col-span-2">Measurement sheet <span className="font-normal text-muted-foreground">· optional</span><MeasurementSheetLookup selectedId={measurementId} selectedLabel={measurementLabel} currentQuotationRequestId="" onSelect={(item) => { setMeasurementId(item.id); setMeasurementLabel(`${measurementSheetIdLabel(item.id, item.sheetId)} · ${item.clientName}`); }} />{measurementId && <button type="button" onClick={() => { setMeasurementId(null); setMeasurementLabel(''); }} className="text-[11px] font-semibold text-primary hover:underline" data-testid="button-clear-rate-measurement">Remove linked sheet</button>}</div>
               </div>
-              <label className="block rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs font-semibold" data-testid="label-rate-pdf">
-                Eva Software PDF <span className="font-normal text-muted-foreground">· PDF, up to 10 MiB</span>
-                 <Input className="mt-2" type="file" accept="application/pdf,.pdf" required data-testid="input-new-rate-pdf" onChange={(event) => {
-                  const file = event.target.files?.[0] || null;
-                  if (file && validatePdf(file)) setPdf(file);
-                  else setPdf(null);
-                }} />
-                {pdf && <span className="mt-2 block truncate text-[11px] text-primary">{pdf.name} · {(pdf.size / 1024 / 1024).toFixed(2)} MiB</span>}
-              </label>
               <Button type="submit" className="w-full" disabled={create.isPending || upload.isPending} data-testid="button-submit-rate-request">
-                {create.isPending || upload.isPending ? 'Submitting…' : 'Create rate request'} <FilePlus2 size={15} />
+                 {create.isPending ? 'Submitting…' : 'Create rate request'} <FilePlus2 size={15} />
               </Button>
             </form> : <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-submit-read-only">You have view access to this desk. A quotation team member can prepare a rate request.</div>}
           </CardContent>
@@ -835,8 +834,8 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
               <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Rate request history</p><CardTitle className="mt-1 font-display text-lg">All requests</CardTitle><p className="mt-1 text-xs text-muted-foreground">Request details, status, measurement sheet, and Eva PDFs stay together.</p></div>
               <div className="flex flex-wrap items-center gap-2">
                 {canSubmit && <Button size="sm" variant="outline" onClick={onCreate} data-testid="button-new-rate-request"><FilePlus2 size={13} /> New request</Button>}
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">{pending.length} to assign</span>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">{awaiting.length} awaiting PDF</span>
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">{pending.length} awaiting rate</span>
+                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-800">{awaiting.length} query raised</span>
               </div>
             </div>
             <label className="relative mt-3 block w-full sm:max-w-sm">
@@ -870,7 +869,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
                               <a href={getDownloadQuotationRateSubmissionPdfUrl(submission.id)} download={submission.pdfFilename} className="inline-flex max-w-full items-center gap-1.5 truncate text-[10px] font-semibold text-primary hover:underline" data-testid={`link-download-rate-pdf-${submission.id}`}><Download size={12} /> {submission.pdfNeedsRefresh ? `Previous PDF · ${submission.pdfFilename}` : submission.pdfFilename}</a>
                               {submission.pdfNeedsRefresh && <p className="mt-1 text-[10px] text-amber-700">Updated PDF required before a new rate can be assigned</p>}
                             </div>}
-                            {submission.status === 'awaiting_pdf' && canManageSubmission(submission) ? pdfInput(submission) : null}
+                            {submission.status === 'rated' && canManageSubmission(submission) ? pdfInput(submission) : null}
                           </td>
                           <td className="px-3 py-3 tabular-nums">{submission.windowQty}</td>
                           <td className="px-3 py-3 tabular-nums">{submission.totalSqFt.toLocaleString('en-IN')}</td>
@@ -883,15 +882,18 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
                             {submission.ratePerSqFt != null && <p className="mt-1 text-[10px] font-semibold text-emerald-800">{money(submission.ratePerSqFt)} / sq. ft.</p>}
                             {submission.rateAssignedByName && <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-muted-foreground">Set by {submission.rateAssignedByName}</p>}
                             {submission.decisionComment && <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-muted-foreground">{submission.decisionComment}</p>}
+                            {waitingLabel(submission) && <p className={`mt-1 text-[10px] font-semibold ${submission.status === 'query_raised' ? 'text-violet-700' : 'text-amber-800'}`}>{waitingLabel(submission)}</p>}
+                            {!!submission.queryHistory.length && <details className="mt-2 text-[10px]"><summary className="cursor-pointer font-semibold text-primary">Query history ({submission.queryHistory.length})</summary><div className="mt-1 space-y-1">{submission.queryHistory.map((query, index) => <div key={`${query.raisedAt}-${index}`} className="rounded border p-2"><p><b>{query.raisedByName} asked:</b> {query.question}</p>{query.response && <p className="mt-1"><b>{query.respondedByName} replied:</b> {query.response}</p>}</div>)}</div></details>}
                           </td>
                           <td className="min-w-[260px] px-4 py-3">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <Button size="sm" variant="outline" onClick={() => navigate(`/quotations-rates/requests/${submission.id}`)} data-testid={`button-view-rate-request-${submission.id}`}><Eye size={13} /> View</Button>
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/quotations-rates/requests/${submission.id}`)} data-testid={`button-view-rate-request-${submission.id}`}><Eye size={13} /> {rateDesk && ['awaiting_rate', 'rated'].includes(submission.status) ? 'Enter rate' : 'View'}</Button>
                               {canManageSubmission(submission) && <Button size="sm" variant="outline" onClick={() => navigate(`/quotations-rates/requests/${submission.id}?edit=1`)} data-testid={`button-edit-rate-request-${submission.id}`}><Pencil size={13} /> Edit</Button>}
                               {canManageSubmission(submission) && <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={deleteSubmission.isPending} onClick={() => removeSubmission(submission)} data-testid={`button-delete-rate-request-${submission.id}`}><Trash2 size={13} /> Delete</Button>}
                               {canLinkSubmission(submission) && <Button size="sm" variant="outline" onClick={() => openOrderLink(submission)} data-testid={`button-link-rate-order-${submission.id}`}><Link2 size={13} /> {submission.orderId ? 'Update links' : 'Link to order'}</Button>}
-                              {submission.status === 'pending_review' && rateDesk && <div className="flex min-w-[210px] items-center gap-1.5" data-testid={`rate-assignment-controls-${submission.id}`}><Input type="number" min="0.01" step="0.01" value={rateValues[submission.id] || ''} onChange={(event) => setRateValues((current) => ({ ...current, [submission.id]: event.target.value }))} placeholder="Rate / sq. ft." aria-label={`Rate per square foot for ${submission.clientName}`} data-testid={`input-rate-per-sqft-${submission.id}`} /><Button size="sm" onClick={() => assignRate(submission)} disabled={assignRateMutation.isPending} data-testid={`button-assign-rate-${submission.id}`}>Assign</Button></div>}
-                              {submission.status === 'rate_assigned' && <span className="px-2 text-muted-foreground" data-testid={`text-rate-assigned-${submission.id}`}>Assigned</span>}
+                              {['awaiting_rate', 'rated'].includes(submission.status) && rateDesk && <details className="w-full"><summary className="cursor-pointer text-[10px] font-semibold text-primary">Raise query</summary><Textarea value={queryValues[submission.id] || ''} onChange={(event) => setQueryValues((current) => ({ ...current, [submission.id]: event.target.value }))} maxLength={2000} placeholder="What information is needed?" className="mt-1 min-h-16 text-xs" /><Button size="sm" className="mt-1" disabled={!queryValues[submission.id]?.trim()} onClick={() => void postQuery(submission)}>Send query</Button></details>}
+                              {submission.status === 'query_raised' && canManageSubmission(submission) && <div className="w-full"><p className="mb-1 text-[10px] text-violet-800">{submission.queryHistory.at(-1)?.question}</p><Textarea value={queryAnswers[submission.id] || ''} onChange={(event) => setQueryAnswers((current) => ({ ...current, [submission.id]: event.target.value }))} maxLength={2000} placeholder="Reply to the rate team" className="min-h-16 text-xs" /><Button size="sm" className="mt-1" disabled={!queryAnswers[submission.id]?.trim()} onClick={() => void postQuery(submission, true)}>Send response</Button></div>}
+                              {submission.status === 'rated' && <span className="px-2 text-muted-foreground" data-testid={`text-rate-assigned-${submission.id}`}>Rated</span>}
                               {(submission.status === 'approved' || submission.status === 'rejected') && <span className="px-2 text-muted-foreground" data-testid={`text-rate-action-complete-${submission.id}`}>Historical</span>}
                             </div>
                           </td>
@@ -1117,7 +1119,7 @@ export function LegacyQuotationBuilderPage({ user }: { user: User }) {
                               <button type="button" onClick={() => openQuote(quote, 'view')} className="w-full text-left" data-testid={`button-open-quotation-${quote.id}`}>
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[10px] font-bold text-primary">{quote.quoteNo}</span>{quote.sampleOnly && <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Sample</span>}<span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent-foreground">{quote.status.replace('_', ' ')}</span>{quote.requiresRateApproval && <span className="rounded-full border border-destructive/20 bg-destructive/5 px-2 py-0.5 text-[9px] font-bold text-destructive">Rate override</span>}</div>
+                                    <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[10px] font-bold text-primary">{quote.quoteNo}</span>{quote.sampleOnly && <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Sample</span>}<span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent-foreground">{quote.status.replace('_', ' ')}</span>{quote.outcomeStatus === 'won' && <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-800">Won · confirmation</span>}{quote.requiresRateApproval && <span className="rounded-full border border-destructive/20 bg-destructive/5 px-2 py-0.5 text-[9px] font-bold text-destructive">Rate override</span>}</div>
                                     <p className="mt-2 truncate text-sm font-semibold">{quote.customerName || 'Unnamed customer'}</p>
                                     <p className="mt-1 truncate text-[11px] text-muted-foreground">{quote.projectName || 'No project name'} · {dateLabel(quote.quotationDate)}</p>
                                   </div>
@@ -1195,9 +1197,122 @@ function sectionFromUrl(value: string): QuotationsRatesSection {
   return 'quotations';
 }
 
+function SentRateQuotes({ user }: { user: User }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const query = useListQuotationRateSubmissions({ query: { queryKey: getListQuotationRateSubmissionsQueryKey(), refetchOnWindowFocus: true, refetchInterval: 60_000 } });
+  const [drafts, setDrafts] = useState<Record<string, { status: string; lostReason: string }>>({});
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
+  const rows = (query.data ?? []).filter((item) => item.status === 'sent_to_client');
+  const save = async (item: QuotationRateSubmission) => {
+    const value = drafts[item.id] ?? { status: item.outcomeStatus ?? '', lostReason: item.lostReason ?? '' };
+    if (!value.status || (value.status === 'lost' && !value.lostReason)) return;
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotation-rate-submissions/${encodeURIComponent(item.id)}/outcome`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: value.status, lostReason: value.lostReason || null }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Outcome was not saved.');
+      await queryClient.invalidateQueries({ queryKey: getListQuotationRateSubmissionsQueryKey() });
+      toast({ title: 'Quotation outcome saved', description: item.id });
+    } catch (error) {
+      toast({ title: 'Could not save outcome', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
+    }
+  };
+  const overdueAt = now - 5 * 24 * 60 * 60 * 1000;
+  return <Card className="mt-4 border-border/80" data-testid="card-sent-rate-quotes">
+    <CardHeader className="border-b border-border/70"><CardTitle className="font-display text-lg">Sent to client · outcomes</CardTitle><p className="text-xs text-muted-foreground">Rate requests move here after the final PDF is uploaded.</p></CardHeader>
+    <CardContent className="divide-y p-0">
+      {query.isLoading ? <div className="p-4 text-xs text-muted-foreground">Loading sent quotes…</div> : rows.length === 0 ? <div className="p-4 text-xs text-muted-foreground">No rate-request quotes have been sent yet.</div> : rows.map((item) => {
+        const current = drafts[item.id] ?? { status: item.outcomeStatus ?? '', lostReason: item.lostReason ?? '' };
+        const overdue = !item.outcomeStatus && Date.parse(item.sentToClientAt || item.updatedAt) <= overdueAt;
+        const canSet = user.roleId === 'master-admin' || (user.permissions?.['quotation-builder'] === 'edit' && item.submittedBy === user.id);
+        return <div id={`row-sent-quote-${item.id}`} key={item.id} className="flex flex-wrap items-center justify-between gap-3 p-4" data-testid={`row-sent-quote-${item.id}`}>
+          <div className="min-w-[180px] flex-1"><p className="font-mono text-xs font-bold text-primary">{item.id}</p><p className="mt-1 text-sm font-semibold">{item.clientName}</p><p className="text-[10px] text-muted-foreground">Sent {dateLabel(item.sentToClientAt || item.updatedAt)}</p>
+            {overdue && <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-amber-800"><CircleAlert size={12} /> Follow up: no outcome after 5 days</p>}
+          </div>
+          {canSet && item.outcomeSource !== 'confirmation' && <div className="flex flex-wrap items-center gap-2">
+            <Select value={current.status || 'none'} onValueChange={(status) => setDrafts((old) => ({ ...old, [item.id]: { ...current, status: status === 'none' ? '' : status } }))}>
+              <SelectTrigger className="h-9 w-36" aria-label={`Outcome for ${item.id}`}><SelectValue placeholder="Set outcome" /></SelectTrigger>
+              <SelectContent><SelectItem value="none">Set outcome</SelectItem><SelectItem value="negotiating">Negotiating</SelectItem><SelectItem value="won">Won</SelectItem><SelectItem value="lost">Lost</SelectItem></SelectContent>
+            </Select>
+            {current.status === 'lost' && <Select value={current.lostReason || 'none'} onValueChange={(lostReason) => setDrafts((old) => ({ ...old, [item.id]: { ...current, lostReason: lostReason === 'none' ? '' : lostReason } }))}>
+              <SelectTrigger className="h-9 w-44" aria-label={`Lost reason for ${item.id}`}><SelectValue placeholder="Reason required" /></SelectTrigger>
+              <SelectContent><SelectItem value="none">Choose reason</SelectItem><SelectItem value="price">Price</SelectItem><SelectItem value="competitor">Competitor</SelectItem><SelectItem value="delayed">Delayed</SelectItem><SelectItem value="project_cancelled">Project cancelled</SelectItem></SelectContent>
+            </Select>}
+            <Button size="sm" disabled={!current.status || (current.status === 'lost' && !current.lostReason)} onClick={() => void save(item)}>Save</Button>
+          </div>}
+          {item.outcomeStatus && <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${item.outcomeStatus === 'won' ? 'bg-emerald-50 text-emerald-800' : item.outcomeStatus === 'lost' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-800'}`}>{item.outcomeStatus === 'lost' ? `Lost · ${item.lostReason?.replace('_', ' ')}` : item.outcomeStatus === 'won' ? 'Won' : 'Negotiating'}{item.outcomeSource === 'confirmation' ? ' · confirmation' : ''}</span>}
+        </div>;
+      })}
+    </CardContent>
+  </Card>;
+}
+
+type AttentionConfig = { amberHours: number; redHours: number; noOutcomeDays: number };
+type AttentionRow = { item: QuotationRateSubmission; type: 'urgent' | 'red' | 'amber' | 'sent'; waitMs: number };
+
+function RequiresAttention({
+  submissions, config, onViewRequests, onViewQuotes,
+}: {
+  submissions: QuotationRateSubmission[];
+  config: AttentionConfig;
+  onViewRequests: (id: string) => void;
+  onViewQuotes: (id: string) => void;
+}) {
+  const [now, setNow] = useState(Date.now());
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
+  const rows = submissions.flatMap<AttentionRow>((item) => {
+    const waiting = item.status === 'awaiting_rate' || item.status === 'query_raised';
+    const start = Date.parse(item.awaitingRateSince || item.createdAt);
+    const queryPause = item.status === 'query_raised' && item.queryRaisedAt ? now - Date.parse(item.queryRaisedAt) : 0;
+    const waitMs = Math.max(0, now - start - (item.pausedWaitMilliseconds || 0) - queryPause);
+    const urgent = item.priority === 'urgent' && item.status === 'awaiting_rate';
+    if (urgent) return [{ item, type: 'urgent' as const, waitMs }];
+    if (waiting && item.status === 'awaiting_rate' && waitMs >= config.amberHours * 3_600_000) {
+      return [{ item, type: waitMs >= config.redHours * 3_600_000 ? 'red' as const : 'amber' as const, waitMs }];
+    }
+    const sentAt = Date.parse(item.sentToClientAt || item.updatedAt);
+    if (item.status === 'sent_to_client' && !item.outcomeStatus && now - sentAt >= config.noOutcomeDays * 86_400_000) {
+      return [{ item, type: 'sent' as const, waitMs: now - sentAt }];
+    }
+    return [];
+  }).sort((a, b) => {
+    const rank = (row: AttentionRow) => row.type === 'urgent' ? 0 : row.type === 'sent' ? 2 : 1;
+    return rank(a) - rank(b) || (a.type === 'sent' ? a.waitMs - b.waitMs : b.waitMs - a.waitMs);
+  });
+  const shown = expanded ? rows : rows.slice(0, 5);
+  const age = (ms: number, sent = false) => {
+    const hours = Math.floor(ms / 3_600_000);
+    const days = Math.floor(hours / 24);
+    return sent ? `Sent ${days} ${days === 1 ? 'day' : 'days'} ago` : `${days ? `${days} days ` : ''}${hours % 24} hours waiting`;
+  };
+  return <Card className="border-rose-300 bg-rose-50/40" data-testid="card-requires-attention">
+    <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase tracking-wide text-rose-800">Requires attention</CardTitle></CardHeader>
+    <CardContent className="space-y-2">
+      {!rows.length ? <p className="text-xs text-muted-foreground">All clear — nothing needs attention right now.</p> : shown.map(({ item, type, waitMs }) => {
+        const sent = type === 'sent';
+        const label = type === 'urgent' ? 'Urgent' : type === 'red' ? '48h+ waiting' : type === 'amber' ? '24h+ waiting' : 'Sent, no outcome';
+        const style = type === 'sent' ? 'bg-blue-700 text-white' : type === 'amber' ? 'bg-amber-300 text-amber-950' : 'bg-rose-700 text-white';
+        return <button key={item.id} type="button" onClick={() => sent ? onViewQuotes(item.id) : onViewRequests(item.id)} className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-left hover:bg-rose-50" data-testid={`attention-${item.id}`}>
+          <span className={`rounded-full px-2 py-1 text-[9px] font-bold ${style}`}>{label}</span>
+          <code className="font-mono text-[10px] font-bold text-primary">{item.id}</code>
+          <span className="min-w-[120px] flex-1 truncate text-[11px] font-medium">{item.clientName}</span>
+          <span className={`text-[10px] font-bold ${type === 'sent' ? 'text-blue-800' : 'text-rose-700'}`}>{age(waitMs, sent)}</span>
+        </button>;
+      })}
+      {rows.length > 5 && <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground"><span>{expanded ? `Showing all ${rows.length}` : `Showing 5 of ${rows.length}`}</span><Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => setExpanded((value) => !value)}>{expanded ? 'Show fewer' : 'View all'}</Button></div>}
+    </CardContent>
+  </Card>;
+}
+
 export default function QuotationBuilderPage({ user }: { user: User }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [activeSection, setActiveSection] = useState<QuotationsRatesSection>(() => sectionFromUrl(location));
+  const [attentionConfig, setAttentionConfig] = useState<AttentionConfig>({ amberHours: 24, redHours: 48, noOutcomeDays: 5 });
   const [search, setSearch] = useState('');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(() => new URLSearchParams(location.split('?')[1] || '').get('quote'));
   const quotationQuery = useListQuotations({
@@ -1207,6 +1322,15 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
     query: { enabled: Boolean(selectedQuoteId), queryKey: getGetQuotationQueryKey(selectedQuoteId || '') },
   });
   const quotations = quotationQuery.data ?? [];
+  const attentionQuery = useListQuotationRateSubmissions({ query: { queryKey: getListQuotationRateSubmissionsQueryKey(), refetchInterval: 60_000 } });
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotation-rate-attention-config`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((value) => { if (value && Number.isFinite(value.amberHours) && Number.isFinite(value.redHours) && Number.isFinite(value.noOutcomeDays)) setAttentionConfig(value); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
   const selectedQuote = selectedQuery.data ?? quotations.find((quote) => quote.id === selectedQuoteId) ?? null;
   const visibleQuotes = useMemo(() => {
     const normalized = search.trim().toLowerCase();
@@ -1234,6 +1358,15 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
   return (
     <AppShell user={user} title="Quotations & Rates" eyebrow="Quotations and rate requests">
       <div className="quotation-builder-page min-w-0 max-w-full space-y-5 overflow-x-hidden" data-testid="page-quotations-rates">
+        {(user.roleId === 'master-admin' || user.permissions?.['rate-approval'] === 'view' || user.permissions?.['rate-approval'] === 'edit' || user.permissions?.['quotation-builder'] === 'edit') && attentionQuery.data && <RequiresAttention
+          submissions={attentionQuery.data}
+          config={attentionConfig}
+          onViewRequests={(id) => navigate(`/quotations-rates/requests/${id}`)}
+          onViewQuotes={(id) => {
+            setActiveSection('quotations');
+            window.setTimeout(() => document.getElementById(`row-sent-quote-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+          }}
+        />}
         <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as QuotationsRatesSection)} className="w-full">
           <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl bg-secondary/70 p-1" data-testid="tabs-quotations-rates">
             <TabsTrigger value="quotations" className="py-2.5 text-xs sm:text-sm" data-testid="tab-quotations">Quotations</TabsTrigger>
@@ -1288,6 +1421,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
                 <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Windows</p><p className="mt-1 font-semibold">{selectedQuote.totals.componentCount}</p></div>
               </CardContent>
             </Card>}
+            <SentRateQuotes user={user} />
           </TabsContent>
 
           <TabsContent value="create" className="mt-4" data-testid="section-create-rate-requests">

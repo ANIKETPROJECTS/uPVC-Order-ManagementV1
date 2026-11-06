@@ -13,5 +13,9 @@ export const NotificationType = {
   approval_request: 'approval_request',
   approval_decision: 'approval_decision',
   approval_reminder: 'approval_reminder',
+  rate_request: 'rate_request',
+  rate_request_urgent: 'rate_request_urgent',
+  rate_overdue: 'rate_overdue',
+  rate_assigned: 'rate_assigned',
   test: 'test',
 } as const;

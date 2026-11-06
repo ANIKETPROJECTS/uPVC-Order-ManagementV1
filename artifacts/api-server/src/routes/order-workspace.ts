@@ -817,7 +817,10 @@ router.post("/confirmation-records", async (req, res): Promise<void> => {
   const quotation = quotationInput
     ? await getQuotations(db).findOne({ $or: [{ quoteNo: quotationInput }, { legacyQuoteNo: quotationInput }] })
     : null;
-  if (quotationInput && (!quotation || quotation.archivedAt)) {
+  const rateSubmission = quotationInput && !quotation
+    ? await getQuotationRateSubmissions(db).findOne({ $or: [{ _id: quotationInput }, { legacyId: quotationInput }] })
+    : null;
+  if (quotationInput && ((!quotation || quotation.archivedAt) && !rateSubmission)) {
     res.status(400).json({ error: "Quotation ID was not found." });
     return;
   }
@@ -841,8 +844,8 @@ router.post("/confirmation-records", async (req, res): Promise<void> => {
     confirmationId: `CF-${year}-${String(counter.value).padStart(4, "0")}`,
     clientName,
     location,
-    quotationId: quotation?.quoteNo ?? null,
-    quotationRecordId: quotation?._id ?? null,
+    quotationId: quotation?.quoteNo ?? rateSubmission?._id ?? null,
+    quotationRecordId: quotation?._id ?? rateSubmission?._id ?? null,
     measurementSheetId: measurement?.sheetId ?? measurement?.legacyId ?? measurement?._id ?? null,
     measurementRecordId: measurement?._id ?? null,
     orderRecordId: null,
@@ -860,6 +863,18 @@ router.post("/confirmation-records", async (req, res): Promise<void> => {
     updatedAt: now,
   };
   await getConfirmationRecords(db).insertOne(record);
+  if (quotation) {
+    await getQuotations(db).updateOne({ _id: quotation._id }, {
+      $set: { outcomeStatus: "won", lostReason: null, outcomeSource: "confirmation", updatedAt: now },
+      $addToSet: { confirmationRecordIds: record._id },
+    });
+  }
+  if (rateSubmission) {
+    await getQuotationRateSubmissions(db).updateOne({ _id: rateSubmission._id }, {
+      $set: { outcomeStatus: "won", lostReason: null, outcomeSource: "confirmation", updatedAt: now },
+      $addToSet: { confirmationRecordIds: record._id },
+    });
+  }
   res.status(201).json({ ...record, orderId: null });
 });
 

@@ -12,4 +12,10 @@ export interface QuotationRateAssignmentInput {
      * @maximum 10000000
      */
   ratePerSqFt: number;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  rateNote?: string | null;
+  expectedUpdatedAt: Date;
 }

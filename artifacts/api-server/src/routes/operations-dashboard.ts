@@ -689,7 +689,7 @@ router.get("/dashboard/operations", async (req, res): Promise<void> => {
         sectionErrors,
         () => getQuotationRateSubmissions(db)
           .find({
-            status: { $in: ["awaiting_pdf", "pending_review"] },
+            status: { $in: ["awaiting_rate", "query_raised", "rated", "awaiting_pdf", "pending_review"] },
             createdAt: { $gte: range.start, $lt: range.endExclusive },
           })
           .sort({ createdAt: -1 })

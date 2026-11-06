@@ -10,6 +10,10 @@ export type QuotationRateSubmissionStatus = typeof QuotationRateSubmissionStatus
 
 
 export const QuotationRateSubmissionStatus = {
+  awaiting_rate: 'awaiting_rate',
+  query_raised: 'query_raised',
+  rated: 'rated',
+  sent_to_client: 'sent_to_client',
   awaiting_pdf: 'awaiting_pdf',
   pending_review: 'pending_review',
   rate_assigned: 'rate_assigned',

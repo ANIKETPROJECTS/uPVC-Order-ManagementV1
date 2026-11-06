@@ -2430,6 +2430,85 @@ paths:
           description: Request not found
         "409":
           description: Request is not awaiting a rate
+  /quotation-rate-submissions/{submissionId}/past-rates:
+    get:
+      operationId: getQuotationRateSubmissionPastRates
+      tags: [quotations]
+      summary: Find recent rates for similar work
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Similar rate history
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuotationRatePastRateList" }
+        "403": { description: Rate manager access required }
+        "404": { description: Request not found }
+  /quotation-rate-submissions/{submissionId}/query:
+    post:
+      operationId: raiseQuotationRateQuery
+      tags: [quotations]
+      summary: Raise a rate request query and pause its wait timer
+      parameters:
+        - { name: submissionId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuotationRateQueryInput" }
+      responses:
+        "200":
+          description: Query raised
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuotationRateSubmission" }
+        "403": { description: Rate manager access required }
+        "409": { description: Request status does not allow a query }
+  /quotation-rate-submissions/{submissionId}/query-response:
+    post:
+      operationId: respondToQuotationRateQuery
+      tags: [quotations]
+      summary: Answer a rate team query and resume the wait timer
+      parameters:
+        - { name: submissionId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuotationRateQueryInput" }
+      responses:
+        "200":
+          description: Query answered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuotationRateSubmission" }
+        "403": { description: Request owner access required }
+        "409": { description: No open query }
+  /quotation-rate-submissions/{submissionId}/outcome:
+    patch:
+      operationId: setQuotationRateOutcome
+      tags: [quotations]
+      summary: Record a sent quotation's client outcome
+      parameters:
+        - { name: submissionId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuotationRateOutcomeInput" }
+      responses:
+        "200":
+          description: Outcome saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuotationRateSubmission" }
+        "400": { description: Lost reason is required }
+        "403": { description: Request owner access required }
+        "409": { description: Outcome locked by linked confirmation or quote not sent }
   /measurement-records:
     get:
       operationId: listMeasurementRecords
@@ -7203,6 +7282,20 @@ components:
           $ref: "#/components/schemas/QuotationTotals"
         status:
           $ref: "#/components/schemas/QuotationStatus"
+        outcomeStatus:
+          anyOf:
+            - $ref: "#/components/schemas/QuotationOutcomeStatus"
+            - type: "null"
+        lostReason:
+          anyOf:
+            - $ref: "#/components/schemas/QuotationLostReason"
+            - type: "null"
+        outcomeSource:
+          type: ["string", "null"]
+          enum: [manual, confirmation, null]
+        confirmationRecordIds:
+          type: array
+          items: { type: string }
         requiresRateApproval:
           type: boolean
         sampleOnly:
@@ -7221,7 +7314,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, quoteNo, clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes, totals, status, requiresRateApproval, sampleOnly, approvalHistory, createdBy, updatedBy, createdAt, updatedAt]
+      required: [id, quoteNo, clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes, totals, status, outcomeStatus, lostReason, outcomeSource, confirmationRecordIds, requiresRateApproval, sampleOnly, approvalHistory, createdBy, updatedBy, createdAt, updatedAt]
     QuotationInput:
       type: object
       properties:
@@ -7394,7 +7487,7 @@ components:
       required: [endpoint]
     NotificationType:
       type: string
-      enum: [approval_request, approval_decision, approval_reminder, test]
+      enum: [approval_request, approval_decision, approval_reminder, rate_request, rate_request_urgent, rate_overdue, rate_assigned, test]
     AppNotification:
       type: object
       properties:
@@ -7430,7 +7523,25 @@ components:
       required: [items, unreadCount]
     QuotationRateSubmissionStatus:
       type: string
-      enum: [awaiting_pdf, pending_review, rate_assigned, approved, rejected]
+      enum: [awaiting_rate, query_raised, rated, sent_to_client, awaiting_pdf, pending_review, rate_assigned, approved, rejected]
+    QuotationOutcomeStatus:
+      type: string
+      enum: [negotiating, won, lost]
+    QuotationLostReason:
+      type: string
+      enum: [price, competitor, delayed, project_cancelled]
+    QuotationRateQueryEntry:
+      type: object
+      properties:
+        question: { type: string }
+        raisedBy: { type: string }
+        raisedByName: { type: string }
+        raisedAt: { type: string, format: date-time }
+        response: { type: ["string", "null"] }
+        respondedBy: { type: ["string", "null"] }
+        respondedByName: { type: ["string", "null"] }
+        respondedAt: { type: ["string", "null"], format: date-time }
+      required: [question, raisedBy, raisedByName, raisedAt, response, respondedBy, respondedByName, respondedAt]
     RateRequestPriority:
       type: string
       enum: [normal, urgent]
@@ -7477,11 +7588,26 @@ components:
             type: string
         workflowVersion:
           type: integer
-          enum: [1, 2]
+          enum: [1, 2, 3]
+        awaitingRateSince: { type: string, format: date-time }
+        queryRaisedAt: { type: ["string", "null"], format: date-time }
+        pausedWaitMilliseconds: { type: integer, minimum: 0 }
+        queryHistory:
+          type: array
+          items: { $ref: "#/components/schemas/QuotationRateQueryEntry" }
+        sentToClientAt: { type: ["string", "null"], format: date-time }
+        outcomeStatus: { type: ["string", "null"], enum: [negotiating, won, lost, null] }
+        lostReason: { type: ["string", "null"], enum: [price, competitor, delayed, project_cancelled, null] }
+        outcomeSource: { type: ["string", "null"], enum: [manual, confirmation, null] }
+        confirmationRecordIds:
+          type: array
+          items: { type: string }
         decisionComment:
           type: ["string", "null"]
         ratePerSqFt:
           type: ["number", "null"]
+        rateNote:
+          type: ["string", "null"]
         rateAssignedBy:
           type: ["string", "null"]
         rateAssignedByName:
@@ -7505,7 +7631,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, clientName, location, windowQty, totalSqFt, glassType, priority, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, workflowVersion, ratePerSqFt, rateAssignedBy, rateAssignedByName, rateAssignedAt, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
+      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, clientName, location, windowQty, totalSqFt, glassType, priority, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, workflowVersion, awaitingRateSince, queryRaisedAt, pausedWaitMilliseconds, queryHistory, sentToClientAt, outcomeStatus, lostReason, outcomeSource, confirmationRecordIds, ratePerSqFt, rateNote, rateAssignedBy, rateAssignedByName, rateAssignedAt, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
     QuotationRateSubmissionRevision:
       type: object
       properties:
@@ -7580,6 +7706,17 @@ components:
         measurementRecordId:
           type: ["string", "null"]
       required: [orderRecordId, measurementRecordId]
+    QuotationRateQueryInput:
+      type: object
+      properties:
+        comment: { type: string, minLength: 1, maxLength: 2000 }
+      required: [comment]
+    QuotationRateOutcomeInput:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/QuotationOutcomeStatus" }
+        lostReason: { $ref: "#/components/schemas/QuotationLostReason" }
+      required: [status]
     QuotationRateSubmissionInput:
       type: object
       properties:
@@ -7624,7 +7761,33 @@ components:
           type: number
           minimum: 0.01
           maximum: 10000000
-      required: [ratePerSqFt]
+        rateNote:
+          type: ["string", "null"]
+          maxLength: 1000
+        expectedUpdatedAt:
+          type: string
+          format: date-time
+      required: [ratePerSqFt, expectedUpdatedAt]
+    QuotationRatePastRate:
+      type: object
+      properties:
+        id: { type: string }
+        clientName: { type: string }
+        glassType: { type: string }
+        averageSqFtPerQty: { type: number }
+        ratePerSqFt: { type: number }
+        rateAssignedAt: { type: string, format: date-time }
+      required: [id, clientName, glassType, averageSqFtPerQty, ratePerSqFt, rateAssignedAt]
+    QuotationRatePastRateList:
+      type: object
+      properties:
+        rates:
+          type: array
+          items: { $ref: "#/components/schemas/QuotationRatePastRate" }
+        count: { type: integer }
+        tolerancePercent: { type: number }
+        maxAgeDays: { type: integer }
+      required: [rates, count, tolerancePercent, maxAgeDays]
     MeasurementVersion:
       type: object
       properties:
