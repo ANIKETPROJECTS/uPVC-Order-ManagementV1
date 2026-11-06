@@ -88,7 +88,13 @@ const iconMap: Record<string, SidebarIconName> = {
   installation: 'installation',
 };
 
-const pathForModule = (key: string) => key === 'user-access' ? '/admin/users' : key === 'quotation-builder' ? '/quotations-rates' : `/${key}`;
+const pathForModule = (key: string) => key === 'user-access'
+  ? '/admin/users'
+  : key === 'quotation-builder'
+    ? '/quotations-rates'
+    : key === 'rate-approval'
+      ? '/rate-approval'
+      : `/${key}`;
 const SIDEBAR_SCROLL_STORAGE_KEY = 'framewise-sidebar-scroll-position';
 const isModuleActive = (key: string, location: string) => {
   const isDispatchScanner = location.startsWith('/order-scanner')
@@ -101,11 +107,13 @@ const isModuleActive = (key: string, location: string) => {
         ? location.startsWith('/dispatch') || isDispatchScanner
     : key === 'quotation-builder'
       ? location.startsWith('/quotations-rates') || location.startsWith('/quotation-builder')
+      : key === 'rate-approval'
+        ? location.startsWith('/rate-approval')
       : location.startsWith(pathForModule(key));
 };
 
 const navigationGroups: { id: string; label: string; moduleKeys: string[] }[] = [
-  { id: 'pre-production', label: 'Pre-production', moduleKeys: ['measurements', 'quotation-builder', 'confirmation'] },
+  { id: 'pre-production', label: 'Pre-production', moduleKeys: ['measurements', 'quotation-builder', 'rate-approval', 'confirmation'] },
   { id: 'materials', label: 'Materials', moduleKeys: ['glass-procurement'] },
   { id: 'finance', label: 'Finance', moduleKeys: ['payments', 'balance-payment'] },
   { id: 'fulfillment', label: 'Fulfillment', moduleKeys: ['dispatch', 'installation'] },
@@ -155,6 +163,7 @@ export function AppShell({ user, children, title, eyebrow }: { user: User; child
   const isModuleVisible = (module: (typeof MODULES)[number]) => {
     if (module.key === 'user-access' && !isMasterAdmin) return false;
     const permission = user.permissions?.[module.key];
+    if (module.key === 'rate-approval') return isMasterAdmin || permission === 'edit';
     return permission === 'view' || permission === 'edit';
   };
 

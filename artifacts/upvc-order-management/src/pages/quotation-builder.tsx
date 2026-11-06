@@ -946,6 +946,19 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
   );
 }
 
+export function RateApprovalPage({ user }: { user: User }) {
+  const [, navigate] = useLocation();
+  const canReview = user.roleId === 'master-admin' || user.permissions?.['rate-approval'] === 'edit';
+
+  return (
+    <AppShell user={user} title="Rate Approval" eyebrow="Quotations & Rates · rate request queue">
+      {canReview
+        ? <RateApprovalDesk user={user} activePane="requests" onCreate={() => navigate('/quotations-rates?section=rates')} />
+        : <Card className="border-destructive/20"><CardContent className="p-6 text-sm text-destructive">You do not have access to the rate approval queue.</CardContent></Card>}
+    </AppShell>
+  );
+}
+
 export function LegacyQuotationBuilderPage({ user }: { user: User }) {
   const [location] = useLocation();
   const canEdit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';

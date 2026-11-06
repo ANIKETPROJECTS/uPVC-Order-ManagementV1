@@ -32,3 +32,9 @@ Rate entry shows up to three recent similar rates: same normalized glass type or
 **Why:** The project owner requested comparable-rate guidance, race-safe corrections, and continuity of the existing QT identifier.
 
 **How to apply:** Keep corrected rates as the current record value so future comparison queries use the latest rate. Treat rate-entry notification targeting and QT-ID continuity as owner-confirmable assumptions.
+
+The dedicated Rate Approval sidebar entry opens the existing rate-request queue directly and is available to master admins and users with rate-approval edit access.
+
+**Why:** The project owner wants rate requests reachable as a distinct sidebar destination rather than only as a tab inside Quotations & Rates.
+
+**How to apply:** Reuse the current request queue and rate-entry workflow; do not create a second approval system for new requests.

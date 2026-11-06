@@ -11,7 +11,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'user-access', label: 'Multi-User Architecture & Role-Based Access Control', short: 'User access', built: true },
   { key: 'order-hub', label: 'Client & Orders', short: 'Client & Orders', built: true },
   { key: 'quotation-builder', label: 'Quotations & Rates', short: 'Quotations & Rates', built: true },
-  { key: 'rate-approval', label: 'Rate Request History', short: 'Rate requests' },
+  { key: 'rate-approval', label: 'Rate Approval', short: 'Rate Approval', built: true },
   { key: 'confirmation', label: 'Confirmation Register', short: 'Confirmations', built: true },
   { key: 'measurements', label: 'Measurement Database (Version Control)', short: 'Measurements', built: true },
   { key: 'qr-assembly', label: 'QR Code Generation & Assembly Tracking', short: 'QR assembly' },

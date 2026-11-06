@@ -22,7 +22,7 @@ import DispatchPage from '@/pages/dispatch';
 import InstallationPage from '@/pages/installation';
 import InstallationTeamsPage from '@/pages/installation-teams';
 import OrderStatusPage from '@/pages/order-status';
-import QuotationBuilderPage from '@/pages/quotation-builder';
+import QuotationBuilderPage, { RateApprovalPage } from '@/pages/quotation-builder';
 import MeasurementDatabasePage from '@/pages/measurement-database';
 import MeasurementRecordDetailPage from '@/pages/measurement-record-detail';
 import PaymentsPage from '@/pages/payments';
@@ -51,6 +51,7 @@ function AuthenticatedRoutes({ user }: { user: User | null }) {
     <Route path="/admin/groups" component={() => <ChatGroupsPage user={user} />} />
     <Route path="/communication" component={() => <CommunicationPage user={user} />} />
     <Route path="/quotations-rates/requests/:submissionId" component={() => <QuotationRateRequestDetailPage user={user} />} />
+    <Route path="/rate-approval" component={() => <RateApprovalPage user={user} />} />
     <Route path="/quotations-rates" component={() => <QuotationBuilderPage user={user} />} />
     <Route path="/quotation-builder/requests/:submissionId" component={() => <QuotationRateRequestDetailPage user={user} />} />
     <Route path="/quotation-builder" component={() => <QuotationBuilderPage user={user} />} />
