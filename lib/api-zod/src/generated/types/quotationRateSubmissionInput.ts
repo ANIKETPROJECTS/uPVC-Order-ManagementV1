@@ -36,4 +36,6 @@ export interface QuotationRateSubmissionInput {
   priority?: RateRequestPriority;
   /** @nullable */
   measurementRecordId?: string | null;
+  /** @nullable */
+  quotationRecordId?: string | null;
 }

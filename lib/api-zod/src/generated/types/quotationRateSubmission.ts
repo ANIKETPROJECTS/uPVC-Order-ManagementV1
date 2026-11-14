@@ -23,6 +23,10 @@ export interface QuotationRateSubmission {
   /** @nullable */
   measurementRecordId: string | null;
   /** @nullable */
+  quotationId: string | null;
+  /** @nullable */
+  quotationRecordId: string | null;
+  /** @nullable */
   measurementSheetId: string | null;
   clientName: string;
   /** @nullable */

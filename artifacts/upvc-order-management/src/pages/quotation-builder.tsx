@@ -609,6 +609,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
   const rateDesk = user.roleId === 'master-admin' || user.permissions?.['rate-approval'] === 'edit';
   const canSubmit = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
   const submissionsQuery = useListQuotationRateSubmissions({ query: { queryKey: getListQuotationRateSubmissionsQueryKey(), refetchInterval: 60_000 } });
+  const quotationsQuery = useListQuotations({ query: { queryKey: getListQuotationsQueryKey(), refetchOnWindowFocus: true } });
   const ordersQuery = useListOrders({}, { query: { queryKey: getListOrdersQueryKey({}) } });
   const create = useCreateQuotationRateSubmission();
   const upload = useUploadQuotationRateSubmissionPdf();
@@ -620,6 +621,11 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
   const [totalSqFt, setTotalSqFt] = useState('');
   const [glassType, setGlassType] = useState('');
   const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
+  const [quotationLinkMode, setQuotationLinkMode] = useState<'none' | 'existing' | 'upload'>('none');
+  const [quotationRecordId, setQuotationRecordId] = useState('');
+  const [quotationUploadFile, setQuotationUploadFile] = useState<File | null>(null);
+  const [uploadedQuotationRecordId, setUploadedQuotationRecordId] = useState<string | null>(null);
+  const [uploadingNewQuotation, setUploadingNewQuotation] = useState(false);
   const [measurementId, setMeasurementId] = useState<string | null>(null);
   const [measurementLabel, setMeasurementLabel] = useState('');
   const [queryValues, setQueryValues] = useState<Record<string, string>>({});
@@ -672,25 +678,58 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
       onError: () => toast({ title: 'PDF upload failed', description: 'The request remains available for another upload attempt.', variant: 'destructive' }),
     });
   };
-  const submitRate = (event: FormEvent<HTMLFormElement>) => {
+  const submitRate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!clientName.trim() || !glassType.trim() || Number(windowQty) < 1 || Number(totalSqFt) <= 0) {
       toast({ title: 'Complete the rate request', description: 'Add a client, glass type, positive window quantity, and total area.', variant: 'destructive' });
       return;
     }
-    create.mutate({
-      data: {
+    void (async () => {
+      let linkedQuotationRecordId = quotationLinkMode === 'existing' ? quotationRecordId : null;
+      if (quotationLinkMode === 'existing' && !linkedQuotationRecordId) {
+        toast({ title: 'Choose a quotation', description: 'Select an existing QT record to link.', variant: 'destructive' });
+        return;
+      }
+      if (quotationLinkMode === 'upload') {
+        if (!uploadedQuotationRecordId) {
+          if (!validatePdf(quotationUploadFile ?? undefined)) return;
+          setUploadingNewQuotation(true);
+          try {
+            const response = await fetch(
+              `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotations/upload/${encodeURIComponent(quotationUploadFile!.name)}`,
+              { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: quotationUploadFile },
+            );
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'The quotation PDF could not be uploaded.');
+            linkedQuotationRecordId = result.id;
+            setUploadedQuotationRecordId(result.id);
+            await queryClient.invalidateQueries({ queryKey: getListQuotationsQueryKey() });
+            toast({ title: 'Quotation uploaded', description: `${result.quoteNo} will be linked to this request.` });
+          } catch (error) {
+            toast({ title: 'Quotation upload failed', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
+            return;
+          } finally {
+            setUploadingNewQuotation(false);
+          }
+        } else {
+          linkedQuotationRecordId = uploadedQuotationRecordId;
+        }
+      }
+      create.mutate({
+        data: {
         clientName: clientName.trim(),
         location: location.trim() || null,
         windowQty: Number(windowQty),
         totalSqFt: Number(totalSqFt),
         glassType: glassType.trim(),
-         priority,
-         measurementRecordId: measurementId,
-      },
-    }, {
+        priority,
+        measurementRecordId: measurementId,
+        quotationRecordId: linkedQuotationRecordId,
+        },
+      }, {
       onSuccess: (submission) => {
         refreshSubmissions();
+        void queryClient.invalidateQueries({ queryKey: getListQuotationsQueryKey() });
         setClientName('');
         setLocation('');
         setWindowQty('');
@@ -699,10 +738,15 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
         setPriority('normal');
         setMeasurementId(null);
         setMeasurementLabel('');
-        toast({ title: 'Rate request created', description: `${submission.id} is waiting for a rate.` });
+        setQuotationLinkMode('none');
+        setQuotationRecordId('');
+        setQuotationUploadFile(null);
+        setUploadedQuotationRecordId(null);
+        toast({ title: 'Rate request created', description: `${submission.id} is waiting for a rate${submission.quotationId ? ` · linked to ${submission.quotationId}` : ''}.` });
       },
       onError: () => toast({ title: 'Could not create rate request', description: 'Check the fields and try again.', variant: 'destructive' }),
     });
+    })();
   };
   const postQuery = async (submission: QuotationRateSubmission, answer = false) => {
     const text = (answer ? queryAnswers[submission.id] : queryValues[submission.id])?.trim();
@@ -818,10 +862,29 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
                 <label className="space-y-1.5 text-xs font-semibold">Average (SqFt / Qty)<Input readOnly value={Number(windowQty) > 0 && Number(totalSqFt) > 0 ? (Number(totalSqFt) / Number(windowQty)).toFixed(2) : ''} placeholder="Calculated from total area and quantity" data-testid="input-rate-average-sqft" /></label>
                 <label className="space-y-1.5 text-xs font-semibold sm:col-span-2">Glass type<Input value={glassType} onChange={(event) => setGlassType(event.target.value)} maxLength={120} required placeholder="Clear, toughened, laminated…" data-testid="input-rate-glass-type" /></label>
                  <label className="space-y-1.5 text-xs font-semibold">Priority<Select value={priority} onValueChange={(value) => setPriority(value as 'normal' | 'urgent')}><SelectTrigger data-testid="select-rate-request-priority"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="normal">Normal</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select></label>
+                 <div className="space-y-1.5 text-xs font-semibold sm:col-span-2">
+                   Quotation <span className="font-normal text-muted-foreground">· optional</span>
+                   <Select value={quotationLinkMode} onValueChange={(value) => { setQuotationLinkMode(value as 'none' | 'existing' | 'upload'); setQuotationRecordId(''); }}>
+                     <SelectTrigger data-testid="select-rate-quotation-mode"><SelectValue /></SelectTrigger>
+                     <SelectContent><SelectItem value="none">No quotation link</SelectItem><SelectItem value="existing">Link an existing quotation</SelectItem><SelectItem value="upload">Upload a new quotation PDF</SelectItem></SelectContent>
+                   </Select>
+                   {quotationLinkMode === 'existing' && <Select value={quotationRecordId} onValueChange={setQuotationRecordId}>
+                     <SelectTrigger className="mt-2" data-testid="select-rate-existing-quotation"><SelectValue placeholder={quotationsQuery.isLoading ? 'Loading quotations…' : 'Choose a QT ID'} /></SelectTrigger>
+                     <SelectContent>{(quotationsQuery.data || []).map((quote) => <SelectItem key={quote.id} value={quote.id}>{quote.quoteNo} · {quote.customerName || quote.uploadedDocument?.filename || 'Uploaded quotation'}</SelectItem>)}</SelectContent>
+                   </Select>}
+                   {quotationLinkMode === 'upload' && <div className="mt-2 rounded-lg border border-dashed border-border p-3">
+                     <label className="flex cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-primary">
+                       <FilePlus2 size={14} /> {uploadingNewQuotation ? 'Uploading quotation…' : uploadedQuotationRecordId ? `${quotationUploadFile?.name || 'Quotation PDF'} ready to link` : 'Choose quotation PDF'}
+                       <input type="file" accept="application/pdf,.pdf" className="sr-only" data-testid="input-rate-new-quotation-pdf" disabled={uploadingNewQuotation} onChange={(event) => { setQuotationUploadFile(event.currentTarget.files?.[0] ?? null); setUploadedQuotationRecordId(null); event.currentTarget.value = ''; }} />
+                     </label>
+                     <p className="mt-1 text-[10px] font-normal text-muted-foreground">A new QT ID is assigned automatically and linked after the rate request is saved.</p>
+                   </div>}
+                   {quotationsQuery.isError && quotationLinkMode === 'existing' && <p className="mt-1 font-normal text-destructive">Saved quotations could not be loaded. Refresh and try again.</p>}
+                 </div>
                  <div className="space-y-1.5 text-xs font-semibold sm:col-span-2">Measurement sheet <span className="font-normal text-muted-foreground">· optional</span><MeasurementSheetLookup selectedId={measurementId} selectedLabel={measurementLabel} currentQuotationRequestId="" onSelect={(item) => { setMeasurementId(item.id); setMeasurementLabel(`${measurementSheetIdLabel(item.id, item.sheetId)} · ${item.clientName}`); }} />{measurementId && <button type="button" onClick={() => { setMeasurementId(null); setMeasurementLabel(''); }} className="text-[11px] font-semibold text-primary hover:underline" data-testid="button-clear-rate-measurement">Remove linked sheet</button>}</div>
               </div>
-              <Button type="submit" className="w-full" disabled={create.isPending || upload.isPending} data-testid="button-submit-rate-request">
-                 {create.isPending ? 'Submitting…' : 'Create rate request'} <FilePlus2 size={15} />
+              <Button type="submit" className="w-full" disabled={create.isPending || upload.isPending || uploadingNewQuotation} data-testid="button-submit-rate-request">
+                 {uploadingNewQuotation ? 'Uploading quotation…' : create.isPending ? 'Submitting…' : 'Create rate request'} <FilePlus2 size={15} />
               </Button>
             </form> : <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs leading-5 text-muted-foreground" data-testid="rate-submit-read-only">You have view access to this desk. A quotation team member can prepare a rate request.</div>}
           </CardContent>
@@ -863,6 +926,7 @@ function RateApprovalDesk({ user, activePane, onCreate }: { user: User; activePa
                           <td className="max-w-[220px] px-4 py-3">
                             <p className="truncate font-semibold">{submission.clientName}</p>
                             {submission.orderId && <p className="mt-1 text-[10px] font-semibold text-primary" data-testid={`text-rate-order-id-${submission.id}`}>{submission.orderId}</p>}
+                            {submission.quotationId && <button type="button" className="mt-1 block text-[10px] font-semibold text-primary hover:underline" data-testid={`link-rate-quotation-${submission.id}`} onClick={() => navigate(`/quotations-rates?section=quotations&quote=${encodeURIComponent(submission.quotationRecordId || '')}`)}>Linked quotation {submission.quotationId}</button>}
                             {submission.measurementRecordId && <p className="mt-1 text-[10px] text-muted-foreground">Measurement Sheet ID <code className="font-mono font-semibold text-foreground" data-testid={`text-rate-measurement-sheet-id-${submission.id}`}>{measurementSheetIdLabel(submission.measurementRecordId, submission.measurementSheetId)}</code></p>}
                             <p className="mt-1 text-[10px] text-muted-foreground">Submitted by {submission.submittedByName}</p>
                             {submission.pdfFilename && <div className="mt-2">

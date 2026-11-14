@@ -7620,6 +7620,10 @@ components:
           type: ["string", "null"]
         measurementRecordId:
           type: ["string", "null"]
+        quotationId:
+          type: ["string", "null"]
+        quotationRecordId:
+          type: ["string", "null"]
         measurementSheetId:
           type: ["string", "null"]
         clientName:
@@ -7695,7 +7699,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, clientName, location, windowQty, totalSqFt, glassType, priority, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, workflowVersion, awaitingRateSince, queryRaisedAt, pausedWaitMilliseconds, queryHistory, sentToClientAt, outcomeStatus, lostReason, outcomeSource, confirmationRecordIds, ratePerSqFt, rateNote, rateAssignedBy, rateAssignedByName, rateAssignedAt, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
+      required: [id, orderRecordId, orderId, measurementRecordId, measurementSheetId, quotationId, quotationRecordId, clientName, location, windowQty, totalSqFt, glassType, priority, averageSqFtPerQty, status, pdfFilename, pdfSizeBytes, submittedBy, submittedByName, approverIds, workflowVersion, awaitingRateSince, queryRaisedAt, pausedWaitMilliseconds, queryHistory, sentToClientAt, outcomeStatus, lostReason, outcomeSource, confirmationRecordIds, ratePerSqFt, rateNote, rateAssignedBy, rateAssignedByName, rateAssignedAt, decisionComment, decidedBy, decidedByName, pdfNeedsRefresh, revisionHistory, createdAt, updatedAt]
     QuotationRateSubmissionRevision:
       type: object
       properties:
@@ -7806,6 +7810,8 @@ components:
         priority:
           $ref: "#/components/schemas/RateRequestPriority"
         measurementRecordId:
+          type: ["string", "null"]
+        quotationRecordId:
           type: ["string", "null"]
       required: [clientName, location, windowQty, totalSqFt, glassType]
     QuotationRateDecisionInput:

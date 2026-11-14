@@ -3076,6 +3076,10 @@ export interface QuotationRateSubmission {
   /** @nullable */
   measurementRecordId: string | null;
   /** @nullable */
+  quotationId: string | null;
+  /** @nullable */
+  quotationRecordId: string | null;
+  /** @nullable */
   measurementSheetId: string | null;
   clientName: string;
   /** @nullable */
@@ -3195,6 +3199,8 @@ export interface QuotationRateSubmissionInput {
   priority?: RateRequestPriority;
   /** @nullable */
   measurementRecordId?: string | null;
+  /** @nullable */
+  quotationRecordId?: string | null;
 }
 
 export type QuotationRateDecisionInputDecision = typeof QuotationRateDecisionInputDecision[keyof typeof QuotationRateDecisionInputDecision];

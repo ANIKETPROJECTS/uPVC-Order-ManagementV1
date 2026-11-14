@@ -30,6 +30,7 @@ import {
   getCounters,
   getMeasurementRecords,
   getOrders,
+  getQuotations,
   getQuotationRatePdfsBucket,
   getQuotationRateSubmissions,
   getUsers,
@@ -107,6 +108,8 @@ function response(item: QuotationRateSubmissionDocument, measurementSheetId: str
     orderId: item.orderId ?? null,
     measurementRecordId: item.measurementRecordId ?? null,
     measurementSheetId,
+    quotationId: item.quotationId ?? null,
+    quotationRecordId: item.quotationRecordId ?? null,
     clientName: item.clientName,
     location: item.location,
     windowQty: item.windowQty,
@@ -319,6 +322,14 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
   const now = new Date();
   const { clientName, location, windowQty, totalSqFt, glassType } = parsed.data;
   const measurementRecordId = parsed.data.measurementRecordId ?? null;
+  const quotationRecordId = parsed.data.quotationRecordId ?? null;
+  const linkedQuotation = quotationRecordId
+    ? await getQuotations(db).findOne({ _id: quotationRecordId, archivedAt: null })
+    : null;
+  if (quotationRecordId && !linkedQuotation) {
+    res.status(404).json({ error: "The selected quotation could not be found." });
+    return;
+  }
   if (measurementRecordId) {
     const measurement = await getMeasurementRecords(db).findOne({ _id: measurementRecordId });
     if (!measurement) {
@@ -347,6 +358,8 @@ router.post("/quotation-rate-submissions", async (req, res): Promise<void> => {
     orderRecordId: null,
     orderId: null,
     measurementRecordId,
+    quotationId: linkedQuotation?.quoteNo ?? null,
+    quotationRecordId: linkedQuotation?._id ?? null,
     clientName: clientName.trim(),
     clientNameLower: clientName.trim().toLowerCase(),
     location: location?.trim() || null,

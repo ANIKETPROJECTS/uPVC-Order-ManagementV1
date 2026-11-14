@@ -727,6 +727,8 @@ export interface QuotationRateSubmissionDocument {
   orderRecordId: string | null;
   orderId: string | null;
   measurementRecordId?: string | null;
+  quotationId?: string | null;
+  quotationRecordId?: string | null;
   clientName: string;
   clientNameLower: string;
   location: string | null;

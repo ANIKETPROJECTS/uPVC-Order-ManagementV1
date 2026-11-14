@@ -4115,6 +4115,8 @@ export const ListQuotationRateSubmissionsResponseItem = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -4206,7 +4208,8 @@ export const CreateQuotationRateSubmissionBody = zod.object({
   "totalSqFt": zod.number().min(createQuotationRateSubmissionBodyTotalSqFtMin).max(createQuotationRateSubmissionBodyTotalSqFtMax),
   "glassType": zod.string().min(1).max(createQuotationRateSubmissionBodyGlassTypeMax),
   "priority": zod.enum(['normal', 'urgent']).optional(),
-  "measurementRecordId": zod.string().nullish()
+  "measurementRecordId": zod.string().nullish(),
+  "quotationRecordId": zod.string().nullish()
 })
 
 export const createQuotationRateSubmissionResponsePausedWaitMillisecondsMin = 0;
@@ -4218,6 +4221,8 @@ export const CreateQuotationRateSubmissionResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -4316,7 +4321,8 @@ export const UpdateQuotationRateSubmissionBody = zod.object({
   "totalSqFt": zod.number().min(updateQuotationRateSubmissionBodyTotalSqFtMin).max(updateQuotationRateSubmissionBodyTotalSqFtMax),
   "glassType": zod.string().min(1).max(updateQuotationRateSubmissionBodyGlassTypeMax),
   "priority": zod.enum(['normal', 'urgent']).optional(),
-  "measurementRecordId": zod.string().nullish()
+  "measurementRecordId": zod.string().nullish(),
+  "quotationRecordId": zod.string().nullish()
 })
 
 export const updateQuotationRateSubmissionResponsePausedWaitMillisecondsMin = 0;
@@ -4328,6 +4334,8 @@ export const UpdateQuotationRateSubmissionResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -4453,6 +4461,8 @@ export const LinkQuotationRateSubmissionOrderResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -4541,6 +4551,8 @@ export const UploadQuotationRateSubmissionPdfResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -4645,6 +4657,8 @@ export const DecideQuotationRateSubmissionResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -4741,6 +4755,8 @@ export const AssignQuotationRateSubmissionRateResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -4854,6 +4870,8 @@ export const RaiseQuotationRateQueryResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -4945,6 +4963,8 @@ export const RespondToQuotationRateQueryResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
@@ -5033,6 +5053,8 @@ export const SetQuotationRateOutcomeResponse = zod.object({
   "orderRecordId": zod.string().nullable(),
   "orderId": zod.string().nullable(),
   "measurementRecordId": zod.string().nullable(),
+  "quotationId": zod.string().nullable(),
+  "quotationRecordId": zod.string().nullable(),
   "measurementSheetId": zod.string().nullable(),
   "clientName": zod.string(),
   "location": zod.string().nullable(),
