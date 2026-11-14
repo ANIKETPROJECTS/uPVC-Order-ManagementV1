@@ -1060,7 +1060,7 @@
  * palettes. These narrowly target card primitives and rounded, bordered panels;
  * badges, maps, menus, and modal backdrops keep their own semantic treatments.
  */
-[data-framewise-card],
+[data-framewise-card]:not([class~="bg-primary"]),
 [class*="rounded-"][class*="border"][class*="bg-card/"]:not([class*="rounded-full"]):not([class*="absolute"]):not([class*="animate-pulse"]),
 [class*="rounded-"][class*="border"][class*="bg-background/"]:not([class*="rounded-full"]):not([class*="absolute"]):not([class*="animate-pulse"]):not([data-testid*="map"]),
 [class*="rounded-"][class*="border"][class*="bg-muted/"]:not([class*="rounded-full"]):not([class*="absolute"]):not([class*="animate-pulse"]):not([data-testid*="map"]) {
