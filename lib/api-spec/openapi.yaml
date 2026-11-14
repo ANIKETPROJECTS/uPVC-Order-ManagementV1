@@ -1919,6 +1919,55 @@ paths:
           description: Invalid quotation details
         "404":
           description: Client or profile not found
+  /quotations/upload/{filename}:
+    post:
+      operationId: uploadQuotationDocument
+      tags: [quotations]
+      summary: Create a quotation record from an uploaded PDF
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              $ref: "#/components/schemas/QuotationPdfUpload"
+      responses:
+        "201":
+          description: Created quotation with assigned QT ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "400":
+          description: Invalid PDF
+        "413":
+          description: PDF exceeds the upload size limit
+  /quotations/{quotationId}/document:
+    get:
+      operationId: downloadQuotationDocument
+      tags: [quotations]
+      summary: Download an uploaded quotation PDF
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotation PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Quotation PDF not found
   /quotations/{quotationId}:
     get:
       operationId: getQuotation
@@ -7245,6 +7294,10 @@ components:
           type: string
         quoteNo:
           type: string
+        uploadedDocument:
+          anyOf:
+            - $ref: "#/components/schemas/UploadedQuotationDocument"
+            - type: "null"
         clientId:
           type: ["string", "null"]
         customerName:
@@ -7315,6 +7368,17 @@ components:
           type: string
           format: date-time
       required: [id, quoteNo, clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes, totals, status, outcomeStatus, lostReason, outcomeSource, confirmationRecordIds, requiresRateApproval, sampleOnly, approvalHistory, createdBy, updatedBy, createdAt, updatedAt]
+    UploadedQuotationDocument:
+      type: object
+      properties:
+        filename: { type: string }
+        sizeBytes: { type: integer }
+        uploadedAt: { type: string, format: date-time }
+        downloadUrl: { type: string }
+      required: [filename, sizeBytes, uploadedAt, downloadUrl]
+    QuotationPdfUpload:
+      type: string
+      format: binary
     QuotationInput:
       type: object
       properties:

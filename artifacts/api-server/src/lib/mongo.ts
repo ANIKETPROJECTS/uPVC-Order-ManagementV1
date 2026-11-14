@@ -596,6 +596,12 @@ export interface QuotationDocument {
   _id: string;
   sequenceNo: number;
   quoteNo: string;
+  uploadedDocument?: {
+    filename: string;
+    sizeBytes: number;
+    storagePath: string;
+    uploadedAt: Date;
+  } | null;
   legacyQuoteNo?: string | null;
   clientId: string | null;
   customerName: string;

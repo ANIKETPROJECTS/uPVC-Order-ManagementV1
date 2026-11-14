@@ -3050,6 +3050,12 @@ export const listQuotationsResponseItemsItemImageDataUrlOneRegExp = new RegExp('
 export const ListQuotationsResponseItem = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]).optional(),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3212,6 +3218,12 @@ export const createQuotationResponseItemsItemImageDataUrlOneRegExp = new RegExp(
 export const CreateQuotationResponse = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]).optional(),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3287,6 +3299,112 @@ export const CreateQuotationResponse = zod.object({
 
 
 /**
+ * @summary Create a quotation record from an uploaded PDF
+ */
+export const UploadQuotationDocumentParams = zod.object({
+  "filename": zod.coerce.string()
+})
+
+export const uploadQuotationDocumentResponseItemsItemImageDataUrlOneMax = 220000;
+
+
+export const uploadQuotationDocumentResponseItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
+export const UploadQuotationDocumentResponse = zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]).optional(),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(uploadQuotationDocumentResponseItemsItemImageDataUrlOneMax).regex(uploadQuotationDocumentResponseItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Download an uploaded quotation PDF
+ */
+export const DownloadQuotationDocumentParams = zod.object({
+  "quotationId": zod.coerce.string()
+})
+
+export const DownloadQuotationDocumentResponse = zod.unknown()
+
+
+/**
  * @summary Get a saved quotation
  */
 export const GetQuotationParams = zod.object({
@@ -3302,6 +3420,12 @@ export const getQuotationResponseItemsItemImageDataUrlOneRegExp = new RegExp('^d
 export const GetQuotationResponse = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]).optional(),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3467,6 +3591,12 @@ export const updateQuotationResponseItemsItemImageDataUrlOneRegExp = new RegExp(
 export const UpdateQuotationResponse = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]).optional(),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3567,6 +3697,12 @@ export const submitQuotationForApprovalResponseItemsItemImageDataUrlOneRegExp = 
 export const SubmitQuotationForApprovalResponse = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]).optional(),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3654,6 +3790,12 @@ export const ListQuotationApprovalsResponseItem = zod.object({
   "quotation": zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]).optional(),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3758,6 +3900,12 @@ export const decideQuotationApprovalResponseItemsItemImageDataUrlOneRegExp = new
 export const DecideQuotationApprovalResponse = zod.object({
   "id": zod.string(),
   "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]).optional(),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),

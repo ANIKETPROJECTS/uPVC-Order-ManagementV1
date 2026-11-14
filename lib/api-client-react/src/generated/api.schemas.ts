@@ -2714,6 +2714,13 @@ export const QuotationOutcomeSource = {
   confirmation: 'confirmation',
 } as const;
 
+export interface UploadedQuotationDocument {
+  filename: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  downloadUrl: string;
+}
+
 export type QuotationOutcomeStatus = typeof QuotationOutcomeStatus[keyof typeof QuotationOutcomeStatus];
 
 
@@ -2754,6 +2761,7 @@ export interface QuotationApprovalHistory {
 export interface Quotation {
   id: string;
   quoteNo: string;
+  uploadedDocument?: UploadedQuotationDocument | null;
   /** @nullable */
   clientId: string | null;
   customerName: string;
@@ -2787,6 +2795,8 @@ export interface Quotation {
   createdAt: string;
   updatedAt: string;
 }
+
+export type QuotationPdfUpload = Blob;
 
 export interface QuotationInput {
   /** @nullable */

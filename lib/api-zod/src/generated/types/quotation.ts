@@ -12,10 +12,12 @@ import type { QuotationOutcomeSource } from './quotationOutcomeSource';
 import type { QuotationOutcomeStatus } from './quotationOutcomeStatus';
 import type { QuotationStatus } from './quotationStatus';
 import type { QuotationTotals } from './quotationTotals';
+import type { UploadedQuotationDocument } from './uploadedQuotationDocument';
 
 export interface Quotation {
   id: string;
   quoteNo: string;
+  uploadedDocument?: UploadedQuotationDocument | null;
   /** @nullable */
   clientId: string | null;
   customerName: string;

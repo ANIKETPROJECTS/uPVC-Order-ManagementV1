@@ -1324,9 +1324,12 @@ function RequiresAttention({
 
 export default function QuotationBuilderPage({ user }: { user: User }) {
   const [location, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<QuotationsRatesSection>(() => sectionFromUrl(location));
   const [attentionConfig, setAttentionConfig] = useState<AttentionConfig>({ amberHours: 24, redHours: 48, noOutcomeDays: 5 });
   const [search, setSearch] = useState('');
+  const [uploadingQuotation, setUploadingQuotation] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(() => new URLSearchParams(location.split('?')[1] || '').get('quote'));
   const quotationQuery = useListQuotations({
     query: { queryKey: getListQuotationsQueryKey(), refetchOnWindowFocus: true },
@@ -1368,6 +1371,30 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
     }, 80);
   };
 
+  const uploadQuotationDocument = async (file?: File) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf') || file.size > MAX_UPLOAD_BYTES) {
+      toast({ title: 'Choose a PDF up to 10 MiB', variant: 'destructive' });
+      return;
+    }
+    setUploadingQuotation(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotations/upload/${encodeURIComponent(file.name)}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: file },
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'The quotation could not be uploaded.');
+      await queryClient.invalidateQueries({ queryKey: getListQuotationsQueryKey() });
+      setSelectedQuoteId(result.id);
+      toast({ title: 'Quotation uploaded', description: `${result.quoteNo} was assigned automatically.` });
+    } catch (error) {
+      toast({ title: 'Upload failed', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setUploadingQuotation(false);
+    }
+  };
+
   return (
     <AppShell user={user} title="Quotations & Rates" eyebrow="Quotations and rate requests">
       <div className="quotation-builder-page min-w-0 max-w-full space-y-5 overflow-x-hidden" data-testid="page-quotations-rates">
@@ -1390,8 +1417,13 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
           <TabsContent value="quotations" className="mt-4" data-testid="section-quotations">
             <Card className="overflow-hidden border-border/80">
               <CardHeader className="border-b border-border/70 pb-4">
-                <CardTitle className="font-display text-lg">Quotations</CardTitle>
-                <p className="text-xs text-muted-foreground">Existing quotation records are available for viewing and printing.</p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><CardTitle className="font-display text-lg">Quotations</CardTitle><p className="mt-1 text-xs text-muted-foreground">Existing quotation records are available for viewing and printing.</p></div>
+                  {(user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit') && <>
+                    <input type="file" accept="application/pdf,.pdf" className="hidden" id="upload-quotation-document" data-testid="input-upload-quotation-document" disabled={uploadingQuotation} onChange={(event) => { void uploadQuotationDocument(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
+                    <Button type="button" disabled={uploadingQuotation} onClick={() => document.getElementById('upload-quotation-document')?.click()} data-testid="button-upload-quotation-document"><FilePlus2 size={14} /> {uploadingQuotation ? 'Uploading…' : 'Upload quotation PDF'}</Button>
+                  </>}
+                </div>
                 <div className="relative mt-2">
                   <Search size={15} className="absolute left-3 top-2.5 text-muted-foreground" />
                   <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search by quotation ID or client" data-testid="input-search-quotations" />
@@ -1412,6 +1444,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
                               <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">{quote.status.replace('_', ' ')}</span>
                               <p className="mt-1 truncate text-sm font-semibold">{quote.customerName || 'Unnamed customer'}</p>
                               <p className="mt-1 truncate text-[11px] text-muted-foreground">{quote.projectName || 'No project name'} · {dateLabel(quote.quotationDate)}</p>
+                              {quote.uploadedDocument && <a href={quote.uploadedDocument.downloadUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="mt-1 inline-block text-[11px] font-semibold text-primary hover:underline">{quote.uploadedDocument.filename} · Open PDF</a>}
                             </button>
                             <div className="flex items-center gap-3">
                               <span className="text-right font-display text-sm font-bold">{money(quote.totals.grandTotal)}<span className="mt-1 block font-sans text-[10px] font-normal text-muted-foreground">{quote.totals.componentCount} windows</span></span>

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import {
   ArchiveQuotationParams,
   ArchiveWindowProfileParams,
@@ -37,12 +38,15 @@ import {
 import {
   localImageStoragePath,
   removeProjectUpload,
+  resolveProjectUploadPath,
   storeImageDataUrl,
+  storeProjectUpload,
 } from "../lib/project-upload-storage";
 
 const router: IRouter = Router();
 const SQ_FT_PER_SQUARE_MM = 92903.04;
 const MAX_WINDOW_PROFILE_IMAGE_BYTES = 1_000_000;
+const MAX_QUOTATION_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
 interface UserContext {
   id: string;
@@ -149,6 +153,12 @@ export function quotationResponse(quotation: QuotationDocument) {
   return {
     id: quotation._id,
     quoteNo: quotation.quoteNo,
+    uploadedDocument: quotation.uploadedDocument ? {
+      filename: quotation.uploadedDocument.filename,
+      sizeBytes: quotation.uploadedDocument.sizeBytes,
+      uploadedAt: quotation.uploadedDocument.uploadedAt.toISOString(),
+      downloadUrl: `/api/quotations/${encodeURIComponent(quotation._id)}/document`,
+    } : null,
     clientId: quotation.clientId,
     customerName: quotation.customerName,
     customerPhone: quotation.customerPhone,
@@ -552,6 +562,131 @@ router.get("/quotations", async (req, res): Promise<void> => {
     .sort({ updatedAt: -1 })
     .toArray();
   res.json(ListQuotationsResponse.parse(quotations.map(quotationResponse)));
+});
+
+router.post("/quotations/upload/:filename", async (req, res, next): Promise<void> => {
+  const actor = await context(req, res, true);
+  if (!actor) return;
+  const filename = req.params.filename.replace(/[\r\n"]/g, "").trim().slice(0, 200);
+  const declaredType = String(req.headers["content-type"] ?? "").split(";")[0];
+  const declaredLength = Number(req.headers["content-length"]);
+  if (!filename.toLowerCase().endsWith(".pdf") || (declaredType !== "application/pdf" && declaredType !== "application/octet-stream")) {
+    res.status(400).json({ error: "Upload a PDF quotation document." });
+    return;
+  }
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_QUOTATION_DOCUMENT_BYTES) {
+    res.status(413).json({ error: "The quotation PDF must be 10 MiB or smaller." });
+    req.resume();
+    return;
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  let tooLarge = false;
+  req.on("data", (chunk: Buffer) => {
+    if (tooLarge) return;
+    size += chunk.length;
+    if (size > MAX_QUOTATION_DOCUMENT_BYTES) {
+      tooLarge = true;
+      chunks.length = 0;
+      if (!res.headersSent) res.status(413).json({ error: "The quotation PDF must be 10 MiB or smaller." });
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on("end", () => {
+    if (tooLarge) return;
+    void (async () => {
+      const body = Buffer.concat(chunks, size);
+      if (body.length < 5 || body.subarray(0, 5).toString("ascii") !== "%PDF-") {
+        res.status(400).json({ error: "The uploaded file is not a valid PDF." });
+        return;
+      }
+      const db = await getMongoDb();
+      const now = new Date();
+      const year = quotationYearCode(now);
+      const counter = await getCounters(db).findOneAndUpdate(
+        { _id: `quotation-year-sequence:${year}` },
+        { $inc: { value: 1 }, $set: { updatedAt: now } },
+        { returnDocument: "after", upsert: true },
+      );
+      if (!counter || !Number.isSafeInteger(counter.value) || counter.value < 1) {
+        res.status(503).json({ error: "A quotation ID could not be allocated." });
+        return;
+      }
+      const storagePath = await storeProjectUpload("quotation-documents", filename, body);
+      const quoteNo = quotationNumber(year, counter.value);
+      const document: QuotationDocument = {
+        _id: randomUUID(),
+        sequenceNo: counter.value,
+        quoteNo,
+        clientId: null,
+        customerName: filename.replace(/\.pdf$/i, "").slice(0, 160) || "Uploaded quotation",
+        customerPhone: "",
+        customerAddress: "",
+        customerGstin: null,
+        projectName: "",
+        quotationDate: now.toISOString().slice(0, 10),
+        items: [],
+        transportationCost: 0,
+        loadingUnloadingCost: 0,
+        additionalChargeDescription: "",
+        additionalChargeRate: 0,
+        additionalChargeAreaSqFt: 0,
+        gstPercent: 0,
+        notes: "Uploaded quotation document",
+        totals: {
+          componentCount: 0, totalAreaSqFt: 0, basicValue: 0, transportationCost: 0,
+          loadingUnloadingCost: 0, additionalCharge: 0, subtotal: 0, gstPercent: 0,
+          gstAmount: 0, grandTotal: 0, averagePricePerSqFt: 0,
+        },
+        status: "draft",
+        sampleOnly: false,
+        requiresRateApproval: false,
+        approvalApproverId: null,
+        approvalSubmittedAt: null,
+        approvalLastReminderAt: null,
+        approvalHistory: [],
+        uploadedDocument: { filename, sizeBytes: body.length, storagePath, uploadedAt: now },
+        createdBy: actor.id,
+        updatedBy: actor.id,
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await getQuotations(db).insertOne(document);
+        res.status(201).json(quotationResponse(document));
+      } catch (error) {
+        await removeProjectUpload(storagePath).catch(() => undefined);
+        throw error;
+      }
+    })().catch(next);
+  });
+  req.on("aborted", () => next(new Error("Quotation upload was interrupted.")));
+  req.on("error", next);
+});
+
+router.get("/quotations/:quotationId/document", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  if (!actor) return;
+  const quotation = await getQuotations(await getMongoDb()).findOne({
+    _id: req.params.quotationId,
+    archivedAt: null,
+  });
+  if (!quotation?.uploadedDocument) {
+    res.status(404).json({ error: "Uploaded quotation document not found." });
+    return;
+  }
+  const filePath = resolveProjectUploadPath(quotation.uploadedDocument.storagePath);
+  if (!filePath) {
+    res.status(404).json({ error: "Quotation document is unavailable." });
+    return;
+  }
+  try {
+    res.type("application/pdf").setHeader("Content-Disposition", `inline; filename="${quotation.uploadedDocument.filename.replace(/[\r\n"\\]/g, "")}"`);
+    res.send(await readFile(filePath));
+  } catch {
+    res.status(404).json({ error: "Quotation document is unavailable." });
+  }
 });
 
 router.post("/quotations", async (req, res): Promise<void> => {
