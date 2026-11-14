@@ -2049,6 +2049,20 @@ export async function initializeMongo(): Promise<void> {
 
   const now = new Date();
 
+  await getOrderDocumentCategories(db).updateOne(
+    { _id: "confirmation" },
+    {
+      $setOnInsert: {
+        label: "Confirmation / Purchase Order",
+        labelNormalized: "confirmation / purchase order",
+        requiredModule: "order-hub",
+        createdAt: now,
+        updatedAt: now,
+      },
+    },
+    { upsert: true },
+  );
+
   const profileRates = new Map(
     (await windowProfiles.find({}).toArray()).map((profile) => [
       profile._id,

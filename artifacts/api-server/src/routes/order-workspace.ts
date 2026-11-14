@@ -70,6 +70,7 @@ import {
 
 const router = ExpressRouter();
 const MAX_FILE = 10 * 1024 * 1024;
+const MAX_WINDOW_IMPORT_ROWS = 500;
 const MAX_FILE_MESSAGE = "Document must be 10 MiB or smaller.";
 const mimeByExt: Record<string, string[]> = { pdf: ["application/pdf"], png: ["image/png"], jpg: ["image/jpeg"], jpeg: ["image/jpeg"], webp: ["image/webp"], docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"], xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"], xlsm: ["application/vnd.ms-excel.sheet.macroEnabled.12"], xls: ["application/vnd.ms-excel"], csv: ["text/csv"] };
 type UserContext = { id: string; name: string; permissions: Record<string, string>; masterAdmin: boolean };
@@ -1414,8 +1415,8 @@ router.post("/orders/:id/windows/import", async (req, res): Promise<void> => {
   if (!actor) return;
   const order = await getOrders(await getMongoDb()).findOne({ _id: id });
   if (!order) { res.status(404).json({ error: "Order not found." }); return; }
-  if (!Array.isArray(req.body?.rows) || req.body.rows.length < 1 || req.body.rows.length > 200) {
-    res.status(400).json({ error: "Import between 1 and 200 window rows at a time." }); return;
+  if (!Array.isArray(req.body?.rows) || req.body.rows.length < 1 || req.body.rows.length > MAX_WINDOW_IMPORT_ROWS) {
+    res.status(400).json({ error: `Import between 1 and ${MAX_WINDOW_IMPORT_ROWS} window rows at a time.` }); return;
   }
       const parsed = req.body.rows.map((row: unknown) => CreateOrderWindowBody.safeParse(row));
   const invalid = parsed.find((result: any) => !result.success);
@@ -2249,6 +2250,7 @@ router.delete("/order-document-categories/:categoryId", async (req, res): Promis
   const categories = getOrderDocumentCategories(db);
   const category = await categories.findOne({ _id: p.data.categoryId });
   if (!category) { res.status(404).json({ error: "Document category not found." }); return; }
+  if (category._id === "confirmation") { res.status(409).json({ error: "The confirmation category is required for window and confirmation imports." }); return; }
   if (await getOrderDocumentMetadata(db).countDocuments({ category: category._id })) {
     res.status(409).json({ error: "This category is assigned to documents and cannot be deleted." });
     return;
@@ -2264,8 +2266,14 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
   const db = await getMongoDb();
   const category = await getOrderDocumentCategories(db).findOne({ _id: p.data.category });
   if (!category) { res.status(400).json({ error: "Choose an active document category." }); return; }
-  const actor = await context(req, res, category.requiredModule, true);
-  if (!actor || !(await orderExists(p.data.id, res))) return;
+  const actor = await context(req, res);
+  if (!actor) return;
+  if (!hasModuleEdit(actor, category.requiredModule)
+    && !(p.data.category === "confirmation" && hasModuleEdit(actor, "measurements"))) {
+    res.status(403).json({ error: `${category.requiredModule} editing access is required.` });
+    return;
+  }
+  if (!(await orderExists(p.data.id, res))) return;
   expressRaw(req, res, next, async () => {
     const body = req.body as Buffer;
     const declaredType = String(req.headers["content-type"] ?? "").split(";")[0];
@@ -2352,7 +2360,11 @@ router.delete("/orders/:id/documents/:documentId", async (req, res): Promise<voi
   if (!meta) { res.status(404).json({ error: "Document not found." }); return; }
   const category = await getOrderDocumentCategories(db).findOne({ _id: meta.category });
   if (!category) { res.status(409).json({ error: "The document category is no longer available." }); return; }
-  if (!requireModuleEdit(actor, res, category.requiredModule)) return;
+  if (!hasModuleEdit(actor, category.requiredModule)
+    && !(meta.category === "confirmation" && hasModuleEdit(actor, "measurements"))) {
+    res.status(403).json({ error: `${category.requiredModule} editing access is required.` });
+    return;
+  }
   if (meta.gridFsId && ObjectId.isValid(meta.gridFsId)) {
     const bucket = getOrderDocumentsBucket(db);
     const gridId = new ObjectId(meta.gridFsId);

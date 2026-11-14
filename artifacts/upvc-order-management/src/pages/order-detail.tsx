@@ -1068,6 +1068,10 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
   const skipped = extractedRows.length - rowsToAdd.length - alreadyPresent;
   const addToWindows = async () => {
     if (!canMeasure || saving || rowsToAdd.length === 0) return;
+    if (rowsToAdd.length > 500) {
+      toast({ title: 'Too many windows to import at once', description: 'Import no more than 500 extracted windows at a time.', variant: 'destructive' });
+      return;
+    }
     const destination = lotId ? `Lot ${lotId}` : "this order's Windows register";
     const summary = `Add ${rowsToAdd.length} extracted window${rowsToAdd.length === 1 ? '' : 's'} from ${documentRecord.filename} to ${destination}?${alreadyPresent ? ` ${alreadyPresent} already-listed row${alreadyPresent === 1 ? ' will' : 's will'} be skipped.` : ''}${skipped ? ` ${skipped} incomplete row${skipped === 1 ? ' will' : 's will'} be skipped.` : ''}`;
     if (!window.confirm(summary)) return;

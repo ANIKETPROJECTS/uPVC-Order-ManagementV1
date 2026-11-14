@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useArchiveOrderDocument, useUploadOrderDocument } from "@workspace/api-client-react";
 import type { User } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ type ImportSheet = {
   warnings: string[]; source: "excel" | "pdf"; confidence: number;
 };
 
+const MAX_WINDOW_IMPORT_ROWS = 500;
+
 export function WindowListImporter({ orderId, meshType, user, onComplete }: {
   orderId: string; meshType: string; user: User; onComplete: () => void;
 }) {
@@ -33,36 +35,30 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [displayMode, setDisplayMode] = useState<"document" | "software">("document");
-  const preview = async (selectedFile: File, sheet?: string) => {
+  const previewSequence = useRef(0);
+  const preview = async (selectedFile: File) => {
+    const sequence = ++previewSequence.current;
     setLoading(true); setError("");
     try {
-      const suffix = sheet ? `?sheet=${encodeURIComponent(sheet)}` : "";
-      const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/windows/import-preview/${encodeURIComponent(selectedFile.name)}${suffix}`, {
+      const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/windows/import-preview/${encodeURIComponent(selectedFile.name)}`, {
         method: "POST", headers: { "Content-Type": selectedFile.type || "application/octet-stream" }, body: selectedFile,
       });
       const result = await response.json() as { error?: string; sheets?: ImportSheet[] };
       if (!response.ok) throw new Error(result.error || "The workbook could not be previewed.");
+      if (sequence !== previewSequence.current) return;
       const returnedSheets = result.sheets ?? [];
-      if (sheet) {
-        const parsedSheet = returnedSheets.find((item) => item.sheetName === sheet);
-        if (parsedSheet) setSheets((current) => current.map((item) => item.sheetName === sheet ? parsedSheet : item));
-      } else {
-        setSheets(returnedSheets);
-      }
-      if (!sheet && result.sheets?.length) {
-        setSelectedSheet(result.sheets[0].sheetName);
-        setRows(result.sheets[0].rows);
-      } else {
-        const active = result.sheets?.find((item) => item.sheetName === sheet);
-        setRows(active?.rows ?? []);
-      }
+      setSheets(returnedSheets);
+      setSelectedSheet(returnedSheets[0]?.sheetName ?? "");
+      setRows(returnedSheets[0]?.rows ?? []);
     } catch (cause) {
+      if (sequence !== previewSequence.current) return;
       setError(cause instanceof Error ? cause.message : "The workbook could not be previewed.");
       setSheets([]); setRows([]);
-    } finally { setLoading(false); }
+    } finally { if (sequence === previewSequence.current) setLoading(false); }
   };
   const chooseFile = (selected: File | null) => {
-    setFile(selected); setSheets([]); setRows([]); setSelectedSheet(""); setError("");
+    previewSequence.current += 1;
+    setFile(selected); setSheets([]); setRows([]); setSelectedSheet(""); setError(""); setLoading(false);
     if (selected) void preview(selected);
   };
   const editCell = (index: number, field: keyof ImportedRow, value: string) => {
@@ -81,6 +77,10 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
   const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
   const confirmImport = async () => {
     if (!file || !rows.length) return;
+    if (rows.length > MAX_WINDOW_IMPORT_ROWS) {
+      setError(`Import up to ${MAX_WINDOW_IMPORT_ROWS} rows at a time.`);
+      return;
+    }
     const duplicateNumbers = new Set<string>();
     const invalid = rows.some((row) => {
       const key = row.windowNo.trim().toLocaleLowerCase();
@@ -118,7 +118,7 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
   };
   const activeSheet = sheets.find((item) => item.sheetName === selectedSheet);
   return <section className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm" data-testid="window-list-importer">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-bold">Import window list</h3><p className="mt-1 text-xs text-muted-foreground">Excel is recommended. Review the rows before adding them. Maximum 10 MiB.</p></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-bold">Import window list</h3><p className="mt-1 text-xs text-muted-foreground">Excel is recommended. Review the rows before adding them. Maximum 10 MiB and {MAX_WINDOW_IMPORT_ROWS} rows.</p></div>
       <a href={`/api/orders/${encodeURIComponent(orderId)}/windows/import-template`} className="text-xs font-semibold text-primary underline">Download Excel template</a>
     </div>
     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -133,7 +133,7 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
       {file && <span className="max-w-64 truncate text-xs text-muted-foreground">{file.name}</span>}
       {loading && <span className="text-xs text-muted-foreground">Reading workbook…</span>}
     </div>
-    {sheets.length > 1 && <label className="mt-3 block max-w-sm text-xs font-semibold">Worksheet<select className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2" value={selectedSheet} onChange={(event) => { setSelectedSheet(event.target.value); if (file) void preview(file, event.target.value); }}><option value="">Choose sheet</option>{sheets.map((sheet) => <option key={sheet.sheetName}>{sheet.sheetName}</option>)}</select></label>}
+    {sheets.length > 1 && <label className="mt-3 block max-w-sm text-xs font-semibold">Worksheet<select className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2" value={selectedSheet} onChange={(event) => { const sheetName = event.target.value; setSelectedSheet(sheetName); setRows(sheets.find((sheet) => sheet.sheetName === sheetName)?.rows ?? []); setError(""); }}><option value="">Choose sheet</option>{sheets.map((sheet) => <option key={sheet.sheetName} value={sheet.sheetName}>{sheet.sheetName}</option>)}</select></label>}
     {activeSheet && <><div className="mt-3 flex flex-wrap items-center gap-3 text-xs"><span><strong>{rows.length}</strong> rows</span><span><strong>{totalQuantity}</strong> windows</span><span><strong>{totalAreaSqFt.toFixed(2)}</strong> sq ft</span><span>Source: <strong>{activeSheet.source.toUpperCase()}</strong></span><span className="max-w-64 truncate">{file?.name}</span><div className="ml-auto flex gap-1"><Button size="sm" variant={displayMode === "document" ? "default" : "outline"} onClick={() => setDisplayMode("document")}>Document view</Button><Button size="sm" variant={displayMode === "software" ? "default" : "outline"} onClick={() => setDisplayMode("software")}>Software view</Button></div></div>
       {activeSheet.source === "pdf" && <p className="mt-2 rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">PDF import, please verify.</p>}
       {activeSheet.warnings.map((warning) => <p key={warning} className="mt-2 text-xs text-amber-800">{warning}</p>)}
@@ -157,7 +157,8 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
           </tbody>
         </table>
       </div>
-      <div className="mt-3 flex justify-between"><Button size="sm" variant="outline" onClick={addRow}>Add row</Button><Button size="sm" disabled={saving || loading || !rows.length} onClick={() => void confirmImport()}>{saving ? "Importing…" : `Confirm import ${rows.length} rows`}</Button></div></>}
+      {rows.length > MAX_WINDOW_IMPORT_ROWS && <p role="alert" className="mt-2 text-xs text-destructive">Import no more than {MAX_WINDOW_IMPORT_ROWS} rows at a time.</p>}
+      <div className="mt-3 flex justify-between"><Button size="sm" variant="outline" onClick={addRow}>Add row</Button><Button size="sm" disabled={saving || loading || !rows.length || rows.length > MAX_WINDOW_IMPORT_ROWS} onClick={() => void confirmImport()}>{saving ? "Importing…" : `Confirm import ${rows.length} rows`}</Button></div></>}
     {error && <p className="mt-3 rounded-md bg-destructive/10 p-2 text-xs text-destructive">{error}</p>}
   </section>;
 }

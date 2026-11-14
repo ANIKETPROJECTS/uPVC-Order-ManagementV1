@@ -252,7 +252,9 @@ export default function ConfirmationFirstRegister({ user }: { user: User }) {
                       const version = Math.max(pdfVersion, excelVersion, 1);
                       const mismatch = pdfVersion > 0 && excelVersion > 0 && pdfVersion !== excelVersion;
                       return <tr key={record._id} data-testid={`row-confirmation-${record.confirmationId}`} className="align-top hover:bg-muted/15">
-                        <td className="px-3 py-3"><code className="font-mono font-bold text-primary">{record.confirmationId}</code><p className="mt-1 max-w-[180px] truncate font-medium text-foreground" title={record.clientName}>{record.clientName}</p></td>
+                        <td className="px-3 py-3">{record.orderRecordId && canViewOrders(user)
+                          ? <Link href={`/order-hub/${encodeURIComponent(record.orderRecordId)}?tab=confirmation-info`} className="font-mono font-bold text-primary hover:underline" data-testid={`link-confirmation-order-${record.confirmationId}`}>{record.confirmationId}</Link>
+                          : <code className="font-mono font-bold text-primary">{record.confirmationId}</code>}<p className="mt-1 max-w-[180px] truncate font-medium text-foreground" title={record.clientName}>{record.clientName}</p></td>
                         <td className="px-3 py-3">{record.quotationId && <Link href={`/quotations-rates?quote=${encodeURIComponent(record.quotationId)}`} className="font-mono font-semibold text-primary hover:underline">{record.quotationId}</Link>}</td>
                         <td className="px-3 py-3">{record.measurementSheetId && <Link href={record.measurementRecordId ? `/measurements/${record.measurementRecordId}` : '/measurements'} className="font-mono font-semibold text-primary hover:underline">{record.measurementSheetId}</Link>}</td>
                         <td className="px-3 py-3">{record.orderRecordId && record.orderId
