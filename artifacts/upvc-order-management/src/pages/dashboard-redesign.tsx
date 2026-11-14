@@ -784,7 +784,7 @@ export default function DashboardRedesign({ user }: { user: User }) {
                     </label>
                     <div className="relative">
                       <button type="button" title="Export dashboard" aria-label="Export dashboard" aria-expanded={exportMenuOpen} onClick={() => setExportMenuOpen((open) => !open)} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-50 sm:px-3" disabled={!data} data-testid="button-export-dashboard"><Download size={14} /><span className="hidden sm:inline">Export</span><ChevronDown size={12} className="hidden sm:block" /></button>
-                      {exportMenuOpen && <div className="absolute right-0 top-10 z-40 w-52 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl" role="menu">
+                      {exportMenuOpen && <div className="absolute right-0 top-10 z-40 w-52 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl sm:left-0 sm:right-auto" role="menu">
                         <button type="button" onClick={() => { window.print(); setExportMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-muted" role="menuitem"><Printer size={13} className="mr-2 inline" />Print / Save as PDF</button>
                         <button type="button" onClick={() => { exportDashboardCsv(); setExportMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-muted" role="menuitem"><Download size={13} className="mr-2 inline" />Download orders + attention CSV</button>
                       </div>}
