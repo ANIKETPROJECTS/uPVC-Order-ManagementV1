@@ -478,7 +478,7 @@ function NewOrderDialog({ open, onOpenChange, clients, onDone }: { open: boolean
               const addLot = () => form.setValue('initialLots', [...(form.getValues('initialLots') ?? []), { windowNosText: '' }], { shouldDirty: true });
               return <section className="space-y-3 rounded-xl border border-border/80 p-3" data-testid="section-initial-project-lots">
                 <div className="flex items-center justify-between gap-3">
-                  <div><FormLabel>Project lots and windows</FormLabel><p className="mt-1 text-[10px] text-muted-foreground">Enter window numbers separated by commas or new lines. Dimensions can be added later.</p></div>
+                  <div><p className="text-xs font-semibold">Project lots and windows</p><p className="mt-1 text-[10px] text-muted-foreground">Enter window numbers separated by commas or new lines. Dimensions can be added later.</p></div>
                   <Button type="button" size="sm" variant="outline" onClick={addLot}><Plus size={13} /> Add lot</Button>
                 </div>
                 {lots.map((lot, index) => {
