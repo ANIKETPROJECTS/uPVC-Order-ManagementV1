@@ -2721,6 +2721,15 @@ export interface UploadedQuotationDocument {
   downloadUrl: string;
 }
 
+export interface UploadedQuotationDocumentVersion {
+  versionNumber: number;
+  filename: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  uploadedBy: string;
+  downloadUrl: string;
+}
+
 export type QuotationOutcomeStatus = typeof QuotationOutcomeStatus[keyof typeof QuotationOutcomeStatus];
 
 
@@ -2761,7 +2770,8 @@ export interface QuotationApprovalHistory {
 export interface Quotation {
   id: string;
   quoteNo: string;
-  uploadedDocument?: UploadedQuotationDocument | null;
+  uploadedDocument: UploadedQuotationDocument | null;
+  uploadedDocumentVersions: UploadedQuotationDocumentVersion[];
   /** @nullable */
   clientId: string | null;
   customerName: string;

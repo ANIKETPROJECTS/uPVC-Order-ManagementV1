@@ -13,11 +13,13 @@ import type { QuotationOutcomeStatus } from './quotationOutcomeStatus';
 import type { QuotationStatus } from './quotationStatus';
 import type { QuotationTotals } from './quotationTotals';
 import type { UploadedQuotationDocument } from './uploadedQuotationDocument';
+import type { UploadedQuotationDocumentVersion } from './uploadedQuotationDocumentVersion';
 
 export interface Quotation {
   id: string;
   quoteNo: string;
-  uploadedDocument?: UploadedQuotationDocument | null;
+  uploadedDocument: UploadedQuotationDocument | null;
+  uploadedDocumentVersions: UploadedQuotationDocumentVersion[];
   /** @nullable */
   clientId: string | null;
   customerName: string;

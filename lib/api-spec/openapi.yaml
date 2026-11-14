@@ -1968,6 +1968,79 @@ paths:
                 format: binary
         "404":
           description: Quotation PDF not found
+    post:
+      operationId: uploadQuotationRevision
+      tags: [quotations]
+      summary: Upload a new version under the existing QT ID
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              $ref: "#/components/schemas/QuotationPdfUpload"
+      responses:
+        "200":
+          description: Quotation with the new PDF version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "404":
+          description: Quotation not found
+  /quotations/{quotationId}/document/versions/{versionNumber}:
+    get:
+      operationId: downloadQuotationRevision
+      tags: [quotations]
+      summary: Download a quotation PDF version
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Quotation PDF version
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Quotation version not found
+    delete:
+      operationId: deleteQuotationRevision
+      tags: [quotations]
+      summary: Delete one quotation PDF version
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "204":
+          description: Quotation version deleted
+        "404":
+          description: Quotation version not found
   /quotations/{quotationId}:
     get:
       operationId: getQuotation
@@ -7298,6 +7371,10 @@ components:
           anyOf:
             - $ref: "#/components/schemas/UploadedQuotationDocument"
             - type: "null"
+        uploadedDocumentVersions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadedQuotationDocumentVersion"
         clientId:
           type: ["string", "null"]
         customerName:
@@ -7367,7 +7444,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, quoteNo, clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes, totals, status, outcomeStatus, lostReason, outcomeSource, confirmationRecordIds, requiresRateApproval, sampleOnly, approvalHistory, createdBy, updatedBy, createdAt, updatedAt]
+      required: [id, quoteNo, uploadedDocument, uploadedDocumentVersions, clientId, customerName, customerPhone, customerAddress, customerGstin, projectName, quotationDate, items, transportationCost, loadingUnloadingCost, additionalChargeDescription, additionalChargeRate, additionalChargeAreaSqFt, gstPercent, notes, totals, status, outcomeStatus, lostReason, outcomeSource, confirmationRecordIds, requiresRateApproval, sampleOnly, approvalHistory, createdBy, updatedBy, createdAt, updatedAt]
     UploadedQuotationDocument:
       type: object
       properties:
@@ -7376,6 +7453,16 @@ components:
         uploadedAt: { type: string, format: date-time }
         downloadUrl: { type: string }
       required: [filename, sizeBytes, uploadedAt, downloadUrl]
+    UploadedQuotationDocumentVersion:
+      type: object
+      properties:
+        versionNumber: { type: integer }
+        filename: { type: string }
+        sizeBytes: { type: integer }
+        uploadedAt: { type: string, format: date-time }
+        uploadedBy: { type: string }
+        downloadUrl: { type: string }
+      required: [versionNumber, filename, sizeBytes, uploadedAt, uploadedBy, downloadUrl]
     QuotationPdfUpload:
       type: string
       format: binary

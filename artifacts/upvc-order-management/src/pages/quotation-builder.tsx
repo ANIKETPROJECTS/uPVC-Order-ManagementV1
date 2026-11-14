@@ -1394,6 +1394,8 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
   const [attentionConfig, setAttentionConfig] = useState<AttentionConfig>({ amberHours: 24, redHours: 48, noOutcomeDays: 5 });
   const [search, setSearch] = useState('');
   const [uploadingQuotation, setUploadingQuotation] = useState(false);
+  const [uploadingQuotationVersion, setUploadingQuotationVersion] = useState(false);
+  const [deletingQuotationDocument, setDeletingQuotationDocument] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(() => new URLSearchParams(location.split('?')[1] || '').get('quote'));
   const quotationQuery = useListQuotations({
     query: { queryKey: getListQuotationsQueryKey(), refetchOnWindowFocus: true },
@@ -1412,6 +1414,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
     return () => controller.abort();
   }, []);
   const selectedQuote = selectedQuery.data ?? quotations.find((quote) => quote.id === selectedQuoteId) ?? null;
+  const canEditQuotations = user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit';
   const visibleQuotes = useMemo(() => {
     const normalized = search.trim().toLowerCase();
     if (!normalized) return quotations;
@@ -1459,6 +1462,71 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
     }
   };
 
+  const uploadQuotationVersion = async (file?: File) => {
+    if (!file || !selectedQuote) return;
+    if (!file.name.toLowerCase().endsWith('.pdf') || file.size > MAX_UPLOAD_BYTES) {
+      toast({ title: 'Choose a PDF up to 10 MiB', variant: 'destructive' });
+      return;
+    }
+    setUploadingQuotationVersion(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotations/${encodeURIComponent(selectedQuote.id)}/document/${encodeURIComponent(file.name)}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: file },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'The new version could not be uploaded.');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getListQuotationsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getGetQuotationQueryKey(selectedQuote.id) }),
+      ]);
+      toast({ title: 'Quotation version uploaded', description: `${selectedQuote.quoteNo} now has ${result.uploadedDocumentVersions.length} version(s).` });
+    } catch (error) {
+      toast({ title: 'Re-upload failed', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setUploadingQuotationVersion(false);
+    }
+  };
+
+  const deleteQuotationVersion = async (versionNumber: number, filename: string) => {
+    if (!selectedQuote || !window.confirm(`Delete version ${versionNumber} (${filename})?`)) return;
+    setDeletingQuotationDocument(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotations/${encodeURIComponent(selectedQuote.id)}/document/versions/${versionNumber}`,
+        { method: 'DELETE' },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'This version could not be deleted.');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getListQuotationsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getGetQuotationQueryKey(selectedQuote.id) }),
+      ]);
+      toast({ title: 'Quotation version deleted', description: `Version ${versionNumber} was removed.` });
+    } catch (error) {
+      toast({ title: 'Could not delete version', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setDeletingQuotationDocument(false);
+    }
+  };
+
+  const deleteUploadedQuotation = async () => {
+    if (!selectedQuote || !window.confirm(`Delete ${selectedQuote.quoteNo} and all its uploaded PDF versions?`)) return;
+    setDeletingQuotationDocument(true);
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/quotations/${encodeURIComponent(selectedQuote.id)}`, { method: 'DELETE' });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'This quotation could not be deleted.');
+      await queryClient.invalidateQueries({ queryKey: getListQuotationsQueryKey() });
+      setSelectedQuoteId(null);
+      toast({ title: 'Quotation deleted', description: `${selectedQuote.quoteNo} and its PDF versions were removed.` });
+    } catch (error) {
+      toast({ title: 'Could not delete quotation', description: error instanceof Error ? error.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setDeletingQuotationDocument(false);
+    }
+  };
+
   return (
     <AppShell user={user} title="Quotations & Rates" eyebrow="Quotations and rate requests">
       <div className="quotation-builder-page min-w-0 max-w-full space-y-5 overflow-x-hidden" data-testid="page-quotations-rates">
@@ -1483,7 +1551,7 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
               <CardHeader className="border-b border-border/70 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div><CardTitle className="font-display text-lg">Quotations</CardTitle><p className="mt-1 text-xs text-muted-foreground">Existing quotation records are available for viewing and printing.</p></div>
-                  {(user.roleId === 'master-admin' || user.permissions?.['quotation-builder'] === 'edit') && <>
+                  {canEditQuotations && <>
                     <input type="file" accept="application/pdf,.pdf" className="hidden" id="upload-quotation-document" data-testid="input-upload-quotation-document" disabled={uploadingQuotation} onChange={(event) => { void uploadQuotationDocument(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
                     <Button type="button" disabled={uploadingQuotation} onClick={() => document.getElementById('upload-quotation-document')?.click()} data-testid="button-upload-quotation-document"><FilePlus2 size={14} /> {uploadingQuotation ? 'Uploading…' : 'Upload quotation PDF'}</Button>
                   </>}
@@ -1522,13 +1590,27 @@ export default function QuotationBuilderPage({ user }: { user: User }) {
             {selectedQuote && <Card className="mt-4 border-border/80" data-testid="card-selected-quotation">
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 border-b border-border/70">
                 <div><p className="font-mono text-xs font-bold text-primary">{selectedQuote.quoteNo}</p><CardTitle className="mt-1 font-display text-lg">{selectedQuote.customerName}</CardTitle><p className="mt-1 text-xs text-muted-foreground">{selectedQuote.projectName || 'No project name'} · {selectedQuote.totals.componentCount} windows</p></div>
-                <Button type="button" size="sm" variant="outline" onClick={printSelected} data-testid="button-print-quotation"><Printer size={14} /> Print / PDF</Button>
+                <div className="flex flex-wrap gap-2">
+                  {canEditQuotations && selectedQuote.notes === 'Uploaded quotation document' && <>
+                    <input type="file" accept="application/pdf,.pdf" className="hidden" id="upload-quotation-revision" data-testid="input-upload-quotation-revision" disabled={uploadingQuotationVersion} onChange={(event) => { void uploadQuotationVersion(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
+                    <Button type="button" size="sm" variant="outline" disabled={uploadingQuotationVersion} onClick={() => document.getElementById('upload-quotation-revision')?.click()} data-testid="button-upload-quotation-revision"><FilePlus2 size={14} /> {uploadingQuotationVersion ? 'Uploading…' : 'Upload new version'}</Button>
+                    <Button type="button" size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={deletingQuotationDocument} onClick={() => void deleteUploadedQuotation()} data-testid="button-delete-uploaded-quotation"><Trash2 size={14} /> Delete quotation</Button>
+                  </>}
+                  <Button type="button" size="sm" variant="outline" onClick={printSelected} data-testid="button-print-quotation"><Printer size={14} /> Print / PDF</Button>
+                </div>
               </CardHeader>
               <CardContent className="grid gap-3 p-4 text-xs sm:grid-cols-2 lg:grid-cols-4">
                 <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Status</p><p className="mt-1 font-semibold capitalize">{selectedQuote.status.replace('_', ' ')}</p></div>
                 <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Quotation date</p><p className="mt-1 font-semibold">{dateLabel(selectedQuote.quotationDate)}</p></div>
                 <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Grand total</p><p className="mt-1 font-semibold">{money(selectedQuote.totals.grandTotal)}</p></div>
                 <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Windows</p><p className="mt-1 font-semibold">{selectedQuote.totals.componentCount}</p></div>
+                {selectedQuote.uploadedDocumentVersions.length > 0 && <div className="space-y-2 border-t border-border/70 pt-3 sm:col-span-2 lg:col-span-4" data-testid="list-quotation-document-versions">
+                  <p className="font-bold">Uploaded PDF versions</p>
+                  {selectedQuote.uploadedDocumentVersions.slice().sort((a, b) => b.versionNumber - a.versionNumber).map((version) => <div key={version.versionNumber} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2" data-testid={`row-quotation-document-version-${version.versionNumber}`}>
+                    <div><span className="font-semibold">v{version.versionNumber}</span><span className="ml-2">{version.filename}</span><span className="ml-2 text-muted-foreground">{dateLabel(version.uploadedAt)}</span></div>
+                    <div className="flex items-center gap-2"><a href={version.downloadUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline"><Download size={13} className="mr-1 inline" />Open PDF</a>{canEditQuotations && <Button type="button" size="sm" variant="ghost" className="h-7 text-destructive" disabled={deletingQuotationDocument} onClick={() => void deleteQuotationVersion(version.versionNumber, version.filename)} data-testid={`button-delete-quotation-version-${version.versionNumber}`}><Trash2 size={13} /> Delete</Button>}</div>
+                  </div>)}
+                </div>}
               </CardContent>
             </Card>}
             <SentRateQuotes user={user} />

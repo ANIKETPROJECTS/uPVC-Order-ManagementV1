@@ -7250,6 +7250,253 @@ export function useDownloadQuotationDocument<TData = Awaited<ReturnType<typeof d
 
 
 
+export const getUploadQuotationRevisionUrl = (quotationId: string,) => {
+
+
+
+
+  return `/api/quotations/${quotationId}/document`
+}
+
+/**
+ * @summary Upload a new version under the existing QT ID
+ */
+export const uploadQuotationRevision = async (quotationId: string,
+    uploadQuotationRevisionBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<Quotation> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Quotation>(getUploadQuotationRevisionUrl(quotationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/pdf', ...getHeaders(options?.headers) },
+    body: uploadQuotationRevisionBody
+  }
+);}
+
+
+
+
+
+export const getUploadQuotationRevisionMutationKey = () => ['uploadQuotationRevision'] as const;
+
+export const getUploadQuotationRevisionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadQuotationRevision>>, TError,UploadQuotationRevisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadQuotationRevision>>, TError,UploadQuotationRevisionMutationVariables, TContext> => {
+
+const mutationKey = getUploadQuotationRevisionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadQuotationRevision>>, UploadQuotationRevisionMutationVariables> = (props) => {
+          const {quotationId,data} = props ?? {};
+
+          return  uploadQuotationRevision(quotationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadQuotationRevisionMutationResult = NonNullable<Awaited<ReturnType<typeof uploadQuotationRevision>>>
+    export type UploadQuotationRevisionMutationBody = BodyType<Blob>
+    export type UploadQuotationRevisionMutationError = ErrorType<void>
+    export type UploadQuotationRevisionMutationVariables = {quotationId: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Upload a new version under the existing QT ID
+ */
+export const useUploadQuotationRevision = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadQuotationRevision>>, TError,UploadQuotationRevisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadQuotationRevision>>,
+        TError,
+        UploadQuotationRevisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadQuotationRevisionMutationOptions(options));
+    }
+
+export const getDownloadQuotationRevisionUrl = (quotationId: string,
+    versionNumber: number,) => {
+
+
+
+
+  return `/api/quotations/${quotationId}/document/versions/${versionNumber}`
+}
+
+/**
+ * @summary Download a quotation PDF version
+ */
+export const downloadQuotationRevision = async (quotationId: string,
+    versionNumber: number, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadQuotationRevisionUrl(quotationId,versionNumber),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadQuotationRevisionQueryKey = (quotationId: string,
+    versionNumber: number,) => {
+    return [
+    `/api/quotations/${quotationId}/document/versions/${versionNumber}`
+    ] as const;
+    }
+
+
+export const getDownloadQuotationRevisionQueryOptions = <TData = Awaited<ReturnType<typeof downloadQuotationRevision>>, TError = ErrorType<void>>(quotationId: string,
+    versionNumber: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadQuotationRevision>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadQuotationRevisionQueryKey(quotationId,versionNumber);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadQuotationRevision>>> = ({ signal }) => downloadQuotationRevision(quotationId,versionNumber, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: quotationId !== null && quotationId !== undefined && versionNumber !== null && versionNumber !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadQuotationRevision>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadQuotationRevisionQueryResult = NonNullable<Awaited<ReturnType<typeof downloadQuotationRevision>>>
+export type DownloadQuotationRevisionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download a quotation PDF version
+ */
+
+export function useDownloadQuotationRevision<TData = Awaited<ReturnType<typeof downloadQuotationRevision>>, TError = ErrorType<void>>(
+ quotationId: string,
+    versionNumber: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadQuotationRevision>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadQuotationRevisionQueryOptions(quotationId,versionNumber,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDeleteQuotationRevisionUrl = (quotationId: string,
+    versionNumber: number,) => {
+
+
+
+
+  return `/api/quotations/${quotationId}/document/versions/${versionNumber}`
+}
+
+/**
+ * @summary Delete one quotation PDF version
+ */
+export const deleteQuotationRevision = async (quotationId: string,
+    versionNumber: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteQuotationRevisionUrl(quotationId,versionNumber),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteQuotationRevisionMutationKey = () => ['deleteQuotationRevision'] as const;
+
+export const getDeleteQuotationRevisionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQuotationRevision>>, TError,DeleteQuotationRevisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteQuotationRevision>>, TError,DeleteQuotationRevisionMutationVariables, TContext> => {
+
+const mutationKey = getDeleteQuotationRevisionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteQuotationRevision>>, DeleteQuotationRevisionMutationVariables> = (props) => {
+          const {quotationId,versionNumber} = props ?? {};
+
+          return  deleteQuotationRevision(quotationId,versionNumber,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteQuotationRevisionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteQuotationRevision>>>
+
+    export type DeleteQuotationRevisionMutationError = ErrorType<void>
+    export type DeleteQuotationRevisionMutationVariables = {quotationId: string;versionNumber: number}
+
+    /**
+ * @summary Delete one quotation PDF version
+ */
+export const useDeleteQuotationRevision = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQuotationRevision>>, TError,DeleteQuotationRevisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteQuotationRevision>>,
+        TError,
+        DeleteQuotationRevisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteQuotationRevisionMutationOptions(options));
+    }
+
 export const getGetQuotationUrl = (quotationId: string,) => {
 
 

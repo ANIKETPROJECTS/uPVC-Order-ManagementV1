@@ -26,6 +26,8 @@ import {
   getClients,
   getCounters,
   getMongoDb,
+  getOrders,
+  getQuotationRateSubmissions,
   getQuotations,
   getUsers,
   getWindowProfiles,
@@ -150,6 +152,11 @@ export function quotationResponse(quotation: QuotationDocument) {
       item.rateOverridden ??
       Math.abs(item.ratePerSqFt - (item.catalogueRatePerSqFt ?? item.ratePerSqFt)) > 0.005,
   }));
+  const documentVersions = quotation.uploadedDocumentVersions?.length
+    ? quotation.uploadedDocumentVersions
+    : quotation.uploadedDocument
+      ? [{ ...quotation.uploadedDocument, versionNumber: 1, uploadedBy: quotation.createdBy }]
+      : [];
   return {
     id: quotation._id,
     quoteNo: quotation.quoteNo,
@@ -159,6 +166,14 @@ export function quotationResponse(quotation: QuotationDocument) {
       uploadedAt: quotation.uploadedDocument.uploadedAt.toISOString(),
       downloadUrl: `/api/quotations/${encodeURIComponent(quotation._id)}/document`,
     } : null,
+    uploadedDocumentVersions: documentVersions.map((version) => ({
+      versionNumber: version.versionNumber,
+      filename: version.filename,
+      sizeBytes: version.sizeBytes,
+      uploadedAt: version.uploadedAt.toISOString(),
+      uploadedBy: version.uploadedBy,
+      downloadUrl: `/api/quotations/${encodeURIComponent(quotation._id)}/document/versions/${version.versionNumber}`,
+    })),
     clientId: quotation.clientId,
     customerName: quotation.customerName,
     customerPhone: quotation.customerPhone,
@@ -647,6 +662,15 @@ router.post("/quotations/upload/:filename", async (req, res, next): Promise<void
         approvalLastReminderAt: null,
         approvalHistory: [],
         uploadedDocument: { filename, sizeBytes: body.length, storagePath, uploadedAt: now },
+        uploadedDocumentVersions: [{
+          versionNumber: 1,
+          filename,
+          sizeBytes: body.length,
+          storagePath,
+          uploadedAt: now,
+          uploadedBy: actor.id,
+        }],
+        uploadedDocumentVersionSequence: 1,
         createdBy: actor.id,
         updatedBy: actor.id,
         createdAt: now,
@@ -687,6 +711,177 @@ router.get("/quotations/:quotationId/document", async (req, res): Promise<void> 
   } catch {
     res.status(404).json({ error: "Quotation document is unavailable." });
   }
+});
+
+router.post("/quotations/:quotationId/document/:filename", async (req, res, next): Promise<void> => {
+  const actor = await context(req, res, true);
+  if (!actor) return;
+  const filename = req.params.filename.replace(/[\r\n"]/g, "").trim().slice(0, 200);
+  const declaredType = String(req.headers["content-type"] ?? "").split(";")[0];
+  const declaredLength = Number(req.headers["content-length"]);
+  if (!filename.toLowerCase().endsWith(".pdf") || (declaredType !== "application/pdf" && declaredType !== "application/octet-stream")) {
+    res.status(400).json({ error: "Upload a PDF quotation document." });
+    return;
+  }
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_QUOTATION_DOCUMENT_BYTES) {
+    res.status(413).json({ error: "The quotation PDF must be 10 MiB or smaller." });
+    req.resume();
+    return;
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  let tooLarge = false;
+  req.on("data", (chunk: Buffer) => {
+    if (tooLarge) return;
+    size += chunk.length;
+    if (size > MAX_QUOTATION_DOCUMENT_BYTES) {
+      tooLarge = true;
+      chunks.length = 0;
+      if (!res.headersSent) res.status(413).json({ error: "The quotation PDF must be 10 MiB or smaller." });
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on("end", () => {
+    if (tooLarge) return;
+    void (async () => {
+      const body = Buffer.concat(chunks, size);
+      if (body.length < 5 || body.subarray(0, 5).toString("ascii") !== "%PDF-") {
+        res.status(400).json({ error: "The uploaded file is not a valid PDF." });
+        return;
+      }
+      const quotations = getQuotations(await getMongoDb());
+      const existing = await quotations.findOne({ _id: req.params.quotationId, archivedAt: null });
+      if (!existing) {
+        res.status(404).json({ error: "Quotation not found." });
+        return;
+      }
+      const now = new Date();
+      const storagePath = await storeProjectUpload("quotation-documents", filename, body);
+      const currentVersions = existing.uploadedDocumentVersions?.length
+        ? existing.uploadedDocumentVersions
+        : existing.uploadedDocument
+          ? [{ ...existing.uploadedDocument, versionNumber: 1, uploadedBy: existing.createdBy }]
+          : [];
+      const version = {
+        versionNumber: Math.max(
+          existing.uploadedDocumentVersionSequence ?? 0,
+          currentVersions.reduce((max, item) => Math.max(max, item.versionNumber), 0),
+        ) + 1,
+        filename,
+        sizeBytes: body.length,
+        storagePath,
+        uploadedAt: now,
+        uploadedBy: actor.id,
+      };
+      let updated: QuotationDocument | null;
+      try {
+        updated = await quotations.findOneAndUpdate(
+          { _id: existing._id, updatedAt: existing.updatedAt, archivedAt: null },
+          {
+            $set: {
+              uploadedDocument: { filename, sizeBytes: body.length, storagePath, uploadedAt: now },
+              uploadedDocumentVersions: [...currentVersions, version],
+              uploadedDocumentVersionSequence: version.versionNumber,
+              updatedAt: now,
+              updatedBy: actor.id,
+            },
+          },
+          { returnDocument: "after" },
+        );
+      } catch (error) {
+        await removeProjectUpload(storagePath).catch(() => undefined);
+        throw error;
+      }
+      if (!updated) {
+        await removeProjectUpload(storagePath).catch(() => undefined);
+        res.status(409).json({ error: "The quotation changed during upload. Refresh and try again." });
+        return;
+      }
+      res.json(quotationResponse(updated));
+    })().catch(next);
+  });
+  req.on("aborted", () => next(new Error("Quotation upload was interrupted.")));
+  req.on("error", next);
+});
+
+router.get("/quotations/:quotationId/document/versions/:versionNumber", async (req, res): Promise<void> => {
+  const actor = await context(req, res);
+  if (!actor) return;
+  const versionNumber = Number(req.params.versionNumber);
+  const quotation = await getQuotations(await getMongoDb()).findOne({ _id: req.params.quotationId, archivedAt: null });
+  const versions = quotation?.uploadedDocumentVersions?.length
+    ? quotation.uploadedDocumentVersions
+    : quotation?.uploadedDocument
+      ? [{ ...quotation.uploadedDocument, versionNumber: 1, uploadedBy: quotation.createdBy }]
+      : [];
+  const version = versions.find((entry) => entry.versionNumber === versionNumber);
+  const filePath = version ? resolveProjectUploadPath(version.storagePath) : null;
+  if (!version || !filePath) {
+    res.status(404).json({ error: "Quotation version not found." });
+    return;
+  }
+  try {
+    res.type("application/pdf").setHeader("Content-Disposition", `inline; filename="${version.filename.replace(/[\r\n"\\]/g, "")}"`);
+    res.send(await readFile(filePath));
+  } catch {
+    res.status(404).json({ error: "Quotation version is unavailable." });
+  }
+});
+
+router.delete("/quotations/:quotationId/document/versions/:versionNumber", async (req, res): Promise<void> => {
+  const actor = await context(req, res, true);
+  if (!actor) return;
+  const versionNumber = Number(req.params.versionNumber);
+  if (!Number.isInteger(versionNumber) || versionNumber < 1) {
+    res.status(400).json({ error: "Invalid quotation version number." });
+    return;
+  }
+  const quotations = getQuotations(await getMongoDb());
+  const existing = await quotations.findOne({ _id: req.params.quotationId, archivedAt: null });
+  if (!existing) {
+    res.status(404).json({ error: "Quotation not found." });
+    return;
+  }
+  const versions = existing.uploadedDocumentVersions?.length
+    ? existing.uploadedDocumentVersions
+    : existing.uploadedDocument
+      ? [{ ...existing.uploadedDocument, versionNumber: 1, uploadedBy: existing.createdBy }]
+      : [];
+  const removed = versions.find((entry) => entry.versionNumber === versionNumber);
+  if (!removed) {
+    res.status(404).json({ error: "Quotation version not found." });
+    return;
+  }
+  const remaining = versions.filter((entry) => entry.versionNumber !== versionNumber);
+  const latest = remaining.reduce<typeof remaining[number] | null>(
+    (current, entry) => !current || entry.versionNumber > current.versionNumber ? entry : current,
+    null,
+  );
+  const updated = await quotations.updateOne(
+    { _id: existing._id, updatedAt: existing.updatedAt, archivedAt: null },
+    {
+      $set: {
+        uploadedDocumentVersions: remaining,
+        uploadedDocument: latest ? {
+          filename: latest.filename,
+          sizeBytes: latest.sizeBytes,
+          storagePath: latest.storagePath,
+          uploadedAt: latest.uploadedAt,
+        } : null,
+        updatedAt: new Date(),
+        updatedBy: actor.id,
+      },
+    },
+  );
+  if (!updated.matchedCount) {
+    res.status(409).json({ error: "The quotation changed. Refresh and try again." });
+    return;
+  }
+  await removeProjectUpload(removed.storagePath).catch((error: unknown) =>
+    req.log.error({ err: error, quotationId: existing._id }, "Failed to remove a deleted quotation version"),
+  );
+  res.status(204).end();
 });
 
 router.post("/quotations", async (req, res): Promise<void> => {
@@ -866,14 +1061,43 @@ router.delete("/quotations/:quotationId", async (req, res): Promise<void> => {
     inputError(req, res, parsed.error);
     return;
   }
-  const result = await getQuotations(await getMongoDb()).updateOne(
-    { _id: parsed.data.quotationId, archivedAt: null, status: "draft" },
-    { $set: { archivedAt: new Date(), updatedAt: new Date(), updatedBy: actor.id } },
-  );
-  if (!result.matchedCount) {
+  const db = await getMongoDb();
+  const quotations = getQuotations(db);
+  const quotation = await quotations.findOne({
+    _id: parsed.data.quotationId,
+    archivedAt: null,
+    status: "draft",
+  });
+  if (!quotation) {
     res.status(404).json({ error: "Draft quotation not found." });
     return;
   }
+  const [linkedOrder, linkedRequest] = await Promise.all([
+    getOrders(db).findOne({ quotationId: quotation._id }),
+    getQuotationRateSubmissions(db).findOne({ quotationRecordId: quotation._id }),
+  ]);
+  if (linkedOrder || linkedRequest) {
+    res.status(409).json({ error: "This quotation is linked to an order or rate request. Remove the PDF versions individually instead." });
+    return;
+  }
+  const result = await quotations.updateOne(
+    { _id: quotation._id, archivedAt: null, status: "draft", updatedAt: quotation.updatedAt },
+    { $set: { archivedAt: new Date(), updatedAt: new Date(), updatedBy: actor.id } },
+  );
+  if (!result.matchedCount) {
+    res.status(409).json({ error: "The quotation changed. Refresh and try again." });
+    return;
+  }
+  const versions = quotation.uploadedDocumentVersions?.length
+    ? quotation.uploadedDocumentVersions
+    : quotation.uploadedDocument
+      ? [{ ...quotation.uploadedDocument, versionNumber: 1, uploadedBy: quotation.createdBy }]
+      : [];
+  await Promise.all(versions.map((version) =>
+    removeProjectUpload(version.storagePath).catch((error: unknown) =>
+      req.log.error({ err: error, quotationId: quotation._id }, "Failed to remove an archived quotation PDF"),
+    ),
+  ));
   res.status(204).end();
 });
 

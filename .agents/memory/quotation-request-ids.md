@@ -3,8 +3,8 @@ name: Quotation IDs
 description: Shared human-readable ID sequence for quotations and rate requests.
 ---
 
-Quotations and quotation rate requests use one `QT-{YY}-{4-digit sequence}` counter per year, based on Asia/Kolkata creation dates. Keep Mongo `_id` values stable for quotation records. Rate-request records may be migrated to QT IDs, but preserve their prior public ID as `legacyId` and update measurement/document references together. Gaps in allocated counters are acceptable; never reuse an issued number.
+Quotations use `QT-{YY}-{4-digit sequence}` IDs; rate requests use `RR-{YY}-{4-digit sequence}` IDs. Both use the yearly counter based on Asia/Kolkata creation dates. Keep quotation Mongo `_id` values stable. When migrating rate-request IDs, preserve the prior public ID as `legacyId` and update measurement, document, notification, and URL references together. Gaps in counters are acceptable; never reuse an issued number.
 
-**Why:** The user requested one ID style for existing QT and QTR records, while a failed migration attempt can consume a counter before retrying.
+**Why:** The user distinguishes quotations (QT) from rate requests (RR); separate prefixes prevent confusion while preserving one annual sequence.
 
-**How to apply:** When adding a quotation or rate request, allocate from the shared year counter. When migrating historical IDs, retain searchable legacy aliases and update every stored link before removing an old request record.
+**How to apply:** Use the same yearly sequence allocator for new QT and RR records, but format each with its correct prefix. Retain old rate-request aliases and update stored references during migration.

@@ -602,6 +602,15 @@ export interface QuotationDocument {
     storagePath: string;
     uploadedAt: Date;
   } | null;
+  uploadedDocumentVersions?: Array<{
+    versionNumber: number;
+    filename: string;
+    sizeBytes: number;
+    storagePath: string;
+    uploadedAt: Date;
+    uploadedBy: string;
+  }>;
+  uploadedDocumentVersionSequence?: number;
   legacyQuoteNo?: string | null;
   clientId: string | null;
   customerName: string;
@@ -1531,6 +1540,146 @@ async function migrateQuotationRateRequestIds(db: Db, now: Date): Promise<void> 
   logger.info({ migratedRateRequests: legacyRequests.length }, "Migrated quotation rate-request IDs");
 }
 
+async function migrateQuotationRateRequestIdsToRr(db: Db, now: Date): Promise<void> {
+  const counters = getCounters(db);
+  const markerId = "quotationRateRequestIdFormatV2";
+  const marker = await counters.findOne({ _id: markerId });
+  if (marker?.value === 1) return;
+
+  const submissions = getQuotationRateSubmissions(db);
+  let all = await submissions.find({}).sort({ createdAt: 1, _id: 1 }).toArray();
+  for (const item of all.filter((entry) => entry._id.startsWith("__RR_MIGRATING__"))) {
+    const oldId = item.legacyId ?? item._id.slice("__RR_MIGRATING__".length);
+    const match = /^(?:QT|RR)-(\d{2})-(\d{4,})$/i.exec(oldId);
+    const finished = await submissions.findOne({ _id: /^RR-/i, legacyId: oldId });
+    if (finished) {
+      await submissions.deleteOne({ _id: item._id });
+      continue;
+    }
+    if (await submissions.findOne({ _id: oldId })) {
+      await submissions.deleteOne({ _id: oldId });
+    }
+  }
+  all = await submissions.find({}).sort({ createdAt: 1, _id: 1 }).toArray();
+  const reservedIds = new Set(
+    all.filter((item) => /^RR-\d{2}-\d{4,}$/i.test(item._id)).map((item) => item._id.toUpperCase()),
+  );
+  const sequenceByYear = new Map<string, number>();
+  for (const item of all) {
+    const sourceId = item._id.startsWith("__RR_MIGRATING__")
+      ? item.legacyId ?? item._id.slice("__RR_MIGRATING__".length)
+      : item._id;
+    const match = /^(?:QT|RR)-(\d{2})-(\d{4,})$/i.exec(sourceId);
+    if (match) {
+      const year = match[1];
+      sequenceByYear.set(year, Math.max(sequenceByYear.get(year) ?? 0, Number(match[2])));
+    }
+  }
+  for (const [year, value] of sequenceByYear) {
+    await counters.updateOne(
+      { _id: quotationYearSequenceCounterId(year) },
+      { $max: { value }, $set: { updatedAt: now } },
+      { upsert: true },
+    );
+  }
+
+  const plans: Array<{ item: QuotationRateSubmissionDocument; oldId: string; newId: string; tempId: string }> = [];
+  for (const item of all) {
+    if (/^RR-\d{2}-\d{4,}$/i.test(item._id)) continue;
+    const oldId = item._id.startsWith("__RR_MIGRATING__")
+      ? item.legacyId ?? item._id.slice("__RR_MIGRATING__".length)
+      : item._id;
+    const match = /^(?:QT|RR)-(\d{2})-(\d{4,})$/i.exec(oldId);
+    const year = match?.[1] ?? quotationYearCode(item.createdAt);
+    let nextId = match ? `RR-${year}-${match[2]}` : "";
+    if (!nextId || reservedIds.has(nextId.toUpperCase())) {
+      const counter = await counters.findOneAndUpdate(
+        { _id: quotationYearSequenceCounterId(year) },
+        { $inc: { value: 1 }, $set: { updatedAt: now } },
+        { returnDocument: "after", upsert: true },
+      );
+      if (!counter || !Number.isSafeInteger(counter.value) || counter.value < 1) {
+        throw new Error("The rate-request RR ID sequence could not be allocated.");
+      }
+      nextId = `RR-${year}-${String(counter.value).padStart(4, "0")}`;
+      while (reservedIds.has(nextId.toUpperCase())) {
+        const nextCounter = await counters.findOneAndUpdate(
+          { _id: quotationYearSequenceCounterId(year) },
+          { $inc: { value: 1 }, $set: { updatedAt: now } },
+          { returnDocument: "after" },
+        );
+        if (!nextCounter) throw new Error("The rate-request RR ID sequence could not be allocated.");
+        nextId = `RR-${year}-${String(nextCounter.value).padStart(4, "0")}`;
+      }
+    }
+    reservedIds.add(nextId.toUpperCase());
+    plans.push({ item, oldId, newId: nextId, tempId: `__RR_MIGRATING__${randomUUID()}` });
+  }
+
+  for (const { item, oldId, newId, tempId } of plans) {
+    let currentId = item._id;
+    let migratedFields = item;
+    if (!item._id.startsWith("__RR_MIGRATING__")) {
+      const {
+        _id: _ignoredId,
+        measurementRecordId,
+        ...cloneFields
+      } = item;
+      migratedFields = {
+        ...cloneFields,
+        _id: tempId,
+        legacyId: item.legacyId ?? oldId,
+        migrationMeasurementRecordId: measurementRecordId ?? item.migrationMeasurementRecordId ?? null,
+      };
+      await submissions.insertOne(migratedFields);
+      await submissions.deleteOne({ _id: item._id });
+      currentId = tempId;
+    }
+    for (const referenceId of new Set([oldId, item.legacyId].filter((id): id is string => Boolean(id)))) {
+      await Promise.all([
+        getMeasurementRecords(db).updateMany(
+          { quotationRequestId: referenceId },
+          { $set: { quotationRequestId: newId } },
+        ),
+        getOrderDocumentMetadata(db).updateMany(
+          { quotationRequestId: referenceId },
+          { $set: { quotationRequestId: newId } },
+        ),
+      ]);
+      const notifications = await getAppNotifications(db).find({
+        quotationId: referenceId,
+        type: { $in: ["rate_request", "rate_request_urgent", "rate_overdue", "rate_assigned"] },
+      }).toArray();
+      for (const notification of notifications) {
+        await getAppNotifications(db).updateOne(
+          { _id: notification._id },
+          {
+            $set: {
+              quotationId: newId,
+              url: notification.url.replace(referenceId, newId),
+            },
+          },
+        );
+      }
+    }
+    const {
+      _id: _oldId,
+      migrationMeasurementRecordId,
+      measurementRecordId,
+      ...fields
+    } = migratedFields;
+    await submissions.insertOne({
+      ...fields,
+      _id: newId,
+      legacyId: item.legacyId ?? oldId,
+      measurementRecordId: measurementRecordId ?? migrationMeasurementRecordId ?? null,
+    });
+    await submissions.deleteOne({ _id: currentId });
+  }
+  await counters.updateOne({ _id: markerId }, { $set: { value: 1, updatedAt: now } }, { upsert: true });
+  logger.info({ migratedRateRequests: plans.length }, "Changed rate-request IDs to RR format");
+}
+
 async function migrateQuotationOrderIds(db: Db, now: Date): Promise<void> {
   const counters = getCounters(db);
   const migrationMarkerId = "quotationOrderIdFormatV1";
@@ -2122,6 +2271,7 @@ export async function initializeMongo(): Promise<void> {
 
   await migrateQuotationDocumentIds(db, now);
   await migrateQuotationRateRequestIds(db, now);
+  await migrateQuotationRateRequestIdsToRr(db, now);
   await migrateQuotationOrderIds(db, now);
   await migrateOrderIds(db, now);
   await migrateProjectIdentifiers(db, now);

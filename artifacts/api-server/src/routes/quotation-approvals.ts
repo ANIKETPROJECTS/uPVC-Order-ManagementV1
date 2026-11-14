@@ -65,7 +65,7 @@ function quotationRequestYearCode(date: Date): string {
 }
 
 function formatQuotationRequestId(sequence: number, createdAt: Date): string {
-  return `QT-${quotationRequestYearCode(createdAt)}-${String(sequence).padStart(4, "0")}`;
+  return `RR-${quotationRequestYearCode(createdAt)}-${String(sequence).padStart(4, "0")}`;
 }
 
 type Actor = {
@@ -938,7 +938,9 @@ router.get("/quotation-rate-submissions/:submissionId/past-rates", async (req, r
     return;
   }
   const db = await getMongoDb();
-  const current = await getQuotationRateSubmissions(db).findOne({ _id: String(req.params.submissionId) });
+  const current = await getQuotationRateSubmissions(db).findOne({
+    $or: [{ _id: String(req.params.submissionId) }, { legacyId: String(req.params.submissionId) }],
+  });
   if (!current) {
     res.status(404).json({ error: "Rate request not found." });
     return;
@@ -981,7 +983,11 @@ router.post("/quotation-rate-submissions/:submissionId/query", async (req, res):
   const question = typeof req.body?.comment === "string" ? req.body.comment.trim() : "";
   if (!question || question.length > 2000) { res.status(400).json({ error: "Enter a query up to 2000 characters." }); return; }
   const submissions = getQuotationRateSubmissions(await getMongoDb());
-  const item = await submissions.findOne({ _id: String(req.params.submissionId), workflowVersion: 3, status: { $in: ["awaiting_rate", "rated"] } });
+  const item = await submissions.find({
+    $or: [{ _id: String(req.params.submissionId) }, { legacyId: String(req.params.submissionId) }],
+    workflowVersion: 3,
+    status: { $in: ["awaiting_rate", "rated"] },
+  }).next();
   if (!item) { res.status(409).json({ error: "This request cannot receive a query in its current status." }); return; }
   const now = new Date();
   const queryHistory = [...(item.queryHistory ?? []), {
@@ -998,7 +1004,11 @@ router.post("/quotation-rate-submissions/:submissionId/query-response", async (r
   const actor = await getActor(req, res);
   if (!actor) return;
   const submissions = getQuotationRateSubmissions(await getMongoDb());
-  const item = await submissions.findOne({ _id: String(req.params.submissionId), workflowVersion: 3, status: "query_raised" });
+  const item = await submissions.find({
+    $or: [{ _id: String(req.params.submissionId) }, { legacyId: String(req.params.submissionId) }],
+    workflowVersion: 3,
+    status: "query_raised",
+  }).next();
   if (!item) { res.status(409).json({ error: "There is no open query on this request." }); return; }
   if (!actor.masterAdmin && (!canSubmit(actor) || item.submittedBy !== actor.id)) {
     res.status(403).json({ error: "Only the requesting quotation member can answer this query." }); return;
@@ -1030,7 +1040,11 @@ router.patch("/quotation-rate-submissions/:submissionId/outcome", async (req, re
     res.status(400).json({ error: "Choose an outcome; Lost also requires a valid reason." }); return;
   }
   const submissions = getQuotationRateSubmissions(await getMongoDb());
-  const item = await submissions.findOne({ _id: String(req.params.submissionId), workflowVersion: 3, status: "sent_to_client" });
+  const item = await submissions.find({
+    $or: [{ _id: String(req.params.submissionId) }, { legacyId: String(req.params.submissionId) }],
+    workflowVersion: 3,
+    status: "sent_to_client",
+  }).next();
   if (!item) { res.status(409).json({ error: "Only sent quotations can have an outcome." }); return; }
   if (!actor.masterAdmin && (!canSubmit(actor) || item.submittedBy !== actor.id)) {
     res.status(403).json({ error: "Only the quotation owner can set its client outcome." }); return;

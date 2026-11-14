@@ -3055,7 +3055,15 @@ export const ListQuotationsResponseItem = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedAt": zod.coerce.date(),
   "downloadUrl": zod.string()
-}),zod.null()]).optional(),
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3223,7 +3231,15 @@ export const CreateQuotationResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedAt": zod.coerce.date(),
   "downloadUrl": zod.string()
-}),zod.null()]).optional(),
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3319,7 +3335,15 @@ export const UploadQuotationDocumentResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedAt": zod.coerce.date(),
   "downloadUrl": zod.string()
-}),zod.null()]).optional(),
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3405,6 +3429,138 @@ export const DownloadQuotationDocumentResponse = zod.unknown()
 
 
 /**
+ * @summary Upload a new version under the existing QT ID
+ */
+export const UploadQuotationRevisionParams = zod.object({
+  "quotationId": zod.coerce.string()
+})
+
+export const uploadQuotationRevisionResponseItemsItemImageDataUrlOneMax = 220000;
+
+
+export const uploadQuotationRevisionResponseItemsItemImageDataUrlOneRegExp = new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$');
+
+
+export const UploadQuotationRevisionResponse = zod.object({
+  "id": zod.string(),
+  "quoteNo": zod.string(),
+  "uploadedDocument": zod.union([zod.object({
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "downloadUrl": zod.string()
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
+  "clientId": zod.string().nullable(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerAddress": zod.string(),
+  "customerGstin": zod.string().nullable(),
+  "projectName": zod.string(),
+  "quotationDate": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "profileId": zod.string(),
+  "profileCode": zod.string(),
+  "profileName": zod.string(),
+  "profileSystem": zod.string(),
+  "glass": zod.string(),
+  "profileColor": zod.string(),
+  "meshType": zod.string(),
+  "specifications": zod.string(),
+  "accessories": zod.string(),
+  "remarks": zod.string().optional(),
+  "imageDataUrl": zod.union([zod.string().max(uploadQuotationRevisionResponseItemsItemImageDataUrlOneMax).regex(uploadQuotationRevisionResponseItemsItemImageDataUrlOneRegExp),zod.null()]).optional(),
+  "drawingType": zod.enum(['casement', 'sliding', 'mixed', 'louvre']),
+  "code": zod.string(),
+  "location": zod.string(),
+  "widthMm": zod.number(),
+  "heightMm": zod.number(),
+  "sqFtPerWindow": zod.number(),
+  "ratePerSqFt": zod.number(),
+  "catalogueRatePerSqFt": zod.number(),
+  "rateOverridden": zod.boolean(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number().int(),
+  "value": zod.number(),
+  "weightKgPerWindow": zod.number()
+})),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalChargeDescription": zod.string(),
+  "additionalChargeRate": zod.number(),
+  "additionalChargeAreaSqFt": zod.number(),
+  "gstPercent": zod.number(),
+  "notes": zod.string().nullable(),
+  "totals": zod.object({
+  "componentCount": zod.number().int(),
+  "totalAreaSqFt": zod.number(),
+  "basicValue": zod.number(),
+  "transportationCost": zod.number(),
+  "loadingUnloadingCost": zod.number(),
+  "additionalCharge": zod.number(),
+  "subtotal": zod.number(),
+  "gstPercent": zod.number(),
+  "gstAmount": zod.number(),
+  "grandTotal": zod.number(),
+  "averagePricePerSqFt": zod.number()
+}),
+  "status": zod.enum(['draft', 'pending_approval', 'approved', 'rejected']),
+  "outcomeStatus": zod.union([zod.enum(['negotiating', 'won', 'lost']),zod.null()]),
+  "lostReason": zod.union([zod.enum(['price', 'competitor', 'delayed', 'project_cancelled']),zod.null()]),
+  "outcomeSource": zod.union([zod.literal('manual'),zod.literal('confirmation'),zod.literal(null)]).nullable(),
+  "confirmationRecordIds": zod.array(zod.string()),
+  "requiresRateApproval": zod.boolean(),
+  "sampleOnly": zod.boolean(),
+  "approvalHistory": zod.array(zod.object({
+  "action": zod.enum(['submitted', 'approved', 'rejected']),
+  "actorId": zod.string(),
+  "actorName": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdBy": zod.string(),
+  "updatedBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Download a quotation PDF version
+ */
+
+
+
+export const DownloadQuotationRevisionParams = zod.object({
+  "quotationId": zod.coerce.string(),
+  "versionNumber": zod.coerce.number().int().min(1)
+})
+
+export const DownloadQuotationRevisionResponse = zod.unknown()
+
+
+/**
+ * @summary Delete one quotation PDF version
+ */
+
+
+
+export const DeleteQuotationRevisionParams = zod.object({
+  "quotationId": zod.coerce.string(),
+  "versionNumber": zod.coerce.number().int().min(1)
+})
+
+export const DeleteQuotationRevisionResponse = zod.void()
+
+
+/**
  * @summary Get a saved quotation
  */
 export const GetQuotationParams = zod.object({
@@ -3425,7 +3581,15 @@ export const GetQuotationResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedAt": zod.coerce.date(),
   "downloadUrl": zod.string()
-}),zod.null()]).optional(),
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3596,7 +3760,15 @@ export const UpdateQuotationResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedAt": zod.coerce.date(),
   "downloadUrl": zod.string()
-}),zod.null()]).optional(),
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3702,7 +3874,15 @@ export const SubmitQuotationForApprovalResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedAt": zod.coerce.date(),
   "downloadUrl": zod.string()
-}),zod.null()]).optional(),
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3795,7 +3975,15 @@ export const ListQuotationApprovalsResponseItem = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedAt": zod.coerce.date(),
   "downloadUrl": zod.string()
-}),zod.null()]).optional(),
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),
@@ -3905,7 +4093,15 @@ export const DecideQuotationApprovalResponse = zod.object({
   "sizeBytes": zod.number().int(),
   "uploadedAt": zod.coerce.date(),
   "downloadUrl": zod.string()
-}),zod.null()]).optional(),
+}),zod.null()]),
+  "uploadedDocumentVersions": zod.array(zod.object({
+  "versionNumber": zod.number().int(),
+  "filename": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date(),
+  "uploadedBy": zod.string(),
+  "downloadUrl": zod.string()
+})),
   "clientId": zod.string().nullable(),
   "customerName": zod.string(),
   "customerPhone": zod.string(),

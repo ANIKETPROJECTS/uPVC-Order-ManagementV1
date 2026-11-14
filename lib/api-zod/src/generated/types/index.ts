@@ -293,6 +293,7 @@ export * from './searchQuotationRateSubmissionsParams';
 export * from './startDirectConversationInput';
 export * from './successResponse';
 export * from './uploadedQuotationDocument';
+export * from './uploadedQuotationDocumentVersion';
 export * from './user';
 export * from './userInput';
 export * from './userInputPermissionOverrides';
