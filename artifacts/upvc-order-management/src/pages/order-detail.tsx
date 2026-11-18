@@ -1057,18 +1057,8 @@ function WindowsPanel({ orderId, user, allowMultiple = false }: { orderId: strin
     </CardContent><WindowDialog orderId={orderId} window={editingWindow} user={user} allowMultiple={allowMultiple} universalMeshType={universalMeshType} open={dialogOpen} onOpenChange={setDialogOpen} onComplete={() => { void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }} /></Card>{viewingWindow && <WindowDetailsDialog window={viewingWindow} onClose={() => setViewingWindow(null)} />}</>;
 }
 
-function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType, canMeasure, lotId, onComplete }: {
-  orderId: string;
-  documentRecord: OrderDocument;
-  windows: OrderWindow[];
-  meshType: string;
-  canMeasure: boolean;
-  lotId?: string | null;
-  onComplete: () => void;
-}) {
-  const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
-  const extractedRows = documentRecord.confirmationInfo?.windows ?? [];
+function getConfirmationRowsToAdd(info: NonNullable<OrderDocument['confirmationInfo']>, windows: OrderWindow[]) {
+  const extractedRows = info.windows ?? [];
   const existingNumbers = new Set(windows.map((item) => item.windowNo.trim().toLocaleLowerCase()));
   const seenNumbers = new Set<string>();
   const rowsToAdd = extractedRows.filter((row) => {
@@ -1082,7 +1072,55 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
       && Number.isInteger(quantity) && quantity > 0;
   });
   const alreadyPresent = extractedRows.filter((row) => existingNumbers.has(row.windowNo.trim().toLocaleLowerCase())).length;
-  const skipped = extractedRows.length - rowsToAdd.length - alreadyPresent;
+  return { extractedRows, rowsToAdd, alreadyPresent, skipped: extractedRows.length - rowsToAdd.length - alreadyPresent };
+}
+
+async function importConfirmationRows(orderId: string, filename: string, rows: NonNullable<OrderDocument['confirmationInfo']>['windows'], meshType: string, lotId?: string | null) {
+  if (rows.length > 500) throw new Error('More than 500 new windows were extracted. Split the schedule into smaller imports.');
+  const payloadRows = rows.map((row) => ({
+    windowNo: row.windowNo.trim(),
+    widthMm: Number(row.width),
+    heightMm: Number(row.height),
+    windowType: row.windowType.trim() || 'Confirmation schedule',
+    location: row.location.trim() || null,
+    glassType: row.glass.trim() || null,
+    meshType: meshType || null,
+    frameCount: Number(row.quantity),
+    lotId: lotId ?? null,
+    frameStatus: OrderWindowReadiness.pending,
+    shutterStatus: OrderWindowReadiness.pending,
+    glassStatus: OrderGlassStatus.pending,
+    pendingReason: null,
+    lockType: row.lockType,
+    profile: row.profile,
+    mesh: row.mesh,
+  }));
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const response = await fetch(`${base}/api/orders/${encodeURIComponent(orderId)}/windows/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, source: 'confirmation', rows: payloadRows }),
+  });
+  const result = await response.json() as { created?: number; error?: string };
+  if (!response.ok) throw new Error(result.error || 'The extracted schedule could not be added to Windows.');
+  return result.created ?? rows.length;
+}
+
+function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType, canMeasure, lotId, onComplete }: {
+  orderId: string;
+  documentRecord: OrderDocument;
+  windows: OrderWindow[];
+  meshType: string;
+  canMeasure: boolean;
+  lotId?: string | null;
+  onComplete: () => void;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const extractedRows = documentRecord.confirmationInfo?.windows ?? [];
+  const { rowsToAdd, alreadyPresent, skipped } = documentRecord.confirmationInfo
+    ? getConfirmationRowsToAdd(documentRecord.confirmationInfo, windows)
+    : { rowsToAdd: [], alreadyPresent: 0, skipped: 0 };
   const addToWindows = async () => {
     if (!canMeasure || saving || rowsToAdd.length === 0) return;
     if (rowsToAdd.length > 500) {
@@ -1094,34 +1132,9 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
     if (!window.confirm(summary)) return;
     setSaving(true);
     try {
-      const payloadRows = rowsToAdd.map((row) => ({
-        windowNo: row.windowNo.trim(),
-        widthMm: Number(row.width),
-        heightMm: Number(row.height),
-        windowType: row.windowType.trim() || 'Confirmation schedule',
-        location: row.location.trim() || null,
-        glassType: row.glass.trim() || null,
-        meshType: meshType || null,
-        frameCount: Number(row.quantity),
-        lotId: lotId ?? null,
-        frameStatus: OrderWindowReadiness.pending,
-        shutterStatus: OrderWindowReadiness.pending,
-        glassStatus: OrderGlassStatus.pending,
-        pendingReason: null,
-        lockType: row.lockType,
-        profile: row.profile,
-        mesh: row.mesh,
-      }));
-      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-      const response = await fetch(`${base}/api/orders/${encodeURIComponent(orderId)}/windows/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: documentRecord.filename, source: 'confirmation', rows: payloadRows }),
-      });
-      const result = await response.json() as { created?: number; error?: string };
-      if (!response.ok) throw new Error(result.error || 'The extracted schedule could not be added to Windows.');
+      const created = await importConfirmationRows(orderId, documentRecord.filename, rowsToAdd, meshType, lotId);
       onComplete();
-      toast({ title: lotId ? `Windows added to ${lotId}` : 'Confirmation windows added', description: `${result.created ?? rowsToAdd.length} windows added. ${alreadyPresent} already listed${skipped ? ` · ${skipped} incomplete rows skipped` : ''}.` });
+      toast({ title: lotId ? `Windows added to ${lotId}` : 'Confirmation windows added', description: `${created} windows added. ${alreadyPresent} already listed${skipped ? ` · ${skipped} incomplete rows skipped` : ''}.` });
     } catch (error) {
       toast({ title: 'Windows could not be added', description: error instanceof Error ? error.message : 'The extracted schedule could not be added.', variant: 'destructive' });
     } finally {
@@ -1130,8 +1143,8 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
   };
   if (!extractedRows.length) return null;
   return <section className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3" data-testid="confirmation-schedule-import">
-    <div><h3 className="text-xs font-bold">Extracted window schedule</h3><p className="mt-1 text-xs text-muted-foreground">{rowsToAdd.length} ready to add · {alreadyPresent} already listed{skipped ? ` · ${skipped} incomplete` : ''}.</p></div>
-    {canMeasure && <Button type="button" size="sm" variant="outline" onClick={() => void addToWindows()} disabled={saving || rowsToAdd.length === 0} data-testid="button-add-confirmation-windows">{saving ? 'Adding windows…' : rowsToAdd.length ? 'Add extracted windows' : 'No new windows to add'}</Button>}
+    <div><h3 className="text-xs font-bold">Extracted window schedule</h3><p className="mt-1 text-xs text-muted-foreground">{rowsToAdd.length ? `${rowsToAdd.length} ready to add` : 'All valid extracted windows are in the shared register'} · {alreadyPresent} already listed{skipped ? ` · ${skipped} incomplete` : ''}.</p></div>
+    {canMeasure && rowsToAdd.length > 0 && <Button type="button" size="sm" variant="outline" onClick={() => void addToWindows()} disabled={saving} data-testid="button-add-confirmation-windows">{saving ? 'Adding windows…' : 'Add extracted windows'}</Button>}
   </section>;
 }
 
@@ -1254,17 +1267,38 @@ function GlassPill({ value }: { value: string }) {
 function OverviewWindowList({ windows }: { windows: OrderWindow[] }) {
   const progress = (ready: number | null, total: number | null, fallback: string) => total === null ? fallback : total === 0 ? 'Not applicable' : `${ready ?? 0}/${total} Ready`;
   return <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm" data-testid="section-order-overview-windows">
-    <header className="border-b border-border/70 px-4 py-3"><h2 className="font-display text-base font-bold">Windows</h2><p className="text-xs text-muted-foreground">{windows.length} total · dimensions are available in the Windows tab.</p></header>
-    <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-xs">
+    <header className="border-b border-border/70 px-4 py-3"><h2 className="font-display text-base font-bold">Windows</h2><p className="text-xs text-muted-foreground">All {windows.length} windows from the shared order register · dimensions are available in the Windows tab.</p></header>
+    <div className="max-h-[36rem] overflow-auto"><table className="w-full min-w-[850px] text-left text-xs">
       <thead><tr className="border-b border-border/70 bg-muted/35 text-[10px] uppercase tracking-wider text-muted-foreground"><th rowSpan={2} className="px-3 py-2">Window</th><th rowSpan={2} className="px-3 py-2">Type</th><th rowSpan={2} className="px-3 py-2">Location</th><th rowSpan={2} className="px-3 py-2">Frame status</th><th colSpan={2} className="border-l border-border/70 px-3 py-2 text-center">Shutter status</th></tr><tr className="border-b border-border/70 bg-muted/20 text-[10px] uppercase tracking-wider text-muted-foreground"><th className="border-l border-border/70 px-3 py-2">Glass shutter</th><th className="px-3 py-2">Mesh shutter</th></tr></thead>
-      <tbody>{windows.slice(0, 6).map((item) => <tr key={item.id} className="border-b border-border/50 last:border-0" data-testid={`overview-window-${item.id}`}>
+      <tbody>{windows.map((item) => <tr key={item.id} className="border-b border-border/50 last:border-0" data-testid={`overview-window-${item.id}`}>
         <td className="px-3 py-3 font-semibold">{item.windowNo}</td><td className="px-3 py-3">{item.windowType || 'Not recorded'}</td><td className="px-3 py-3">{item.location || 'Not recorded'}</td>
         <td className="px-3 py-3"><ReadinessPill value={item.frameStatus} />{item.pendingReason && <p className="mt-1 w-fit rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800">{item.pendingReason}</p>}</td>
         <td className="border-l border-border/70 px-3 py-3">{progress(item.glassShutterReadyCount ?? null,item.glassShutterCount ?? null,item.glassStatus === 'received' ? 'Ready' : item.glassStatus === 'partial' ? 'In progress' : 'Pending')}</td>
         <td className="px-3 py-3">{progress(item.meshShutterReadyCount ?? null,item.meshShutterCount ?? null,item.shutterStatus === 'ready' ? 'Ready' : item.shutterStatus === 'in_progress' ? 'In progress' : 'Pending')}</td>
       </tr>)}</tbody>
-    </table></div>{windows.length > 6 && <p className="px-4 py-2 text-[10px] text-muted-foreground">Showing 6 of {windows.length} windows.</p>}
+    </table></div>
   </section>;
+}
+
+function ConfirmationDetailsCard({ documentRecord, financialReference = false }: { documentRecord?: OrderDocument; financialReference?: boolean }) {
+  const info = documentRecord?.confirmationInfo;
+  if (!documentRecord || !info) return null;
+  const isFinancialField = (label: string) => /payment|rate|amount|cgst|sgst|balance|advance|window quantity|total area/i.test(label);
+  const sections = info.sections
+    .map((section) => ({ ...section, fields: financialReference ? section.fields.filter((field) => isFinancialField(field.label)) : section.fields }))
+    .filter((section) => section.fields.length > 0);
+  const referenceTerms = financialReference ? info.terms : [];
+  return <Card className="border-border/80" data-testid={financialReference ? 'card-confirmation-payment-reference' : 'card-confirmation-overview-details'}>
+    <CardHeader className="pb-3">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{financialReference ? 'Confirmation reference · not applied to billing' : 'Confirmation source'}</p>
+      <CardTitle className="mt-1 text-base">{financialReference ? 'Extracted payment and order figures' : 'Workbook confirmation details'}</CardTitle>
+      <p className="text-xs text-muted-foreground">{documentRecord.filename}{financialReference ? ' · The saved order value, receipts, and balance remain unchanged.' : ' · Extracted values are shown for reference.'}</p>
+    </CardHeader>
+    <CardContent className="space-y-3">
+      {sections.length ? <div className="grid gap-3 md:grid-cols-2">{sections.map((section) => <section key={section.title} className="overflow-hidden rounded-xl border border-border bg-card"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">{section.title}</h3><table className="w-full text-left text-xs"><tbody>{section.fields.map((field) => <tr key={field.label} className="border-b border-border/60 last:border-0"><th className="w-2/5 px-3 py-2 font-medium text-muted-foreground">{field.label}</th><td className="px-3 py-2 font-semibold">{field.value}</td></tr>)}</tbody></table></section>)}</div> : <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground">{financialReference ? 'No payment amount or payment terms were detected in this workbook.' : 'No confirmation details were extracted.'}</p>}
+      {referenceTerms.length > 0 && <section className="rounded-xl border border-border bg-muted/15 p-3"><h3 className="text-xs font-bold">Extracted terms · reference only</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">{referenceTerms.map((term, index) => <li key={`${index}-${term}`}>{term}</li>)}</ul></section>}
+    </CardContent>
+  </Card>;
 }
 
 function ProjectOrderProgress({ orderRecordId, windows, user }: { orderRecordId: string; windows: OrderWindow[]; user: User }) {
@@ -1412,7 +1446,7 @@ function ProjectLotCards({ order, windows, user, managementEnabled = false }: { 
   </div>;
 }
 
-function ProjectOrderDetailView({ order, windows, user, received, timeline }: { order: Order; windows: OrderWindow[]; user: User; received: number; timeline: { label: string; step: number; complete: boolean; current: boolean }[] }) {
+function ProjectOrderDetailView({ order, windows, user, received, timeline, confirmationDocument }: { order: Order; windows: OrderWindow[]; user: User; received: number; timeline: { label: string; step: number; complete: boolean; current: boolean }[]; confirmationDocument?: OrderDocument }) {
   const assigned = windows.filter((window) => Boolean(window.lotId && order.lots?.some((lot) => lot.lotId === window.lotId)));
   const area = assigned.reduce((sum, window) => sum + (window.sqFt ?? 0), 0);
   const total = windows.length;
@@ -1472,6 +1506,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
             <SummaryStat label="Glass type" value={glassType} detail="From window records" testId="project-stat-glass" />
             <SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : paid == null ? 'Not set' : paid > 0 ? `Due — ${plainInr(paid)}` : 'Paid'} detail="Payments stay on the project" testId="project-stat-payment" />
           </div>
+          <ConfirmationDetailsCard documentRecord={confirmationDocument} />
           <UniversalMeshTypePanel orderId={order.id} orderMeshType={order.meshType} windows={windows} user={user} />
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5" data-testid="section-project-lot-progress">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1496,7 +1531,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline }: { 
           <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-display text-base font-bold">Lots</h2><span className="text-xs text-muted-foreground">{order.lots?.length ?? 0} total · each opens its own lot page</span></div><ProjectLotCards order={order} windows={windows} user={user} /></section>
         </TabsContent>
          <TabsContent value="lots" className="space-y-3 pt-4"><div><h2 className="font-display text-base font-bold">Project lots</h2><p className="text-xs text-muted-foreground">Each lot owns its windows and dispatch history.</p></div><ProjectLotCards order={order} windows={windows} user={user} managementEnabled /></TabsContent>
-        <TabsContent value="payments" className="space-y-4 pt-4"><BillingPanel order={order} user={user} id={order.id} /><OrderPaymentFlagsPanel orderId={order.id} user={user} /><PaymentsPanel orderId={order.id} user={user} order={order} /></TabsContent>
+         <TabsContent value="payments" className="space-y-4 pt-4"><BillingPanel order={order} user={user} id={order.id} /><OrderPaymentFlagsPanel orderId={order.id} user={user} /><PaymentsPanel orderId={order.id} user={user} order={order} confirmationDocument={confirmationDocument} /></TabsContent>
          <TabsContent value="confirmation-info" className="pt-4"><ConfirmationInfoPanel orderId={order.id} /></TabsContent>
         <TabsContent value="documents" className="pt-4"><DocumentsPanel orderId={order.id} user={user} /></TabsContent>
         <TabsContent value="activity" className="space-y-4 pt-4"><GrievancesPanel order={order} user={user} /><ActivityPanel orderId={order.id} /></TabsContent>
@@ -1636,7 +1671,7 @@ function BillingPanel({ order, user, id }: { order: Order; user: User; id: strin
   return <Card className="border-border/80" data-testid="card-billing-value"><CardHeader className="flex-row items-start justify-between pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Commercial record</p><CardTitle className="mt-1 text-base">Order value</CardTitle><p className="mt-1 text-xs text-muted-foreground">The agreed value used for balance calculation.</p></div>{canEdit && <Button size="sm" variant="outline" onClick={() => setEditing((value) => !value)} data-testid="button-edit-order-value"><Pencil size={13} /> {editing ? 'Cancel' : 'Edit value'}</Button>}</CardHeader><CardContent>{editing && canEdit ? <Form {...form}><form onSubmit={form.handleSubmit(save)} className="flex flex-wrap items-end gap-3" data-testid="form-order-billing"><FormField control={form.control} name="orderValue" render={({ field }) => <FormItem className="min-w-[220px] flex-1"><FormLabel>Order value (INR)</FormLabel><FormControl><Input {...field} type="number" min="0" step="0.01" placeholder="Leave blank if not agreed" data-testid="input-order-value" /></FormControl><FormMessage /></FormItem>} /><Button type="submit" disabled={update.isPending} data-testid="button-save-order-value">{update.isPending ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} Save</Button></form></Form> : <div className="flex items-end justify-between gap-4"><div><p className="font-display text-3xl font-bold tracking-[-0.04em]" data-testid="text-order-value">{inr(order.orderValue)}</p><p className="mt-1 text-xs text-muted-foreground">{order.orderValue == null ? 'Balance remains unknown until an order value is set.' : 'Persisted on the central order record.'}</p></div><IndianRupee className="mb-1 text-primary/70" size={28} /></div>}</CardContent></Card>;
 }
 
-function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; order: Order }) {
+function PaymentsPanel({ orderId, user, order, confirmationDocument }: { orderId: string; user: User; order: Order; confirmationDocument?: OrderDocument }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canView = hasPermission(user, 'payments', 'view');
@@ -1729,6 +1764,7 @@ function PaymentsPanel({ orderId, user, order }: { orderId: string; user: User; 
   };
   if (!canView) return <ZeroState icon={IndianRupee} title="Payment access is restricted" description="You need payments view access to see this order's financial records." testId="state-payments-restricted" />;
   return <div className="space-y-5">
+    <ConfirmationDetailsCard documentRecord={confirmationDocument} financialReference />
     <div className="grid gap-3 sm:grid-cols-3">
       <SummaryStat label="Order value" value={inr(order.orderValue)} detail={order.orderValue == null ? 'Unknown' : 'Agreed value'} testId="text-billing-order-value" />
       <SummaryStat label="Paid" value={plainInr(progress.paid)} detail="Received receipts less refunds" testId="text-payments-received" />
@@ -1902,6 +1938,7 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const query = useListOrderDocuments(orderId, { query: { queryKey: getListOrderDocumentsQueryKey(orderId) } });
+  const windowsQuery = useListOrderWindows(orderId, { query: { queryKey: getListOrderWindowsQueryKey(orderId) } });
   const categoryQuery = useListOrderDocumentCategories({ query: { queryKey: getListOrderDocumentCategoriesQueryKey(), refetchOnWindowFocus: true } });
   const upload = useUploadOrderDocument();
   const replace = useReplaceOrderDocument();
@@ -1960,6 +1997,23 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
 
   const categoryLabel = (id: string) => categoriesById.get(id)?.label || readable(id);
   const categoryModule = (id: string) => categoriesById.get(id)?.requiredModule || 'order-hub';
+  const syncConfirmationWindows = async (documentRecord: OrderDocument): Promise<string | null> => {
+    const info = documentRecord.confirmationInfo;
+    if (documentRecord.category !== 'confirmation' || !info?.windows.length) return null;
+    if (!hasPermission(user, 'measurements')) return 'Window rows were extracted, but automatic sync requires Measurements edit access.';
+    const latestWindows = await windowsQuery.refetch();
+    if (!latestWindows.data || latestWindows.isError) throw new Error('Confirmation uploaded, but the order window register could not be loaded for sync.');
+    const { rowsToAdd, alreadyPresent, skipped } = getConfirmationRowsToAdd(info, latestWindows.data);
+    if (!rowsToAdd.length) {
+      return skipped
+        ? `No new valid windows were added; ${alreadyPresent} already existed and ${skipped} extracted row${skipped === 1 ? ' needs' : 's need'} review.`
+        : `${alreadyPresent} extracted windows were already in the order register.`;
+    }
+    const created = await importConfirmationRows(orderId, documentRecord.filename, rowsToAdd, '');
+    void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) });
+    void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
+    return `${created} extracted window${created === 1 ? '' : 's'} synced to Overview and Windows${alreadyPresent ? `; ${alreadyPresent} already existed` : ''}${skipped ? `; ${skipped} incomplete row${skipped === 1 ? ' needs' : 's need'} review` : ''}.`;
+  };
   const filteredDocuments = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
     const result = documents.filter((item) => {
@@ -1990,7 +2044,27 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
       toast({ title: 'Unsupported document type', description: 'Choose a PDF, PNG, JPEG, WebP, DOCX, XLSX, XLSM, XLS, or CSV file.', variant: 'destructive' });
       return;
     }
-    upload.mutate({ id: orderId, category, filename: encodeURIComponent(file.name), data: file }, { onSuccess: () => { toast({ title: 'Document uploaded' }); setFileKey((value) => value + 1); void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) }); void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) }); }, onError: () => toast({ title: 'Document could not be uploaded', variant: 'destructive' as const }) });
+    void (async () => {
+      let uploaded: OrderDocument;
+      try {
+        uploaded = await upload.mutateAsync({ id: orderId, category, filename: encodeURIComponent(file.name), data: file });
+      } catch {
+        toast({ title: 'Document could not be uploaded', variant: 'destructive' });
+        return;
+      }
+      let syncDescription: string | null = null;
+      if (category === 'confirmation') {
+        try {
+          syncDescription = await syncConfirmationWindows(uploaded);
+        } catch (error) {
+          syncDescription = error instanceof Error ? error.message : 'Extracted windows could not be synced. Review the confirmation details and try again.';
+        }
+      }
+      toast({ title: 'Document uploaded', ...(syncDescription ? { description: syncDescription } : {}) });
+      setFileKey((value) => value + 1);
+      void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) });
+      void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
+    })();
   };
 
   const replaceFile = (event: ChangeEvent<HTMLInputElement>, documentRecord: OrderDocument) => {
@@ -2007,7 +2081,7 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
     }
     setReplacingDocumentId(documentRecord.id);
     replace.mutate({ id: orderId, documentId: documentRecord.id, filename: encodeURIComponent(file.name), data: file }, {
-      onSuccess: (updated) => {
+      onSuccess: async (updated) => {
         setReplacingDocumentId(null);
         setPreviewId(null);
         queryClient.setQueryData<OrderDocument[]>(getListOrderDocumentsQueryKey(orderId), (current) =>
@@ -2016,7 +2090,13 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
         void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) });
         void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
         void queryClient.invalidateQueries({ queryKey: getDownloadOrderDocumentQueryKey(orderId, documentRecord.id) });
-        toast({ title: 'Document replaced', description: `${updated.filename} now replaces ${documentRecord.filename}.` });
+        let syncDescription: string | null = null;
+        try {
+          syncDescription = await syncConfirmationWindows(updated);
+        } catch (error) {
+          syncDescription = error instanceof Error ? error.message : 'Extracted windows could not be synced. Review the confirmation details and try again.';
+        }
+        toast({ title: 'Document replaced', description: `${updated.filename} now replaces ${documentRecord.filename}.${syncDescription ? ` ${syncDescription}` : ''}` });
       },
       onError: () => {
         setReplacingDocumentId(null);
@@ -2366,6 +2446,10 @@ export default function OrderDetailPage({ user }: { user: User }) {
   const templates = useListOrderMessageTemplates({ query: { queryKey: getListOrderMessageTemplatesQueryKey() } });
   const record = order.data;
   const windows = useListOrderWindows(id, { query: { queryKey: getListOrderWindowsQueryKey(id) } });
+  const orderDocuments = useListOrderDocuments(id, { query: { enabled: Boolean(id), queryKey: getListOrderDocumentsQueryKey(id) } });
+  const latestConfirmationDocument = (orderDocuments.data ?? [])
+    .filter((item) => item.category === 'confirmation' && item.confirmationInfo)
+    .sort((a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt))[0];
   const payments = useListOrderPayments(id, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderPaymentsQueryKey(id) } });
   const orderRefunds = useListOrderRefunds(id, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderRefundsQueryKey(id) } });
   const canReadOrder = hasPermission(user, 'order-hub', 'view');
@@ -2393,7 +2477,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
      return { label, step, complete, current, active: complete || current };
    });
    if (record.clientType === 'Project') {
-     return <ProjectOrderDetailView order={record} windows={windowRows} user={user} received={received} timeline={timeline} />;
+      return <ProjectOrderDetailView order={record} windows={windowRows} user={user} received={received} timeline={timeline} confirmationDocument={latestConfirmationDocument} />;
    }
   return <AppShell user={user} title={record.orderId} eyebrow="Module 2 · order record"><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-order-hub"><ArrowLeft size={15} /> Back to order hub</Link><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full bg-primary" /> <span>Last updated {dateLabel(record.updatedAt)}</span></div></div>
@@ -2429,6 +2513,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
      </section>
       <Tabs key={id} defaultValue={['overview', 'windows', 'payments', 'confirmation-info', 'documents', 'activity'].includes(new URLSearchParams(window.location.search).get('tab') || '') ? new URLSearchParams(window.location.search).get('tab')! : 'overview'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-6"><TabsTrigger value="overview" className="py-2.5 text-xs sm:text-sm">Overview</TabsTrigger><TabsTrigger value="windows" className="py-2.5 text-xs sm:text-sm">Windows</TabsTrigger><TabsTrigger value="payments" className="py-2.5 text-xs sm:text-sm">Payments</TabsTrigger><TabsTrigger value="confirmation-info" className="py-2.5 text-xs sm:text-sm">Confirmation info</TabsTrigger><TabsTrigger value="documents" className="py-2.5 text-xs sm:text-sm">Documents</TabsTrigger><TabsTrigger value="activity" className="py-2.5 text-xs sm:text-sm">Activity</TabsTrigger></TabsList>
       <TabsContent value="overview" className="space-y-5">
+        <ConfirmationDetailsCard documentRecord={latestConfirmationDocument} />
          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Location" value={record.siteAddress || record.locationName || 'Not recorded'} detail={record.locationName || 'Site'} testId="text-summary-location" /><SummaryStat label="Phone" value={record.clientPhone || 'Not recorded'} detail="Client contact" testId="text-summary-phone" /><SummaryStat label="Mesh Type" value={record.meshType || [...new Set(windowRows.map((w) => w.meshType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="Shared across all order windows" testId="text-summary-mesh-type" /><SummaryStat label="Glass Type" value={[...new Set(windowRows.map((w) => w.glassType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="From window records" testId="text-summary-glass-type" /></div>
          <UniversalMeshTypePanel orderId={record.id} orderMeshType={record.meshType} windows={windowRows} user={user} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Window qty" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Sq ft" value={summary.measured === 0 && summary.count > 0 ? '—' : summary.sqFt.toFixed(1)} detail={`${summary.measured} of ${summary.count} windows measured`} testId="text-summary-area" /><SummaryStat label="Glass status" value={summary.glass} detail="Counted from window rows" testId="text-summary-glass" /><SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : record.orderValue == null ? 'Not set' : record.orderValue - received > 0 ? `Due — ${plainInr(record.orderValue - received)}` : 'Paid'} detail="Order value less received payments" testId="text-summary-payment-status" /></div>
@@ -2446,7 +2531,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
         <MessagePreview order={record} templates={templates.data || []} canEdit={hasPermission(user, 'order-hub')} />
       </TabsContent>
       <TabsContent value="windows" className="space-y-5"><WindowsPanel orderId={id} user={user} /></TabsContent>
-      <TabsContent value="payments" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><OrderPaymentFlagsPanel orderId={id} user={user} /><PaymentsPanel orderId={id} user={user} order={record} /></TabsContent>
+      <TabsContent value="payments" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><OrderPaymentFlagsPanel orderId={id} user={user} /><PaymentsPanel orderId={id} user={user} order={record} confirmationDocument={latestConfirmationDocument} /></TabsContent>
       <TabsContent value="confirmation-info"><ConfirmationInfoPanel orderId={id} /></TabsContent>
       <TabsContent value="documents"><DocumentsPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="activity" className="space-y-5"><GrievancesPanel order={record} user={user} /><ActivityPanel orderId={id} /></TabsContent>

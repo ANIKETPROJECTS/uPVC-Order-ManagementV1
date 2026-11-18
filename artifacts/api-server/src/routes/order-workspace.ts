@@ -2356,7 +2356,7 @@ router.post("/orders/:id/documents/:category/:filename", async (req, res, next):
       return;
     }
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
-    const confirmationInfo = p.data.category === "confirmation" && /\.(xlsx|xls)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
+    const confirmationInfo = p.data.category === "confirmation" && /\.(xlsx|xlsm|xls|csv)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
     const meta = { _id: randomUUID(), orderRecordId: p.data.id, quotationRequestId: null, filename: p.data.filename, category: p.data.category as DocumentCategory, contentType: type, sizeBytes: body.length, gridFsId: null, storagePath, uploadedBy: actor.id, uploadedAt: new Date(), confirmationInfo };
     try {
       await getOrderDocumentMetadata(db).insertOne(meta);
@@ -2397,7 +2397,7 @@ router.post("/orders/:id/quotation-requests/:quotationRequestId/confirmation-doc
       return;
     }
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
-    const confirmationInfo = /\.(xlsx|xls)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
+    const confirmationInfo = /\.(xlsx|xlsm|xls|csv)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
     const meta = {
       _id: randomUUID(),
       orderRecordId: p.data.id,
@@ -2562,7 +2562,7 @@ router.put("/orders/:id/documents/:documentId/content/:filename", async (req, re
 
     const storagePath = await storeProjectUpload("order-documents", p.data.filename, body);
     const uploadedAt = new Date();
-    const confirmationInfo = meta.category === "confirmation" && /\.(xlsx|xls)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
+    const confirmationInfo = meta.category === "confirmation" && /\.(xlsx|xlsm|xls|csv)$/i.test(p.data.filename) ? await extractConfirmationInfo(body, p.data.filename) : null;
     let replaced;
     try {
       replaced = await documents.updateOne(
