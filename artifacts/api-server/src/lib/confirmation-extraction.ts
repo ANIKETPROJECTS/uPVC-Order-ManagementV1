@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { parseWindowListPdf, parseWindowListWorkbook, type NormalizedWindowImport } from "./window-list-import";
+import { parseWindowListPdf, parseWindowListWorkbook, parseWindowTypeCounts, type NormalizedWindowImport } from "./window-list-import";
 
 const execFile = promisify(execFileCallback);
 const roundSqFt = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
@@ -13,7 +13,7 @@ export type ConfirmationInfo = {
   method: "pdf_text" | "ocr" | "none";
   extractedAt: string;
   sections: Array<{ title: string; fields: Array<{ label: string; value: string }> }>;
-  windows: Array<{ windowNo: string; location: string; width: string; height: string; area: string; quantity: string; windowType: string; glass: string; lockType: string; profile: string; mesh: string; originalCells?: Array<{ columnLabel: string; text: string; page: number | null; rowPosition: number }>; page?: number | null; rowPosition?: number; warnings?: string[]; confidence?: number }>;
+  windows: Array<{ windowNo: string; location: string; width: string; height: string; area: string; quantity: string; windowType: string; trackCount?: number | null; glassShutterCount?: number | null; meshShutterCount?: number | null; glass: string; lockType: string; profile: string; mesh: string; originalCells?: Array<{ columnLabel: string; text: string; page: number | null; rowPosition: number }>; page?: number | null; rowPosition?: number; warnings?: string[]; confidence?: number }>;
   columns?: string[];
   checksum?: { rowsFound: number; quantity: number; calculatedAreaSqFt: number; documentAreaSqFt: number | null; matches: boolean | null };
   terms: string[];
@@ -82,6 +82,7 @@ function extractWindows(text: string) {
     const upper = nearby.toUpperCase();
     const trackType = previousLine.match(/\b\d+\s*TRACK\b.*$/i)?.[0]?.replace(/\s+(?:TOUCH|UPVC)\b.*$/i, "").trim();
     const louversType = match?.[7]?.replace(/\s+NA$/i, "").replace(/\s+(?:4|5|6)\s*MM\b.*$/i, "").trim();
+    const windowType = trackType ? `${trackType}${/\bMESH\b/i.test(nearby) ? " MESH" : ""}` : louversType || "";
     return {
       windowNo: match?.[1] ?? "",
       location: match?.[2]?.trim() ?? "",
@@ -91,7 +92,8 @@ function extractWindows(text: string) {
         ? Number(match[5].replace(/,/g, "")).toFixed(2)
         : match?.[5] ?? "",
       quantity: match?.[6] ?? "",
-      windowType: trackType ? `${trackType}${/\bMESH\b/i.test(nearby) ? " MESH" : ""}` : louversType || "",
+      windowType,
+      ...parseWindowTypeCounts(windowType),
       glass: /\b4\s*MM\s+FROSTED\b/.test(upper) ? "4 MM Frosted glass" : upper.match(/\b\d+\s*MM\s+(?:FROSTED|CLEAR|TOUGHENED)?\s*GLASS\b/)?.[0] ?? "",
       lockType: upper.includes("TOUCH") && upper.includes("LOCK") ? "Touch lock" : upper.includes("LOCK") ? "Lock" : /\bNA\b/.test(upper) ? "N/A" : "",
       profile: upper.includes("UPVC") ? "UPVC" : "",
@@ -114,6 +116,9 @@ function buildInfo(text: string, method: ConfirmationInfo["method"], table?: Nor
     lockType: row.lockType === "TOUCH LOCK" ? "Touch lock" : row.lockType,
     profile: row.profile === "UPVC WHITE" ? "UPVC" : row.profile,
     mesh: /ALLUMINIUM/i.test(row.mesh) ? "Aluminium" : row.mesh === "SS MESH" ? "" : row.mesh,
+    trackCount: row.trackCount,
+    glassShutterCount: row.glassShutterCount,
+    meshShutterCount: row.meshShutterCount,
     originalCells: row.originalCells, page: row.page, rowPosition: row.originalCells[0]?.rowPosition,
     warnings: row.warnings, confidence: row.confidence,
   })) : extractWindows(text);
@@ -173,7 +178,9 @@ export async function extractConfirmationInfo(bytes: Buffer, filename: string): 
           windowNo: row.windowNo, location: row.location, width: row.widthMm == null ? "" : String(row.widthMm),
           height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : roundSqFt(row.areaSqFt).toFixed(2),
           quantity: String(row.quantity), windowType: row.windowType, glass: row.glass, lockType: row.lockType,
-          profile: row.profile, mesh: row.mesh, originalCells: row.originalCells,
+          profile: row.profile, mesh: row.mesh, trackCount: row.trackCount,
+          glassShutterCount: row.glassShutterCount, meshShutterCount: row.meshShutterCount,
+          originalCells: row.originalCells,
           page: null, rowPosition: row.sourceRow, warnings: row.warnings, confidence: row.confidence,
         })),
         columns: selected.columns,

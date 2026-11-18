@@ -5247,6 +5247,9 @@ components:
         glassShutterCount:
           type: ["integer", "null"]
           minimum: 0
+        trackCount:
+          type: ["integer", "null"]
+          minimum: 0
         glassShutterReadyCount:
           type: ["integer", "null"]
           minimum: 0
@@ -5297,6 +5300,7 @@ components:
         - sourceFilename
         - importedDetails
         - glassShutterCount
+        - trackCount
         - glassShutterReadyCount
         - meshShutterCount
         - meshShutterReadyCount
@@ -5350,6 +5354,9 @@ components:
           type: ["string", "null"]
           maxLength: 100
         glassShutterCount:
+          type: ["integer", "null"]
+          minimum: 0
+        trackCount:
           type: ["integer", "null"]
           minimum: 0
         glassShutterReadyCount:
@@ -5414,6 +5421,9 @@ components:
           type: ["string", "null"]
           maxLength: 100
         glassShutterCount:
+          type: ["integer", "null"]
+          minimum: 0
+        trackCount:
           type: ["integer", "null"]
           minimum: 0
         glassShutterReadyCount:
@@ -6099,6 +6109,9 @@ components:
         area: { type: string }
         quantity: { type: string }
         windowType: { type: string }
+        trackCount: { type: ["integer", "null"], minimum: 0 }
+        glassShutterCount: { type: ["integer", "null"], minimum: 0 }
+        meshShutterCount: { type: ["integer", "null"], minimum: 0 }
         glass: { type: string }
         lockType: { type: string }
         profile: { type: string }

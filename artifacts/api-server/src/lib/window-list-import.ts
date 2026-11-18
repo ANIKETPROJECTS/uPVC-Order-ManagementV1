@@ -17,6 +17,9 @@ export type WindowImportRow = {
   areaSqFt: number | null;
   quantity: number;
   windowType: string;
+  trackCount: number | null;
+  glassShutterCount: number | null;
+  meshShutterCount: number | null;
   glass: string;
   lockType: string;
   profile: string;
@@ -66,6 +69,23 @@ function normalized(value: unknown): string {
 
 function numeric(value: unknown): number | null {
   return parseDocumentNumber(value);
+}
+
+export function parseWindowTypeCounts(windowType: string): {
+  trackCount: number | null;
+  glassShutterCount: number | null;
+  meshShutterCount: number | null;
+} {
+  const findCount = (pattern: string) => {
+    const match = windowType.match(new RegExp(`(?:\\b(\\d+)\\s*(?:${pattern})\\b|\\b(?:${pattern})\\s*(\\d+)\\b)`, "i"));
+    const value = match?.[1] ?? match?.[2];
+    return value === undefined ? null : Number(value);
+  };
+  return {
+    trackCount: findCount("TRACKS?|TRK"),
+    glassShutterCount: findCount("GLASS"),
+    meshShutterCount: findCount("MESH"),
+  };
 }
 
 function headerKey(value: unknown): keyof WindowImportRow | "finalMeasurement" | null {
@@ -208,6 +228,8 @@ function parseSheet(rows: unknown[][], sheetName: string): NormalizedWindowImpor
     if (sourceArea != null && computedArea != null && computedArea > 0 && Math.abs(sourceArea - computedArea) / computedArea > 0.005) rowWarnings.push("Sheet area differs from the recomputed area by more than 0.5%.");
     const windowNo = text(get("windowNo"));
     const location = text(get("location"));
+    const windowType = text(get("windowType"));
+    const typeCounts = parseWindowTypeCounts(windowType);
     if (!windowNo && !location) rowWarnings.push("Row has no window number or location; verify it before importing.");
     importRows.push({
       sourceRow: index + 1,
@@ -217,7 +239,8 @@ function parseSheet(rows: unknown[][], sheetName: string): NormalizedWindowImpor
       heightMm,
       areaSqFt: sourceArea ?? computedArea,
       quantity,
-      windowType: text(get("windowType")),
+      windowType,
+      ...typeCounts,
       glass: text(get("glass")),
       lockType: text(get("lockType")),
       profile: text(get("profile")),
@@ -466,10 +489,12 @@ export async function parseWindowListPdf(bytes: Buffer, filename: string): Promi
       if (sourceArea != null && computed != null && computed > 0 && Math.abs(sourceArea - computed) / computed > 0.005) rowWarnings.push("Document area differs from width × height × quantity by more than 0.5%.");
       if (/\b(?:TOUCH\s+LOCK|UPVC|(?:\d+\s*MM\s+CLEAR))\b/i.test(raw("windowType"))) rowWarnings.push("Window Type contains text that may belong to a neighboring column.");
       const normalizedField = (key: string) => raw(key);
+      const windowType = normalizedField("windowType");
+      const typeCounts = parseWindowTypeCounts(windowType);
       return {
         sourceRow: index + 1,
         windowNo: raw("windowNo"), location: raw("location"), widthMm, heightMm,
-        areaSqFt: sourceArea ?? computed, quantity, windowType: normalizedField("windowType"),
+        areaSqFt: sourceArea ?? computed, quantity, windowType, ...typeCounts,
         glass: normalizedField("glass"), lockType: normalizedField("lockType"),
         profile: normalizedField("profile"), mesh: normalizedField("mesh"),
         finalMeasurementSqFt: null, warnings: rowWarnings, originalCells: orderedCells,

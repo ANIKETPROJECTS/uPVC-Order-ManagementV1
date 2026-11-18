@@ -54,6 +54,11 @@ export interface OrderWindowUpdate {
      * @minimum 0
      * @nullable
      */
+  trackCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
   glassShutterReadyCount?: number | null;
   /**
      * @minimum 0

@@ -758,6 +758,7 @@ const windowSchema = z.object({
   windowType: z.string().min(1, 'Window type is required').max(100),
   location: z.string().max(120),
   glassType: z.string().max(100),
+  trackCount: z.string(),
   glassShutterCount: z.string(),
   glassShutterReadyCount: z.string(),
   meshShutterCount: z.string(),
@@ -773,7 +774,7 @@ type WindowFormValues = z.infer<typeof windowSchema>;
 type WindowDialogProps = { orderId: string; window: OrderWindow | null; user: User; open: boolean; onOpenChange: (open: boolean) => void; onComplete: () => void; defaultLotId?: string | null; allowMultiple?: boolean; universalMeshType: string };
 
 function emptyWindowValues(lotId: string | null): WindowFormValues {
-  return { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' };
+  return { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', trackCount: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' };
 }
 
 function WindowDialog(props: WindowDialogProps) {
@@ -819,6 +820,7 @@ function BulkWindowDialog({ orderId, user, open, onOpenChange, onComplete, defau
     location: values.location || null,
     glassType: values.glassType || null,
     meshType: universalMeshType.trim() || null,
+    trackCount: values.trackCount === '' ? null : Number(values.trackCount),
     glassShutterCount: values.glassShutterCount === '' ? null : Number(values.glassShutterCount),
     glassShutterReadyCount: values.glassShutterReadyCount === '' ? null : Number(values.glassShutterReadyCount),
     meshShutterCount: values.meshShutterCount === '' ? null : Number(values.meshShutterCount),
@@ -912,6 +914,7 @@ function BulkWindowDialog({ orderId, user, open, onOpenChange, onComplete, defau
             {textField(row, 'heightMm', 'Height (mm)', 'number', true)}
             {textField(row, 'location', 'Room / location')}
             {textField(row, 'glassType', 'Glass type')}
+            {textField(row, 'trackCount', 'Track count', 'number')}
             {textField(row, 'glassShutterCount', 'Glass shutters total', 'number')}
             {textField(row, 'glassShutterReadyCount', 'Glass shutters ready', 'number')}
             {textField(row, 'meshShutterCount', 'Mesh shutters total', 'number')}
@@ -940,15 +943,15 @@ function SingleWindowDialog({ orderId, window, user, open, onOpenChange, onCompl
   const canAssignLot = hasPermission(user, 'order-hub');
   const create = useCreateOrderWindow();
   const update = useUpdateOrderWindow();
-  const form = useForm<WindowFormValues>({ resolver: zodResolver(windowSchema), defaultValues: { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: null, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' } });
+  const form = useForm<WindowFormValues>({ resolver: zodResolver(windowSchema), defaultValues: { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', trackCount: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: null, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' } });
   useEffect(() => {
-    if (open) form.reset(window ? { windowNo: window.windowNo, widthMm: window.widthMm ?? 0, heightMm: window.heightMm ?? 0, windowType: window.windowType ?? '', location: window.location ?? '', glassType: window.glassType ?? '', glassShutterCount: window.glassShutterCount == null ? '' : String(window.glassShutterCount), glassShutterReadyCount: window.glassShutterReadyCount == null ? '' : String(window.glassShutterReadyCount), meshShutterCount: window.meshShutterCount == null ? '' : String(window.meshShutterCount), meshShutterReadyCount: window.meshShutterReadyCount == null ? '' : String(window.meshShutterReadyCount), lotId: window.lotId, frameStatus: window.frameStatus, shutterStatus: window.shutterStatus, glassStatus: window.glassStatus, pendingReason: window.pendingReason || '' } : { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: defaultLotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' });
+    if (open) form.reset(window ? { windowNo: window.windowNo, widthMm: window.widthMm ?? 0, heightMm: window.heightMm ?? 0, windowType: window.windowType ?? '', location: window.location ?? '', glassType: window.glassType ?? '', trackCount: window.trackCount == null ? '' : String(window.trackCount), glassShutterCount: window.glassShutterCount == null ? '' : String(window.glassShutterCount), glassShutterReadyCount: window.glassShutterReadyCount == null ? '' : String(window.glassShutterReadyCount), meshShutterCount: window.meshShutterCount == null ? '' : String(window.meshShutterCount), meshShutterReadyCount: window.meshShutterReadyCount == null ? '' : String(window.meshShutterReadyCount), lotId: window.lotId, frameStatus: window.frameStatus, shutterStatus: window.shutterStatus, glassStatus: window.glassStatus, pendingReason: window.pendingReason || '' } : { windowNo: '', widthMm: 0, heightMm: 0, windowType: '', location: '', glassType: '', trackCount: '', glassShutterCount: '', glassShutterReadyCount: '', meshShutterCount: '', meshShutterReadyCount: '', lotId: defaultLotId, frameStatus: OrderWindowReadiness.pending, shutterStatus: OrderWindowReadiness.pending, glassStatus: OrderGlassStatus.pending, pendingReason: '' });
   }, [form, open, window, defaultLotId]);
   const save = (values: WindowFormValues) => {
     const options = { onSuccess: () => { toast({ title: window ? 'Window updated' : 'Window added', description: 'The order window record is now current.' }); onOpenChange(false); onComplete(); }, onError: () => toast({ title: 'Window could not be saved', description: 'Check your permissions and the entered values.', variant: 'destructive' as const }) };
     if (window) {
       const data = {
-        ...(canMeasure ? { windowNo: values.windowNo, widthMm: values.widthMm, heightMm: values.heightMm, windowType: values.windowType, location: values.location || null, glassType: values.glassType || null } : {}),
+        ...(canMeasure ? { windowNo: values.windowNo, widthMm: values.widthMm, heightMm: values.heightMm, windowType: values.windowType, location: values.location || null, glassType: values.glassType || null, trackCount: values.trackCount === '' ? null : Number(values.trackCount) } : {}),
         ...(canReadiness ? { glassShutterCount: values.glassShutterCount === '' ? null : Number(values.glassShutterCount), glassShutterReadyCount: values.glassShutterReadyCount === '' ? null : Number(values.glassShutterReadyCount), meshShutterCount: values.meshShutterCount === '' ? null : Number(values.meshShutterCount), meshShutterReadyCount: values.meshShutterReadyCount === '' ? null : Number(values.meshShutterReadyCount) } : {}),
         ...(canAssignLot ? { lotId: values.lotId } : {}),
         ...(canReadiness ? { frameStatus: values.frameStatus as Readiness, shutterStatus: values.shutterStatus as Readiness, pendingReason: values.pendingReason || null } : {}),
@@ -956,16 +959,17 @@ function SingleWindowDialog({ orderId, window, user, open, onOpenChange, onCompl
       };
       update.mutate({ id: orderId, windowId: window.id, data }, options);
     } else if (canMeasure) {
-      create.mutate({ id: orderId, data: { windowNo: values.windowNo, widthMm: values.widthMm, heightMm: values.heightMm, windowType: values.windowType, location: values.location || null, glassType: values.glassType || null, meshType: universalMeshType || null, glassShutterCount: values.glassShutterCount === '' ? null : Number(values.glassShutterCount), glassShutterReadyCount: values.glassShutterReadyCount === '' ? null : Number(values.glassShutterReadyCount), meshShutterCount: values.meshShutterCount === '' ? null : Number(values.meshShutterCount), meshShutterReadyCount: values.meshShutterReadyCount === '' ? null : Number(values.meshShutterReadyCount), lotId: values.lotId, frameStatus: (canReadiness ? values.frameStatus : OrderWindowReadiness.pending) as Readiness, shutterStatus: (canReadiness ? values.shutterStatus : OrderWindowReadiness.pending) as Readiness, glassStatus: (canGlass ? values.glassStatus : OrderGlassStatus.pending) as GlassStatus, pendingReason: canReadiness ? values.pendingReason || null : null } }, options);
+      create.mutate({ id: orderId, data: { windowNo: values.windowNo, widthMm: values.widthMm, heightMm: values.heightMm, windowType: values.windowType, location: values.location || null, glassType: values.glassType || null, meshType: universalMeshType || null, trackCount: values.trackCount === '' ? null : Number(values.trackCount), glassShutterCount: values.glassShutterCount === '' ? null : Number(values.glassShutterCount), glassShutterReadyCount: values.glassShutterReadyCount === '' ? null : Number(values.glassShutterReadyCount), meshShutterCount: values.meshShutterCount === '' ? null : Number(values.meshShutterCount), meshShutterReadyCount: values.meshShutterReadyCount === '' ? null : Number(values.meshShutterReadyCount), lotId: values.lotId, frameStatus: (canReadiness ? values.frameStatus : OrderWindowReadiness.pending) as Readiness, shutterStatus: (canReadiness ? values.shutterStatus : OrderWindowReadiness.pending) as Readiness, glassStatus: (canGlass ? values.glassStatus : OrderGlassStatus.pending) as GlassStatus, pendingReason: canReadiness ? values.pendingReason || null : null } }, options);
     }
   };
   const pending = create.isPending || update.isPending;
-  return <div className={open ? 'fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-3 sm:items-center' : 'hidden'} role="dialog" aria-modal="true" aria-labelledby="window-dialog-title" data-testid="dialog-window"><div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl sm:p-6"><div className="flex items-start justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Window register</p><h2 id="window-dialog-title" className="mt-1 font-display text-xl font-bold">{window ? 'Edit window' : 'Add window'}</h2><p className="mt-1 text-xs text-muted-foreground">Dimensions are recorded in millimetres.</p></div><Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} data-testid="button-close-window-dialog">Close</Button></div><Form {...form}><form onSubmit={form.handleSubmit(save)} className="mt-6 space-y-4" data-testid="form-window"><div className="grid gap-4 sm:grid-cols-2"><FormField control={form.control} name="windowNo" render={({ field }) => <FormItem><FormLabel>Window no.</FormLabel><FormControl><Input {...field} disabled={!canMeasure} data-testid="input-window-no" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="windowType" render={({ field }) => <FormItem><FormLabel>Window type</FormLabel><FormControl><Input {...field} disabled={!canMeasure} data-testid="input-window-type" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="widthMm" render={({ field }) => <FormItem><FormLabel>Width (mm)</FormLabel><FormControl><Input {...field} type="number" min="1" disabled={!canMeasure} data-testid="input-window-width" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="heightMm" render={({ field }) => <FormItem><FormLabel>Height (mm)</FormLabel><FormControl><Input {...field} type="number" min="1" disabled={!canMeasure} data-testid="input-window-height" /></FormControl><FormMessage /></FormItem>} /></div><div className="grid gap-4 sm:grid-cols-3"><WindowSelectField control={form.control} name="frameStatus" label="Frame" options={READINESS_OPTIONS} disabled={!canReadiness} testId="select-window-frame" /><WindowSelectField control={form.control} name="shutterStatus" label="Shutter" options={READINESS_OPTIONS} disabled={!canReadiness} testId="select-window-shutter" /><WindowSelectField control={form.control} name="glassStatus" label="Glass" options={GLASS_OPTIONS} disabled={!canGlass} testId="select-window-glass" /></div><FormField control={form.control} name="pendingReason" render={({ field }) => <FormItem><FormLabel>Pending reason <span className="font-normal text-muted-foreground">(optional)</span></FormLabel><FormControl><Textarea {...field} value={field.value || ''} disabled={!canReadiness} rows={3} data-testid="textarea-window-pending-reason" /></FormControl><FormMessage /></FormItem>} /><div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4"><p className="text-[11px] text-muted-foreground">{!canMeasure ? 'Measurement fields are read-only for your role.' : !canReadiness || !canGlass ? 'Some readiness fields are read-only for your role.' : 'Changes are written to the order register.'}</p><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-window">Cancel</Button><Button type="submit" disabled={pending || (!window && !canMeasure)} data-testid="button-save-window">{pending ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} {pending ? 'Saving…' : window ? 'Save window' : 'Add window'}</Button></div></div></form></Form></div></div>;
+  return <div className={open ? 'fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-3 sm:items-center' : 'hidden'} role="dialog" aria-modal="true" aria-labelledby="window-dialog-title" data-testid="dialog-window"><div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl sm:p-6"><div className="flex items-start justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Window register</p><h2 id="window-dialog-title" className="mt-1 font-display text-xl font-bold">{window ? 'Edit window' : 'Add window'}</h2><p className="mt-1 text-xs text-muted-foreground">Dimensions are recorded in millimetres.</p></div><Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} data-testid="button-close-window-dialog">Close</Button></div><Form {...form}><form onSubmit={form.handleSubmit(save)} className="mt-6 space-y-4" data-testid="form-window"><div className="grid gap-4 sm:grid-cols-2"><FormField control={form.control} name="windowNo" render={({ field }) => <FormItem><FormLabel>Window no.</FormLabel><FormControl><Input {...field} disabled={!canMeasure} data-testid="input-window-no" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="windowType" render={({ field }) => <FormItem><FormLabel>Window type</FormLabel><FormControl><Input {...field} disabled={!canMeasure} data-testid="input-window-type" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="widthMm" render={({ field }) => <FormItem><FormLabel>Width (mm)</FormLabel><FormControl><Input {...field} type="number" min="1" disabled={!canMeasure} data-testid="input-window-width" /></FormControl><FormMessage /></FormItem>} /><FormField control={form.control} name="heightMm" render={({ field }) => <FormItem><FormLabel>Height (mm)</FormLabel><FormControl><Input {...field} type="number" min="1" disabled={!canMeasure} data-testid="input-window-height" /></FormControl><FormMessage /></FormItem>} /></div><div className="grid gap-4 sm:grid-cols-3"><WindowSelectField control={form.control} name="frameStatus" label="Frame" options={READINESS_OPTIONS} disabled={!canReadiness} measurementDisabled={!canMeasure} testId="select-window-frame" /><WindowSelectField control={form.control} name="shutterStatus" label="Shutter" options={READINESS_OPTIONS} disabled={!canReadiness} testId="select-window-shutter" /><WindowSelectField control={form.control} name="glassStatus" label="Glass" options={GLASS_OPTIONS} disabled={!canGlass} testId="select-window-glass" /></div><FormField control={form.control} name="pendingReason" render={({ field }) => <FormItem><FormLabel>Pending reason <span className="font-normal text-muted-foreground">(optional)</span></FormLabel><FormControl><Textarea {...field} value={field.value || ''} disabled={!canReadiness} rows={3} data-testid="textarea-window-pending-reason" /></FormControl><FormMessage /></FormItem>} /><div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4"><p className="text-[11px] text-muted-foreground">{!canMeasure ? 'Measurement fields are read-only for your role.' : !canReadiness || !canGlass ? 'Some readiness fields are read-only for your role.' : 'Changes are written to the order register.'}</p><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-window">Cancel</Button><Button type="submit" disabled={pending || (!window && !canMeasure)} data-testid="button-save-window">{pending ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} {pending ? 'Saving…' : window ? 'Save window' : 'Add window'}</Button></div></div></form></Form></div></div>;
 }
 
-function WindowSelectField({ control, name, label, options, disabled, testId }: { control: ReturnType<typeof useForm<WindowFormValues>>['control']; name: 'frameStatus' | 'shutterStatus' | 'glassStatus'; label: string; options: { value: string; label: string }[]; disabled: boolean; testId: string }) {
+function WindowSelectField({ control, name, label, options, disabled, testId, measurementDisabled = disabled }: { control: ReturnType<typeof useForm<WindowFormValues>>['control']; name: 'frameStatus' | 'shutterStatus' | 'glassStatus'; label: string; options: { value: string; label: string }[]; disabled: boolean; testId: string; measurementDisabled?: boolean }) {
   return <div className="contents"><FormField control={control} name={name} render={({ field }) => <FormItem><FormLabel>{label}</FormLabel><Select value={field.value} onValueChange={field.onChange} disabled={disabled}><FormControl><SelectTrigger data-testid={testId}><SelectValue /></SelectTrigger></FormControl><SelectContent>{options.map((item) => <SelectItem value={item.value} key={item.value}>{item.label}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />{name === 'frameStatus' && <div className="sm:col-span-3 grid gap-3 rounded-lg border border-border/70 p-3 sm:grid-cols-3">
     {([['location','Room / location'],['glassType','Glass type']] as const).map(([fieldName, fieldLabel]) => <FormField key={fieldName} control={control} name={fieldName} render={({ field }) => <FormItem><FormLabel>{fieldLabel}</FormLabel><FormControl><Input {...field} disabled={disabled} /></FormControl><FormMessage /></FormItem>} />)}
+    <FormField control={control} name="trackCount" render={({ field }) => <FormItem><FormLabel>Track count</FormLabel><FormControl><Input {...field} type="number" min="0" disabled={measurementDisabled} data-testid="input-window-track-count" /></FormControl><FormMessage /></FormItem>} />
     {([['glassShutterReadyCount','Glass shutters ready'],['glassShutterCount','Glass shutters total'],['meshShutterReadyCount','Mesh shutters ready'],['meshShutterCount','Mesh shutters total']] as const).map(([fieldName, fieldLabel]) => <FormField key={fieldName} control={control} name={fieldName} render={({ field }) => <FormItem><FormLabel>{fieldLabel}</FormLabel><FormControl><Input {...field} type="number" min="0" disabled={disabled} /></FormControl><FormMessage /></FormItem>} />)}
   </div>}</div>;
 }
@@ -1087,6 +1091,9 @@ async function importConfirmationRows(orderId: string, filename: string, rows: N
     location: row.location.trim() || null,
     glassType: row.glass.trim() || null,
     meshType: meshType || null,
+    trackCount: row.trackCount ?? null,
+    glassShutterCount: row.glassShutterCount == null ? null : row.glassShutterCount * Number(row.quantity),
+    meshShutterCount: row.meshShutterCount == null ? null : row.meshShutterCount * Number(row.quantity),
     frameCount: Number(row.quantity),
     lotId: lotId ?? null,
     frameStatus: OrderWindowReadiness.pending,
@@ -1106,6 +1113,50 @@ async function importConfirmationRows(orderId: string, filename: string, rows: N
   const result = await response.json() as { created?: number; error?: string };
   if (!response.ok) throw new Error(result.error || 'The extracted schedule could not be added to Windows.');
   return result.created ?? rows.length;
+}
+
+async function syncExistingConfirmationCounts(
+  orderId: string,
+  rows: NonNullable<OrderDocument['confirmationInfo']>['windows'],
+  existingWindows: OrderWindow[],
+  canUpdateShutters: boolean,
+) {
+  const windowsByNumber = new Map(existingWindows
+    .filter((item) => item.source === 'confirmation' || item.source === 'window_list')
+    .map((item) => [item.windowNo.trim().toLocaleLowerCase(), item]));
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  let updated = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const existing = windowsByNumber.get(row.windowNo.trim().toLocaleLowerCase());
+    const quantity = Number(row.quantity);
+    if (!existing || !Number.isInteger(quantity) || quantity <= 0) continue;
+    const data: Record<string, number> = {};
+    if (row.trackCount != null && existing.trackCount !== row.trackCount) data.trackCount = row.trackCount;
+    if (canUpdateShutters) {
+      const glassCount = row.glassShutterCount == null ? null : row.glassShutterCount * quantity;
+      const meshCount = row.meshShutterCount == null ? null : row.meshShutterCount * quantity;
+      if (glassCount != null && existing.glassShutterCount !== glassCount) {
+        if ((existing.glassShutterReadyCount ?? 0) <= glassCount) data.glassShutterCount = glassCount;
+        else skipped += 1;
+      }
+      if (meshCount != null && existing.meshShutterCount !== meshCount) {
+        if ((existing.meshShutterReadyCount ?? 0) <= meshCount) data.meshShutterCount = meshCount;
+        else skipped += 1;
+      }
+    } else if (row.glassShutterCount != null || row.meshShutterCount != null) {
+      skipped += 1;
+    }
+    if (!Object.keys(data).length) continue;
+    const response = await fetch(`${base}/api/orders/${encodeURIComponent(orderId)}/windows/${encodeURIComponent(existing.id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (response.ok) updated += 1;
+    else skipped += 1;
+  }
+  return { updated, skipped };
 }
 
 function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType, canMeasure, lotId, onComplete }: {
@@ -1230,7 +1281,8 @@ function WindowDetailsDialog({ window, onClose }: { window: OrderWindow; onClose
     ['Imported lock', window.importedDetails?.lockType || 'Not recorded'],
     ['Imported profile', window.importedDetails?.profile || 'Not recorded'],
     ['Imported mesh', window.importedDetails?.mesh || 'Not recorded'],
-    ['Frame count', String(window.frameCount)],
+    ['Frame pieces', String(window.frameCount)],
+    ['Track count', window.trackCount == null ? 'Not recorded' : String(window.trackCount)],
     ['Frame status', readable(window.frameStatus)],
     ['Shutter status', readable(window.shutterStatus)],
     ['Glass status', readable(window.glassStatus)],
@@ -1279,10 +1331,10 @@ function OverviewWindowList({ windows, confirmationWindows = [], orderMeshType }
   const progress = (ready: number | null, total: number | null, fallback: string) => total === null ? fallback : total === 0 ? 'Not applicable' : `${ready ?? 0}/${total} Ready`;
   return <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm" data-testid="section-order-overview-windows">
     <header className="border-b border-border/70 px-4 py-3"><h2 className="font-display text-base font-bold">Windows</h2><p className="text-xs text-muted-foreground">All {windows.length} windows from the shared order register · dimensions are available in the Windows tab.</p></header>
-    <div className="max-h-[36rem] overflow-auto"><table className="w-full min-w-[850px] text-left text-xs">
-      <thead><tr className="border-b border-border/70 bg-muted/35 text-[10px] uppercase tracking-wider text-muted-foreground"><th rowSpan={2} className="px-3 py-2">Window</th><th rowSpan={2} className="px-3 py-2">Type</th><th rowSpan={2} className="px-3 py-2">Location</th><th rowSpan={2} className="px-3 py-2">Frame status</th><th colSpan={2} className="border-l border-border/70 px-3 py-2 text-center">Shutter status</th><th rowSpan={2} className="px-3 py-2">Mesh type</th></tr><tr className="border-b border-border/70 bg-muted/20 text-[10px] uppercase tracking-wider text-muted-foreground"><th className="border-l border-border/70 px-3 py-2">Glass shutter</th><th className="px-3 py-2">Mesh shutter</th></tr></thead>
+    <div className="max-h-[36rem] overflow-auto"><table className="w-full min-w-[930px] text-left text-xs">
+      <thead><tr className="border-b border-border/70 bg-muted/35 text-[10px] uppercase tracking-wider text-muted-foreground"><th rowSpan={2} className="px-3 py-2">Window</th><th rowSpan={2} className="px-3 py-2">Type</th><th rowSpan={2} className="px-3 py-2">Track count</th><th rowSpan={2} className="px-3 py-2">Location</th><th rowSpan={2} className="px-3 py-2">Frame status</th><th colSpan={2} className="border-l border-border/70 px-3 py-2 text-center">Shutter status</th><th rowSpan={2} className="px-3 py-2">Mesh type</th></tr><tr className="border-b border-border/70 bg-muted/20 text-[10px] uppercase tracking-wider text-muted-foreground"><th className="border-l border-border/70 px-3 py-2">Glass shutter</th><th className="px-3 py-2">Mesh shutter</th></tr></thead>
       <tbody>{windows.map((item) => <tr key={item.id} className="border-b border-border/50 last:border-0" data-testid={`overview-window-${item.id}`}>
-        <td className="px-3 py-3 font-semibold">{item.windowNo}</td><td className="px-3 py-3">{item.windowType || 'Not recorded'}</td><td className="px-3 py-3">{item.location || 'Not recorded'}</td>
+        <td className="px-3 py-3 font-semibold">{item.windowNo}</td><td className="px-3 py-3">{item.windowType || 'Not recorded'}</td><td className="px-3 py-3">{item.trackCount ?? 'Not recorded'}</td><td className="px-3 py-3">{item.location || 'Not recorded'}</td>
         <td className="px-3 py-3"><ReadinessPill value={item.frameStatus} />{item.pendingReason && <p className="mt-1 w-fit rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800">{item.pendingReason}</p>}</td>
         <td className="border-l border-border/70 px-3 py-3">{progress(item.glassShutterReadyCount ?? null,item.glassShutterCount ?? null,item.glassStatus === 'received' ? 'Ready' : item.glassStatus === 'partial' ? 'In progress' : 'Pending')}</td>
         <td className="px-3 py-3">{progress(item.meshShutterReadyCount ?? null,item.meshShutterCount ?? null,item.shutterStatus === 'ready' ? 'Ready' : item.shutterStatus === 'in_progress' ? 'In progress' : 'Pending')}</td>
@@ -1872,6 +1924,7 @@ function ConfirmationInfoPanel({ orderId, user }: { orderId: string; user: User 
   const [view, setView] = useState<"document" | "software">("document");
   const [reextracting, setReextracting] = useState(false);
   const query = useListOrderDocuments(orderId, { query: { queryKey: getListOrderDocumentsQueryKey(orderId) } });
+  const windowsQuery = useListOrderWindows(orderId, { query: { queryKey: getListOrderWindowsQueryKey(orderId) } });
   const documentRecord = (query.data ?? []).filter((item) => item.category === 'confirmation').sort((a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt))[0];
   const info = documentRecord?.confirmationInfo;
   const refreshConfirmationVersions = async () => {
@@ -1913,7 +1966,21 @@ function ConfirmationInfoPanel({ orderId, user }: { orderId: string; user: User 
       if (!saved.ok) throw new Error(result.error || "The extraction changed before it could be saved.");
       await client.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) });
       const billingMessage = await syncOrderValueFromConfirmation({ ...documentRecord, confirmationInfo: candidate });
-      toast({ title: "Confirmation re-extracted", description: `${candidate.windows.length} rows saved after confirmation.${billingMessage ? ` ${billingMessage}` : ''}` });
+      let countMessage = '';
+      if (hasPermission(user, 'measurements')) {
+        try {
+          const latestWindows = await windowsQuery.refetch();
+          if (!latestWindows.data || latestWindows.isError) throw new Error('Window register could not be loaded.');
+          const countSync = await syncExistingConfirmationCounts(orderId, candidate.windows, latestWindows.data, hasPermission(user, 'window-readiness'));
+          if (countSync.updated || countSync.skipped) {
+            countMessage = `${countSync.updated} existing window${countSync.updated === 1 ? '' : 's'} had counts updated${countSync.skipped ? `; ${countSync.skipped} count updates were skipped` : ''}.`;
+          }
+          if (countSync.updated) void client.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) });
+        } catch (countError) {
+          countMessage = `Window counts could not be synchronized: ${countError instanceof Error ? countError.message : 'try again from the confirmation upload.'}`;
+        }
+      }
+      toast({ title: "Confirmation re-extracted", description: `${candidate.windows.length} rows saved after confirmation.${countMessage ? ` ${countMessage}` : ''}${billingMessage ? ` ${billingMessage}` : ''}` });
     } catch (error) {
       toast({ title: "Re-extraction failed", description: error instanceof Error ? error.message : "The document could not be re-extracted.", variant: "destructive" });
     } finally { setReextracting(false); }
@@ -2019,15 +2086,20 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
     const latestWindows = await windowsQuery.refetch();
     if (!latestWindows.data || latestWindows.isError) throw new Error('Confirmation uploaded, but the order window register could not be loaded for sync.');
     const { rowsToAdd, alreadyPresent, skipped } = getConfirmationRowsToAdd(info, latestWindows.data);
+    const countSync = await syncExistingConfirmationCounts(orderId, info.windows, latestWindows.data, hasPermission(user, 'window-readiness'));
+    const countSummary = countSync.updated ? `${countSync.updated} existing window${countSync.updated === 1 ? '' : 's'} had extracted counts updated.` : '';
+    const skippedCountSummary = countSync.skipped ? `${countSync.skipped} count update${countSync.skipped === 1 ? '' : 's'} could not be applied because of access restrictions or already-ready pieces.` : '';
+    if (countSync.updated) void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) });
     if (!rowsToAdd.length) {
-      return skipped
+      const baseMessage = skipped
         ? `No new valid windows were added; ${alreadyPresent} already existed and ${skipped} extracted row${skipped === 1 ? ' needs' : 's need'} review.`
         : `${alreadyPresent} extracted windows were already in the order register.`;
+      return [baseMessage, countSummary, skippedCountSummary].filter(Boolean).join(' ');
     }
     const created = await importConfirmationRows(orderId, documentRecord.filename, rowsToAdd, '');
     void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(orderId) });
     void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
-    return `${created} extracted window${created === 1 ? '' : 's'} synced to Overview and Windows${alreadyPresent ? `; ${alreadyPresent} already existed` : ''}${skipped ? `; ${skipped} incomplete row${skipped === 1 ? ' needs' : 's need'} review` : ''}.`;
+    return [`${created} extracted window${created === 1 ? '' : 's'} synced to Overview and Windows${alreadyPresent ? `; ${alreadyPresent} already existed` : ''}${skipped ? `; ${skipped} incomplete row${skipped === 1 ? ' needs' : 's need'} review` : ''}.`, countSummary, skippedCountSummary].filter(Boolean).join(' ');
   };
   const filteredDocuments = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();

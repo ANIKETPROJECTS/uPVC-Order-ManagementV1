@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 import * as XLSX from "xlsx";
-import { parseWindowListPdf, parseWindowListWorkbook } from "./window-list-import";
+import { parseWindowListPdf, parseWindowListWorkbook, parseWindowTypeCounts } from "./window-list-import";
 import { extractConfirmationInfo } from "./confirmation-extraction";
 import { canonicalizeHeader, parseDocumentDate, parseDocumentNumber } from "./document-extraction";
 
@@ -28,6 +28,40 @@ test("parses 10+ rows and verifies source totals", () => {
   assert.equal(result.totals.quantity, 12);
   assert.equal(result.totals.sourceQuantity, 12);
   assert.deepEqual(result.warnings, []);
+});
+
+test("extracts track, glass, and mesh counts from mixed window type text", () => {
+  assert.deepEqual(parseWindowTypeCounts("UPVC profile: 3 TRACKS, 2 GLASS SHUTTERS / 1 MESH"), {
+    trackCount: 3,
+    glassShutterCount: 2,
+    meshShutterCount: 1,
+  });
+  assert.deepEqual(parseWindowTypeCounts("Sliding track 2, glass 4"), {
+    trackCount: 2,
+    glassShutterCount: 4,
+    meshShutterCount: null,
+  });
+  assert.deepEqual(parseWindowTypeCounts("LOUVERS WITH EXZ"), {
+    trackCount: null,
+    glassShutterCount: null,
+    meshShutterCount: null,
+  });
+});
+
+test("confirmation workbook extraction keeps only counts explicitly present in window type", async () => {
+  const bytes = workbook([{ name: "Order", rows: [
+    columns,
+    ["W1", "Hall", 1200, 1500, 38.75, 2, "3 TRACK 2 GLASS 1 MESH", "Clear", "Handle", "UPVC", "Fiber"],
+    ["W2", "Kitchen", 1000, 1200, 12.92, 1, "2 GLASS", "Clear", "Handle", "UPVC", "Fiber"],
+  ] }]);
+  const info = await extractConfirmationInfo(bytes, "confirmation.xlsx");
+  assert.deepEqual(
+    info.windows.map(({ trackCount, glassShutterCount, meshShutterCount }) => ({ trackCount, glassShutterCount, meshShutterCount })),
+    [
+      { trackCount: 3, glassShutterCount: 2, meshShutterCount: 1 },
+      { trackCount: null, glassShutterCount: 2, meshShutterCount: null },
+    ],
+  );
 });
 
 test("keeps blank serial rows and warns instead of dropping them", () => {
@@ -96,6 +130,9 @@ test("mirrors every Laxman PDF row cell exactly and verifies the printed checksu
   assert.equal(cell("W1", "Window Type"), "VERTICAL SLIDING");
   assert.equal(cell("W1", "Glass"), "6 MM CLEAR TOUGHENED GLASS");
   assert.equal(cell("W2", "Window Type"), "3 TRACK 2 GLASS 1 MESH WITH TOP FIX ARCH");
+  assert.equal(result.rows.find((row) => row.windowNo === "W2")?.trackCount, 3);
+  assert.equal(result.rows.find((row) => row.windowNo === "W2")?.glassShutterCount, 2);
+  assert.equal(result.rows.find((row) => row.windowNo === "W2")?.meshShutterCount, 1);
   assert.equal(cell("W2", "Lock Type"), "TOUCH LOCK");
   assert.equal(cell("W4", "Window Type"), "3 TRACK 2 GLASS 1 MESH WITH EXZ");
   assert.equal(cell("W7", "Glass"), "6 MM CLEAR TOUGHENED GLASS");
@@ -123,6 +160,9 @@ test("confirmation extraction uses the exact PDF window cells and retains normal
   assert.ok(info.windows.every((row) => !row.area || /^\d+(?:\.\d{1,2})?$/.test(row.area)), "extracted square-foot values should use at most two decimal places");
   const w1 = info.windows.find((row) => row.windowNo === "W1")!;
   assert.equal(w1.originalCells?.find((cell) => cell.columnLabel === "Glass")?.text, "6 MM CLEAR TOUGHENED GLASS");
+  assert.equal(info.windows.find((row) => row.windowNo === "W2")?.trackCount, 3);
+  assert.equal(info.windows.find((row) => row.windowNo === "W2")?.glassShutterCount, 2);
+  assert.equal(info.windows.find((row) => row.windowNo === "W2")?.meshShutterCount, 1);
   assert.equal(info.windows.find((row) => row.windowNo === "W13")?.page, 2);
   assert.equal(info.windows.find((row) => row.windowNo === "W16")?.location, "NA");
   assert.equal(info.sections.find((section) => section.title === "Payment terms")?.fields.length, 3);

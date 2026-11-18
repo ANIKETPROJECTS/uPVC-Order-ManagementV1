@@ -8,7 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 type ImportedRow = {
   sourceRow: number; windowNo: string; location: string; widthMm: number | null;
   heightMm: number | null; areaSqFt: number | null; quantity: number;
-  windowType: string; glass: string; lockType: string; profile: string; mesh: string;
+  windowType: string; trackCount: number | null; glassShutterCount: number | null;
+  meshShutterCount: number | null; glass: string; lockType: string; profile: string; mesh: string;
   finalMeasurementSqFt: number | null; warnings: string[];
   originalCells?: Array<{ columnLabel: string; text: string; page: number | null; rowPosition: number }>;
   page?: number | null; confidence?: number;
@@ -21,6 +22,19 @@ type ImportSheet = {
 };
 
 const MAX_WINDOW_IMPORT_ROWS = 500;
+
+function parseWindowTypeCounts(windowType: string) {
+  const findCount = (pattern: string) => {
+    const match = windowType.match(new RegExp(`(?:\\b(\\d+)\\s*(?:${pattern})\\b|\\b(?:${pattern})\\s*(\\d+)\\b)`, "i"));
+    const value = match?.[1] ?? match?.[2];
+    return value === undefined ? null : Number(value);
+  };
+  return {
+    trackCount: findCount("TRACKS?|TRK"),
+    glassShutterCount: findCount("GLASS"),
+    meshShutterCount: findCount("MESH"),
+  };
+}
 
 export function WindowListImporter({ orderId, meshType, user, onComplete }: {
   orderId: string; meshType: string; user: User; onComplete: () => void;
@@ -65,13 +79,16 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
   };
   const editCell = (index: number, field: keyof ImportedRow, value: string) => {
     setRows((current) => current.map((row, rowIndex) => rowIndex === index
-      ? { ...row, [field]: field === "widthMm" || field === "heightMm" || field === "quantity" ? (value === "" ? null : Number(value)) : value }
+      ? field === "windowType"
+        ? { ...row, windowType: value, ...parseWindowTypeCounts(value) }
+        : { ...row, [field]: field === "widthMm" || field === "heightMm" || field === "quantity" ? (value === "" ? null : Number(value)) : value }
       : row));
   };
   const addRow = () => setRows((current) => [...current, {
     sourceRow: current.length ? Math.max(...current.map((row) => row.sourceRow)) + 1 : 1,
     windowNo: "", location: "", widthMm: null, heightMm: null, areaSqFt: null, quantity: 1,
-    windowType: "", glass: "", lockType: "", profile: "", mesh: "", finalMeasurementSqFt: null, warnings: [],
+    windowType: "", trackCount: null, glassShutterCount: null, meshShutterCount: null,
+    glass: "", lockType: "", profile: "", mesh: "", finalMeasurementSqFt: null, warnings: [],
   }]);
   const deleteRow = (index: number) => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
   const totalAreaSqFt = rows.reduce((sum, row) => sum + ((Number(row.widthMm) > 0 && Number(row.heightMm) > 0)
@@ -88,7 +105,7 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
       const key = row.windowNo.trim().toLocaleLowerCase();
       if (key && duplicateNumbers.has(key)) return true;
       if (key) duplicateNumbers.add(key);
-      return !key || !row.windowType.trim() || !row.widthMm || !row.heightMm || !row.quantity || row.widthMm <= 0 || row.heightMm <= 0;
+      return !key || !row.windowType.trim() || !row.widthMm || !row.heightMm || !row.quantity || !Number.isInteger(row.quantity) || row.widthMm <= 0 || row.heightMm <= 0;
     });
     if (invalid) { setError("Fix every highlighted row: window number, window type, dimensions, and quantity are required; window numbers must be unique."); return; }
     setSaving(true); setError("");
@@ -97,6 +114,9 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
       const savedDocument = await uploadDocument.mutateAsync({ id: orderId, category: "confirmation", filename: encodeURIComponent(file.name), data: file });
       sourceDocumentId = savedDocument.id;
       const payloadRows = rows.map((row) => ({
+        trackCount: row.trackCount,
+        glassShutterCount: row.glassShutterCount == null ? null : row.glassShutterCount * Number(row.quantity),
+        meshShutterCount: row.meshShutterCount == null ? null : row.meshShutterCount * Number(row.quantity),
         windowNo: row.windowNo.trim(), widthMm: Number(row.widthMm), heightMm: Number(row.heightMm),
         windowType: row.windowType.trim(), location: row.location || null, glassType: row.glass || null,
         meshType: meshType || null, frameCount: Number(row.quantity), lotId: null,

@@ -15,6 +15,21 @@ export interface ConfirmationWindowRow {
   area: string;
   quantity: string;
   windowType: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  trackCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  glassShutterCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  meshShutterCount?: number | null;
   glass: string;
   lockType: string;
   profile: string;

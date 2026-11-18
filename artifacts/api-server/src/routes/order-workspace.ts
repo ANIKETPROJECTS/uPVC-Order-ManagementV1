@@ -113,6 +113,7 @@ const windowResponse = (w: OrderWindowDocument, order?: OrderDocument, pieceCoun
   windowType: w.windowType, location: w.location ?? null, glassType: w.glassType ?? null, meshType: w.meshType ?? null,
   source: w.source ?? "legacy",
   sourceFilename: w.sourceFilename ?? null, importedDetails: w.importedDetails ?? null,
+  trackCount: w.trackCount ?? null,
   frameCount: w.frameCount ?? 1, glassShutterCount: w.glassShutterCount ?? null,
   glassShutterReadyCount: w.glassShutterReadyCount ?? null, meshShutterCount: w.meshShutterCount ?? null,
   meshShutterReadyCount: w.meshShutterReadyCount ?? null,
@@ -1528,7 +1529,7 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
   }
   const proposedWindow = { ...old, ...b.data };
   if ((proposedWindow.glassShutterCount != null && proposedWindow.glassShutterReadyCount != null && proposedWindow.glassShutterReadyCount > proposedWindow.glassShutterCount) || (proposedWindow.meshShutterCount != null && proposedWindow.meshShutterReadyCount != null && proposedWindow.meshShutterReadyCount > proposedWindow.meshShutterCount)) { res.status(400).json({ error: "Ready shutter counts cannot exceed total shutter counts." }); return; }
-  const keys = Object.keys(b.data); const measurement = keys.some(k => ["windowNo", "widthMm", "heightMm", "windowType", "location", "glassType", "meshType"].includes(k)); const readiness = keys.some(k => ["frameCount", "frameStatus", "shutterStatus", "pendingReason", "glassShutterCount", "glassShutterReadyCount", "meshShutterCount", "meshShutterReadyCount"].includes(k)); const glass = keys.includes("glassStatus");
+   const keys = Object.keys(b.data); const measurement = keys.some(k => ["windowNo", "widthMm", "heightMm", "windowType", "location", "glassType", "meshType", "trackCount"].includes(k)); const readiness = keys.some(k => ["frameCount", "frameStatus", "shutterStatus", "pendingReason", "glassShutterCount", "glassShutterReadyCount", "meshShutterCount", "meshShutterReadyCount"].includes(k)); const glass = keys.includes("glassStatus");
   const order = await getOrders(db).findOne({ _id: p.data.id });
   if (keys.includes("lotId")) {
     if (!order || (b.data.lotId && !(order.lots ?? []).some((lot) => lot.lotId === b.data.lotId))) { res.status(400).json({ error: "Choose a lot that belongs to this order." }); return; }

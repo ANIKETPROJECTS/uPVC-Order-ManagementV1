@@ -256,6 +256,7 @@ export interface OrderWindowDocument {
   source?: "manual" | "window_list" | "confirmation";
   sourceFilename?: string | null;
   importedDetails?: { lockType: string; profile: string; mesh: string };
+  trackCount?: number | null;
   frameCount?: number;
   glassShutterCount?: number | null; glassShutterReadyCount?: number | null;
   meshShutterCount?: number | null; meshShutterReadyCount?: number | null;

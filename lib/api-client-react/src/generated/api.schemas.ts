@@ -1102,6 +1102,11 @@ export interface OrderWindow {
      * @minimum 0
      * @nullable
      */
+  trackCount: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
   glassShutterReadyCount: number | null;
   /**
      * @minimum 0
@@ -1172,6 +1177,11 @@ export interface OrderWindowInput {
      * @nullable
      */
   glassShutterCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  trackCount?: number | null;
   /**
      * @minimum 0
      * @nullable
@@ -1252,6 +1262,11 @@ export interface OrderWindowUpdate {
      * @nullable
      */
   glassShutterCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  trackCount?: number | null;
   /**
      * @minimum 0
      * @nullable
@@ -1785,6 +1800,21 @@ export interface ConfirmationWindowRow {
   area: string;
   quantity: string;
   windowType: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  trackCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  glassShutterCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  meshShutterCount?: number | null;
   glass: string;
   lockType: string;
   profile: string;

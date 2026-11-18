@@ -6034,6 +6034,8 @@ export const ListOrderWindowsParams = zod.object({
 
 export const listOrderWindowsResponseGlassShutterCountMin = 0;
 
+export const listOrderWindowsResponseTrackCountMin = 0;
+
 export const listOrderWindowsResponseGlassShutterReadyCountMin = 0;
 
 export const listOrderWindowsResponseMeshShutterCountMin = 0;
@@ -6064,6 +6066,7 @@ export const ListOrderWindowsResponseItem = zod.object({
   "mesh": zod.string()
 }),zod.null()]),
   "glassShutterCount": zod.number().int().min(listOrderWindowsResponseGlassShutterCountMin).nullable(),
+  "trackCount": zod.number().int().min(listOrderWindowsResponseTrackCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(listOrderWindowsResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(listOrderWindowsResponseMeshShutterCountMin).nullable(),
   "frameCount": zod.number().int().min(1),
@@ -6120,6 +6123,8 @@ export const createOrderWindowBodyMeshTypeMax = 100;
 
 export const createOrderWindowBodyGlassShutterCountMin = 0;
 
+export const createOrderWindowBodyTrackCountMin = 0;
+
 export const createOrderWindowBodyGlassShutterReadyCountMin = 0;
 
 export const createOrderWindowBodyMeshShutterCountMin = 0;
@@ -6141,6 +6146,7 @@ export const CreateOrderWindowBody = zod.object({
   "glassType": zod.string().max(createOrderWindowBodyGlassTypeMax).nullish(),
   "meshType": zod.string().max(createOrderWindowBodyMeshTypeMax).nullish(),
   "glassShutterCount": zod.number().int().min(createOrderWindowBodyGlassShutterCountMin).nullish(),
+  "trackCount": zod.number().int().min(createOrderWindowBodyTrackCountMin).nullish(),
   "glassShutterReadyCount": zod.number().int().min(createOrderWindowBodyGlassShutterReadyCountMin).nullish(),
   "meshShutterCount": zod.number().int().min(createOrderWindowBodyMeshShutterCountMin).nullish(),
   "frameCount": zod.number().int().min(1).max(createOrderWindowBodyFrameCountMax).optional(),
@@ -6153,6 +6159,8 @@ export const CreateOrderWindowBody = zod.object({
 })
 
 export const createOrderWindowResponseGlassShutterCountMin = 0;
+
+export const createOrderWindowResponseTrackCountMin = 0;
 
 export const createOrderWindowResponseGlassShutterReadyCountMin = 0;
 
@@ -6184,6 +6192,7 @@ export const CreateOrderWindowResponse = zod.object({
   "mesh": zod.string()
 }),zod.null()]),
   "glassShutterCount": zod.number().int().min(createOrderWindowResponseGlassShutterCountMin).nullable(),
+  "trackCount": zod.number().int().min(createOrderWindowResponseTrackCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(createOrderWindowResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(createOrderWindowResponseMeshShutterCountMin).nullable(),
   "frameCount": zod.number().int().min(1),
@@ -6545,6 +6554,8 @@ export const updateOrderWindowBodyMeshTypeMax = 100;
 
 export const updateOrderWindowBodyGlassShutterCountMin = 0;
 
+export const updateOrderWindowBodyTrackCountMin = 0;
+
 export const updateOrderWindowBodyGlassShutterReadyCountMin = 0;
 
 export const updateOrderWindowBodyMeshShutterCountMin = 0;
@@ -6564,6 +6575,7 @@ export const UpdateOrderWindowBody = zod.object({
   "glassType": zod.string().max(updateOrderWindowBodyGlassTypeMax).nullish(),
   "meshType": zod.string().max(updateOrderWindowBodyMeshTypeMax).nullish(),
   "glassShutterCount": zod.number().int().min(updateOrderWindowBodyGlassShutterCountMin).nullish(),
+  "trackCount": zod.number().int().min(updateOrderWindowBodyTrackCountMin).nullish(),
   "glassShutterReadyCount": zod.number().int().min(updateOrderWindowBodyGlassShutterReadyCountMin).nullish(),
   "meshShutterCount": zod.number().int().min(updateOrderWindowBodyMeshShutterCountMin).nullish(),
   "meshShutterReadyCount": zod.number().int().min(updateOrderWindowBodyMeshShutterReadyCountMin).nullish(),
@@ -6577,6 +6589,8 @@ export const UpdateOrderWindowBody = zod.object({
 })
 
 export const updateOrderWindowResponseGlassShutterCountMin = 0;
+
+export const updateOrderWindowResponseTrackCountMin = 0;
 
 export const updateOrderWindowResponseGlassShutterReadyCountMin = 0;
 
@@ -6608,6 +6622,7 @@ export const UpdateOrderWindowResponse = zod.object({
   "mesh": zod.string()
 }),zod.null()]),
   "glassShutterCount": zod.number().int().min(updateOrderWindowResponseGlassShutterCountMin).nullable(),
+  "trackCount": zod.number().int().min(updateOrderWindowResponseTrackCountMin).nullable(),
   "glassShutterReadyCount": zod.number().int().min(updateOrderWindowResponseGlassShutterReadyCountMin).nullable(),
   "meshShutterCount": zod.number().int().min(updateOrderWindowResponseMeshShutterCountMin).nullable(),
   "frameCount": zod.number().int().min(1),
@@ -6841,7 +6856,19 @@ export const RecordOrderRefundResponse = zod.object({
  */
 export const getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemCategoryMax = 64;
 
+export const getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
+
 export const getPurchaseOrderRegisterResponseConfirmationDocumentsItemCategoryMax = 64;
+
+export const getPurchaseOrderRegisterResponseConfirmationDocumentsItemConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const getPurchaseOrderRegisterResponseConfirmationDocumentsItemConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const getPurchaseOrderRegisterResponseConfirmationDocumentsItemConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
 
 
 
@@ -6896,6 +6923,9 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(getPurchaseOrderRegisterResponsePurchaseOrderDocumentsItemConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -6953,6 +6983,9 @@ export const GetPurchaseOrderRegisterResponseItem = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(getPurchaseOrderRegisterResponseConfirmationDocumentsItemConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(getPurchaseOrderRegisterResponseConfirmationDocumentsItemConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(getPurchaseOrderRegisterResponseConfirmationDocumentsItemConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -6990,6 +7023,12 @@ export const GetPurchaseOrderRegisterResponse = zod.array(GetPurchaseOrderRegist
  */
 
 
+
+export const listConfirmationRecordsResponseExcelConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const listConfirmationRecordsResponseExcelConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const listConfirmationRecordsResponseExcelConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
 
 
 
@@ -7056,6 +7095,9 @@ export const ListConfirmationRecordsResponseItem = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(listConfirmationRecordsResponseExcelConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(listConfirmationRecordsResponseExcelConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(listConfirmationRecordsResponseExcelConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -7105,6 +7147,12 @@ export const CreateConfirmationRecordBody = zod.object({
 
 
 
+
+export const createConfirmationRecordResponseExcelConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const createConfirmationRecordResponseExcelConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const createConfirmationRecordResponseExcelConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
 
 
 
@@ -7171,6 +7219,9 @@ export const CreateConfirmationRecordResponse = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(createConfirmationRecordResponseExcelConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(createConfirmationRecordResponseExcelConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(createConfirmationRecordResponseExcelConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -7245,6 +7296,12 @@ export const UploadConfirmationRecordFileHeader = zod.object({
 })
 
 
+export const uploadConfirmationRecordFileResponseConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const uploadConfirmationRecordFileResponseConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const uploadConfirmationRecordFileResponseConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
+
 
 
 export const UploadConfirmationRecordFileResponse = zod.object({
@@ -7277,6 +7334,9 @@ export const UploadConfirmationRecordFileResponse = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(uploadConfirmationRecordFileResponseConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(uploadConfirmationRecordFileResponseConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(uploadConfirmationRecordFileResponseConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -7404,6 +7464,12 @@ export const ListOrderDocumentsParams = zod.object({
 
 export const listOrderDocumentsResponseCategoryMax = 64;
 
+export const listOrderDocumentsResponseConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const listOrderDocumentsResponseConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const listOrderDocumentsResponseConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
+
 
 
 export const ListOrderDocumentsResponseItem = zod.object({
@@ -7435,6 +7501,9 @@ export const ListOrderDocumentsResponseItem = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(listOrderDocumentsResponseConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(listOrderDocumentsResponseConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(listOrderDocumentsResponseConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -7561,6 +7630,12 @@ export const UploadOrderDocumentParams = zod.object({
 
 export const uploadOrderDocumentResponseCategoryMax = 64;
 
+export const uploadOrderDocumentResponseConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const uploadOrderDocumentResponseConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const uploadOrderDocumentResponseConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
+
 
 
 export const UploadOrderDocumentResponse = zod.object({
@@ -7592,6 +7667,9 @@ export const UploadOrderDocumentResponse = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(uploadOrderDocumentResponseConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(uploadOrderDocumentResponseConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(uploadOrderDocumentResponseConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -7639,6 +7717,12 @@ export const UploadQuotationConfirmationDocumentParams = zod.object({
 
 export const uploadQuotationConfirmationDocumentResponseCategoryMax = 64;
 
+export const uploadQuotationConfirmationDocumentResponseConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const uploadQuotationConfirmationDocumentResponseConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const uploadQuotationConfirmationDocumentResponseConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
+
 
 
 export const UploadQuotationConfirmationDocumentResponse = zod.object({
@@ -7670,6 +7754,9 @@ export const UploadQuotationConfirmationDocumentResponse = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(uploadQuotationConfirmationDocumentResponseConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(uploadQuotationConfirmationDocumentResponseConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(uploadQuotationConfirmationDocumentResponseConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -7719,6 +7806,14 @@ export const PreviewOrderDocumentReextractionParams = zod.object({
   "documentId": zod.coerce.string()
 })
 
+export const previewOrderDocumentReextractionResponseConfirmationInfoWindowsItemTrackCountMin = 0;
+
+export const previewOrderDocumentReextractionResponseConfirmationInfoWindowsItemGlassShutterCountMin = 0;
+
+export const previewOrderDocumentReextractionResponseConfirmationInfoWindowsItemMeshShutterCountMin = 0;
+
+
+
 export const PreviewOrderDocumentReextractionResponse = zod.object({
   "confirmationInfo": zod.object({
   "status": zod.enum(['extracted', 'no_text', 'unsupported', 'failed']),
@@ -7739,6 +7834,9 @@ export const PreviewOrderDocumentReextractionResponse = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(previewOrderDocumentReextractionResponseConfirmationInfoWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(previewOrderDocumentReextractionResponseConfirmationInfoWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(previewOrderDocumentReextractionResponseConfirmationInfoWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -7783,6 +7881,12 @@ export const ReextractOrderDocumentBody = zod.object({
 
 export const reextractOrderDocumentResponseCategoryMax = 64;
 
+export const reextractOrderDocumentResponseConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const reextractOrderDocumentResponseConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const reextractOrderDocumentResponseConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
+
 
 
 export const ReextractOrderDocumentResponse = zod.object({
@@ -7814,6 +7918,9 @@ export const ReextractOrderDocumentResponse = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(reextractOrderDocumentResponseConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(reextractOrderDocumentResponseConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(reextractOrderDocumentResponseConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
@@ -7859,6 +7966,12 @@ export const ReplaceOrderDocumentParams = zod.object({
 
 export const replaceOrderDocumentResponseCategoryMax = 64;
 
+export const replaceOrderDocumentResponseConfirmationInfoOneWindowsItemTrackCountMin = 0;
+
+export const replaceOrderDocumentResponseConfirmationInfoOneWindowsItemGlassShutterCountMin = 0;
+
+export const replaceOrderDocumentResponseConfirmationInfoOneWindowsItemMeshShutterCountMin = 0;
+
 
 
 export const ReplaceOrderDocumentResponse = zod.object({
@@ -7890,6 +8003,9 @@ export const ReplaceOrderDocumentResponse = zod.object({
   "area": zod.string(),
   "quantity": zod.string(),
   "windowType": zod.string(),
+  "trackCount": zod.number().int().min(replaceOrderDocumentResponseConfirmationInfoOneWindowsItemTrackCountMin).nullish(),
+  "glassShutterCount": zod.number().int().min(replaceOrderDocumentResponseConfirmationInfoOneWindowsItemGlassShutterCountMin).nullish(),
+  "meshShutterCount": zod.number().int().min(replaceOrderDocumentResponseConfirmationInfoOneWindowsItemMeshShutterCountMin).nullish(),
   "glass": zod.string(),
   "lockType": zod.string(),
   "profile": zod.string(),
