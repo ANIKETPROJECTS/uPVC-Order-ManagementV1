@@ -4,16 +4,22 @@ An internal order, quotation, and production tracking system for a uPVC windows 
 
 ## Run & Operate
 
+- In Replit, start the managed workflows `artifacts/api-server: API Server` and `artifacts/upvc-order-management: web`. Open the web app at `/`; API routes are served at `/api`. The Canvas preview workflow is optional and is not needed to run the app.
+- Managed workflows supply `PORT` and `BASE_PATH`; the commands below are package entry points, not standalone shell commands without that environment.
 - `pnpm --filter @workspace/api-server run dev` — run the API server
 - `pnpm --filter @workspace/upvc-order-management run dev` — run the web app
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - Required secrets: `MONGODB_URI`, `SESSION_SECRET`
+- Install the imported dependencies with `pnpm install --frozen-lockfile`.
+- Startup verification: `/api/healthz` returns `{"status":"ok"}`, `/api/auth/session` responds, and `/` displays staff sign-in. Use an existing account to access the Admin panel; setup does not create accounts or demo data.
+- The API runs its existing index setup and compatibility migrations on startup.
+- Project-local `uploads/` files are not included in Git imports. Restore any needed historical files separately; do not assume MongoDB metadata includes those file bytes. Local uploads may be lost on a published-app restart or publish.
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
+- pnpm workspaces, Node.js 20.20, TypeScript 5.9
 - Web: React + Vite
 - API: Express 5
 - Persistence: MongoDB only, using the MongoDB Node.js driver
