@@ -33,7 +33,7 @@ import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { formatInr, formatIstDateTime } from '@/lib/formatters';
 
-type PaymentState = 'all' | 'paid' | 'partial' | 'unpaid' | 'unpriced';
+type PaymentState = 'all' | 'paid' | 'overpaid' | 'partial' | 'unpaid' | 'unpriced';
 type SortKey = 'createdAt' | 'balance' | 'orderValue' | 'netPaid' | 'clientName' | 'orderId';
 type LedgerEntry = { kind: 'receipt'; item: OrderPayment } | { kind: 'refund'; item: OrderRefund };
 
@@ -55,18 +55,20 @@ const methodLabel = (method: string) => method.replaceAll('_', ' ').replace(/\b\
 
 function getPaymentState(order: BalancePaymentRegisterOrder): Exclude<PaymentState, 'all'> {
   if (order.orderValue === null) return 'unpriced';
-  if (order.balance !== null && order.balance <= 0) return 'paid';
+  if (order.balance !== null && order.balance < 0) return 'overpaid';
+  if (order.balance === 0) return 'paid';
   if (order.netPaid > 0) return 'partial';
   return 'unpaid';
 }
 
 function stateLabel(state: Exclude<PaymentState, 'all'>) {
-  return ({ paid: 'Paid', partial: 'Partially paid', unpaid: 'Unpaid', unpriced: 'No order value' })[state];
+  return ({ paid: 'Paid', overpaid: 'Overpaid', partial: 'Partially paid', unpaid: 'Unpaid', unpriced: 'No order value' })[state];
 }
 
 function StateBadge({ state }: { state: Exclude<PaymentState, 'all'> }) {
   const styles = {
     paid: 'bg-primary/10 text-primary',
+    overpaid: 'bg-amber-100 text-amber-800',
     partial: 'bg-amber-100 text-amber-800',
     unpaid: 'bg-rose-100 text-rose-800',
     unpriced: 'bg-muted text-muted-foreground',
@@ -175,7 +177,7 @@ function OrderRow({ order, expanded, onToggle }: { order: BalancePaymentRegister
         <div className="lg:hidden"><span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Net paid</span><p className="font-mono text-xs font-semibold tabular-nums">{formatInr(order.netPaid)}</p></div>
       </div>
       <div className="hidden lg:block"><p className="font-mono text-xs font-semibold tabular-nums">{formatInr(order.netPaid)}</p><p className="mt-1 text-[9px] text-muted-foreground">Net paid</p></div>
-      <div><p className={`font-mono text-xs font-semibold tabular-nums ${order.balance !== null && order.balance > 0 ? 'text-amber-800' : ''}`}>{order.balance === null ? '—' : formatInr(order.balance)}</p><p className="mt-1 text-[9px] text-muted-foreground">Balance</p></div>
+       <div><p className={`font-mono text-xs font-semibold tabular-nums ${order.balance !== null && order.balance > 0 ? 'text-amber-800' : order.balance !== null && order.balance < 0 ? 'text-amber-800' : ''}`}>{order.balance === null ? '—' : formatInr(Math.abs(order.balance))}</p><p className="mt-1 text-[9px] text-muted-foreground">{order.balance !== null && order.balance < 0 ? 'Overpaid by' : 'Balance'}</p></div>
       <div><p className="text-[11px] font-semibold">{lifecycleLabels[order.orderStatus] ?? order.orderStatus}</p><p className="mt-1 text-[9px] text-muted-foreground">Lifecycle</p></div>
       <div><p className="text-[11px] font-medium">{formatDate(order.createdAt)}</p><p className="mt-1 text-[9px] text-muted-foreground">Order date</p></div>
       <div className="flex items-center justify-between gap-2 lg:justify-end">
@@ -203,7 +205,7 @@ function OrderCard({ order, expanded, onToggle }: { order: BalancePaymentRegiste
       <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border/70 pt-3">
         <div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Order value</p><p className="mt-1 font-mono text-[11px] font-semibold">{order.orderValue === null ? 'Not set' : formatInr(order.orderValue)}</p></div>
         <div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Net paid</p><p className="mt-1 font-mono text-[11px] font-semibold">{formatInr(order.netPaid)}</p></div>
-        <div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Balance</p><p className="mt-1 font-mono text-[11px] font-semibold">{order.balance === null ? '—' : formatInr(order.balance)}</p></div>
+        <div><p className="text-[9px] uppercase tracking-wide text-muted-foreground">{order.balance !== null && order.balance < 0 ? 'Overpaid by' : 'Balance'}</p><p className="mt-1 font-mono text-[11px] font-semibold">{order.balance === null ? '—' : formatInr(Math.abs(order.balance))}</p></div>
       </div>
       <div className="mt-3 flex items-center justify-between">
         <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><CalendarDays size={11} />{formatDate(order.createdAt)}</span>
@@ -268,6 +270,7 @@ export default function BalancePaymentPage({ user }: { user: User }) {
       netPaid: filtered.reduce((sum, order) => sum + order.netPaid, 0),
       outstanding: filtered.reduce((sum, order) => sum + Math.max(0, order.balance ?? 0), 0),
       paidCount: filtered.filter((order) => getPaymentState(order) === 'paid').length,
+      overpaidCount: filtered.filter((order) => getPaymentState(order) === 'overpaid').length,
       valuedCount: valued.length,
     };
   }, [filtered]);
@@ -309,7 +312,7 @@ export default function BalancePaymentPage({ user }: { user: User }) {
             <div><p className="text-[9px] font-bold uppercase tracking-[.14em] text-muted-foreground">Outstanding · filtered</p><p className="mt-1 font-display text-xl font-bold tabular-nums">{formatInr(summary.outstanding)}</p></div><span className="grid size-9 place-items-center rounded-lg bg-accent/20 text-accent-foreground"><ArrowDown size={17} /></span>
           </div>
           <div className="flex min-h-[94px] items-center justify-between rounded-xl border border-border bg-card px-4 py-4 shadow-sm sm:px-5">
-            <div><p className="text-[9px] font-bold uppercase tracking-[.14em] text-muted-foreground">Orders shown</p><p className="mt-1 font-display text-xl font-bold tabular-nums">{summary.orderCount}<span className="ml-2 text-xs font-medium text-muted-foreground">{summary.paidCount} paid</span></p></div><span className="grid size-9 place-items-center rounded-lg bg-secondary text-secondary-foreground"><Building2 size={17} /></span>
+             <div><p className="text-[9px] font-bold uppercase tracking-[.14em] text-muted-foreground">Orders shown</p><p className="mt-1 font-display text-xl font-bold tabular-nums">{summary.orderCount}<span className="ml-2 text-xs font-medium text-muted-foreground">{summary.paidCount} paid{summary.overpaidCount ? ` · ${summary.overpaidCount} overpaid` : ''}</span></p></div><span className="grid size-9 place-items-center rounded-lg bg-secondary text-secondary-foreground"><Building2 size={17} /></span>
           </div>
         </section>
 
@@ -326,7 +329,7 @@ export default function BalancePaymentPage({ user }: { user: User }) {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-end gap-2.5">
-              <label className="flex min-w-[145px] flex-1 flex-col gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground sm:flex-none"><span className="inline-flex items-center gap-1"><SlidersHorizontal size={11} />Payment state</span><select value={paymentState} onChange={(event) => setPaymentState(event.target.value as PaymentState)} className="h-8 rounded-md border border-input bg-background px-2 text-[11px] font-medium normal-case tracking-normal text-foreground outline-none focus:border-primary" data-testid="select-balance-payment-state"><option value="all">All states</option><option value="paid">Paid</option><option value="partial">Partially paid</option><option value="unpaid">Unpaid</option><option value="unpriced">No order value</option></select></label>
+              <label className="flex min-w-[145px] flex-1 flex-col gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground sm:flex-none"><span className="inline-flex items-center gap-1"><SlidersHorizontal size={11} />Payment state</span><select value={paymentState} onChange={(event) => setPaymentState(event.target.value as PaymentState)} className="h-8 rounded-md border border-input bg-background px-2 text-[11px] font-medium normal-case tracking-normal text-foreground outline-none focus:border-primary" data-testid="select-balance-payment-state"><option value="all">All states</option><option value="paid">Paid</option><option value="overpaid">Overpaid</option><option value="partial">Partially paid</option><option value="unpaid">Unpaid</option><option value="unpriced">No order value</option></select></label>
               <label className="flex min-w-[145px] flex-1 flex-col gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground sm:flex-none"><span>Lifecycle</span><select value={lifecycle} onChange={(event) => setLifecycle(event.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-[11px] font-medium normal-case tracking-normal text-foreground outline-none focus:border-primary" data-testid="select-balance-lifecycle"><option value="all">All lifecycle stages</option>{lifecycles.map((status) => <option key={status} value={status}>{lifecycleLabels[status] ?? status}</option>)}</select></label>
               <label className="flex min-w-[135px] flex-1 flex-col gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground sm:flex-none"><span className="inline-flex items-center gap-1"><MapPin size={11} />Location</span><select value={location} onChange={(event) => setLocation(event.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-[11px] font-medium normal-case tracking-normal text-foreground outline-none focus:border-primary" data-testid="select-balance-location"><option value="all">All locations</option>{locations.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
               <label className="flex min-w-[140px] flex-col gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground"><span className="inline-flex items-center gap-1"><CalendarDays size={11} />Order date from</span><input type="date" value={fromDate} max={toDate || undefined} onChange={(event) => setFromDate(event.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-[11px] font-medium normal-case tracking-normal text-foreground outline-none focus:border-primary" aria-label="Created from date" data-testid="input-balance-date-from" /></label>

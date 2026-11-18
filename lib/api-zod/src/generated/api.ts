@@ -8067,7 +8067,8 @@ export const updateOrderBillingBodyOrderValueMin = 0;
 
 
 export const UpdateOrderBillingBody = zod.object({
-  "orderValue": zod.number().min(updateOrderBillingBodyOrderValueMin).nullable()
+  "orderValue": zod.number().min(updateOrderBillingBodyOrderValueMin).nullable(),
+  "allowOverpayment": zod.boolean().optional().describe('Allow this confirmation-derived value to be lower than net payments already received.')
 })
 
 

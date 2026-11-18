@@ -11,7 +11,7 @@ export function PaymentProgressBar({
 }) {
   const safePercentage = Number.isFinite(percentage) ? percentage : 0;
   const fill = Math.max(0, Math.min(100, safePercentage));
-  const label = `${safePercentage.toFixed(1)}% paid`;
+  const label = safePercentage > 100 ? 'Overpaid' : `${safePercentage.toFixed(1)}% paid`;
   return <div className={compact ? 'flex min-w-28 items-center gap-2' : 'space-y-2'} data-testid={testId}>
     <div
       className={`w-full overflow-hidden rounded-full bg-muted ${compact ? 'h-1.5' : 'h-2.5'}`}

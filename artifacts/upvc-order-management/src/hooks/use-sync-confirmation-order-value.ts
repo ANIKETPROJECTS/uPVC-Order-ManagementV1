@@ -55,7 +55,7 @@ export function useSyncConfirmationOrderValue(orderId: string, user: User) {
     }
 
     try {
-      const updated = await updateBilling.mutateAsync({ id: orderId, data: { orderValue: amount } });
+      const updated = await updateBilling.mutateAsync({ id: orderId, data: { orderValue: amount, allowOverpayment: true } });
       queryClient.setQueryData(getGetOrderQueryKey(orderId), updated);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }),

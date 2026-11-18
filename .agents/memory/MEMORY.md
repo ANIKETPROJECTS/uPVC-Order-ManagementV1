@@ -30,3 +30,4 @@
 - [Order detail window tracking](order-detail-window-tracking.md) — persist room, glass/mesh type, and separate shutter quantities per window; keep missing counts distinct from zero.
 - [QR sticker printing](qr-sticker-printing.md) — print sharp vector QR labels in cuttable A4 grids while preserving each label’s configured physical size.
 - [Project vs. retail order scope](project-retail-order-scope.md) — project-only lot features must not alter retail order screens or behavior.
+- [Confirmation billing overpayments](confirmation-billing-overpayments.md) — extracted final billing may lower order value below receipts; show the positive overpaid difference without altering the payment ledger.

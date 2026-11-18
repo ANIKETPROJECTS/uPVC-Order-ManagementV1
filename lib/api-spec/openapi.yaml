@@ -5045,6 +5045,9 @@ components:
         orderValue:
           type: ["number", "null"]
           minimum: 0
+        allowOverpayment:
+          type: boolean
+          description: Allow this confirmation-derived value to be lower than net payments already received.
       required: [orderValue]
     OrderList:
       type: array

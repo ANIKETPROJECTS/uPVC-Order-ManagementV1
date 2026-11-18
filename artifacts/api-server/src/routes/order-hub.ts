@@ -1348,9 +1348,11 @@ router.patch("/orders/:id/billing", requireOrderHubPermission("view"), async (re
   if (!publicUser || publicUser.permissions.payments !== "edit") { res.status(user ? 403 : 401).json({ error: user ? "Payment editing access is required." : "Sign in to continue." }); return; }
   const order = await getOrders(db).findOne({ _id: params.data.id });
   if (!order) { res.status(404).json({ error: "Order not found." }); return; }
-  const received = await getOrderPayments(db).aggregate([{ $match: { orderRecordId: order._id, status: "received" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).toArray();
-  const total = Number(received[0]?.total ?? 0);
-  if (parsed.data.orderValue !== null && parsed.data.orderValue < total) { res.status(400).json({ error: `Order value cannot be below received payments (${total}).` }); return; }
+  if (parsed.data.orderValue !== null && !parsed.data.allowOverpayment) {
+    const received = await getOrderPayments(db).aggregate([{ $match: { orderRecordId: order._id, status: "received" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).toArray();
+    const total = Number(received[0]?.total ?? 0);
+    if (parsed.data.orderValue < total) { res.status(400).json({ error: `Order value cannot be below received payments (${total}).` }); return; }
+  }
   const old = order.orderValue ?? null;
   await getOrders(db).updateOne({ _id: order._id }, { $set: { orderValue: parsed.data.orderValue, updatedAt: new Date(), updatedBy: userId } });
   if (old !== parsed.data.orderValue) {

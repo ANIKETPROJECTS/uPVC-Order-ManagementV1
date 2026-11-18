@@ -838,6 +838,8 @@ export interface OrderBillingUpdate {
      * @nullable
      */
   orderValue: number | null;
+  /** Allow this confirmation-derived value to be lower than net payments already received. */
+  allowOverpayment?: boolean;
 }
 
 export type OrderList = Order[];
