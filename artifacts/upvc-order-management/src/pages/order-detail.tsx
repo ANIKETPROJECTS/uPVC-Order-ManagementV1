@@ -1270,17 +1270,23 @@ function GlassPill({ value }: { value: string }) {
   return <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold capitalize ${tone}`}>{readable(value)}</span>;
 }
 
-function OverviewWindowList({ windows }: { windows: OrderWindow[] }) {
+function OverviewWindowList({ windows, confirmationWindows = [], orderMeshType }: {
+  windows: OrderWindow[];
+  confirmationWindows?: NonNullable<OrderDocument['confirmationInfo']>['windows'];
+  orderMeshType?: string | null;
+}) {
+  const extractedMeshByWindow = new Map(confirmationWindows.map((row) => [row.windowNo.trim().toLocaleLowerCase(), row.mesh.trim()]));
   const progress = (ready: number | null, total: number | null, fallback: string) => total === null ? fallback : total === 0 ? 'Not applicable' : `${ready ?? 0}/${total} Ready`;
   return <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm" data-testid="section-order-overview-windows">
     <header className="border-b border-border/70 px-4 py-3"><h2 className="font-display text-base font-bold">Windows</h2><p className="text-xs text-muted-foreground">All {windows.length} windows from the shared order register · dimensions are available in the Windows tab.</p></header>
     <div className="max-h-[36rem] overflow-auto"><table className="w-full min-w-[850px] text-left text-xs">
-      <thead><tr className="border-b border-border/70 bg-muted/35 text-[10px] uppercase tracking-wider text-muted-foreground"><th rowSpan={2} className="px-3 py-2">Window</th><th rowSpan={2} className="px-3 py-2">Type</th><th rowSpan={2} className="px-3 py-2">Location</th><th rowSpan={2} className="px-3 py-2">Frame status</th><th colSpan={2} className="border-l border-border/70 px-3 py-2 text-center">Shutter status</th></tr><tr className="border-b border-border/70 bg-muted/20 text-[10px] uppercase tracking-wider text-muted-foreground"><th className="border-l border-border/70 px-3 py-2">Glass shutter</th><th className="px-3 py-2">Mesh shutter</th></tr></thead>
+      <thead><tr className="border-b border-border/70 bg-muted/35 text-[10px] uppercase tracking-wider text-muted-foreground"><th rowSpan={2} className="px-3 py-2">Window</th><th rowSpan={2} className="px-3 py-2">Type</th><th rowSpan={2} className="px-3 py-2">Location</th><th rowSpan={2} className="px-3 py-2">Frame status</th><th colSpan={2} className="border-l border-border/70 px-3 py-2 text-center">Shutter status</th><th rowSpan={2} className="px-3 py-2">Mesh type</th></tr><tr className="border-b border-border/70 bg-muted/20 text-[10px] uppercase tracking-wider text-muted-foreground"><th className="border-l border-border/70 px-3 py-2">Glass shutter</th><th className="px-3 py-2">Mesh shutter</th></tr></thead>
       <tbody>{windows.map((item) => <tr key={item.id} className="border-b border-border/50 last:border-0" data-testid={`overview-window-${item.id}`}>
         <td className="px-3 py-3 font-semibold">{item.windowNo}</td><td className="px-3 py-3">{item.windowType || 'Not recorded'}</td><td className="px-3 py-3">{item.location || 'Not recorded'}</td>
         <td className="px-3 py-3"><ReadinessPill value={item.frameStatus} />{item.pendingReason && <p className="mt-1 w-fit rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800">{item.pendingReason}</p>}</td>
         <td className="border-l border-border/70 px-3 py-3">{progress(item.glassShutterReadyCount ?? null,item.glassShutterCount ?? null,item.glassStatus === 'received' ? 'Ready' : item.glassStatus === 'partial' ? 'In progress' : 'Pending')}</td>
         <td className="px-3 py-3">{progress(item.meshShutterReadyCount ?? null,item.meshShutterCount ?? null,item.shutterStatus === 'ready' ? 'Ready' : item.shutterStatus === 'in_progress' ? 'In progress' : 'Pending')}</td>
+        <td className="px-3 py-3">{extractedMeshByWindow.get(item.windowNo.trim().toLocaleLowerCase()) || item.meshType || orderMeshType || 'Not recorded'}</td>
       </tr>)}</tbody>
     </table></div>
   </section>;
@@ -2548,7 +2554,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Location" value={record.siteAddress || record.locationName || 'Not recorded'} detail={record.locationName || 'Site'} testId="text-summary-location" /><SummaryStat label="Phone" value={record.clientPhone || 'Not recorded'} detail="Client contact" testId="text-summary-phone" /><SummaryStat label="Mesh Type" value={extractedMeshType || record.meshType || mostCommonUsableMeshType(windowRows.map((w) => w.meshType)) || 'Not recorded'} detail="Most common extracted mesh; outside aluminium and NA excluded" testId="text-summary-mesh-type" /><SummaryStat label="Glass Type" value={[...new Set(windowRows.map((w) => w.glassType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="From window records" testId="text-summary-glass-type" /></div>
          <UniversalMeshTypePanel orderId={record.id} orderMeshType={record.meshType} suggestedMeshType={extractedMeshType} windows={windowRows} user={user} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Window qty" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Sq ft" value={summary.measured === 0 && summary.count > 0 ? '—' : summary.sqFt.toFixed(1)} detail={`${summary.measured} of ${summary.count} windows measured`} testId="text-summary-area" /><SummaryStat label="Glass status" value={summary.glass} detail="Counted from window rows" testId="text-summary-glass" /><SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : record.orderValue == null ? 'Not set' : record.orderValue - received > 0 ? `Due — ${plainInr(record.orderValue - received)}` : 'Paid'} detail="Order value less received payments" testId="text-summary-payment-status" /></div>
-        {record.clientType === 'Retail' ? <OverviewWindowList windows={windowRows} /> : <ProjectOrderProgress orderRecordId={record.id} windows={windowRows} user={user} />}
+        {record.clientType === 'Retail' ? <OverviewWindowList windows={windowRows} confirmationWindows={latestConfirmationDocument?.confirmationInfo?.windows} orderMeshType={record.meshType} /> : <ProjectOrderProgress orderRecordId={record.id} windows={windowRows} user={user} />}
         <OrderDeliveryPanels orderRecordId={record.id} createdAt={record.createdAt} user={user} />
         <OrderQrCard orderId={record.orderId} orderRecordId={record.id} /><OrderLotsCard order={record} user={user} id={id} windows={windowRows} /><OrderRecordCard order={record} user={user} id={id} />
         <ProjectLotAssignmentPanel order={record} windows={windowRows} user={user} /><PieceQrLabelSheet order={record} windows={windowRows} />
