@@ -3148,6 +3148,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrderWindow"
+  /orders/{id}/windows/extracted:
+    delete:
+      operationId: deleteExtractedOrderWindows
+      tags: [orders]
+      summary: Permanently delete imported window records
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Number of imported windows deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: integer
+                    minimum: 0
+        "403":
+          description: Measurement edit access is required
+        "409":
+          description: One or more windows are assigned to a dispatch or active QR print job
   /orders/{id}/qr-print-summary:
     get:
       operationId: getOrderQrPrintSummary
@@ -3323,9 +3350,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/OrderWindow"
     delete:
-      operationId: archiveOrderWindow
+      operationId: deleteOrderWindow
       tags: [orders]
-      summary: Archive a window without removing its activity history
+      summary: Permanently delete a window without removing its activity history
       parameters:
         - name: id
           in: path
@@ -3339,7 +3366,11 @@ paths:
             type: string
       responses:
         "204":
-          description: Window archived
+          description: Window deleted
+        "403":
+          description: Measurement edit access is required
+        "409":
+          description: Window is assigned to a dispatch or active QR print job
   /orders/{id}/payments:
     get:
       operationId: listOrderPayments

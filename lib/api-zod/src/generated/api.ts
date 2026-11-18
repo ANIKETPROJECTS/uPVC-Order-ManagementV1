@@ -6215,6 +6215,22 @@ export const CreateOrderWindowResponse = zod.object({
 
 
 /**
+ * @summary Permanently delete imported window records
+ */
+export const DeleteExtractedOrderWindowsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const deleteExtractedOrderWindowsResponseDeletedMin = 0;
+
+
+
+export const DeleteExtractedOrderWindowsResponse = zod.object({
+  "deleted": zod.number().int().min(deleteExtractedOrderWindowsResponseDeletedMin)
+})
+
+
+/**
  * @summary Get QR sticker print counts for an order
  */
 export const GetOrderQrPrintSummaryParams = zod.object({
@@ -6623,14 +6639,14 @@ export const UpdateOrderWindowResponse = zod.object({
 
 
 /**
- * @summary Archive a window without removing its activity history
+ * @summary Permanently delete a window without removing its activity history
  */
-export const ArchiveOrderWindowParams = zod.object({
+export const DeleteOrderWindowParams = zod.object({
   "id": zod.coerce.string(),
   "windowId": zod.coerce.string()
 })
 
-export const ArchiveOrderWindowResponse = zod.void()
+export const DeleteOrderWindowResponse = zod.void()
 
 
 /**

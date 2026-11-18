@@ -78,6 +78,7 @@ export * from './dashboardReminderCandidate';
 export * from './dashboardSectionErrors';
 export * from './dashboardTopClient';
 export * from './dashboardTrendPoint';
+export * from './deleteExtractedOrderWindows200';
 export * from './dispatchLot';
 export * from './dispatchOrder';
 export * from './dispatchOrderList';

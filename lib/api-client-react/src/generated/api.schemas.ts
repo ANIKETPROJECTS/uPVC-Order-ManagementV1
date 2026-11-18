@@ -3535,6 +3535,11 @@ export type SearchMeasurementRecordsParams = {
 query: string;
 };
 
+export type DeleteExtractedOrderWindows200 = {
+  /** @minimum 0 */
+  deleted: number;
+};
+
 export type CancelQrPrintJob200State = typeof CancelQrPrintJob200State[keyof typeof CancelQrPrintJob200State];
 
 

@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 import { Router as ExpressRouter, type RequestHandler } from "express";
 import {
   AddPaymentFlagFollowUpBody, AddPaymentFlagFollowUpParams, AddPaymentFlagFollowUpResponse,
-  ArchiveOrderDocumentParams, ArchiveOrderWindowParams,
+  ArchiveOrderDocumentParams, DeleteExtractedOrderWindowsParams, DeleteOrderWindowParams,
   BounceOrderPaymentBody, BounceOrderPaymentParams, BounceOrderPaymentResponse,
   CreateOrderDocumentCategoryBody, CreateOrderDocumentCategoryResponse,
   CreateOrderPaymentFlagBody, CreateOrderPaymentFlagParams, CreateOrderPaymentFlagResponse,
@@ -1562,10 +1562,82 @@ router.patch("/orders/:id/windows/:windowId", async (req, res): Promise<void> =>
    await event(p.data.id, actor, "window.updated", `Updated window ${old.windowNo}.${pieceCountWarning ? ` ${pieceCountWarning}` : ""}`);
    res.json(UpdateOrderWindowResponse.parse(windowResponse(updated!, order ?? undefined, pieceCountWarning)));
 });
+router.delete("/orders/:id/windows/extracted", async (req, res): Promise<void> => {
+  const p = DeleteExtractedOrderWindowsParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "measurements", true);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
+
+  const db = await getMongoDb();
+  const windows = await getOrderWindows(db).find({
+    orderRecordId: p.data.id,
+    archivedAt: null,
+    source: { $in: ["window_list", "confirmation"] },
+  }).toArray();
+  if (!windows.length) { res.json({ deleted: 0 }); return; }
+
+  const windowIds = new Set(windows.map((window) => window._id));
+  const dispatched = (order.dispatches ?? []).some((dispatch) =>
+    dispatch.windowIds.some((windowId) => windowIds.has(windowId)),
+  );
+  if (dispatched) {
+    res.status(409).json({ error: "Some extracted windows are assigned to a dispatch. Remove them from the dispatch before deleting." });
+    return;
+  }
+
+  const pieceIds = [...new Set(windows.flatMap((window) => windowPieces(window).map((piece) => piece.id)))];
+  const activePrintJob = pieceIds.length > 0 && await getQrPrintJobs(db).findOne({
+    orderRecordId: p.data.id,
+    state: "requested",
+    pieceIds: { $in: pieceIds },
+  });
+  if (activePrintJob) {
+    res.status(409).json({ error: "Some extracted windows have an active QR print job. Wait for it to finish or cancel it before deleting." });
+    return;
+  }
+
+  const result = await getOrderWindows(db).deleteMany({
+    _id: { $in: [...windowIds] },
+    orderRecordId: p.data.id,
+    archivedAt: null,
+    source: { $in: ["window_list", "confirmation"] },
+  });
+  const deleted = result.deletedCount;
+  if (deleted) await event(p.data.id, actor, "window.extracted.deleted", `Deleted ${deleted} extracted window${deleted === 1 ? "" : "s"}.`);
+  res.json({ deleted });
+});
 router.delete("/orders/:id/windows/:windowId", async (req, res): Promise<void> => {
-  const p = ArchiveOrderWindowParams.safeParse(req.params); if (!p.success) { res.status(400).json({ error: p.error.message }); return; } const actor = await context(req, res, "measurements", true); if (!actor || !(await orderExists(p.data.id, res))) return;
-  const db = await getMongoDb(); const w = await getOrderWindows(db).findOne({ _id: p.data.windowId, orderRecordId: p.data.id, archivedAt: null }); if (!w) { res.status(404).json({ error: "Window not found." }); return; }
-  await getOrderWindows(db).updateOne({ _id: w._id }, { $set: { archivedAt: new Date(), updatedAt: new Date(), updatedBy: actor.id } }); await event(p.data.id, actor, "window.archived", `Archived window ${w.windowNo}.`); res.status(204).send();
+  const p = DeleteOrderWindowParams.safeParse(req.params);
+  if (!p.success) { res.status(400).json({ error: p.error.message }); return; }
+  const actor = await context(req, res, "measurements", true);
+  const order = actor ? await orderExists(p.data.id, res) : null;
+  if (!actor || !order) return;
+
+  const db = await getMongoDb();
+  const window = await getOrderWindows(db).findOne({
+    _id: p.data.windowId,
+    orderRecordId: p.data.id,
+    archivedAt: null,
+  });
+  if (!window) { res.status(404).json({ error: "Window not found." }); return; }
+  if ((order.dispatches ?? []).some((dispatch) => dispatch.windowIds.includes(window._id))) {
+    res.status(409).json({ error: "This window is assigned to a dispatch. Remove it from the dispatch before deleting." });
+    return;
+  }
+  const pieceIds = windowPieces(window).map((piece) => piece.id);
+  const activePrintJob = pieceIds.length > 0 && await getQrPrintJobs(db).findOne({
+    orderRecordId: p.data.id,
+    state: "requested",
+    pieceIds: { $in: pieceIds },
+  });
+  if (activePrintJob) {
+    res.status(409).json({ error: "This window has an active QR print job. Wait for it to finish or cancel it before deleting." });
+    return;
+  }
+  await getOrderWindows(db).deleteOne({ _id: window._id, orderRecordId: p.data.id, archivedAt: null });
+  await event(p.data.id, actor, "window.deleted", `Deleted window ${window.windowNo}.`);
+  res.status(204).send();
 });
 
 router.get("/orders/:id/payments", async (req, res): Promise<void> => {

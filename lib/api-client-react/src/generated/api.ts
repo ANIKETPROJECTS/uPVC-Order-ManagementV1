@@ -50,6 +50,7 @@ import type {
   Dashboard,
   DashboardPreferences,
   DashboardPreferencesInput,
+  DeleteExtractedOrderWindows200,
   DispatchOrder,
   DispatchOrderList,
   DispatchPlanUpdate,
@@ -11725,6 +11726,80 @@ export const useCreateOrderWindow = <TError = ErrorType<unknown>,
       return useMutation(getCreateOrderWindowMutationOptions(options));
     }
 
+export const getDeleteExtractedOrderWindowsUrl = (id: string,) => {
+
+
+
+
+  return `/api/orders/${id}/windows/extracted`
+}
+
+/**
+ * @summary Permanently delete imported window records
+ */
+export const deleteExtractedOrderWindows = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<DeleteExtractedOrderWindows200> => {
+
+  return customFetch<DeleteExtractedOrderWindows200>(getDeleteExtractedOrderWindowsUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteExtractedOrderWindowsMutationKey = () => ['deleteExtractedOrderWindows'] as const;
+
+export const getDeleteExtractedOrderWindowsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteExtractedOrderWindows>>, TError,DeleteExtractedOrderWindowsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteExtractedOrderWindows>>, TError,DeleteExtractedOrderWindowsMutationVariables, TContext> => {
+
+const mutationKey = getDeleteExtractedOrderWindowsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteExtractedOrderWindows>>, DeleteExtractedOrderWindowsMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteExtractedOrderWindows(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteExtractedOrderWindowsMutationResult = NonNullable<Awaited<ReturnType<typeof deleteExtractedOrderWindows>>>
+
+    export type DeleteExtractedOrderWindowsMutationError = ErrorType<void>
+    export type DeleteExtractedOrderWindowsMutationVariables = {id: string}
+
+    /**
+ * @summary Permanently delete imported window records
+ */
+export const useDeleteExtractedOrderWindows = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteExtractedOrderWindows>>, TError,DeleteExtractedOrderWindowsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteExtractedOrderWindows>>,
+        TError,
+        DeleteExtractedOrderWindowsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteExtractedOrderWindowsMutationOptions(options));
+    }
+
 export const getGetOrderQrPrintSummaryUrl = (id: string,) => {
 
 
@@ -12399,7 +12474,7 @@ export const useUpdateOrderWindow = <TError = ErrorType<unknown>,
       return useMutation(getUpdateOrderWindowMutationOptions(options));
     }
 
-export const getArchiveOrderWindowUrl = (id: string,
+export const getDeleteOrderWindowUrl = (id: string,
     windowId: string,) => {
 
 
@@ -12409,12 +12484,12 @@ export const getArchiveOrderWindowUrl = (id: string,
 }
 
 /**
- * @summary Archive a window without removing its activity history
+ * @summary Permanently delete a window without removing its activity history
  */
-export const archiveOrderWindow = async (id: string,
+export const deleteOrderWindow = async (id: string,
     windowId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
 
-  return customFetch<void>(getArchiveOrderWindowUrl(id,windowId),
+  return customFetch<void>(getDeleteOrderWindowUrl(id,windowId),
   {
     ...options,
     method: 'DELETE'
@@ -12427,13 +12502,13 @@ export const archiveOrderWindow = async (id: string,
 
 
 
-export const getArchiveOrderWindowMutationKey = () => ['archiveOrderWindow'] as const;
+export const getDeleteOrderWindowMutationKey = () => ['deleteOrderWindow'] as const;
 
-export const getArchiveOrderWindowMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderWindow>>, TError,ArchiveOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof archiveOrderWindow>>, TError,ArchiveOrderWindowMutationVariables, TContext> => {
+export const getDeleteOrderWindowMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOrderWindow>>, TError,DeleteOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteOrderWindow>>, TError,DeleteOrderWindowMutationVariables, TContext> => {
 
-const mutationKey = getArchiveOrderWindowMutationKey();
+const mutationKey = getDeleteOrderWindowMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -12443,10 +12518,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveOrderWindow>>, ArchiveOrderWindowMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteOrderWindow>>, DeleteOrderWindowMutationVariables> = (props) => {
           const {id,windowId} = props ?? {};
 
-          return  archiveOrderWindow(id,windowId,requestOptions)
+          return  deleteOrderWindow(id,windowId,requestOptions)
         }
 
 
@@ -12456,23 +12531,23 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type ArchiveOrderWindowMutationResult = NonNullable<Awaited<ReturnType<typeof archiveOrderWindow>>>
+    export type DeleteOrderWindowMutationResult = NonNullable<Awaited<ReturnType<typeof deleteOrderWindow>>>
 
-    export type ArchiveOrderWindowMutationError = ErrorType<unknown>
-    export type ArchiveOrderWindowMutationVariables = {id: string;windowId: string}
+    export type DeleteOrderWindowMutationError = ErrorType<void>
+    export type DeleteOrderWindowMutationVariables = {id: string;windowId: string}
 
     /**
- * @summary Archive a window without removing its activity history
+ * @summary Permanently delete a window without removing its activity history
  */
-export const useArchiveOrderWindow = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderWindow>>, TError,ArchiveOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useDeleteOrderWindow = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOrderWindow>>, TError,DeleteOrderWindowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof archiveOrderWindow>>,
+        Awaited<ReturnType<typeof deleteOrderWindow>>,
         TError,
-        ArchiveOrderWindowMutationVariables,
+        DeleteOrderWindowMutationVariables,
         TContext
       > => {
-      return useMutation(getArchiveOrderWindowMutationOptions(options));
+      return useMutation(getDeleteOrderWindowMutationOptions(options));
     }
 
 export const getListOrderPaymentsUrl = (id: string,) => {
