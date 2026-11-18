@@ -17,6 +17,21 @@ const formatInr = (amount: number) => new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 }).format(amount);
 
+export function parseConfirmationBillingAmount(value: string): number | null {
+  const normalizedAmount = value
+    .replace(/₹|INR|Rs\.?/gi, "")
+    .replace(/[\s,]/g, "")
+    .replace(/\/-?$/, "")
+    .trim();
+  if (!/^\d+(?:\.\d+)?$/.test(normalizedAmount)) return null;
+
+  const parsedAmount = Number(normalizedAmount);
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return null;
+
+  const roundedAmount = Math.round((parsedAmount + Number.EPSILON) * 100) / 100;
+  return Number.isFinite(roundedAmount) && roundedAmount > 0 ? roundedAmount : null;
+}
+
 export function useSyncConfirmationOrderValue(orderId: string, user: User) {
   const queryClient = useQueryClient();
   const updateBilling = useUpdateOrderBilling();
@@ -31,13 +46,8 @@ export function useSyncConfirmationOrderValue(orderId: string, user: User) {
       .find((field) => /^final\s+billing\s+(?:amount|amt\.?)$/i.test(field.label.trim()));
     if (!finalAmountField) return "No Final Billing Amount was found; the saved order value was left unchanged.";
 
-    const normalizedAmount = finalAmountField.value
-      .replace(/₹|INR|Rs\.?/gi, "")
-      .replace(/[\s,]/g, "")
-      .replace(/\/-?$/, "")
-      .trim();
-    const amount = Number(normalizedAmount);
-    if (!/^\d+(?:\.\d{1,2})?$/.test(normalizedAmount) || !Number.isFinite(amount) || amount <= 0) {
+    const amount = parseConfirmationBillingAmount(finalAmountField.value);
+    if (amount === null) {
       return "The extracted Final Billing Amount is invalid; the saved order value was left unchanged.";
     }
     if (!canEditPayments) {

@@ -1349,12 +1349,13 @@ function ConfirmationDetailsCard({ documentRecord, placement = 'overview' }: { d
   if (!documentRecord || !info) return null;
   const paymentReference = placement === 'payments';
   const sections = info.sections.filter((section) => section.fields.length > 0);
+  const hasFinalBillingAmount = sections.some((section) => section.fields.some((field) => /^final\s+billing\s+(?:amount|amt\.?)$/i.test(field.label.trim())));
   const referenceTerms = paymentReference ? info.terms : [];
   return <Card className="border-border/80" data-testid={paymentReference ? 'card-confirmation-payment-details' : 'card-confirmation-overview-details'}>
     <CardHeader className="pb-3">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{paymentReference ? 'Confirmation reference · not applied to billing' : 'Confirmation source'}</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{paymentReference ? 'Confirmation details · billing source' : 'Confirmation source'}</p>
       <CardTitle className="mt-1 text-base">Workbook confirmation details</CardTitle>
-      <p className="text-xs text-muted-foreground">{documentRecord.filename}{paymentReference ? ' · The saved order value, receipts, and balance remain unchanged.' : ' · Extracted values are shown for reference.'}</p>
+      <p className="text-xs text-muted-foreground">{documentRecord.filename}{paymentReference ? hasFinalBillingAmount ? ' · Final Billing Amount updates the saved order value when confirmation data is uploaded or re-extracted; other extracted fields are reference only.' : ' · No Final Billing Amount was found; other extracted fields are reference only.' : ' · Extracted values are shown for reference.'}</p>
     </CardHeader>
     <CardContent className="space-y-3">
       {sections.length ? <div className="grid gap-3 md:grid-cols-2">{sections.map((section) => <section key={section.title} className="overflow-hidden rounded-xl border border-border bg-card"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">{section.title}</h3><table className="w-full text-left text-xs"><tbody>{section.fields.map((field) => <tr key={field.label} className="border-b border-border/60 last:border-0"><th className="w-2/5 px-3 py-2 font-medium text-muted-foreground">{field.label}</th><td className="px-3 py-2 font-semibold">{field.value}</td></tr>)}</tbody></table></section>)}</div> : <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground">No confirmation details were extracted.</p>}
