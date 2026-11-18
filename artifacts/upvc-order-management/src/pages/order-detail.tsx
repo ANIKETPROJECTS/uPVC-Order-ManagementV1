@@ -2437,6 +2437,20 @@ function OrderDeliveryPanels({ orderRecordId, createdAt, user }: { orderRecordId
   </div>;
 }
 
+function mostCommonUsableMeshType(values: Array<string | null | undefined>): string | null {
+  const ignored = /^(?:OUTSIDE\s+ALUMIN(?:I|U)M|N\.?\s*\/?\s*A|NONE|NOT\s+APPLICABLE)$/i;
+  const counts = new Map<string, { label: string; count: number }>();
+  for (const value of values) {
+    const label = value?.trim().replace(/\s+/g, ' ');
+    if (!label || ignored.test(label)) continue;
+    const key = label.toLocaleLowerCase();
+    const current = counts.get(key);
+    if (current) current.count += 1;
+    else counts.set(key, { label, count: 1 });
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count)[0]?.label ?? null;
+}
+
 export default function OrderDetailPage({ user }: { user: User }) {
   const params = useParams<{ id: string }>();
   const id = params.id || '';
@@ -2448,6 +2462,9 @@ export default function OrderDetailPage({ user }: { user: User }) {
   const latestConfirmationDocument = (orderDocuments.data ?? [])
     .filter((item) => item.category === 'confirmation' && item.confirmationInfo)
     .sort((a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt))[0];
+  const extractedMeshType = mostCommonUsableMeshType(
+    latestConfirmationDocument?.confirmationInfo?.windows.map((windowRow) => windowRow.mesh) ?? [],
+  );
   const payments = useListOrderPayments(id, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderPaymentsQueryKey(id) } });
   const orderRefunds = useListOrderRefunds(id, { query: { enabled: hasPermission(user, 'payments', 'view'), queryKey: getListOrderRefundsQueryKey(id) } });
   const canReadOrder = hasPermission(user, 'order-hub', 'view');
@@ -2512,8 +2529,8 @@ export default function OrderDetailPage({ user }: { user: User }) {
       <Tabs key={id} defaultValue={['overview', 'windows', 'payments', 'confirmation-info', 'documents', 'activity'].includes(new URLSearchParams(window.location.search).get('tab') || '') ? new URLSearchParams(window.location.search).get('tab')! : 'overview'} className="w-full" data-testid="tabs-order-detail"><TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 md:grid-cols-6"><TabsTrigger value="overview" className="py-2.5 text-xs sm:text-sm">Overview</TabsTrigger><TabsTrigger value="windows" className="py-2.5 text-xs sm:text-sm">Windows</TabsTrigger><TabsTrigger value="payments" className="py-2.5 text-xs sm:text-sm">Payments</TabsTrigger><TabsTrigger value="confirmation-info" className="py-2.5 text-xs sm:text-sm">Confirmation info</TabsTrigger><TabsTrigger value="documents" className="py-2.5 text-xs sm:text-sm">Documents</TabsTrigger><TabsTrigger value="activity" className="py-2.5 text-xs sm:text-sm">Activity</TabsTrigger></TabsList>
       <TabsContent value="overview" className="space-y-5">
         <ConfirmationDetailsCard documentRecord={latestConfirmationDocument} />
-         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Location" value={record.siteAddress || record.locationName || 'Not recorded'} detail={record.locationName || 'Site'} testId="text-summary-location" /><SummaryStat label="Phone" value={record.clientPhone || 'Not recorded'} detail="Client contact" testId="text-summary-phone" /><SummaryStat label="Mesh Type" value={record.meshType || [...new Set(windowRows.map((w) => w.meshType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="Shared across all order windows" testId="text-summary-mesh-type" /><SummaryStat label="Glass Type" value={[...new Set(windowRows.map((w) => w.glassType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="From window records" testId="text-summary-glass-type" /></div>
-         <UniversalMeshTypePanel orderId={record.id} orderMeshType={record.meshType} windows={windowRows} user={user} />
+         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Location" value={record.siteAddress || record.locationName || 'Not recorded'} detail={record.locationName || 'Site'} testId="text-summary-location" /><SummaryStat label="Phone" value={record.clientPhone || 'Not recorded'} detail="Client contact" testId="text-summary-phone" /><SummaryStat label="Mesh Type" value={extractedMeshType || record.meshType || mostCommonUsableMeshType(windowRows.map((w) => w.meshType)) || 'Not recorded'} detail="Most common extracted mesh; outside aluminium and NA excluded" testId="text-summary-mesh-type" /><SummaryStat label="Glass Type" value={[...new Set(windowRows.map((w) => w.glassType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="From window records" testId="text-summary-glass-type" /></div>
+         <UniversalMeshTypePanel orderId={record.id} orderMeshType={extractedMeshType || record.meshType} windows={windowRows} user={user} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Window qty" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Sq ft" value={summary.measured === 0 && summary.count > 0 ? '—' : summary.sqFt.toFixed(1)} detail={`${summary.measured} of ${summary.count} windows measured`} testId="text-summary-area" /><SummaryStat label="Glass status" value={summary.glass} detail="Counted from window rows" testId="text-summary-glass" /><SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : record.orderValue == null ? 'Not set' : record.orderValue - received > 0 ? `Due — ${plainInr(record.orderValue - received)}` : 'Paid'} detail="Order value less received payments" testId="text-summary-payment-status" /></div>
         {record.clientType === 'Retail' ? <OverviewWindowList windows={windowRows} /> : <ProjectOrderProgress orderRecordId={record.id} windows={windowRows} user={user} />}
         <OrderDeliveryPanels orderRecordId={record.id} createdAt={record.createdAt} user={user} />
