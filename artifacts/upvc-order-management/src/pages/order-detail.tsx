@@ -1280,22 +1280,20 @@ function OverviewWindowList({ windows }: { windows: OrderWindow[] }) {
   </section>;
 }
 
-function ConfirmationDetailsCard({ documentRecord, financialReference = false }: { documentRecord?: OrderDocument; financialReference?: boolean }) {
+function ConfirmationDetailsCard({ documentRecord, placement = 'overview' }: { documentRecord?: OrderDocument; placement?: 'overview' | 'payments' }) {
   const info = documentRecord?.confirmationInfo;
   if (!documentRecord || !info) return null;
-  const isFinancialField = (label: string) => /payment|rate|amount|cgst|sgst|balance|advance|window quantity|total area/i.test(label);
-  const sections = info.sections
-    .map((section) => ({ ...section, fields: financialReference ? section.fields.filter((field) => isFinancialField(field.label)) : section.fields }))
-    .filter((section) => section.fields.length > 0);
-  const referenceTerms = financialReference ? info.terms : [];
-  return <Card className="border-border/80" data-testid={financialReference ? 'card-confirmation-payment-reference' : 'card-confirmation-overview-details'}>
+  const paymentReference = placement === 'payments';
+  const sections = info.sections.filter((section) => section.fields.length > 0);
+  const referenceTerms = paymentReference ? info.terms : [];
+  return <Card className="border-border/80" data-testid={paymentReference ? 'card-confirmation-payment-details' : 'card-confirmation-overview-details'}>
     <CardHeader className="pb-3">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{financialReference ? 'Confirmation reference · not applied to billing' : 'Confirmation source'}</p>
-      <CardTitle className="mt-1 text-base">{financialReference ? 'Extracted payment and order figures' : 'Workbook confirmation details'}</CardTitle>
-      <p className="text-xs text-muted-foreground">{documentRecord.filename}{financialReference ? ' · The saved order value, receipts, and balance remain unchanged.' : ' · Extracted values are shown for reference.'}</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{paymentReference ? 'Confirmation reference · not applied to billing' : 'Confirmation source'}</p>
+      <CardTitle className="mt-1 text-base">Workbook confirmation details</CardTitle>
+      <p className="text-xs text-muted-foreground">{documentRecord.filename}{paymentReference ? ' · The saved order value, receipts, and balance remain unchanged.' : ' · Extracted values are shown for reference.'}</p>
     </CardHeader>
     <CardContent className="space-y-3">
-      {sections.length ? <div className="grid gap-3 md:grid-cols-2">{sections.map((section) => <section key={section.title} className="overflow-hidden rounded-xl border border-border bg-card"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">{section.title}</h3><table className="w-full text-left text-xs"><tbody>{section.fields.map((field) => <tr key={field.label} className="border-b border-border/60 last:border-0"><th className="w-2/5 px-3 py-2 font-medium text-muted-foreground">{field.label}</th><td className="px-3 py-2 font-semibold">{field.value}</td></tr>)}</tbody></table></section>)}</div> : <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground">{financialReference ? 'No payment amount or payment terms were detected in this workbook.' : 'No confirmation details were extracted.'}</p>}
+      {sections.length ? <div className="grid gap-3 md:grid-cols-2">{sections.map((section) => <section key={section.title} className="overflow-hidden rounded-xl border border-border bg-card"><h3 className="border-b border-border bg-muted/35 px-3 py-2 text-xs font-bold">{section.title}</h3><table className="w-full text-left text-xs"><tbody>{section.fields.map((field) => <tr key={field.label} className="border-b border-border/60 last:border-0"><th className="w-2/5 px-3 py-2 font-medium text-muted-foreground">{field.label}</th><td className="px-3 py-2 font-semibold">{field.value}</td></tr>)}</tbody></table></section>)}</div> : <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground">No confirmation details were extracted.</p>}
       {referenceTerms.length > 0 && <section className="rounded-xl border border-border bg-muted/15 p-3"><h3 className="text-xs font-bold">Extracted terms · reference only</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">{referenceTerms.map((term, index) => <li key={`${index}-${term}`}>{term}</li>)}</ul></section>}
     </CardContent>
   </Card>;
@@ -1764,7 +1762,7 @@ function PaymentsPanel({ orderId, user, order, confirmationDocument }: { orderId
   };
   if (!canView) return <ZeroState icon={IndianRupee} title="Payment access is restricted" description="You need payments view access to see this order's financial records." testId="state-payments-restricted" />;
   return <div className="space-y-5">
-    <ConfirmationDetailsCard documentRecord={confirmationDocument} financialReference />
+    <ConfirmationDetailsCard documentRecord={confirmationDocument} placement="payments" />
     <div className="grid gap-3 sm:grid-cols-3">
       <SummaryStat label="Order value" value={inr(order.orderValue)} detail={order.orderValue == null ? 'Unknown' : 'Agreed value'} testId="text-billing-order-value" />
       <SummaryStat label="Paid" value={plainInr(progress.paid)} detail="Received receipts less refunds" testId="text-payments-received" />
