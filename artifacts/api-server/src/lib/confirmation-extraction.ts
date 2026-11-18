@@ -161,9 +161,14 @@ export async function extractConfirmationInfo(bytes: Buffer, filename: string): 
       fields.push({ label: "Worksheet", value: selected.sheetName });
       fields.push({ label: "Window quantity", value: String(selected.totals.quantity) });
       fields.push({ label: "Total area (sq ft)", value: selected.totals.areaSqFt.toFixed(2) });
+      const paymentFields = Object.entries(selected.paymentSummary)
+        .filter(([label, value]) => label !== "Total sq ft" && Boolean(value))
+        .map(([label, value]) => ({ label, value }));
+      const sections = [{ title: "Workbook confirmation details", fields }];
+      if (paymentFields.length) sections.push({ title: "Order and payment summary", fields: paymentFields });
       return {
         status: "extracted", method: "none", extractedAt: now,
-        sections: [{ title: "Workbook confirmation details", fields }],
+        sections,
         windows: selected.rows.map((row) => ({
           windowNo: row.windowNo, location: row.location, width: row.widthMm == null ? "" : String(row.widthMm),
           height: row.heightMm == null ? "" : String(row.heightMm), area: row.areaSqFt == null ? "" : roundSqFt(row.areaSqFt).toFixed(2),

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useArchiveOrderDocument, useUploadOrderDocument } from "@workspace/api-client-react";
 import type { User } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { useSyncConfirmationOrderValue } from "@/hooks/use-sync-confirmation-order-value";
 import { useToast } from "@/hooks/use-toast";
 
 type ImportedRow = {
@@ -26,6 +27,7 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
 }) {
   const uploadDocument = useUploadOrderDocument();
   const archiveDocument = useArchiveOrderDocument();
+  const syncOrderValueFromConfirmation = useSyncConfirmationOrderValue(orderId, user);
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [sheets, setSheets] = useState<ImportSheet[]>([]);
@@ -107,8 +109,9 @@ export function WindowListImporter({ orderId, meshType, user, onComplete }: {
       });
       const result = await response.json() as { created?: number; error?: string };
       if (!response.ok) throw new Error(result.error || "The window rows could not be saved.");
+      const billingMessage = await syncOrderValueFromConfirmation(savedDocument);
       onComplete();
-      toast({ title: "Window list imported", description: `${result.created ?? rows.length} window rows were saved. Source: ${file.name}.` });
+      toast({ title: "Window list imported", description: `${result.created ?? rows.length} window rows were saved. Source: ${file.name}.${billingMessage ? ` ${billingMessage}` : ''}` });
       setFile(null); setRows([]); setSheets([]); setSelectedSheet("");
     } catch (cause) {
       if (sourceDocumentId) await archiveDocument.mutateAsync({ id: orderId, documentId: sourceDocumentId }).catch(() => undefined);

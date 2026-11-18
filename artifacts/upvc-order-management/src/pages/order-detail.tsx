@@ -114,6 +114,7 @@ import { OrderQrCard } from '@/components/order-qr-card';
 import { OrderQrStickerControls, PieceQrLabelSheet, ProjectLotAssignmentPanel } from '@/components/order-window-operations';
 import { SiteLocation } from '@/components/site-location';
 import { SiteMapPicker } from '@/components/site-map-picker';
+import { useSyncConfirmationOrderValue } from '@/hooks/use-sync-confirmation-order-value';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -969,7 +970,7 @@ function WindowSelectField({ control, name, label, options, disabled, testId }: 
   </div>}</div>;
 }
 
-function UniversalMeshTypePanel({ orderId, orderMeshType, windows, user }: { orderId: string; orderMeshType: string | null; windows: OrderWindow[]; user: User }) {
+function UniversalMeshTypePanel({ orderId, orderMeshType, suggestedMeshType, windows, user }: { orderId: string; orderMeshType: string | null; suggestedMeshType?: string | null; windows: OrderWindow[]; user: User }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const canEditOrder = hasPermission(user, 'order-hub');
@@ -977,11 +978,12 @@ function UniversalMeshTypePanel({ orderId, orderMeshType, windows, user }: { ord
   const distinctMeshTypes = [...new Set(windows.map((item) => item.meshType).filter((value): value is string => Boolean(value)))];
   const fallbackMeshType = distinctMeshTypes.length === 1 ? distinctMeshTypes[0] : '';
   const appliedMeshType = orderMeshType ?? fallbackMeshType;
-  const [meshTypeDraft, setMeshTypeDraft] = useState(appliedMeshType);
+  const suggestedMesh = suggestedMeshType || fallbackMeshType;
+  const [meshTypeDraft, setMeshTypeDraft] = useState(orderMeshType ?? suggestedMesh);
 
   useEffect(() => {
-    setMeshTypeDraft(orderMeshType ?? fallbackMeshType);
-  }, [orderMeshType, fallbackMeshType]);
+    setMeshTypeDraft(orderMeshType ?? suggestedMesh);
+  }, [orderMeshType, suggestedMesh]);
 
   const applyMeshType = () => updateOrder.mutate(
     { id: orderId, data: { meshType: meshTypeDraft.trim() || null } },
@@ -1148,14 +1150,16 @@ function ConfirmationScheduleImport({ orderId, documentRecord, windows, meshType
   </section>;
 }
 
-function ProjectLotConfirmationUpload({ orderId, lotId, windows, meshType, onComplete }: {
+function ProjectLotConfirmationUpload({ orderId, lotId, windows, meshType, syncOrderValueFromConfirmation, onComplete }: {
   orderId: string;
   lotId: string;
   windows: OrderWindow[];
   meshType: string;
+  syncOrderValueFromConfirmation: (documentRecord?: OrderDocument | null) => Promise<string | null>;
   onComplete: () => void;
 }) {
   const upload = useUploadOrderDocument();
+  const { toast } = useToast();
   const [documentRecord, setDocumentRecord] = useState<OrderDocument | null>(null);
   const [error, setError] = useState('');
   const busy = upload.isPending;
@@ -1174,6 +1178,8 @@ function ProjectLotConfirmationUpload({ orderId, lotId, windows, meshType, onCom
       const saved = await upload.mutateAsync({ id: orderId, category: 'confirmation', filename: encodeURIComponent(file.name), data: file });
       setDocumentRecord(saved);
       onComplete();
+      const billingMessage = await syncOrderValueFromConfirmation(saved);
+      if (billingMessage) toast({ title: 'Confirmation uploaded', description: billingMessage });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The confirmation file could not be uploaded.');
     }
@@ -1347,6 +1353,7 @@ function ProjectLotWindowsTable({ windows }: { windows: OrderWindow[] }) {
 function ProjectLotCards({ order, windows, user, managementEnabled = false }: { order: Order; windows: OrderWindow[]; user: User; managementEnabled?: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const syncOrderValueFromConfirmation = useSyncConfirmationOrderValue(order.id, user);
   const canViewDispatch = hasPermission(user, 'dispatch', 'view');
   const canManage = managementEnabled && hasPermission(user, 'order-hub', 'edit') && !order.needsReview;
   const canCreateWindow = hasPermission(user, 'measurements');
@@ -1419,6 +1426,7 @@ function ProjectLotCards({ order, windows, user, managementEnabled = false }: { 
                 lotId={lot.lotId}
                 windows={windows}
                 meshType={order.meshType ?? ''}
+                syncOrderValueFromConfirmation={syncOrderValueFromConfirmation}
                 onComplete={() => {
                   void queryClient.invalidateQueries({ queryKey: getListOrderWindowsQueryKey(order.id) });
                   void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(order.id) });
@@ -1444,7 +1452,7 @@ function ProjectLotCards({ order, windows, user, managementEnabled = false }: { 
   </div>;
 }
 
-function ProjectOrderDetailView({ order, windows, user, received, timeline, confirmationDocument }: { order: Order; windows: OrderWindow[]; user: User; received: number; timeline: { label: string; step: number; complete: boolean; current: boolean }[]; confirmationDocument?: OrderDocument }) {
+function ProjectOrderDetailView({ order, windows, user, received, timeline, confirmationDocument, suggestedMeshType }: { order: Order; windows: OrderWindow[]; user: User; received: number; timeline: { label: string; step: number; complete: boolean; current: boolean }[]; confirmationDocument?: OrderDocument; suggestedMeshType?: string | null }) {
   const assigned = windows.filter((window) => Boolean(window.lotId && order.lots?.some((lot) => lot.lotId === window.lotId)));
   const area = assigned.reduce((sum, window) => sum + (window.sqFt ?? 0), 0);
   const total = windows.length;
@@ -1505,7 +1513,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline, conf
             <SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : paid == null ? 'Not set' : paid > 0 ? `Due — ${plainInr(paid)}` : 'Paid'} detail="Payments stay on the project" testId="project-stat-payment" />
           </div>
           <ConfirmationDetailsCard documentRecord={confirmationDocument} />
-          <UniversalMeshTypePanel orderId={order.id} orderMeshType={order.meshType} windows={windows} user={user} />
+          <UniversalMeshTypePanel orderId={order.id} orderMeshType={order.meshType} suggestedMeshType={suggestedMeshType} windows={windows} user={user} />
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5" data-testid="section-project-lot-progress">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryStat label="Planned window qty" value={String(total)} detail="Counted from project windows" testId="project-stat-planned-windows" />
@@ -1530,7 +1538,7 @@ function ProjectOrderDetailView({ order, windows, user, received, timeline, conf
         </TabsContent>
          <TabsContent value="lots" className="space-y-3 pt-4"><div><h2 className="font-display text-base font-bold">Project lots</h2><p className="text-xs text-muted-foreground">Each lot owns its windows and dispatch history.</p></div><ProjectLotCards order={order} windows={windows} user={user} managementEnabled /></TabsContent>
          <TabsContent value="payments" className="space-y-4 pt-4"><BillingPanel order={order} user={user} id={order.id} /><OrderPaymentFlagsPanel orderId={order.id} user={user} /><PaymentsPanel orderId={order.id} user={user} order={order} confirmationDocument={confirmationDocument} /></TabsContent>
-         <TabsContent value="confirmation-info" className="pt-4"><ConfirmationInfoPanel orderId={order.id} /></TabsContent>
+         <TabsContent value="confirmation-info" className="pt-4"><ConfirmationInfoPanel orderId={order.id} user={user} /></TabsContent>
         <TabsContent value="documents" className="pt-4"><DocumentsPanel orderId={order.id} user={user} /></TabsContent>
         <TabsContent value="activity" className="space-y-4 pt-4"><GrievancesPanel order={order} user={user} /><ActivityPanel orderId={order.id} /></TabsContent>
       </Tabs>
@@ -1850,9 +1858,10 @@ function PaymentsPanel({ orderId, user, order, confirmationDocument }: { orderId
   </div>;
 }
 
-function ConfirmationInfoPanel({ orderId }: { orderId: string }) {
+function ConfirmationInfoPanel({ orderId, user }: { orderId: string; user: User }) {
   const { toast } = useToast();
   const client = useQueryClient();
+  const syncOrderValueFromConfirmation = useSyncConfirmationOrderValue(orderId, user);
   const [newerConfirmations, setNewerConfirmations] = useState<{ recordId: string; confirmationId: string; linkedVersionNumber: number; latestVersionNumber: number; newerAvailable: boolean }[]>([]);
   const [view, setView] = useState<"document" | "software">("document");
   const [reextracting, setReextracting] = useState(false);
@@ -1897,7 +1906,8 @@ function ConfirmationInfoPanel({ orderId }: { orderId: string }) {
       const result = await saved.json() as { error?: string };
       if (!saved.ok) throw new Error(result.error || "The extraction changed before it could be saved.");
       await client.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) });
-      toast({ title: "Confirmation re-extracted", description: `${candidate.windows.length} rows saved after confirmation.` });
+      const billingMessage = await syncOrderValueFromConfirmation({ ...documentRecord, confirmationInfo: candidate });
+      toast({ title: "Confirmation re-extracted", description: `${candidate.windows.length} rows saved after confirmation.${billingMessage ? ` ${billingMessage}` : ''}` });
     } catch (error) {
       toast({ title: "Re-extraction failed", description: error instanceof Error ? error.message : "The document could not be re-extracted.", variant: "destructive" });
     } finally { setReextracting(false); }
@@ -1935,6 +1945,7 @@ function ConfirmationInfoPanel({ orderId }: { orderId: string }) {
 function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const syncOrderValueFromConfirmation = useSyncConfirmationOrderValue(orderId, user);
   const query = useListOrderDocuments(orderId, { query: { queryKey: getListOrderDocumentsQueryKey(orderId) } });
   const windowsQuery = useListOrderWindows(orderId, { query: { queryKey: getListOrderWindowsQueryKey(orderId) } });
   const categoryQuery = useListOrderDocumentCategories({ query: { queryKey: getListOrderDocumentCategoriesQueryKey(), refetchOnWindowFocus: true } });
@@ -2051,14 +2062,17 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
         return;
       }
       let syncDescription: string | null = null;
+      let billingDescription: string | null = null;
       if (category === 'confirmation') {
         try {
           syncDescription = await syncConfirmationWindows(uploaded);
         } catch (error) {
           syncDescription = error instanceof Error ? error.message : 'Extracted windows could not be synced. Review the confirmation details and try again.';
         }
+        billingDescription = await syncOrderValueFromConfirmation(uploaded);
       }
-      toast({ title: 'Document uploaded', ...(syncDescription ? { description: syncDescription } : {}) });
+      const description = [syncDescription, billingDescription].filter(Boolean).join(' ');
+      toast({ title: 'Document uploaded', ...(description ? { description } : {}) });
       setFileKey((value) => value + 1);
       void queryClient.invalidateQueries({ queryKey: getListOrderDocumentsQueryKey(orderId) });
       void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
@@ -2089,12 +2103,14 @@ function DocumentsPanel({ orderId, user }: { orderId: string; user: User }) {
         void queryClient.invalidateQueries({ queryKey: getListOrderActivityQueryKey(orderId) });
         void queryClient.invalidateQueries({ queryKey: getDownloadOrderDocumentQueryKey(orderId, documentRecord.id) });
         let syncDescription: string | null = null;
+        let billingDescription: string | null = null;
         try {
           syncDescription = await syncConfirmationWindows(updated);
         } catch (error) {
           syncDescription = error instanceof Error ? error.message : 'Extracted windows could not be synced. Review the confirmation details and try again.';
         }
-        toast({ title: 'Document replaced', description: `${updated.filename} now replaces ${documentRecord.filename}.${syncDescription ? ` ${syncDescription}` : ''}` });
+        billingDescription = await syncOrderValueFromConfirmation(updated);
+        toast({ title: 'Document replaced', description: `${updated.filename} now replaces ${documentRecord.filename}.${syncDescription ? ` ${syncDescription}` : ''}${billingDescription ? ` ${billingDescription}` : ''}` });
       },
       onError: () => {
         setReplacingDocumentId(null);
@@ -2492,7 +2508,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
      return { label, step, complete, current, active: complete || current };
    });
    if (record.clientType === 'Project') {
-      return <ProjectOrderDetailView order={record} windows={windowRows} user={user} received={received} timeline={timeline} confirmationDocument={latestConfirmationDocument} />;
+      return <ProjectOrderDetailView order={record} windows={windowRows} user={user} received={received} timeline={timeline} confirmationDocument={latestConfirmationDocument} suggestedMeshType={extractedMeshType} />;
    }
   return <AppShell user={user} title={record.orderId} eyebrow="Module 2 · order record"><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><Link href="/order-hub" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline" data-testid="link-back-order-hub"><ArrowLeft size={15} /> Back to order hub</Link><div className="flex items-center gap-2 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full bg-primary" /> <span>Last updated {dateLabel(record.updatedAt)}</span></div></div>
@@ -2530,7 +2546,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
       <TabsContent value="overview" className="space-y-5">
         <ConfirmationDetailsCard documentRecord={latestConfirmationDocument} />
          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Location" value={record.siteAddress || record.locationName || 'Not recorded'} detail={record.locationName || 'Site'} testId="text-summary-location" /><SummaryStat label="Phone" value={record.clientPhone || 'Not recorded'} detail="Client contact" testId="text-summary-phone" /><SummaryStat label="Mesh Type" value={extractedMeshType || record.meshType || mostCommonUsableMeshType(windowRows.map((w) => w.meshType)) || 'Not recorded'} detail="Most common extracted mesh; outside aluminium and NA excluded" testId="text-summary-mesh-type" /><SummaryStat label="Glass Type" value={[...new Set(windowRows.map((w) => w.glassType).filter((x): x is string => Boolean(x)))].join(', ') || 'Not recorded'} detail="From window records" testId="text-summary-glass-type" /></div>
-         <UniversalMeshTypePanel orderId={record.id} orderMeshType={extractedMeshType || record.meshType} windows={windowRows} user={user} />
+         <UniversalMeshTypePanel orderId={record.id} orderMeshType={record.meshType} suggestedMeshType={extractedMeshType} windows={windowRows} user={user} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryStat label="Window qty" value={String(summary.count)} detail={`${summary.ready} fully ready`} testId="text-summary-window-count" /><SummaryStat label="Sq ft" value={summary.measured === 0 && summary.count > 0 ? '—' : summary.sqFt.toFixed(1)} detail={`${summary.measured} of ${summary.count} windows measured`} testId="text-summary-area" /><SummaryStat label="Glass status" value={summary.glass} detail="Counted from window rows" testId="text-summary-glass" /><SummaryStat label="Payment status" value={!hasPermission(user, 'payments', 'view') ? 'Restricted' : record.orderValue == null ? 'Not set' : record.orderValue - received > 0 ? `Due — ${plainInr(record.orderValue - received)}` : 'Paid'} detail="Order value less received payments" testId="text-summary-payment-status" /></div>
         {record.clientType === 'Retail' ? <OverviewWindowList windows={windowRows} /> : <ProjectOrderProgress orderRecordId={record.id} windows={windowRows} user={user} />}
         <OrderDeliveryPanels orderRecordId={record.id} createdAt={record.createdAt} user={user} />
@@ -2547,7 +2563,7 @@ export default function OrderDetailPage({ user }: { user: User }) {
       </TabsContent>
       <TabsContent value="windows" className="space-y-5"><WindowsPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="payments" className="space-y-5"><BillingPanel order={record} user={user} id={id} /><OrderPaymentFlagsPanel orderId={id} user={user} /><PaymentsPanel orderId={id} user={user} order={record} confirmationDocument={latestConfirmationDocument} /></TabsContent>
-      <TabsContent value="confirmation-info"><ConfirmationInfoPanel orderId={id} /></TabsContent>
+      <TabsContent value="confirmation-info"><ConfirmationInfoPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="documents"><DocumentsPanel orderId={id} user={user} /></TabsContent>
       <TabsContent value="activity" className="space-y-5"><GrievancesPanel order={record} user={user} /><ActivityPanel orderId={id} /></TabsContent>
     </Tabs>
