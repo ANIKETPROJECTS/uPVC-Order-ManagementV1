@@ -2114,7 +2114,7 @@ export const ListInstallationOrdersResponse = zod.array(ListInstallationOrdersRe
 
 
 /**
- * @summary List active orders that can be scheduled for installation
+ * @summary List all orders that can be scheduled for installation
  */
 export const ListInstallationOrderOptionsResponseItem = zod.object({
   "id": zod.string(),
@@ -2122,7 +2122,8 @@ export const ListInstallationOrderOptionsResponseItem = zod.object({
   "clientName": zod.string(),
   "locationName": zod.string(),
   "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
-  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered'])
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered']),
+  "isActive": zod.boolean()
 })
 export const ListInstallationOrderOptionsResponse = zod.array(ListInstallationOrderOptionsResponseItem)
 

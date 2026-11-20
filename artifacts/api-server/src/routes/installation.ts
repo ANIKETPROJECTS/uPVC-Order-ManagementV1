@@ -468,7 +468,7 @@ router.get("/installation/order-options", async (req, res): Promise<void> => {
   const actor = await getActor(req, res, "installation", "edit");
   if (!actor) return;
   const orders = await getOrders(await getMongoDb())
-    .find({ isActive: { $ne: false } })
+    .find({})
     .sort({ createdAt: -1, sequenceNo: -1 })
     .toArray();
   res.json(ListInstallationOrderOptionsResponse.parse(orders.map((order) => ({
@@ -478,6 +478,7 @@ router.get("/installation/order-options", async (req, res): Promise<void> => {
     locationName: order.locationName,
     orderStatus: order.status,
     dispatchStatus: order.dispatchStatus ?? "pending_dispatch",
+    isActive: order.isActive !== false,
   }))));
 });
 

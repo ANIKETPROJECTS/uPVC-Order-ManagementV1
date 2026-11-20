@@ -15,4 +15,5 @@ export interface InstallationOrderOption {
   locationName: string;
   orderStatus: OrderStatus;
   dispatchStatus: DispatchStatus;
+  isActive: boolean;
 }

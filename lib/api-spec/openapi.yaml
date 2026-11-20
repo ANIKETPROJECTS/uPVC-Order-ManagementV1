@@ -1141,10 +1141,10 @@ paths:
     get:
       operationId: listInstallationOrderOptions
       tags: [installation]
-      summary: List active orders that can be scheduled for installation
+      summary: List all orders that can be scheduled for installation
       responses:
         "200":
-          description: Active order choices for the Installation scheduler
+          description: Order choices, including inactive orders, for the Installation scheduler
           content:
             application/json:
               schema:
@@ -4659,7 +4659,9 @@ components:
           $ref: "#/components/schemas/OrderStatus"
         dispatchStatus:
           $ref: "#/components/schemas/DispatchStatus"
-      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus]
+        isActive:
+          type: boolean
+      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus, isActive]
     InstallationOrderOptionList:
       type: array
       items:

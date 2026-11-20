@@ -17,7 +17,7 @@ import {
   useListInstallationOrderOptions, useListInstallationOrders, useListInstallationTeams, useListInstallationUsers,
   useUpdateInstallationOrder, useUploadInstallationDrawing, useDeleteInstallationDrawing,
 } from '@workspace/api-client-react';
-import type { InstallationOrder, InstallationTeam, User } from '@workspace/api-client-react';
+import type { InstallationOrder, InstallationOrderOption, InstallationTeam, User } from '@workspace/api-client-react';
 import { AppShell } from '@/components/app-shell';
 import { InstallationOrderPickerDialog } from '@/components/installation-order-picker-dialog';
 import { getInstallationStatusUrl } from '@/lib/order-qr';
@@ -25,6 +25,7 @@ import { SiteLocation } from '@/components/site-location';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -234,6 +235,7 @@ export default function InstallationPage({ user }: { user: User }) {
   const [resultOrder, setResultOrder] = useState<InstallationOrder | null>(null);
   const [assignmentOrder, setAssignmentOrder] = useState<AssignmentTarget | null>(null);
   const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
+  const [pendingScheduleOption, setPendingScheduleOption] = useState<InstallationOrderOption | null>(null);
   const [drawingOrder, setDrawingOrder] = useState<InstallationOrder | null>(null);
   const [qrOrder, setQrOrder] = useState<InstallationOrder | null>(null);
   const [shareQrOrder, setShareQrOrder] = useState<InstallationOrder | null>(null);
@@ -331,7 +333,7 @@ export default function InstallationPage({ user }: { user: User }) {
       onError: () => toast({ title: 'Team could not be unassigned', description: 'Refresh and try again.', variant: 'destructive' }),
     });
   };
-  const selectOrderForSchedule = (option: NonNullable<typeof orderOptionsQuery.data>[number]) => {
+  const openScheduleForm = (option: InstallationOrderOption) => {
     const existing = orders.find((order) => order.id === option.id);
     const target: AssignmentTarget = existing ?? {
       id: option.id,
@@ -349,8 +351,16 @@ export default function InstallationPage({ user }: { user: User }) {
       drawingFilename: null,
       drawingSizeBytes: null,
     };
+    setPendingScheduleOption(null);
     setSchedulePickerOpen(false);
     setAssignmentOrder(target);
+  };
+  const selectOrderForSchedule = (option: InstallationOrderOption) => {
+    if (option.isActive && option.dispatchStatus !== 'pending_dispatch') {
+      openScheduleForm(option);
+      return;
+    }
+    setPendingScheduleOption(option);
   };
   const copyInstallationLink = async (order: InstallationOrder, updateStatus = false) => {
     const url = updateStatus
@@ -431,7 +441,7 @@ export default function InstallationPage({ user }: { user: User }) {
         <div className="relative flex flex-col justify-between gap-5 md:flex-row md:items-end"><div className="max-w-2xl">
           <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.18em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> Fulfillment · service completion</p>
           <h1 className="mt-2 font-display text-3xl font-bold tracking-[-.05em] md:text-[2.65rem]">Plan the visit. Close the order.</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Coordinate field teams for any active order, schedule ahead of dispatch, and record completion or follow-up issues.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Coordinate field teams for any order, schedule ahead of dispatch, and record completion or follow-up issues.</p>
         </div><div className="flex flex-wrap gap-2"><Link href="/order-scanner" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:bg-primary/90" data-testid="link-scan-installation-qr"><Camera size={14} /> Scan QR</Link><Link href="/dispatch" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background/80 px-4 text-xs font-bold transition hover:border-primary/35 hover:text-primary" data-testid="link-back-to-dispatch">Dispatch register <ArrowRight size={14} /></Link></div></div>
       </section>
 
@@ -510,7 +520,7 @@ export default function InstallationPage({ user }: { user: User }) {
          <CardContent id="installation-register-panel" role="tabpanel" aria-label={showInstalled ? 'Completed installations' : 'Upcoming installations'} className={view === 'grid' ? 'p-3 sm:p-4' : 'space-y-3 p-3 sm:p-4'}>
           {ordersQuery.isLoading ? <div className={view === 'grid' ? 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3' : 'space-y-3'} aria-label="Loading installation orders" data-testid="state-installation-loading">{[0, 1, 2].map((n) => <div key={n} className="h-36 animate-pulse rounded-xl border border-border/70 bg-card/70" />)}</div>
             : ordersQuery.isError ? <div className="grid min-h-56 place-items-center rounded-xl border border-destructive/20 bg-destructive/[.035] p-6 text-center" data-testid="state-installation-error"><div><CircleAlert size={24} className="mx-auto text-destructive" /><h3 className="mt-3 font-display text-sm font-bold">Installation records unavailable</h3><p className="mt-1 text-xs text-muted-foreground">Delivered orders could not be loaded.</p><Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => void ordersQuery.refetch()} data-testid="button-retry-installation"><RefreshCw size={13} /> Try again</Button></div></div>
-            : visibleOrders.length === 0 ? <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-installation-empty"><div><div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-primary"><Wrench size={20} /></div><h3 className="mt-3 font-display text-sm font-bold">{orders.length ? 'No orders match this view' : 'No installation schedules yet'}</h3><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{orders.length ? 'Try another search or change the status, assignment, or sort filters.' : 'Delivered orders appear automatically. Use Add / Schedule Installation to choose any active order.'}</p>{orders.length > 0 && <Button type="button" size="sm" variant="outline" className="mt-4" onClick={() => { setSearch(''); setFilter('all'); setShowInstalled(false); setAssignmentFilter('all'); setSort('scheduled-asc'); }} data-testid="button-reset-installation-filters">Clear filters</Button>}</div></div>
+            : visibleOrders.length === 0 ? <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center" data-testid="state-installation-empty"><div><div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-primary"><Wrench size={20} /></div><h3 className="mt-3 font-display text-sm font-bold">{orders.length ? 'No orders match this view' : 'No installation schedules yet'}</h3><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{orders.length ? 'Try another search or change the status, assignment, or sort filters.' : 'Delivered orders appear automatically. Use Add / Schedule Installation to choose any order.'}</p>{orders.length > 0 && <Button type="button" size="sm" variant="outline" className="mt-4" onClick={() => { setSearch(''); setFilter('all'); setShowInstalled(false); setAssignmentFilter('all'); setSort('scheduled-asc'); }} data-testid="button-reset-installation-filters">Clear filters</Button>}</div></div>
             : <div className={view === 'grid' ? 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3' : 'space-y-3'}>
               {visibleOrders.map((order) => <article key={order.id} className={`${view === 'grid' ? 'flex h-full flex-col gap-4' : 'grid gap-4 md:grid-cols-[minmax(180px,1.2fr)_minmax(150px,.9fr)_minmax(180px,1fr)_minmax(160px,1fr)_auto] md:items-center'} rounded-xl border border-border/75 bg-background/70 p-4 transition hover:border-primary/25 hover:bg-primary/[.015]`} data-testid={`row-installation-order-${order.id}`}>
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2">{canOrderView ? <Link href={`/order-hub/${encodeURIComponent(order.id)}`} className="font-mono text-sm font-bold tracking-tight text-primary underline-offset-4 hover:underline" data-testid={`link-installation-order-${order.id}`}>{order.orderId}</Link> : <p className="font-mono text-sm font-bold" data-testid={`text-order-id-${order.id}`}>{order.orderId}</p>}<span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold capitalize text-emerald-800 ring-1 ring-inset ring-emerald-200/80">{readable(order.dispatchStatus)}</span></div>
@@ -545,6 +555,23 @@ export default function InstallationPage({ user }: { user: User }) {
     </main>
     <ResultDialog order={resultOrder} canEdit={canEdit} pending={resultMutation.isPending} onClose={() => { setResultOrder(null); resultMutation.reset(); }} onSave={saveResult} />
     <InstallationOrderPickerDialog open={schedulePickerOpen} options={orderOptionsQuery.data || []} installations={orders} loading={orderOptionsQuery.isLoading || ordersQuery.isLoading} error={orderOptionsQuery.isError || ordersQuery.isError} onRetry={() => { void orderOptionsQuery.refetch(); void ordersQuery.refetch(); }} onClose={() => setSchedulePickerOpen(false)} onSelect={selectOrderForSchedule} />
+    <AlertDialog open={Boolean(pendingScheduleOption)} onOpenChange={(open) => { if (!open) setPendingScheduleOption(null); }}>
+      <AlertDialogContent data-testid="dialog-confirm-installation-order">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm this installation schedule</AlertDialogTitle>
+          <AlertDialogDescription>
+            {pendingScheduleOption && <span className="block font-semibold text-foreground">{pendingScheduleOption.orderId} · {pendingScheduleOption.clientName} · {pendingScheduleOption.locationName}</span>}
+            {!pendingScheduleOption?.isActive && <span className="mt-2 block">This order is inactive. You can still schedule the visit.</span>}
+            {pendingScheduleOption?.dispatchStatus === 'pending_dispatch' && <span className="mt-2 block">This order has not been dispatched yet. You can still schedule the visit.</span>}
+            <span className="mt-2 block">Scheduling only creates or updates the Installation record; it will not change the order’s status.</span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="button-cancel-installation-order-confirmation">Back</AlertDialogCancel>
+          <AlertDialogAction onClick={() => { if (pendingScheduleOption) openScheduleForm(pendingScheduleOption); }} data-testid="button-confirm-installation-order">Confirm and continue</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <AssignmentDialog order={assignmentOrder} teams={teams} users={users} directoryReady={directoryReady} directoryError={directoryError} pending={assignmentMutation.isPending} unassignPending={unassignMutation.isPending} drawingPending={uploadDrawingMutation.isPending} drawingDeletePending={deleteDrawingMutation.isPending} onUploadDrawing={uploadDrawing} onDeleteDrawing={deleteDrawing} onClose={() => { setAssignmentOrder(null); assignmentMutation.reset(); unassignMutation.reset(); }} onSave={saveAssignment} onUnassign={unassignTeam} onRetryDirectory={() => { void teamsQuery.refetch(); void usersQuery.refetch(); }} />
     <CompletedDrawingDialog order={drawingOrder} pending={uploadDrawingMutation.isPending} deleting={deleteDrawingMutation.isPending} onClose={() => setDrawingOrder(null)} onUpload={uploadDrawing} onDelete={deleteDrawing} />
     <Dialog open={Boolean(qrOrder)} onOpenChange={(open) => { if (!open) setQrOrder(null); }}>

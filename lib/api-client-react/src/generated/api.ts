@@ -4166,7 +4166,7 @@ export const getListInstallationOrderOptionsUrl = () => {
 }
 
 /**
- * @summary List active orders that can be scheduled for installation
+ * @summary List all orders that can be scheduled for installation
  */
 export const listInstallationOrderOptions = async ( options?: Parameters<typeof customFetch>[1]): Promise<InstallationOrderOptionList> => {
 
@@ -4213,7 +4213,7 @@ export type ListInstallationOrderOptionsQueryError = ErrorType<void>
 
 
 /**
- * @summary List active orders that can be scheduled for installation
+ * @summary List all orders that can be scheduled for installation
  */
 
 export function useListInstallationOrderOptions<TData = Awaited<ReturnType<typeof listInstallationOrderOptions>>, TError = ErrorType<void>>(
