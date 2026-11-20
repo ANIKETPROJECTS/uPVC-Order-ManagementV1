@@ -5,6 +5,7 @@ import {
   CreateOrderGrievanceParams,
   CreateOrderGrievanceResponse,
   ListInstallationOrdersResponse,
+  ListInstallationOrderOptionsResponse,
   ListOrderGrievancesParams,
   ListOrderGrievancesResponse,
   UpdateInstallationOrderBody,
@@ -201,7 +202,7 @@ async function getActiveShare(db: Awaited<ReturnType<typeof getMongoDb>>, token:
     getOrders(db).findOne({ _id: installation.orderRecordId }),
     getInstallationTeams(db).findOne({ _id: installation.teamId }),
   ]);
-  if (!order || order.dispatchStatus !== "delivered") return null;
+  if (!order || (order.dispatchStatus !== "delivered" && !installation.scheduledDate)) return null;
   return { installation, order, team };
 }
 
@@ -269,9 +270,9 @@ router.get("/installation/orders/:id/drawing", async (req, res): Promise<void> =
   const actor = await getActor(req, res, "installation", "view");
   if (!actor) return;
   const db = await getMongoDb();
-  const order = await getOrders(db).findOne({ _id: params.data.id, dispatchStatus: "delivered" });
+  const order = await getOrders(db).findOne({ _id: params.data.id });
   if (!order) {
-    res.status(404).json({ error: "Delivered installation not found." });
+    res.status(404).json({ error: "Installation order not found." });
     return;
   }
   const installation = await getInstallations(db).findOne({
@@ -304,9 +305,9 @@ router.post(
     const actor = await getActor(req, res, "installation", "edit");
     if (!actor) return;
     const db = await getMongoDb();
-    const order = await getOrders(db).findOne({ _id: params.data.id, dispatchStatus: "delivered" });
+    const order = await getOrders(db).findOne({ _id: params.data.id });
     if (!order) {
-      res.status(404).json({ error: "Delivered installation not found." });
+      res.status(404).json({ error: "Installation order not found." });
       return;
     }
     const installations = getInstallations(db);
@@ -403,8 +404,17 @@ router.get("/installation/orders", async (req, res): Promise<void> => {
   if (!actor) return;
 
   const db = await getMongoDb();
+  const scheduledInstallations = await getInstallations(db)
+    .find({ scheduledDate: { $type: "string" } })
+    .toArray();
+  const scheduledOrderIds = scheduledInstallations.map((installation) => installation.orderRecordId);
   const orders = await getOrders(db)
-    .find({ dispatchStatus: "delivered" })
+    .find({
+      $or: [
+        { dispatchStatus: "delivered" },
+        { _id: { $in: scheduledOrderIds } },
+      ],
+    })
     .sort({ updatedAt: -1, createdAt: -1 })
     .toArray();
   if (!orders.length) {
@@ -454,6 +464,23 @@ router.get("/installation/orders", async (req, res): Promise<void> => {
   )));
 });
 
+router.get("/installation/order-options", async (req, res): Promise<void> => {
+  const actor = await getActor(req, res, "installation", "edit");
+  if (!actor) return;
+  const orders = await getOrders(await getMongoDb())
+    .find({ isActive: { $ne: false } })
+    .sort({ createdAt: -1, sequenceNo: -1 })
+    .toArray();
+  res.json(ListInstallationOrderOptionsResponse.parse(orders.map((order) => ({
+    id: order._id,
+    orderId: order.orderId,
+    clientName: order.clientName,
+    locationName: order.locationName,
+    orderStatus: order.status,
+    dispatchStatus: order.dispatchStatus ?? "pending_dispatch",
+  }))));
+});
+
 router.patch("/installation/orders/:id/assignment", async (req, res): Promise<void> => {
   const params = AssignInstallationOrderParams.safeParse(req.params);
   const body = AssignInstallationOrderBody.safeParse(req.body);
@@ -471,14 +498,9 @@ router.patch("/installation/orders/:id/assignment", async (req, res): Promise<vo
   let assignedTeam: InstallationTeamDocument | null = null;
   try {
     await runWithMongoTransactionIfSupported(async (session) => {
-      const order = await getOrders(db).findOne(
-        { _id: params.data.id, dispatchStatus: "delivered" },
-        { session },
-      );
+      const order = await getOrders(db).findOne({ _id: params.data.id }, { session });
       if (!order) {
-        const existing = await getOrders(db).findOne({ _id: params.data.id }, { session });
-        if (!existing) throw new InstallationConflict("Order not found.");
-        throw new InstallationConflict("Only delivered orders can be scheduled in Installation.");
+        throw new InstallationConflict("Order not found.");
       }
       if (order.status === "installed") {
         throw new InstallationConflict("Installed orders cannot be reassigned.");
@@ -595,14 +617,9 @@ router.delete("/installation/orders/:id/assignment", async (req, res): Promise<v
   try {
     await runWithMongoTransactionIfSupported(async (session) => {
       const orders = getOrders(db);
-      const order = await orders.findOne(
-        { _id: params.data.id, dispatchStatus: "delivered" },
-        { session },
-      );
+      const order = await orders.findOne({ _id: params.data.id }, { session });
       if (!order) {
-        const existing = await orders.findOne({ _id: params.data.id }, { session });
-        if (!existing) throw new InstallationConflict("Order not found.");
-        throw new InstallationConflict("Only delivered orders can be unassigned from Installation.");
+        throw new InstallationConflict("Order not found.");
       }
       if (order.status === "installed") {
         throw new InstallationConflict("Installed orders cannot be unassigned.");

@@ -115,6 +115,8 @@ export * from './installationAssignmentUpdate';
 export * from './installationDrawing';
 export * from './installationOrder';
 export * from './installationOrderList';
+export * from './installationOrderOption';
+export * from './installationOrderOptionList';
 export * from './installationOrderUpdate';
 export * from './installationOrderUpdateInstallationStatus';
 export * from './installationStatus';

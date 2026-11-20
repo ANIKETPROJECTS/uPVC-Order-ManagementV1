@@ -1125,10 +1125,10 @@ paths:
     get:
       operationId: listInstallationOrders
       tags: [installation]
-      summary: List delivered orders and their installation state
+      summary: List delivered or scheduled orders and their installation state
       responses:
         "200":
-          description: Delivered orders for installation tracking
+          description: Delivered orders and any orders with a saved installation schedule
           content:
             application/json:
               schema:
@@ -1137,6 +1137,22 @@ paths:
           description: Sign in required
         "403":
           description: Installation view access required
+  /installation/order-options:
+    get:
+      operationId: listInstallationOrderOptions
+      tags: [installation]
+      summary: List active orders that can be scheduled for installation
+      responses:
+        "200":
+          description: Active order choices for the Installation scheduler
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationOrderOptionList"
+        "401":
+          description: Sign in required
+        "403":
+          description: Installation edit access required
   /installation/share/{token}:
     get:
       operationId: getPublicInstallationShare
@@ -4628,6 +4644,26 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/InstallationOrder"
+    InstallationOrderOption:
+      type: object
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        clientName:
+          type: string
+        locationName:
+          type: string
+        orderStatus:
+          $ref: "#/components/schemas/OrderStatus"
+        dispatchStatus:
+          $ref: "#/components/schemas/DispatchStatus"
+      required: [id, orderId, clientName, locationName, orderStatus, dispatchStatus]
+    InstallationOrderOptionList:
+      type: array
+      items:
+        $ref: "#/components/schemas/InstallationOrderOption"
     InstallationAssignedMember:
       type: object
       properties:

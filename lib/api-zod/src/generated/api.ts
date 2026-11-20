@@ -2067,7 +2067,7 @@ export const UpdateDispatchOrderPlanResponse = zod.object({
 
 
 /**
- * @summary List delivered orders and their installation state
+ * @summary List delivered or scheduled orders and their installation state
  */
 export const listInstallationOrdersResponseSiteLatitudeMin = -90;
 export const listInstallationOrdersResponseSiteLatitudeMax = 90;
@@ -2111,6 +2111,20 @@ export const ListInstallationOrdersResponseItem = zod.object({
   "updatedAt": zod.coerce.date()
 })
 export const ListInstallationOrdersResponse = zod.array(ListInstallationOrdersResponseItem)
+
+
+/**
+ * @summary List active orders that can be scheduled for installation
+ */
+export const ListInstallationOrderOptionsResponseItem = zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "clientName": zod.string(),
+  "locationName": zod.string(),
+  "orderStatus": zod.enum(['quotation_stage', 'confirmed', 'in_production', 'ready', 'dispatched', 'installed']),
+  "dispatchStatus": zod.enum(['pending_dispatch', 'dispatched', 'delivered'])
+})
+export const ListInstallationOrderOptionsResponse = zod.array(ListInstallationOrderOptionsResponseItem)
 
 
 /**

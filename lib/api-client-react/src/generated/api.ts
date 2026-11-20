@@ -67,6 +67,7 @@ import type {
   InstallationDrawing,
   InstallationOrder,
   InstallationOrderList,
+  InstallationOrderOptionList,
   InstallationOrderUpdate,
   InstallationTeam,
   InstallationTeamInput,
@@ -4088,7 +4089,7 @@ export const getListInstallationOrdersUrl = () => {
 }
 
 /**
- * @summary List delivered orders and their installation state
+ * @summary List delivered or scheduled orders and their installation state
  */
 export const listInstallationOrders = async ( options?: Parameters<typeof customFetch>[1]): Promise<InstallationOrderList> => {
 
@@ -4135,7 +4136,7 @@ export type ListInstallationOrdersQueryError = ErrorType<void>
 
 
 /**
- * @summary List delivered orders and their installation state
+ * @summary List delivered or scheduled orders and their installation state
  */
 
 export function useListInstallationOrders<TData = Awaited<ReturnType<typeof listInstallationOrders>>, TError = ErrorType<void>>(
@@ -4144,6 +4145,83 @@ export function useListInstallationOrders<TData = Awaited<ReturnType<typeof list
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListInstallationOrdersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListInstallationOrderOptionsUrl = () => {
+
+
+
+
+  return `/api/installation/order-options`
+}
+
+/**
+ * @summary List active orders that can be scheduled for installation
+ */
+export const listInstallationOrderOptions = async ( options?: Parameters<typeof customFetch>[1]): Promise<InstallationOrderOptionList> => {
+
+  return customFetch<InstallationOrderOptionList>(getListInstallationOrderOptionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInstallationOrderOptionsQueryKey = () => {
+    return [
+    `/api/installation/order-options`
+    ] as const;
+    }
+
+
+export const getListInstallationOrderOptionsQueryOptions = <TData = Awaited<ReturnType<typeof listInstallationOrderOptions>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstallationOrderOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInstallationOrderOptionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInstallationOrderOptions>>> = ({ signal }) => listInstallationOrderOptions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInstallationOrderOptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInstallationOrderOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof listInstallationOrderOptions>>>
+export type ListInstallationOrderOptionsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List active orders that can be scheduled for installation
+ */
+
+export function useListInstallationOrderOptions<TData = Awaited<ReturnType<typeof listInstallationOrderOptions>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstallationOrderOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInstallationOrderOptionsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

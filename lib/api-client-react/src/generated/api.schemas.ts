@@ -510,6 +510,17 @@ export interface InstallationOrderUpdate {
 
 export type InstallationOrderList = InstallationOrder[];
 
+export interface InstallationOrderOption {
+  id: string;
+  orderId: string;
+  clientName: string;
+  locationName: string;
+  orderStatus: OrderStatus;
+  dispatchStatus: DispatchStatus;
+}
+
+export type InstallationOrderOptionList = InstallationOrderOption[];
+
 export interface InstallationTeamMember {
   id: string;
   name: string;
