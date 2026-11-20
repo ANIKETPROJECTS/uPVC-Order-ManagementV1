@@ -11,9 +11,9 @@ An internal order, quotation, and production tracking system for a uPVC windows 
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- Required secrets: `MONGODB_URI`, `SESSION_SECRET`
+- Required Replit Secrets: `MONGODB_URI` for the intended MongoDB database, and `SESSION_SECRET` for staff sessions. Set both before starting the API.
 - Install the imported dependencies with `pnpm install --frozen-lockfile`.
-- Startup verification: `/api/healthz` returns `{"status":"ok"}`, `/api/auth/session` responds, and `/` displays staff sign-in. Use an existing account to access the Admin panel; setup does not create accounts or demo data.
+- Startup verification: `/api/healthz` returns `{"status":"ok"}`, `/api/auth/session` returns `{"authenticated":false,"user":null}` when signed out, and `/` displays staff sign-in. Sign in as an existing Master Admin and open `/admin/users` to verify that the Users page loads from the connected database. Setup does not create accounts or demo data.
 - The API runs its existing index setup and compatibility migrations on startup.
 - Project-local `uploads/` files are not included in Git imports. Restore any needed historical files separately; do not assume MongoDB metadata includes those file bytes. Local uploads may be lost on a published-app restart or publish.
 
