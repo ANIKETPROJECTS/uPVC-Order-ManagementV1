@@ -34,7 +34,7 @@ export function InstallationOrderPickerDialog({ open, options, installations, lo
   const visibleOrders = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return options.filter((order) =>
-      !needle || `${order.orderId} ${order.clientName} ${order.locationName} ${order.dispatchStatus}`.toLowerCase().includes(needle),
+      !needle || `${order.orderId} ${order.clientName} ${order.locationName} ${order.orderStatus} ${order.dispatchStatus}`.toLowerCase().includes(needle),
     );
   }, [options, search]);
   const installationsById = useMemo(() => new Map(installations.map((order) => [order.id, order])), [installations]);
